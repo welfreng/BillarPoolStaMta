@@ -1,32 +1,25 @@
-import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import type { Metadata, Viewport } from 'next'
+import { Inter, Montserrat } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 
-const _geist = Geist({ subsets: ["latin"] });
-const _geistMono = Geist_Mono({ subsets: ["latin"] });
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
+const montserrat = Montserrat({ subsets: ['latin'], variable: '--font-montserrat' })
 
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
-  generator: 'v0.app',
+  title: 'Billar Pool Santa Marta | Tienda de Accesorios para Billar',
+  description: 'Mas de 12 anos al servicio. Venta de tacos de billar, guantes, tizas, estuches, panos, bolas, triangulos, virolas, casquillos y mas. Servicio de torno profesional. Santa Marta, Colombia.',
+  keywords: 'billar, pool, tacos, accesorios billar, santa marta, guantes billar, tizas billar, panos billar, estuches, virolas, casquillos',
   icons: {
-    icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
-    apple: '/apple-icon.png',
+    icon: '/images/logo.png',
+    apple: '/images/logo.png',
   },
+}
+
+export const viewport: Viewport = {
+  themeColor: '#0a2472',
+  width: 'device-width',
+  initialScale: 1,
 }
 
 export default function RootLayout({
@@ -35,8 +28,8 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
-      <body className="font-sans antialiased">
+    <html lang="es" className="scroll-smooth">
+      <body className={`${inter.variable} ${montserrat.variable} font-sans antialiased`}>
         {children}
         <Analytics />
       </body>
