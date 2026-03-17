@@ -2,7 +2,10 @@
 
 import { useState } from "react"
 import Image from "next/image"
-import { Menu, X, Phone } from "lucide-react"
+import { Menu, X, Phone, LogOut } from "lucide-react"
+import Link from "next/link"
+import { useAuth } from "@/components/auth-context"
+import { Button } from "@/components/ui/button"
 
 const navLinks = [
   { label: "Inicio", href: "#inicio" },
@@ -16,6 +19,7 @@ const navLinks = [
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
+  const { user, logout } = useAuth()
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-[#0a1628]/95 backdrop-blur-md border-b border-[#1e3a8a]/30">
@@ -58,6 +62,34 @@ export default function Navbar() {
             <Phone className="h-4 w-4" />
             WhatsApp
           </a>
+
+          {user ? (
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-white/80">{user.displayName || user.email}</span>
+              <Button
+                onClick={logout}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2 text-white border-white/30 hover:bg-red-600 hover:border-red-600"
+              >
+                <LogOut className="h-4 w-4" />
+                Cerrar Sesión
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Link href="/login">
+                <Button variant="outline" size="sm" className="text-white border-white/30 hover:bg-blue-600 hover:border-blue-600">
+                  Iniciar Sesión
+                </Button>
+              </Link>
+              <Link href="/registro">
+                <Button size="sm" className="bg-[#d4a017] text-black hover:bg-[#d4a017]/90">
+                  Registrarse
+                </Button>
+              </Link>
+            </div>
+          )}
         </div>
 
         {/* Mobile toggle */}
@@ -95,6 +127,38 @@ export default function Navbar() {
                 <Phone className="h-4 w-4" />
                 WhatsApp
               </a>
+            </li>
+            <li className="pt-4 border-t border-[#1e3a8a]/30">
+              {user ? (
+                <div className="flex flex-col gap-2">
+                  <p className="px-4 py-2 text-sm text-white/80">
+                    {user.displayName || user.email}
+                  </p>
+                  <button
+                    onClick={logout}
+                    className="w-full flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-3 text-sm font-semibold text-white hover:bg-red-700 transition-colors"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Cerrar Sesión
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <Link href="/login" onClick={() => setIsOpen(false)}>
+                    <Button
+                      variant="outline"
+                      className="w-full text-white border-white/30 hover:bg-blue-600 hover:border-blue-600"
+                    >
+                      Iniciar Sesión
+                    </Button>
+                  </Link>
+                  <Link href="/registro" onClick={() => setIsOpen(false)}>
+                    <Button className="w-full bg-[#d4a017] text-black hover:bg-[#d4a017]/90">
+                      Registrarse
+                    </Button>
+                  </Link>
+                </div>
+              )}
             </li>
           </ul>
         </div>
