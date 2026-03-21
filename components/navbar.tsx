@@ -38,7 +38,6 @@ export default function Navbar() {
           </div>
         </a>
 
-        {/* Desktop nav */}
         <ul className="hidden lg:flex items-center gap-1">
           {navLinks.map((link) => (
             <li key={link.href}>
@@ -73,26 +72,20 @@ export default function Navbar() {
                 className="flex items-center gap-2 text-white border-white/30 hover:bg-red-600 hover:border-red-600"
               >
                 <LogOut className="h-4 w-4" />
-                Cerrar Sesión
+                Cerrar sesion
               </Button>
             </div>
           ) : (
             <div className="flex items-center gap-2">
               <Link href="/login">
-                <Button variant="outline" size="sm" className="text-white border-white/30 hover:bg-blue-600 hover:border-blue-600">
-                  Iniciar Sesión
-                </Button>
-              </Link>
-              <Link href="/registro">
-                <Button size="sm" className="bg-[#d4a017] text-black hover:bg-[#d4a017]/90">
-                  Registrarse
+                <Button size="sm" className="bg-cyan-500 text-slate-950 hover:bg-cyan-400">
+                  Iniciar sesion
                 </Button>
               </Link>
             </div>
           )}
         </div>
 
-        {/* Mobile toggle */}
         <button
           onClick={() => setIsOpen(!isOpen)}
           className="lg:hidden text-white p-2"
@@ -102,7 +95,6 @@ export default function Navbar() {
         </button>
       </nav>
 
-      {/* Mobile menu */}
       {isOpen && (
         <div className="lg:hidden bg-[#0a1628]/98 backdrop-blur-md border-t border-[#1e3a8a]/30">
           <ul className="flex flex-col px-4 py-4 gap-1">
@@ -139,22 +131,14 @@ export default function Navbar() {
                     className="w-full flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-3 text-sm font-semibold text-white hover:bg-red-700 transition-colors"
                   >
                     <LogOut className="h-4 w-4" />
-                    Cerrar Sesión
+                    Cerrar sesion
                   </button>
                 </div>
               ) : (
                 <div className="flex flex-col gap-2">
                   <Link href="/login" onClick={() => setIsOpen(false)}>
-                    <Button
-                      variant="outline"
-                      className="w-full text-white border-white/30 hover:bg-blue-600 hover:border-blue-600"
-                    >
-                      Iniciar Sesión
-                    </Button>
-                  </Link>
-                  <Link href="/registro" onClick={() => setIsOpen(false)}>
-                    <Button className="w-full bg-[#d4a017] text-black hover:bg-[#d4a017]/90">
-                      Registrarse
+                    <Button className="w-full bg-cyan-500 text-slate-950 hover:bg-cyan-400">
+                      Iniciar sesion
                     </Button>
                   </Link>
                 </div>

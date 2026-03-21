@@ -9,13 +9,29 @@ import {
   type ReactNode,
 } from 'react';
 import {
+  collection,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  setDoc,
+  Timestamp,
+  updateDoc,
+  writeBatch,
+  type DocumentData,
+} from 'firebase/firestore';
+import {
   calculateMargin,
-  calculatePurchaseImpact,
   calculatePurchaseTotals,
   getDashboardSummary,
   getLatestMovements,
+  getProductRealUnitCost,
+  getProductStock,
 } from '@/lib/admin/calculations';
-import { initialMovements, initialProducts, initialPurchases } from '@/lib/admin/mock-data';
+import { initialMovements, initialProducts, initialPurchases, initialSales, initialSuppliers } from '@/lib/admin/mock-data';
+import { db } from '@/lib/firebase';
 import type {
   DashboardSummary,
   InventoryMovement,
@@ -23,9 +39,12 @@ import type {
   MovementType,
   Product,
   Purchase,
+  Sale,
+  Supplier,
 } from '@/lib/admin/types';
 
-type NewProductInput = Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'profitMargin'>;
+type NewProductInput = Omit<Product, 'id' | 'createdAt' | 'updatedAt'>;
+type NewSupplierInput = Omit<Supplier, 'id' | 'createdAt' | 'updatedAt'>;
 
 interface RegisterMovementInput {
   productId: string;
@@ -38,29 +57,60 @@ interface RegisterMovementInput {
 }
 
 interface RegisterPurchaseInput {
-  productId: string;
+  supplierId?: string;
   supplier: string;
   purchasedAt: string;
-  presentationQuantity: number;
-  purchasePresentation: Purchase['purchasePresentation'];
-  conversionFactor: number;
-  purchaseValueTotal: number;
   shippingValueTotal: number;
-  suggestedSalePrice: number;
+  items: Array<{
+    productId: string;
+    presentationQuantity: number;
+    purchaseUnitValue: number;
+    suggestedSalePrice: number;
+  }>;
+}
+
+interface RegisterSaleInput {
+  productId: string;
+  soldAt: string;
+  quantity: number;
+  unitPrice: number;
+  customerName: string;
+  notes: string;
+  responsibleUser: string;
+}
+
+interface RegisterSaleReturnInput {
+  saleId: string;
+  returnedAt: string;
+  quantity: number;
+  notes: string;
+  responsibleUser: string;
 }
 
 interface AdminDataContextValue {
   loading: boolean;
   products: Product[];
+  suppliers: Supplier[];
   movements: InventoryMovement[];
   purchases: Purchase[];
+  sales: Sale[];
   summary: DashboardSummary;
   latestMovements: InventoryMovement[];
-  createProduct: (input: NewProductInput) => Product;
-  updateProduct: (productId: string, input: NewProductInput) => Product | undefined;
-  deleteProduct: (productId: string) => void;
-  registerMovement: (input: RegisterMovementInput) => InventoryMovement | undefined;
-  registerPurchase: (input: RegisterPurchaseInput) => Purchase | undefined;
+  createProduct: (input: NewProductInput) => Promise<Product>;
+  updateProduct: (productId: string, input: NewProductInput) => Promise<Product>;
+  deleteProduct: (productId: string) => Promise<void>;
+  createSupplier: (input: NewSupplierInput) => Promise<Supplier>;
+  updateSupplier: (supplierId: string, input: NewSupplierInput) => Promise<Supplier>;
+  deleteSupplier: (supplierId: string) => Promise<void>;
+  registerMovement: (input: RegisterMovementInput) => Promise<InventoryMovement>;
+  registerPurchase: (input: RegisterPurchaseInput) => Promise<Purchase[]>;
+  updatePurchase: (purchaseId: string, input: RegisterPurchaseInput) => Promise<Purchase>;
+  updatePurchaseBatch: (batchId: string, input: RegisterPurchaseInput) => Promise<Purchase[]>;
+  deletePurchase: (purchaseId: string) => Promise<void>;
+  deletePurchaseBatch: (batchId: string) => Promise<void>;
+  registerSale: (input: RegisterSaleInput) => Promise<Sale>;
+  updateSale: (saleId: string, input: RegisterSaleInput) => Promise<Sale>;
+  registerSaleReturn: (input: RegisterSaleReturnInput) => Promise<Sale>;
 }
 
 const AdminDataContext = createContext<AdminDataContextValue | undefined>(undefined);
@@ -69,67 +119,337 @@ function generateId(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function normalizeDateValue(value: unknown) {
+  if (typeof value === 'string') return value;
+  if (value instanceof Timestamp) return value.toDate().toISOString();
+  if (value && typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') {
+    return value.toDate().toISOString();
+  }
+  return new Date().toISOString();
+}
+
+function mapProductDocument(documentId: string, data: DocumentData): Product {
+  return {
+    id: documentId,
+    name: String(data.name ?? ''),
+    description: String(data.description ?? ''),
+    category: String(data.category ?? ''),
+    subcategory: String(data.subcategory ?? ''),
+    brand: String(data.brand ?? ''),
+    salePrice: Number(data.salePrice ?? 0),
+    image: String(data.image ?? '/images/logo.png'),
+    imageRotation: Number(data.imageRotation ?? 0),
+    status:
+      data.status === 'draft' || data.status === 'archived' || data.status === 'active'
+        ? data.status
+        : 'active',
+    createdAt: normalizeDateValue(data.createdAt),
+    updatedAt: normalizeDateValue(data.updatedAt),
+  };
+}
+
+function mapSupplierDocument(documentId: string, data: DocumentData): Supplier {
+  return {
+    id: documentId,
+    name: String(data.name ?? ''),
+    contactName: String(data.contactName ?? ''),
+    phone: String(data.phone ?? ''),
+    city: String(data.city ?? ''),
+    notes: String(data.notes ?? ''),
+    status: data.status === 'inactive' ? 'inactive' : 'active',
+    createdAt: normalizeDateValue(data.createdAt),
+    updatedAt: normalizeDateValue(data.updatedAt),
+  };
+}
+
+function mapMovementDocument(documentId: string, data: DocumentData): InventoryMovement {
+  return {
+    id: documentId,
+    productId: String(data.productId ?? ''),
+    purchaseId: data.purchaseId ? String(data.purchaseId) : undefined,
+    purchaseBatchId: data.purchaseBatchId ? String(data.purchaseBatchId) : undefined,
+    saleId: data.saleId ? String(data.saleId) : undefined,
+    type:
+      data.type === 'entry' || data.type === 'exit' || data.type === 'adjustment' || data.type === 'purchase'
+        ? data.type
+        : 'adjustment',
+    reason:
+      data.reason === 'purchase' ||
+      data.reason === 'sale' ||
+      data.reason === 'manual-adjustment' ||
+      data.reason === 'damage' ||
+      data.reason === 'initial-load' ||
+      data.reason === 'transfer'
+        ? data.reason
+        : 'manual-adjustment',
+    quantity: Number(data.quantity ?? 0),
+    notes: String(data.notes ?? ''),
+    occurredAt: normalizeDateValue(data.occurredAt),
+    responsibleUser: String(data.responsibleUser ?? 'Administrador'),
+    relatedUnitCost: Number(data.relatedUnitCost ?? 0),
+  };
+}
+
+function mapPurchaseDocument(documentId: string, data: DocumentData): Purchase {
+  return {
+    id: documentId,
+    purchaseBatchId: data.purchaseBatchId ? String(data.purchaseBatchId) : undefined,
+    productId: String(data.productId ?? ''),
+    supplierId: data.supplierId ? String(data.supplierId) : undefined,
+    supplier: String(data.supplier ?? ''),
+    purchasedAt: normalizeDateValue(data.purchasedAt),
+    presentationQuantity: Number(data.presentationQuantity ?? 0),
+    purchaseUnitValue: Number(data.purchaseUnitValue ?? 0),
+    quantityPurchased: Number(data.quantityPurchased ?? 0),
+    purchasePresentation:
+      data.purchasePresentation === 'dozen' || data.purchasePresentation === 'box-12'
+        ? data.purchasePresentation
+        : 'unit',
+    conversionFactor: Number(data.conversionFactor ?? 1),
+    purchaseValueTotal: Number(data.purchaseValueTotal ?? 0),
+    shippingValueTotal: Number(data.shippingValueTotal ?? 0),
+    totalInvestment: Number(data.totalInvestment ?? 0),
+    realUnitCost: Number(data.realUnitCost ?? 0),
+    suggestedSalePrice: Number(data.suggestedSalePrice ?? 0),
+    estimatedMargin: Number(data.estimatedMargin ?? 0),
+  };
+}
+
+function mapSaleDocument(documentId: string, data: DocumentData): Sale {
+  return {
+    id: documentId,
+    productId: String(data.productId ?? ''),
+    soldAt: normalizeDateValue(data.soldAt),
+    quantity: Number(data.quantity ?? 0),
+    unitPrice: Number(data.unitPrice ?? 0),
+    totalSale: Number(data.totalSale ?? 0),
+    realUnitCost: Number(data.realUnitCost ?? 0),
+    totalCost: Number(data.totalCost ?? 0),
+    grossProfit: Number(data.grossProfit ?? 0),
+    returnedQuantity: Number(data.returnedQuantity ?? 0),
+    returnedSaleAmount: Number(data.returnedSaleAmount ?? 0),
+    returnedCostAmount: Number(data.returnedCostAmount ?? 0),
+    customerName: String(data.customerName ?? ''),
+    notes: String(data.notes ?? ''),
+    responsibleUser: String(data.responsibleUser ?? 'Administrador'),
+  };
+}
+
+function findMovementForSale(movements: InventoryMovement[], sale: Sale) {
+  return (
+    movements.find((movement) => movement.saleId === sale.id) ??
+    movements.find(
+      (movement) =>
+        movement.productId === sale.productId &&
+        movement.reason === 'sale' &&
+        movement.occurredAt === sale.soldAt &&
+        movement.quantity === -Math.abs(sale.quantity)
+    )
+  );
+}
+
 export function AdminDataProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState<Product[]>(initialProducts);
+  const [suppliers, setSuppliers] = useState<Supplier[]>(initialSuppliers);
   const [movements, setMovements] = useState<InventoryMovement[]>(initialMovements);
   const [purchases, setPurchases] = useState<Purchase[]>(initialPurchases);
+  const [sales, setSales] = useState<Sale[]>(initialSales);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setLoading(false), 550);
-    return () => window.clearTimeout(timer);
+    const readyCollections = new Set<string>();
+    const markReady = (collectionName: string) => {
+      readyCollections.add(collectionName);
+      if (readyCollections.size === 5) {
+        setLoading(false);
+      }
+    };
+
+    const unsubProducts = onSnapshot(
+      query(collection(db, 'products'), orderBy('createdAt', 'desc')),
+      (snapshot) => {
+        setProducts(snapshot.docs.map((item) => mapProductDocument(item.id, item.data())));
+        markReady('products');
+      },
+      (error) => {
+        console.error('Error leyendo productos desde Firestore:', error);
+        markReady('products');
+      }
+    );
+
+    const unsubSuppliers = onSnapshot(
+      query(collection(db, 'suppliers'), orderBy('createdAt', 'desc')),
+      (snapshot) => {
+        setSuppliers(snapshot.docs.map((item) => mapSupplierDocument(item.id, item.data())));
+        markReady('suppliers');
+      },
+      (error) => {
+        console.error('Error leyendo proveedores desde Firestore:', error);
+        markReady('suppliers');
+      }
+    );
+
+    const unsubMovements = onSnapshot(
+      query(collection(db, 'movements'), orderBy('occurredAt', 'desc')),
+      (snapshot) => {
+        setMovements(snapshot.docs.map((item) => mapMovementDocument(item.id, item.data())));
+        markReady('movements');
+      },
+      (error) => {
+        console.error('Error leyendo movimientos desde Firestore:', error);
+        markReady('movements');
+      }
+    );
+
+    const unsubPurchases = onSnapshot(
+      query(collection(db, 'purchases'), orderBy('purchasedAt', 'desc')),
+      (snapshot) => {
+        setPurchases(snapshot.docs.map((item) => mapPurchaseDocument(item.id, item.data())));
+        markReady('purchases');
+      },
+      (error) => {
+        console.error('Error leyendo compras desde Firestore:', error);
+        markReady('purchases');
+      }
+    );
+
+    const unsubSales = onSnapshot(
+      query(collection(db, 'sales'), orderBy('soldAt', 'desc')),
+      (snapshot) => {
+        setSales(snapshot.docs.map((item) => mapSaleDocument(item.id, item.data())));
+        markReady('sales');
+      },
+      (error) => {
+        console.error('Error leyendo ventas desde Firestore:', error);
+        markReady('sales');
+      }
+    );
+
+    return () => {
+      unsubProducts();
+      unsubSuppliers();
+      unsubMovements();
+      unsubPurchases();
+      unsubSales();
+    };
   }, []);
 
-  const createProduct = (input: NewProductInput) => {
+  const createProduct = async (input: NewProductInput) => {
     const createdAt = new Date().toISOString();
+    const productRef = doc(collection(db, 'products'));
     const newProduct: Product = {
       ...input,
-      id: generateId('prod'),
-      profitMargin: calculateMargin(input.realUnitCost, input.salePrice),
+      id: productRef.id,
       createdAt,
       updatedAt: createdAt,
     };
 
-    setProducts((current) => [newProduct, ...current]);
+    await setDoc(productRef, {
+      ...input,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
     return newProduct;
   };
 
-  const updateProduct = (productId: string, input: NewProductInput) => {
-    let updatedProduct: Product | undefined;
+  const updateProduct = async (productId: string, input: NewProductInput) => {
+    const existingProduct = products.find((product) => product.id === productId);
+    if (!existingProduct) {
+      throw new Error('No se encontro el producto a actualizar.');
+    }
 
-    setProducts((current) =>
-      current.map((product) => {
-        if (product.id !== productId) return product;
+    await updateDoc(doc(db, 'products', productId), {
+      ...input,
+      updatedAt: serverTimestamp(),
+    });
 
-        updatedProduct = {
-          ...product,
-          ...input,
-          profitMargin: calculateMargin(input.realUnitCost, input.salePrice),
-          updatedAt: new Date().toISOString(),
-        };
+    return {
+      ...existingProduct,
+      ...input,
+      updatedAt: new Date().toISOString(),
+    };
+  };
 
-        return updatedProduct;
-      })
+  const deleteProduct = async (productId: string) => {
+    const batch = writeBatch(db);
+    batch.delete(doc(db, 'products', productId));
+    movements
+      .filter((movement) => movement.productId === productId)
+      .forEach((movement) => batch.delete(doc(db, 'movements', movement.id)));
+    purchases
+      .filter((purchase) => purchase.productId === productId)
+      .forEach((purchase) => batch.delete(doc(db, 'purchases', purchase.id)));
+    sales
+      .filter((sale) => sale.productId === productId)
+      .forEach((sale) => batch.delete(doc(db, 'sales', sale.id)));
+    await batch.commit();
+  };
+
+  const createSupplier = async (input: NewSupplierInput) => {
+    const createdAt = new Date().toISOString();
+    const supplierRef = doc(collection(db, 'suppliers'));
+    const newSupplier: Supplier = {
+      ...input,
+      id: supplierRef.id,
+      createdAt,
+      updatedAt: createdAt,
+    };
+
+    await setDoc(supplierRef, {
+      ...input,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    setSuppliers((current) => {
+      const withoutExisting = current.filter((supplier) => supplier.id !== newSupplier.id);
+      return [newSupplier, ...withoutExisting];
+    });
+
+    return newSupplier;
+  };
+
+  const updateSupplier = async (supplierId: string, input: NewSupplierInput) => {
+    const existingSupplier = suppliers.find((supplier) => supplier.id === supplierId);
+    if (!existingSupplier) {
+      throw new Error('No se encontro el proveedor a actualizar.');
+    }
+
+    await updateDoc(doc(db, 'suppliers', supplierId), {
+      ...input,
+      updatedAt: serverTimestamp(),
+    });
+
+    const updatedSupplier = {
+      ...existingSupplier,
+      ...input,
+      updatedAt: new Date().toISOString(),
+    };
+
+    setSuppliers((current) =>
+      current.map((supplier) => (supplier.id === supplierId ? updatedSupplier : supplier))
     );
 
-    return updatedProduct;
+    return updatedSupplier;
   };
 
-  const deleteProduct = (productId: string) => {
-    setProducts((current) => current.filter((product) => product.id !== productId));
-    setMovements((current) => current.filter((movement) => movement.productId !== productId));
-    setPurchases((current) => current.filter((purchase) => purchase.productId !== productId));
+  const deleteSupplier = async (supplierId: string) => {
+    await deleteDoc(doc(db, 'suppliers', supplierId));
+    setSuppliers((current) => current.filter((supplier) => supplier.id !== supplierId));
   };
 
-  const registerMovement = (input: RegisterMovementInput) => {
+  const registerMovement = async (input: RegisterMovementInput) => {
     const targetProduct = products.find((product) => product.id === input.productId);
-    if (!targetProduct) return undefined;
+    if (!targetProduct) {
+      throw new Error('No se encontro el producto para registrar el movimiento.');
+    }
 
     const normalizedQuantity =
       input.type === 'exit' ? -Math.abs(input.quantity) : input.quantity;
-    const nextStock = Math.max(targetProduct.stockQuantity + normalizedQuantity, 0);
+    const movementRef = doc(collection(db, 'movements'));
     const movement: InventoryMovement = {
-      id: generateId('mov'),
+      id: movementRef.id,
       productId: input.productId,
       type: input.type,
       reason: input.reason,
@@ -137,87 +457,364 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       notes: input.notes,
       occurredAt: new Date().toISOString(),
       responsibleUser: input.responsibleUser,
-      relatedUnitCost: input.relatedUnitCost ?? targetProduct.realUnitCost,
+      relatedUnitCost:
+        input.relatedUnitCost ?? getProductRealUnitCost(purchases, input.productId),
     };
 
-    setProducts((current) =>
-      current.map((product) =>
-        product.id === input.productId
-          ? { ...product, stockQuantity: nextStock, updatedAt: new Date().toISOString() }
-          : product
-      )
-    );
-    setMovements((current) => [movement, ...current]);
+    await setDoc(movementRef, {
+      ...movement,
+      occurredAt: serverTimestamp(),
+    });
 
     return movement;
   };
 
-  const registerPurchase = (input: RegisterPurchaseInput) => {
-    const targetProduct = products.find((product) => product.id === input.productId);
-    if (!targetProduct) return undefined;
+  const registerPurchase = async (input: RegisterPurchaseInput) => {
+    return createPurchaseBatch(input);
+  };
 
-    const quantityPurchased = input.presentationQuantity * input.conversionFactor;
-    const totals = calculatePurchaseTotals(
-      input.purchaseValueTotal,
-      input.shippingValueTotal,
-      quantityPurchased
-    );
-    const purchase: Purchase = {
-      id: generateId('buy'),
-      productId: input.productId,
-      supplier: input.supplier,
-      purchasedAt: input.purchasedAt,
-      presentationQuantity: input.presentationQuantity,
-      quantityPurchased,
-      purchasePresentation: input.purchasePresentation,
-      conversionFactor: input.conversionFactor,
-      purchaseValueTotal: input.purchaseValueTotal,
-      shippingValueTotal: input.shippingValueTotal,
-      totalInvestment: totals.totalInvestment,
-      realUnitCost: totals.realUnitCost,
-      suggestedSalePrice: input.suggestedSalePrice,
-      estimatedMargin: calculateMargin(totals.realUnitCost, input.suggestedSalePrice),
-    };
+  const createPurchaseBatch = async (input: RegisterPurchaseInput, existingBatchId?: string) => {
+    if (input.items.length === 0) {
+      throw new Error('Agrega al menos un producto a la compra.');
+    }
 
-    const productImpact = calculatePurchaseImpact(targetProduct, {
-      quantityPurchased,
-      realUnitCost: totals.realUnitCost,
-      shippingValueTotal: input.shippingValueTotal,
-      purchaseValueTotal: input.purchaseValueTotal,
+    input.items.forEach((item) => {
+      const targetProduct = products.find((product) => product.id === item.productId);
+      if (!targetProduct) {
+        throw new Error('Uno de los productos de la compra no existe.');
+      }
     });
 
-    setPurchases((current) => [purchase, ...current]);
-    setProducts((current) =>
-      current.map((product) =>
-        product.id === input.productId
-          ? {
-              ...product,
-              ...productImpact,
-              salePrice: input.suggestedSalePrice,
-              updatedAt: new Date().toISOString(),
-            }
-          : product
-      )
+    const totalPurchasedUnits = input.items.reduce(
+      (total, item) => total + Number(item.presentationQuantity || 0),
+      0
     );
-    setMovements((current) => [
-      {
-        id: generateId('mov'),
-        productId: input.productId,
+    const totalPurchaseValue = input.items.reduce(
+      (total, item) => total + Number((Number(item.purchaseUnitValue || 0) * Number(item.presentationQuantity || 0)).toFixed(2)),
+      0
+    );
+    const batchId = existingBatchId ?? doc(collection(db, 'purchase-batches')).id;
+    const batch = writeBatch(db);
+    const purchasesCreated: Purchase[] = [];
+
+    input.items.forEach((item, index) => {
+      const conversionFactor = 1;
+      const quantityPurchased = Number(item.presentationQuantity) || 0;
+      const purchaseValueTotal = Number((item.purchaseUnitValue * item.presentationQuantity).toFixed(2));
+      const shippingShare =
+        totalPurchasedUnits > 0
+          ? Number(((input.shippingValueTotal * quantityPurchased) / totalPurchasedUnits).toFixed(2))
+          : Number((input.shippingValueTotal / input.items.length).toFixed(2));
+      const adjustedShippingShare =
+        index === input.items.length - 1
+          ? Number(
+              (
+                input.shippingValueTotal -
+                purchasesCreated.reduce((sum, purchase) => sum + purchase.shippingValueTotal, 0)
+              ).toFixed(2)
+            )
+          : shippingShare;
+      const totals = calculatePurchaseTotals(
+        purchaseValueTotal,
+        adjustedShippingShare,
+        quantityPurchased
+      );
+      const purchase: Purchase = {
+        id: doc(collection(db, 'purchases')).id,
+        purchaseBatchId: batchId,
+        productId: item.productId,
+        supplier: input.supplier,
+        supplierId: input.supplierId,
+        purchasedAt: input.purchasedAt,
+        presentationQuantity: item.presentationQuantity,
+        purchaseUnitValue: item.purchaseUnitValue,
+        quantityPurchased,
+        purchasePresentation: 'unit',
+        conversionFactor,
+        purchaseValueTotal,
+        shippingValueTotal: adjustedShippingShare,
+        totalInvestment: totals.totalInvestment,
+        realUnitCost: totals.realUnitCost,
+        suggestedSalePrice: item.suggestedSalePrice,
+        estimatedMargin: calculateMargin(totals.realUnitCost, item.suggestedSalePrice),
+      };
+
+      purchasesCreated.push(purchase);
+
+      const movementRef = doc(collection(db, 'movements'));
+      batch.set(doc(db, 'purchases', purchase.id), {
+        ...purchase,
+        purchasedAt: Timestamp.fromDate(new Date(input.purchasedAt)),
+      });
+      batch.set(movementRef, {
+        id: movementRef.id,
+        productId: item.productId,
+        purchaseId: purchase.id,
+        purchaseBatchId: batchId,
         type: 'purchase',
         reason: 'purchase',
         quantity: quantityPurchased,
-        notes: `Compra registrada a proveedor ${input.supplier}`,
-        occurredAt: input.purchasedAt,
+        notes: `Compra grupal registrada a proveedor ${input.supplier}`,
+        occurredAt: Timestamp.fromDate(new Date(input.purchasedAt)),
         responsibleUser: 'Administrador',
         relatedUnitCost: totals.realUnitCost,
-      },
-      ...current,
-    ]);
+      });
+      batch.update(doc(db, 'products', item.productId), {
+        salePrice: item.suggestedSalePrice,
+        updatedAt: serverTimestamp(),
+      });
+    });
 
-    return purchase;
+    await batch.commit();
+
+    return purchasesCreated;
   };
 
-  const summary = useMemo(() => getDashboardSummary(products), [products]);
+  const updatePurchaseBatch = async (batchId: string, input: RegisterPurchaseInput) => {
+    const targetPurchases = purchases.filter((purchase) => purchase.purchaseBatchId === batchId);
+    if (targetPurchases.length === 0) {
+      throw new Error('No se encontro la compra agrupada a editar.');
+    }
+
+    const batch = writeBatch(db);
+    targetPurchases.forEach((purchase) => batch.delete(doc(db, 'purchases', purchase.id)));
+    movements
+      .filter((movement) => movement.purchaseBatchId === batchId)
+      .forEach((movement) => batch.delete(doc(db, 'movements', movement.id)));
+    await batch.commit();
+
+    return createPurchaseBatch(input, batchId);
+  };
+
+  const updatePurchase = async (purchaseId: string, input: RegisterPurchaseInput) => {
+    const targetPurchase = purchases.find((purchase) => purchase.id === purchaseId);
+    if (!targetPurchase) {
+      throw new Error('No se encontro la compra a editar.');
+    }
+    if (input.items.length !== 1) {
+      throw new Error('La edicion de producto debe contener una sola linea.');
+    }
+
+    const batch = writeBatch(db);
+    batch.delete(doc(db, 'purchases', purchaseId));
+    movements
+      .filter((movement) => movement.purchaseId === purchaseId)
+      .forEach((movement) => batch.delete(doc(db, 'movements', movement.id)));
+    await batch.commit();
+
+    const [updatedPurchase] = await createPurchaseBatch(input, targetPurchase.purchaseBatchId);
+    return updatedPurchase;
+  };
+
+  const deletePurchase = async (purchaseId: string) => {
+    const targetPurchase = purchases.find((purchase) => purchase.id === purchaseId);
+    if (!targetPurchase) {
+      throw new Error('No se encontro la compra a eliminar.');
+    }
+
+    const batch = writeBatch(db);
+    batch.delete(doc(db, 'purchases', purchaseId));
+    movements
+      .filter((movement) => movement.purchaseId === purchaseId)
+      .forEach((movement) => batch.delete(doc(db, 'movements', movement.id)));
+    await batch.commit();
+  };
+
+  const deletePurchaseBatch = async (batchId: string) => {
+    const targetPurchases = purchases.filter((purchase) => purchase.purchaseBatchId === batchId);
+    if (targetPurchases.length === 0) {
+      throw new Error('No se encontro la compra agrupada a eliminar.');
+    }
+
+    const batch = writeBatch(db);
+    targetPurchases.forEach((purchase) => batch.delete(doc(db, 'purchases', purchase.id)));
+    movements
+      .filter((movement) => movement.purchaseBatchId === batchId)
+      .forEach((movement) => batch.delete(doc(db, 'movements', movement.id)));
+    await batch.commit();
+  };
+
+  const registerSale = async (input: RegisterSaleInput) => {
+    const targetProduct = products.find((product) => product.id === input.productId);
+    if (!targetProduct) {
+      throw new Error('No se encontro el producto para registrar la venta.');
+    }
+
+    const availableStock = getProductStock(movements, input.productId);
+    if (input.quantity > availableStock) {
+      throw new Error('La cantidad vendida supera el stock disponible.');
+    }
+
+    const realUnitCost = getProductRealUnitCost(purchases, input.productId);
+    const totalSale = input.quantity * input.unitPrice;
+    const totalCost = input.quantity * realUnitCost;
+    const grossProfit = totalSale - totalCost;
+
+    const saleRef = doc(collection(db, 'sales'));
+    const movementRef = doc(collection(db, 'movements'));
+    const sale: Sale = {
+      id: saleRef.id,
+      productId: input.productId,
+      soldAt: input.soldAt,
+      quantity: input.quantity,
+      unitPrice: input.unitPrice,
+      totalSale,
+      realUnitCost,
+      totalCost,
+      grossProfit,
+      returnedQuantity: 0,
+      returnedSaleAmount: 0,
+      returnedCostAmount: 0,
+      customerName: input.customerName,
+      notes: input.notes,
+      responsibleUser: input.responsibleUser,
+    };
+
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'sales', sale.id), {
+      ...sale,
+      soldAt: Timestamp.fromDate(new Date(input.soldAt)),
+    });
+    batch.set(movementRef, {
+      id: movementRef.id,
+      saleId: sale.id,
+      productId: input.productId,
+      type: 'exit',
+      reason: 'sale',
+      quantity: -Math.abs(input.quantity),
+      notes: input.notes || `Venta registrada${input.customerName ? ` para ${input.customerName}` : ''}`,
+      occurredAt: Timestamp.fromDate(new Date(input.soldAt)),
+      responsibleUser: input.responsibleUser,
+      relatedUnitCost: realUnitCost,
+    });
+
+    await batch.commit();
+
+    return sale;
+  };
+
+  const updateSale = async (saleId: string, input: RegisterSaleInput) => {
+    const existingSale = sales.find((sale) => sale.id === saleId);
+    if (!existingSale) {
+      throw new Error('No se encontro la venta a editar.');
+    }
+
+    const targetProduct = products.find((product) => product.id === input.productId);
+    if (!targetProduct) {
+      throw new Error('No se encontro el producto para actualizar la venta.');
+    }
+
+    const movementToUpdate = findMovementForSale(movements, existingSale);
+    const restoredStock =
+      input.productId === existingSale.productId
+        ? getProductStock(movements, input.productId) + existingSale.quantity
+        : getProductStock(movements, input.productId);
+
+    if (input.quantity > restoredStock) {
+      throw new Error('La cantidad vendida supera el stock disponible.');
+    }
+
+    const realUnitCost = getProductRealUnitCost(purchases, input.productId);
+    const totalSale = input.quantity * input.unitPrice;
+    const totalCost = input.quantity * realUnitCost;
+    const grossProfit = totalSale - totalCost;
+
+    const updatedSale: Sale = {
+      id: saleId,
+      productId: input.productId,
+      soldAt: input.soldAt,
+      quantity: input.quantity,
+      unitPrice: input.unitPrice,
+      totalSale,
+      realUnitCost,
+      totalCost,
+      grossProfit,
+      returnedQuantity: existingSale.returnedQuantity ?? 0,
+      returnedSaleAmount: existingSale.returnedSaleAmount ?? 0,
+      returnedCostAmount: existingSale.returnedCostAmount ?? 0,
+      customerName: input.customerName,
+      notes: input.notes,
+      responsibleUser: input.responsibleUser,
+    };
+
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'sales', saleId), {
+      ...updatedSale,
+      soldAt: Timestamp.fromDate(new Date(input.soldAt)),
+    });
+
+    if (movementToUpdate) {
+      batch.update(doc(db, 'movements', movementToUpdate.id), {
+        saleId,
+        productId: input.productId,
+        type: 'exit',
+        reason: 'sale',
+        quantity: -Math.abs(input.quantity),
+        notes: input.notes || `Venta registrada${input.customerName ? ` para ${input.customerName}` : ''}`,
+        occurredAt: Timestamp.fromDate(new Date(input.soldAt)),
+        responsibleUser: input.responsibleUser,
+        relatedUnitCost: realUnitCost,
+      });
+    }
+
+    await batch.commit();
+    return updatedSale;
+  };
+
+  const registerSaleReturn = async (input: RegisterSaleReturnInput) => {
+    const sale = sales.find((item) => item.id === input.saleId);
+    if (!sale) {
+      throw new Error('No se encontro la venta para registrar la devolucion.');
+    }
+
+    const remainingQuantity = sale.quantity - (sale.returnedQuantity ?? 0);
+    if (input.quantity <= 0) {
+      throw new Error('La cantidad devuelta debe ser mayor a cero.');
+    }
+    if (input.quantity > remainingQuantity) {
+      throw new Error('La cantidad a devolver supera lo pendiente de esa venta.');
+    }
+
+    const returnedSaleAmount = input.quantity * sale.unitPrice;
+    const returnedCostAmount = input.quantity * sale.realUnitCost;
+    const nextReturnedQuantity = (sale.returnedQuantity ?? 0) + input.quantity;
+    const nextReturnedSaleAmount = (sale.returnedSaleAmount ?? 0) + returnedSaleAmount;
+    const nextReturnedCostAmount = (sale.returnedCostAmount ?? 0) + returnedCostAmount;
+
+    const movementRef = doc(collection(db, 'movements'));
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'sales', sale.id), {
+      returnedQuantity: nextReturnedQuantity,
+      returnedSaleAmount: nextReturnedSaleAmount,
+      returnedCostAmount: nextReturnedCostAmount,
+    });
+    batch.set(movementRef, {
+      id: movementRef.id,
+      saleId: sale.id,
+      productId: sale.productId,
+      type: 'entry',
+      reason: 'return',
+      quantity: Math.abs(input.quantity),
+      notes: input.notes || `Devolucion registrada de ${sale.customerName || 'cliente'}`,
+      occurredAt: Timestamp.fromDate(new Date(input.returnedAt)),
+      responsibleUser: input.responsibleUser,
+      relatedUnitCost: sale.realUnitCost,
+    });
+
+    await batch.commit();
+
+    return {
+      ...sale,
+      returnedQuantity: nextReturnedQuantity,
+      returnedSaleAmount: nextReturnedSaleAmount,
+      returnedCostAmount: nextReturnedCostAmount,
+    };
+  };
+
+  const summary = useMemo(
+    () => getDashboardSummary(products, movements, purchases, sales),
+    [movements, products, purchases, sales]
+  );
   const latestMovements = useMemo(() => getLatestMovements(movements), [movements]);
 
   return (
@@ -225,15 +822,27 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       value={{
         loading,
         products,
+        suppliers,
         movements,
         purchases,
+        sales,
         summary,
         latestMovements,
         createProduct,
         updateProduct,
         deleteProduct,
+        createSupplier,
+        updateSupplier,
+        deleteSupplier,
         registerMovement,
         registerPurchase,
+        updatePurchase,
+        updatePurchaseBatch,
+        deletePurchase,
+        deletePurchaseBatch,
+        registerSale,
+        updateSale,
+        registerSaleReturn,
       }}
     >
       {children}

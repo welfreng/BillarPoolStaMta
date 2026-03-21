@@ -1,65 +1,95 @@
-import type { CategoryOption, PresentationKind, ProductPresentation } from '@/lib/admin/types';
+import type { CategoryOption, PresentationKind } from '@/lib/admin/types';
+
+export const movementTypeLabels = {
+  entry: 'Entrada',
+  exit: 'Salida',
+  adjustment: 'Ajuste',
+  purchase: 'Compra',
+} as const;
+
+export const movementReasonLabels = {
+  purchase: 'Compra',
+  sale: 'Venta',
+  return: 'Devolucion',
+  'manual-adjustment': 'Ajuste manual',
+  damage: 'Producto danado',
+  'initial-load': 'Carga inicial',
+  transfer: 'Traslado interno',
+} as const;
+
+export const movementReasonsByType = {
+  entry: ['purchase', 'initial-load', 'transfer'],
+  exit: ['sale', 'damage', 'transfer'],
+  adjustment: ['manual-adjustment'],
+} as const;
 
 export const inventoryCategories: CategoryOption[] = [
   {
     id: 'tacos',
     label: 'Tacos',
-    subcategories: ['Por marca', 'Madera', 'Fibra de carbono', 'Break cue'],
+    subcategories: ['Grafito', 'Madera', 'Fibra de carbono', 'Break cue'],
   },
   {
     id: 'tizas',
     label: 'Tizas',
-    subcategories: ['Por unidad', 'Caja de 12', 'Premium', 'Profesional'],
+    subcategories: ['Por unidad', 'Caja x 12', 'Caja x 144'],
   },
   {
     id: 'guantes',
     label: 'Guantes',
-    subcategories: ['Por unidad', 'Docena', '3 dedos', 'Full hand'],
+    subcategories: ['Dedos completos', '3 Dedos', 'Paquete x 12'],
   },
   {
     id: 'estuches',
     label: 'Estuches',
-    subcategories: ['Rigidos', 'Semirigidos', '1x1', '2x4'],
+    subcategories: ['Tubular', 'Cajon', 'Lona', 'Mochila'],
   },
   {
     id: 'panos-de-billar',
     label: 'Panos de billar',
-    subcategories: ['Pool', 'Carambola', 'Profesional', 'Mesa completa'],
+    subcategories: ['Pool', 'Carambola', 'Mesa 9 pies'],
   },
   {
     id: 'casquillos-o-suelas',
     label: 'Casquillos o suelas',
-    subcategories: ['Blandas', 'Medias', 'Duras', 'Kit de repuesto'],
+    subcategories: ['Importados', 'Caja x 50', 'Casquillos Perilla'],
   },
   {
     id: 'virolas',
     label: 'Virolas',
-    subcategories: ['ABS', 'Fibra', 'Metal', 'Perillas'],
+    subcategories: ['ABS Fibra', 'ABS Teflon', 'Transparente', 'Acrilica Confite', 'Teflon Confite'],
   },
   {
     id: 'supresores',
     label: 'Supresores',
-    subcategories: ['Rosca rapida', 'Universal', 'Goma tecnica'],
+    subcategories: [],
   },
   {
     id: 'cauchos-para-tacos',
     label: 'Cauchos para tacos',
-    subcategories: ['Base', 'Antideslizante', 'Rosca', 'Silicona'],
+    subcategories: ['Parachoques', 'Cauchos Sencillos'],
   },
   {
     id: 'extensiones',
     label: 'Extensiones',
-    subcategories: ['Rosca corta', 'Rosca larga', 'Universal'],
+    subcategories: ['Sencilla', 'Expandible'],
   },
   {
-    id: 'perillas',
-    label: 'Perillas / virolas perillas',
-    subcategories: ['Decorativas', 'Repuesto', 'Premium'],
+    id: 'empunadura',
+    label: 'Empunadura',
+    subcategories: ['Grip'],
   },
   {
     id: 'accesorios',
     label: 'Accesorios',
-    subcategories: ['Triangulos', 'Guarda tacos', 'Cepillos', 'Miscelanea'],
+    subcategories: [
+      'Triangulos',
+      'Cepillos',
+      'Porta Tizas',
+      'Cera brilladora',
+      'Brilladoras de Flechas',
+      'Pica Casquillos',
+    ],
   },
 ];
 
@@ -76,7 +106,7 @@ export const availableBrands = [
   'Accesorios SPSM',
 ];
 
-export const presentationOptions: ProductPresentation[] = [
+export const presentationOptions = [
   { id: 'unit', label: 'Unidad', kind: 'unit', units: 1, isDefault: true },
   { id: 'dozen', label: 'Docena', kind: 'dozen', units: 12 },
   { id: 'box-12', label: 'Caja de 12', kind: 'box-12', units: 12 },
@@ -86,6 +116,12 @@ export const presentationKindLabels: Record<PresentationKind, string> = {
   unit: 'Unidad',
   dozen: 'Docena',
   'box-12': 'Caja de 12',
+};
+
+export const presentationKindUnits: Record<PresentationKind, number> = {
+  unit: 1,
+  dozen: 12,
+  'box-12': 12,
 };
 
 export function getCategoryLabel(categoryId: string) {

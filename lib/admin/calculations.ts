@@ -4,16 +4,29 @@ import type {
   InventoryMovement,
   Product,
   Purchase,
+  Sale,
   StockAlert,
 } from '@/lib/admin/types';
 
 export function roundCurrency(value: number) {
-  return Number(value.toFixed(2));
+  const normalizedValue = Number(value);
+  if (!Number.isFinite(normalizedValue)) return 0;
+  return Number(normalizedValue.toFixed(2));
 }
 
 export function calculateMargin(realUnitCost: number, salePrice: number) {
-  if (realUnitCost <= 0) return 0;
-  return roundCurrency(((salePrice - realUnitCost) / realUnitCost) * 100);
+  const normalizedRealUnitCost = Number(realUnitCost);
+  const normalizedSalePrice = Number(salePrice);
+  if (!Number.isFinite(normalizedRealUnitCost) || normalizedRealUnitCost <= 0) return 0;
+  if (!Number.isFinite(normalizedSalePrice)) return 0;
+  return roundCurrency(((normalizedSalePrice - normalizedRealUnitCost) / normalizedRealUnitCost) * 100);
+}
+
+export function calculateUnitProfit(realUnitCost: number, salePrice: number) {
+  const normalizedRealUnitCost = Number(realUnitCost);
+  const normalizedSalePrice = Number(salePrice);
+  if (!Number.isFinite(normalizedRealUnitCost) || !Number.isFinite(normalizedSalePrice)) return 0;
+  return roundCurrency(normalizedSalePrice - normalizedRealUnitCost);
 }
 
 export function calculateRealUnitCost(
@@ -21,8 +34,18 @@ export function calculateRealUnitCost(
   shippingValueTotal: number,
   quantityPurchased: number
 ) {
-  if (quantityPurchased <= 0) return 0;
-  return roundCurrency((purchaseValueTotal + shippingValueTotal) / quantityPurchased);
+  const normalizedPurchaseValueTotal = Number(purchaseValueTotal);
+  const normalizedShippingValueTotal = Number(shippingValueTotal);
+  const normalizedQuantityPurchased = Number(quantityPurchased);
+
+  if (!Number.isFinite(normalizedQuantityPurchased) || normalizedQuantityPurchased <= 0) return 0;
+
+  return roundCurrency(
+    (
+      (Number.isFinite(normalizedPurchaseValueTotal) ? normalizedPurchaseValueTotal : 0) +
+      (Number.isFinite(normalizedShippingValueTotal) ? normalizedShippingValueTotal : 0)
+    ) / normalizedQuantityPurchased
+  );
 }
 
 export function calculatePurchaseTotals(
@@ -30,10 +53,15 @@ export function calculatePurchaseTotals(
   shippingValueTotal: number,
   quantityPurchased: number
 ) {
-  const totalInvestment = roundCurrency(purchaseValueTotal + shippingValueTotal);
+  const normalizedPurchaseValueTotal = Number(purchaseValueTotal);
+  const normalizedShippingValueTotal = Number(shippingValueTotal);
+  const totalInvestment = roundCurrency(
+    (Number.isFinite(normalizedPurchaseValueTotal) ? normalizedPurchaseValueTotal : 0) +
+      (Number.isFinite(normalizedShippingValueTotal) ? normalizedShippingValueTotal : 0)
+  );
   const realUnitCost = calculateRealUnitCost(
-    purchaseValueTotal,
-    shippingValueTotal,
+    normalizedPurchaseValueTotal,
+    normalizedShippingValueTotal,
     quantityPurchased
   );
 
@@ -43,30 +71,62 @@ export function calculatePurchaseTotals(
   };
 }
 
-export function getStockAlert(product: Product): StockAlert {
-  if (product.stockQuantity <= 0) return 'out';
-  if (product.stockQuantity <= product.stockMinimum) return 'low';
-  return 'healthy';
+export function getProductById(products: Product[], productId: string) {
+  return products.find((product) => product.id === productId);
+}
+
+export function getProductStock(movements: InventoryMovement[], productId: string) {
+  return Math.max(
+    movements
+      .filter((movement) => movement.productId === productId)
+      .reduce((total, movement) => total + movement.quantity, 0),
+    0
+  );
+}
+
+export function getLatestPurchaseForProduct(purchases: Purchase[], productId: string) {
+  return purchases
+    .filter((purchase) => purchase.productId === productId)
+    .sort((a, b) => new Date(b.purchasedAt).getTime() - new Date(a.purchasedAt).getTime())[0];
+}
+
+export function getProductRealUnitCost(purchases: Purchase[], productId: string) {
+  return getLatestPurchaseForProduct(purchases, productId)?.realUnitCost ?? 0;
+}
+
+export function getProductProfitMargin(product: Product, purchases: Purchase[]) {
+  return calculateMargin(getProductRealUnitCost(purchases, product.id), product.salePrice);
+}
+
+export function getStockAlert(
+  product: Product,
+  movements: InventoryMovement[]
+): StockAlert {
+  return getProductStock(movements, product.id) <= 0 ? 'out' : 'healthy';
 }
 
 export function getStockAlertLabel(alert: StockAlert) {
-  if (alert === 'out') return 'Agotado';
-  if (alert === 'low') return 'Stock bajo';
-  return 'Stock suficiente';
+  return alert === 'out' ? 'Agotado' : 'Stock disponible';
 }
 
-export function getDashboardSummary(products: Product[]): DashboardSummary {
-  return products.reduce<DashboardSummary>(
+export function getDashboardSummary(
+  products: Product[],
+  movements: InventoryMovement[],
+  purchases: Purchase[],
+  sales: Sale[]
+): DashboardSummary {
+  const inventorySummary = products.reduce<DashboardSummary>(
     (summary, product) => {
-      summary.totalProducts += 1;
-      summary.totalStock += product.stockQuantity;
-      summary.investedValue += product.realUnitCost * product.stockQuantity;
-      summary.estimatedSalesValue += product.salePrice * product.stockQuantity;
-      summary.projectedProfit +=
-        (product.salePrice - product.realUnitCost) * product.stockQuantity;
+      const stock = getProductStock(movements, product.id);
+      const realUnitCost = getProductRealUnitCost(purchases, product.id);
 
-      const alert = getStockAlert(product);
-      if (alert === 'low') summary.lowStockProducts += 1;
+      summary.totalProducts += 1;
+      summary.totalStock += stock;
+      summary.investedValue += realUnitCost * stock;
+      summary.estimatedSalesValue += product.salePrice * stock;
+      summary.projectedProfit += (product.salePrice - realUnitCost) * stock;
+
+      const alert = getStockAlert(product, movements);
       if (alert === 'out') summary.outOfStockProducts += 1;
 
       return summary;
@@ -79,12 +139,24 @@ export function getDashboardSummary(products: Product[]): DashboardSummary {
       investedValue: 0,
       estimatedSalesValue: 0,
       projectedProfit: 0,
+      salesCount: 0,
+      soldUnits: 0,
+      totalRevenue: 0,
+      realizedProfit: 0,
     }
   );
-}
 
-export function getProductById(products: Product[], productId: string) {
-  return products.find((product) => product.id === productId);
+  return sales.reduce<DashboardSummary>((summary, sale) => {
+    const netRevenue = sale.totalSale - (sale.returnedSaleAmount ?? 0);
+    const netProfit =
+      sale.grossProfit - ((sale.returnedSaleAmount ?? 0) - (sale.returnedCostAmount ?? 0));
+    const netUnits = sale.quantity - (sale.returnedQuantity ?? 0);
+    summary.salesCount += 1;
+    summary.soldUnits += netUnits;
+    summary.totalRevenue += netRevenue;
+    summary.realizedProfit += netProfit;
+    return summary;
+  }, inventorySummary);
 }
 
 export function getLatestMovements(movements: InventoryMovement[], limit = 6) {
@@ -97,6 +169,12 @@ export function getKardexByProduct(movements: InventoryMovement[], productId: st
   return movements
     .filter((movement) => movement.productId === productId)
     .sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
+}
+
+export function getLatestSales(sales: Sale[], limit = 6) {
+  return [...sales]
+    .sort((a, b) => new Date(b.soldAt).getTime() - new Date(a.soldAt).getTime())
+    .slice(0, limit);
 }
 
 export function formatCurrency(value: number) {
@@ -117,26 +195,4 @@ export function formatShortDate(value: string) {
 
 export function formatDateTime(value: string) {
   return format(new Date(value), 'dd/MM/yyyy HH:mm');
-}
-
-export function calculatePurchaseImpact(
-  currentProduct: Product,
-  purchase: Pick<
-    Purchase,
-    'quantityPurchased' | 'realUnitCost' | 'shippingValueTotal' | 'purchaseValueTotal'
-  >
-) {
-  const newStock = currentProduct.stockQuantity + purchase.quantityPurchased;
-  const purchasePrice = roundCurrency(purchase.purchaseValueTotal / purchase.quantityPurchased);
-  const shippingCostAllocated = roundCurrency(
-    purchase.shippingValueTotal / purchase.quantityPurchased
-  );
-
-  return {
-    stockQuantity: newStock,
-    purchasePrice,
-    shippingCostAllocated,
-    realUnitCost: purchase.realUnitCost,
-    profitMargin: calculateMargin(purchase.realUnitCost, currentProduct.salePrice),
-  };
 }

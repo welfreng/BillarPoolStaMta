@@ -4,7 +4,6 @@ export default function About() {
   return (
     <section id="nosotros" className="py-24 bg-background">
       <div className="mx-auto max-w-7xl px-4 lg:px-8">
-        {/* Section header */}
         <div className="text-center mb-16">
           <p className="text-sm font-semibold tracking-widest uppercase text-[#d4a017] mb-2">
             Sobre Nosotros
@@ -17,9 +16,7 @@ export default function About() {
           </p>
         </div>
 
-        {/* Mission & Vision */}
         <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-          {/* Mission */}
           <div className="rounded-2xl bg-card border border-border p-8 relative overflow-hidden group hover:border-[#0a2472]/30 transition-colors">
             <div className="absolute top-0 left-0 w-full h-1 bg-[#0a2472]" />
             <div className="flex items-center gap-4 mb-6">
@@ -33,7 +30,6 @@ export default function About() {
             </p>
           </div>
 
-          {/* Vision */}
           <div className="rounded-2xl bg-card border border-border p-8 relative overflow-hidden group hover:border-[#1a5632]/30 transition-colors">
             <div className="absolute top-0 left-0 w-full h-1 bg-[#1a5632]" />
             <div className="flex items-center gap-4 mb-6">
@@ -48,7 +44,6 @@ export default function About() {
           </div>
         </div>
 
-        {/* Values strip */}
         <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
           {[
             { value: "Calidad", desc: "Productos premium" },

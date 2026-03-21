@@ -5,9 +5,7 @@ export default function Footer() {
   return (
     <footer id="contacto" className="bg-[#0a1628] text-white">
       <div className="mx-auto max-w-7xl px-4 lg:px-8">
-        {/* Main footer */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 py-16 border-b border-white/10">
-          {/* Brand */}
           <div className="lg:col-span-1">
             <div className="flex items-center gap-3 mb-4">
               <Image
@@ -27,7 +25,6 @@ export default function Footer() {
             </p>
           </div>
 
-          {/* Quick links */}
           <div>
             <h4 className="text-sm font-bold uppercase tracking-wider text-[#d4a017] mb-4">
               Enlaces Rapidos
@@ -53,7 +50,6 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Products */}
           <div>
             <h4 className="text-sm font-bold uppercase tracking-wider text-[#d4a017] mb-4">
               Productos
@@ -81,7 +77,6 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Contact */}
           <div>
             <h4 className="text-sm font-bold uppercase tracking-wider text-[#d4a017] mb-4">
               Contacto
@@ -110,7 +105,6 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* Bottom bar */}
         <div className="flex flex-col sm:flex-row items-center justify-between py-6 gap-4">
           <p className="text-xs text-white/30">
             {`\u00A9 ${new Date().getFullYear()} Billar Pool Santa Marta. Todos los derechos reservados.`}

@@ -1,19 +1,33 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/components/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export function AdminRouteGuard({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, role, profile, loading, logout } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (!loading && !user) {
       router.replace('/login');
     }
-  }, [loading, router, user]);
+
+    if (!loading && profile?.status === 'inactive') {
+      logout();
+      router.replace('/login');
+      return;
+    }
+
+    if (!loading && user && role === 'sales') {
+      const allowedRoutes = new Set(['/dashboard', '/dashboard/ventas', '/dashboard/inventario']);
+      if (!allowedRoutes.has(pathname)) {
+        router.replace('/dashboard/ventas');
+      }
+    }
+  }, [loading, logout, pathname, profile?.status, role, router, user]);
 
   if (loading) {
     return (
@@ -31,6 +45,15 @@ export function AdminRouteGuard({ children }: { children: React.ReactNode }) {
   }
 
   if (!user) {
+    return null;
+  }
+
+  if (
+    role === 'sales' &&
+    pathname !== '/dashboard' &&
+    pathname !== '/dashboard/ventas' &&
+    pathname !== '/dashboard/inventario'
+  ) {
     return null;
   }
 

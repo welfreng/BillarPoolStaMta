@@ -1,15 +1,12 @@
 'use client';
 
+import Image from 'next/image';
 import { useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import {
-  availableBrands,
-  inventoryCategories,
-  presentationKindLabels,
-  presentationOptions,
-} from '@/lib/admin/catalogs';
+import { RotateCcw, RotateCw } from 'lucide-react';
+import { availableBrands, inventoryCategories } from '@/lib/admin/catalogs';
 import type { Product } from '@/lib/admin/types';
 import { Button } from '@/components/ui/button';
 import {
@@ -38,52 +35,41 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 
-const productSchema = z.object({
-  sku: z.string().min(3, 'Ingresa un SKU valido'),
-  name: z.string().min(3, 'Ingresa el nombre del producto'),
-  description: z.string().min(10, 'Agrega una descripcion mas completa'),
-  category: z.string().min(1, 'Selecciona una categoria'),
-  subcategory: z.string().min(1, 'Selecciona una subcategoria'),
-  brand: z.string().min(1, 'Ingresa o selecciona una marca'),
-  saleType: z.enum(['unit', 'bundle', 'mixed']),
-  unitMeasure: z.string().min(1, 'Ingresa la unidad de medida'),
-  stockQuantity: z.coerce.number().min(0),
-  stockMinimum: z.coerce.number().min(0),
-  purchasePrice: z.coerce.number().min(0),
-  shippingCostAllocated: z.coerce.number().min(0),
-  realUnitCost: z.coerce.number().min(0),
-  salePrice: z.coerce.number().min(0),
-  warehouseLocation: z.string().min(1, 'Ingresa la ubicacion'),
-  image: z.string().min(1, 'Ingresa una imagen o placeholder'),
-  status: z.enum(['active', 'draft', 'archived']),
-  purchasePresentation: z.enum(['unit', 'dozen', 'box-12']),
-  salePresentation: z.enum(['unit', 'dozen', 'box-12']),
-  conversionFactor: z.coerce.number().min(1),
-});
+const productSchema = z
+  .object({
+    name: z.string().min(3, 'Ingresa el nombre del producto'),
+    description: z.string().min(10, 'Agrega una descripcion mas completa'),
+    category: z.string().min(1, 'Selecciona una categoria'),
+    subcategory: z.string(),
+    brand: z.string().min(1, 'Ingresa o selecciona una marca'),
+    salePrice: z.coerce.number().min(0),
+    image: z.string().min(1, 'Carga una imagen del producto'),
+    imageRotation: z.coerce.number(),
+    status: z.enum(['active', 'draft', 'archived']),
+  })
+  .superRefine((values, ctx) => {
+    const selectedCategory = inventoryCategories.find((category) => category.id === values.category);
+    if (selectedCategory && selectedCategory.subcategories.length > 0 && !values.subcategory) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Selecciona una subcategoria',
+        path: ['subcategory'],
+      });
+    }
+  });
 
 export type ProductFormValues = z.infer<typeof productSchema>;
 
 const defaultValues: ProductFormValues = {
-  sku: '',
   name: '',
   description: '',
   category: 'tacos',
-  subcategory: 'Por marca',
+  subcategory: 'Grafito',
   brand: availableBrands[0],
-  saleType: 'unit',
-  unitMeasure: 'unidad',
-  stockQuantity: 0,
-  stockMinimum: 0,
-  purchasePrice: 0,
-  shippingCostAllocated: 0,
-  realUnitCost: 0,
   salePrice: 0,
-  warehouseLocation: '',
   image: '/images/logo.png',
+  imageRotation: 0,
   status: 'active',
-  purchasePresentation: 'unit',
-  salePresentation: 'unit',
-  conversionFactor: 1,
 };
 
 export function ProductFormDialog({
@@ -95,7 +81,7 @@ export function ProductFormDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialProduct?: Product;
-  onSubmit: (values: ProductFormValues) => void;
+  onSubmit: (values: ProductFormValues) => Promise<void> | void;
 }) {
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
@@ -109,30 +95,21 @@ export function ProductFormDialog({
     }
 
     form.reset({
-      sku: initialProduct.sku,
       name: initialProduct.name,
       description: initialProduct.description,
       category: initialProduct.category,
       subcategory: initialProduct.subcategory,
       brand: initialProduct.brand,
-      saleType: initialProduct.saleType,
-      unitMeasure: initialProduct.unitMeasure,
-      stockQuantity: initialProduct.stockQuantity,
-      stockMinimum: initialProduct.stockMinimum,
-      purchasePrice: initialProduct.purchasePrice,
-      shippingCostAllocated: initialProduct.shippingCostAllocated,
-      realUnitCost: initialProduct.realUnitCost,
       salePrice: initialProduct.salePrice,
-      warehouseLocation: initialProduct.warehouseLocation,
       image: initialProduct.image,
+      imageRotation: initialProduct.imageRotation,
       status: initialProduct.status,
-      purchasePresentation: initialProduct.purchasePresentation,
-      salePresentation: initialProduct.salePresentation,
-      conversionFactor: initialProduct.conversionFactor,
     });
   }, [form, initialProduct]);
 
   const selectedCategoryId = form.watch('category');
+  const selectedImage = form.watch('image');
+  const selectedRotation = form.watch('imageRotation');
   const selectedCategory = useMemo(
     () => inventoryCategories.find((category) => category.id === selectedCategoryId),
     [selectedCategoryId]
@@ -140,30 +117,23 @@ export function ProductFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{initialProduct ? 'Editar producto' : 'Nuevo producto'}</DialogTitle>
           <DialogDescription>
-            Gestiona informacion comercial, costo real, stock base y presentaciones de venta.
+            Registra la informacion esencial del producto y carga su imagen desde tu equipo.
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-2">
-              <FormField
-                control={form.control}
-                name="sku"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>SKU o codigo interno</FormLabel>
-                    <FormControl>
-                      <Input placeholder="TIZ-TAOM-V10" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+          <form
+            onSubmit={form.handleSubmit(async (values) => {
+              await onSubmit(values);
+              form.reset(defaultValues);
+            })}
+            className="space-y-6"
+          >
+            <div className="grid gap-4 md:grid-cols-1">
               <FormField
                 control={form.control}
                 name="name"
@@ -205,11 +175,9 @@ export function ProductFormDialog({
                       onValueChange={(value) => {
                         field.onChange(value);
                         const nextCategory = inventoryCategories.find((category) => category.id === value);
-                        if (nextCategory) {
-                          form.setValue('subcategory', nextCategory.subcategories[0], {
-                            shouldValidate: true,
-                          });
-                        }
+                        form.setValue('subcategory', nextCategory?.subcategories[0] ?? '', {
+                          shouldValidate: true,
+                        });
                       }}
                     >
                       <FormControl>
@@ -235,20 +203,26 @@ export function ProductFormDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Subcategoria</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
+                    {selectedCategory && selectedCategory.subcategories.length > 0 ? (
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Selecciona" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {selectedCategory.subcategories.map((subcategory) => (
+                            <SelectItem key={subcategory} value={subcategory}>
+                              {subcategory}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
                       <FormControl>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Selecciona" />
-                        </SelectTrigger>
+                        <Input value="Sin subcategoria" disabled />
                       </FormControl>
-                      <SelectContent>
-                        {selectedCategory?.subcategories.map((subcategory) => (
-                          <SelectItem key={subcategory} value={subcategory}>
-                            {subcategory}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -273,37 +247,15 @@ export function ProductFormDialog({
               />
             </div>
 
-            <div className="grid gap-4 md:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-2">
               <FormField
                 control={form.control}
-                name="saleType"
+                name="salePrice"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Tipo de venta</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="unit">Unidad</SelectItem>
-                        <SelectItem value="bundle">Presentacion</SelectItem>
-                        <SelectItem value="mixed">Mixto</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="unitMeasure"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Unidad de medida</FormLabel>
+                    <FormLabel>Precio de venta</FormLabel>
                     <FormControl>
-                      <Input placeholder="unidad" {...field} />
+                      <Input type="number" min="0" step="0.01" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -331,191 +283,78 @@ export function ProductFormDialog({
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="warehouseLocation"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Ubicacion en bodega</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Estante A1" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
             </div>
 
-            <div className="grid gap-4 md:grid-cols-4">
-              <FormField
-                control={form.control}
-                name="stockQuantity"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Stock actual</FormLabel>
-                    <FormControl>
-                      <Input type="number" min="0" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="stockMinimum"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Stock minimo</FormLabel>
-                    <FormControl>
-                      <Input type="number" min="0" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="purchasePrice"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Precio de compra</FormLabel>
-                    <FormControl>
-                      <Input type="number" min="0" step="0.01" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="shippingCostAllocated"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Envio prorrateado</FormLabel>
-                    <FormControl>
-                      <Input type="number" min="0" step="0.01" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+            <FormField
+              control={form.control}
+              name="image"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Imagen del producto</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (!file) return;
 
-            <div className="grid gap-4 md:grid-cols-3">
-              <FormField
-                control={form.control}
-                name="realUnitCost"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Costo unitario real</FormLabel>
-                    <FormControl>
-                      <Input type="number" min="0" step="0.01" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="salePrice"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Precio de venta</FormLabel>
-                    <FormControl>
-                      <Input type="number" min="0" step="0.01" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="image"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Imagen</FormLabel>
-                    <FormControl>
-                      <Input placeholder="/images/logo.png" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                          const result = reader.result;
+                          if (typeof result === 'string') {
+                            field.onChange(result);
+                            form.setValue('imageRotation', 0, { shouldValidate: true });
+                          }
+                        };
+                        reader.readAsDataURL(file);
+                      }}
+                    />
+                  </FormControl>
+                  <p className="text-xs text-slate-500">
+                    La imagen se guarda junto al registro del producto en el modelo actual de la app.
+                  </p>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-            <div className="rounded-2xl border border-cyan-100 bg-cyan-50/70 p-4">
-              <p className="mb-4 text-sm font-medium text-cyan-900">
-                Presentaciones comerciales y conversion del stock base
-              </p>
-              <div className="grid gap-4 md:grid-cols-3">
-                <FormField
-                  control={form.control}
-                  name="purchasePresentation"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Presentacion de compra</FormLabel>
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <FormControl>
-                          <SelectTrigger className="w-full">
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {presentationOptions.map((item) => (
-                            <SelectItem key={item.id} value={item.kind}>
-                              {item.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="salePresentation"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Presentacion de venta</FormLabel>
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <FormControl>
-                          <SelectTrigger className="w-full">
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {presentationOptions.map((item) => (
-                            <SelectItem key={item.id} value={item.kind}>
-                              {item.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="conversionFactor"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Factor de conversion</FormLabel>
-                      <FormControl>
-                        <Input type="number" min="1" {...field} />
-                      </FormControl>
-                      <p className="text-xs text-slate-500">
-                        Cuantas unidades base representa la compra o venta principal.
-                      </p>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+            <div className="overflow-hidden rounded-3xl border border-slate-200 bg-slate-50">
+              <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
+                <p className="text-sm font-medium text-slate-700">Vista previa</p>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      form.setValue('imageRotation', ((selectedRotation - 90) % 360 + 360) % 360)
+                    }
+                  >
+                    <RotateCcw className="mr-2 h-4 w-4" />
+                    Girar izquierda
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => form.setValue('imageRotation', (selectedRotation + 90) % 360)}
+                  >
+                    <RotateCw className="mr-2 h-4 w-4" />
+                    Girar derecha
+                  </Button>
+                </div>
+              </div>
+              <div className="relative aspect-[16/8] w-full">
+                <Image
+                  src={selectedImage}
+                  alt="Vista previa del producto"
+                  fill
+                  className="object-cover"
+                  style={{ transform: `rotate(${selectedRotation}deg)` }}
+                  unoptimized={selectedImage.startsWith('data:')}
                 />
               </div>
-              <p className="mt-3 text-xs text-slate-500">
-                Ejemplo: {presentationKindLabels['box-12']} = 12 unidades, {presentationKindLabels.dozen} = 12 unidades.
-              </p>
             </div>
 
             <DialogFooter>

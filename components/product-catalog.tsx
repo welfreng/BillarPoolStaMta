@@ -1,105 +1,41 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Image from "next/image"
+import { doc, onSnapshot } from "firebase/firestore"
 import { ChevronRight, ShoppingBag } from "lucide-react"
-
-const categories = [
-  { id: "todos", label: "Todos" },
-  { id: "tacos", label: "Tacos" },
-  { id: "panos", label: "Panos" },
-  { id: "accesorios", label: "Accesorios" },
-  { id: "repuestos", label: "Repuestos" },
-  { id: "bolas", label: "Bolas y Triangulos" },
-]
-
-const products = [
-  {
-    id: 1,
-    name: "Tacos de Madera Premium",
-    description: "Tacos profesionales de madera maple y palo de rosa. Disponibles en diferentes pesos y medidas.",
-    image: "/images/tacos-madera.jpg",
-    category: "tacos",
-    tag: "Popular",
-    details: ["Madera Maple importada", "Pesos de 18oz a 21oz", "Punta de cuero profesional", "Diferentes acabados"],
-  },
-  {
-    id: 2,
-    name: "Tacos de Fibra de Carbono",
-    description: "Tacos de ultima tecnologia en fibra de carbono. Mayor precision y durabilidad para jugadores exigentes.",
-    image: "/images/tacos-carbono.jpg",
-    category: "tacos",
-    tag: "Nuevo",
-    details: ["Fibra de carbono de alta resistencia", "Menor deflexion", "Tecnologia Low Deflection", "Ideal para jugadores avanzados"],
-  },
-  {
-    id: 3,
-    name: "Panos para Mesa de Billar",
-    description: "Panos de alta calidad para mesas de billar. Disponibles en verde, azul y rojo. Venta e instalacion.",
-    image: "/images/panos-billar.jpg",
-    category: "panos",
-    tag: "Servicio",
-    details: ["Lana premium importada", "Colores: verde, azul, rojo", "Servicio de instalacion incluido", "Para mesas de 7, 8 y 9 pies"],
-  },
-  {
-    id: 4,
-    name: "Tizas por Docena",
-    description: "Tizas de billar de primera calidad. Venta por docena ideal para negocios y salas de billar.",
-    image: "/images/tizas-billar.jpg",
-    category: "accesorios",
-    tag: "Al por mayor",
-    details: ["Marca reconocida", "Venta por docena", "Precio especial para negocios", "Agarre superior"],
-  },
-  {
-    id: 5,
-    name: "Guantes por Docena",
-    description: "Guantes profesionales de 3 dedos. Venta por docena con precios especiales para negocios.",
-    image: "/images/guantes-billar.jpg",
-    category: "accesorios",
-    tag: "Al por mayor",
-    details: ["Guantes de 3 dedos", "Licra elastica premium", "Venta por docena", "Tallas variadas"],
-  },
-  {
-    id: 6,
-    name: "Estuches para Tacos",
-    description: "Estuches de cuero y sinteticos para proteger tu taco. Diferentes capacidades y estilos.",
-    image: "/images/estuches-billar.jpg",
-    category: "accesorios",
-    tag: "Premium",
-    details: ["Cuero genuino y sintetico", "Capacidad 1 a 4 tacos", "Proteccion acolchada", "Cierre de seguridad"],
-  },
-  {
-    id: 7,
-    name: "Juegos de Bolas y Triangulos",
-    description: "Sets completos de bolas de billar profesionales y triangulos de madera o plastico.",
-    image: "/images/bolas-billar.jpg",
-    category: "bolas",
-    tag: "Completo",
-    details: ["Bolas de resina premium", "Tamano reglamentario", "Triangulos de madera o plastico", "Diferentes marcas disponibles"],
-  },
-  {
-    id: 8,
-    name: "Virolas y Casquillos",
-    description: "Virolas de fibra y casquillos de bronce para tacos. Diferentes medidas disponibles. Servicio de instalacion en torno.",
-    image: "/images/virolas-casquillos.jpg",
-    category: "repuestos",
-    tag: "Especializado",
-    details: ["Virolas de fibra premium", "Casquillos de bronce", "Medidas de 11mm a 13mm", "Instalacion con torno incluida"],
-  },
-  {
-    id: 9,
-    name: "Accesorios Varios",
-    description: "Todo lo que necesitas: portatacos, limpiadores, puentes, extensiones y mucho mas para tu negocio de billar.",
-    image: "/images/accesorios-billar.jpg",
-    category: "accesorios",
-    tag: "Variado",
-    details: ["Portatacos de pared", "Limpiadores y ceras", "Puentes y extensiones", "Marcadores de puntuacion"],
-  },
-]
+import { db } from "@/lib/firebase"
+import { publicCatalogCategories, publicCatalogProducts } from "@/lib/public-catalog"
 
 export default function ProductCatalog() {
   const [activeCategory, setActiveCategory] = useState("todos")
-  const [selectedProduct, setSelectedProduct] = useState<number | null>(null)
+  const [selectedProduct, setSelectedProduct] = useState<string | null>(null)
+  const [imageOverrides, setImageOverrides] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      doc(db, "siteAssets", "catalog-images"),
+      (snapshot) => {
+        const data = snapshot.data()
+        const images =
+          data && typeof data === "object" && data.images && typeof data.images === "object"
+            ? (data.images as Record<string, string>)
+            : {}
+        setImageOverrides(images)
+      },
+      (error) => {
+        console.error("Error leyendo imagenes del catalogo:", error)
+        setImageOverrides({})
+      }
+    )
+
+    return () => unsubscribe()
+  }, [])
+
+  const products = publicCatalogProducts.map((product) => ({
+    ...product,
+    image: imageOverrides[product.id] || product.image,
+  }))
 
   const filteredProducts =
     activeCategory === "todos"
@@ -109,7 +45,6 @@ export default function ProductCatalog() {
   return (
     <section id="productos" className="py-24 bg-background">
       <div className="mx-auto max-w-7xl px-4 lg:px-8">
-        {/* Section header */}
         <div className="text-center mb-16">
           <p className="text-sm font-semibold tracking-widest uppercase text-[#d4a017] mb-2">
             Nuestro Catalogo
@@ -122,9 +57,8 @@ export default function ProductCatalog() {
           </p>
         </div>
 
-        {/* Category filters */}
         <div className="flex flex-wrap justify-center gap-2 mb-12">
-          {categories.map((cat) => (
+          {publicCatalogCategories.map((cat) => (
             <button
               key={cat.id}
               onClick={() => {
@@ -142,32 +76,29 @@ export default function ProductCatalog() {
           ))}
         </div>
 
-        {/* Product grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProducts.map((product) => (
             <div
               key={product.id}
               className="group relative rounded-2xl bg-card border border-border overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
             >
-              {/* Product tag */}
               <div className="absolute top-4 left-4 z-10">
                 <span className="inline-flex items-center rounded-full bg-[#0a2472] px-3 py-1 text-xs font-semibold text-white">
                   {product.tag}
                 </span>
               </div>
 
-              {/* Product image */}
               <div className="relative h-56 overflow-hidden">
                 <Image
                   src={product.image}
                   alt={product.name}
                   fill
                   className="object-cover transition-transform duration-500 group-hover:scale-110"
+                  unoptimized={product.image.startsWith("data:")}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#0a1628]/60 via-transparent to-transparent" />
               </div>
 
-              {/* Product info */}
               <div className="p-6">
                 <h3 className="text-xl font-bold font-mono text-foreground mb-2">
                   {product.name}
@@ -218,7 +149,6 @@ export default function ProductCatalog() {
           ))}
         </div>
 
-        {/* CTA */}
         <div className="mt-16 text-center">
           <div className="inline-flex flex-col sm:flex-row items-center gap-4 rounded-2xl bg-[#0a2472] p-8 shadow-xl">
             <div className="text-left">

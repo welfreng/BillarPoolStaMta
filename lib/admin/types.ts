@@ -1,11 +1,12 @@
 export type ProductStatus = 'active' | 'draft' | 'archived';
-export type SaleType = 'unit' | 'bundle' | 'mixed';
-export type StockAlert = 'healthy' | 'low' | 'out';
+export type StockAlert = 'healthy' | 'out';
 export type PresentationKind = 'unit' | 'dozen' | 'box-12';
+export type UserRole = 'admin' | 'sales';
 export type MovementType = 'entry' | 'exit' | 'adjustment' | 'purchase';
 export type MovementReason =
   | 'purchase'
   | 'sale'
+  | 'return'
   | 'manual-adjustment'
   | 'damage'
   | 'initial-load'
@@ -17,38 +18,41 @@ export interface CategoryOption {
   subcategories: string[];
 }
 
-export interface ProductPresentation {
-  id: string;
-  label: string;
-  kind: PresentationKind;
-  units: number;
-  isDefault?: boolean;
-}
-
 export interface Product {
   id: string;
-  sku: string;
   name: string;
   description: string;
   category: string;
   subcategory: string;
   brand: string;
-  saleType: SaleType;
-  unitMeasure: string;
-  stockQuantity: number;
-  stockMinimum: number;
-  purchasePrice: number;
-  shippingCostAllocated: number;
-  realUnitCost: number;
   salePrice: number;
-  profitMargin: number;
-  warehouseLocation: string;
   image: string;
+  imageRotation: number;
   status: ProductStatus;
-  purchasePresentation: PresentationKind;
-  salePresentation: PresentationKind;
-  conversionFactor: number;
-  presentations: ProductPresentation[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Supplier {
+  id: string;
+  name: string;
+  contactName: string;
+  phone: string;
+  city: string;
+  notes: string;
+  status: 'active' | 'inactive';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AppUserAccount {
+  id: string;
+  uid: string;
+  nombre: string;
+  email: string;
+  telefono: string;
+  role: UserRole;
+  status: 'active' | 'inactive';
   createdAt: string;
   updatedAt: string;
 }
@@ -56,6 +60,9 @@ export interface Product {
 export interface InventoryMovement {
   id: string;
   productId: string;
+  purchaseId?: string;
+  purchaseBatchId?: string;
+  saleId?: string;
   type: MovementType;
   reason: MovementReason;
   quantity: number;
@@ -67,10 +74,13 @@ export interface InventoryMovement {
 
 export interface Purchase {
   id: string;
+  purchaseBatchId?: string;
   productId: string;
+  supplierId?: string;
   supplier: string;
   purchasedAt: string;
   presentationQuantity: number;
+  purchaseUnitValue: number;
   quantityPurchased: number;
   purchasePresentation: PresentationKind;
   conversionFactor: number;
@@ -80,6 +90,24 @@ export interface Purchase {
   realUnitCost: number;
   suggestedSalePrice: number;
   estimatedMargin: number;
+}
+
+export interface Sale {
+  id: string;
+  productId: string;
+  soldAt: string;
+  quantity: number;
+  unitPrice: number;
+  totalSale: number;
+  realUnitCost: number;
+  totalCost: number;
+  grossProfit: number;
+  returnedQuantity: number;
+  returnedSaleAmount: number;
+  returnedCostAmount: number;
+  customerName: string;
+  notes: string;
+  responsibleUser: string;
 }
 
 export interface DashboardMetric {
@@ -97,12 +125,15 @@ export interface DashboardSummary {
   investedValue: number;
   estimatedSalesValue: number;
   projectedProfit: number;
+  salesCount: number;
+  soldUnits: number;
+  totalRevenue: number;
+  realizedProfit: number;
 }
 
 export interface ProductFilters {
   query: string;
   category: string;
-  saleType: string;
   status: string;
 }
 

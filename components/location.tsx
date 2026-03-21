@@ -4,7 +4,6 @@ export default function Location() {
   return (
     <section id="ubicacion" className="py-24 bg-background">
       <div className="mx-auto max-w-7xl px-4 lg:px-8">
-        {/* Section header */}
         <div className="text-center mb-16">
           <p className="text-sm font-semibold tracking-widest uppercase text-[#d4a017] mb-2">
             Ubicacion
@@ -18,7 +17,6 @@ export default function Location() {
         </div>
 
         <div className="grid lg:grid-cols-5 gap-8">
-          {/* Map */}
           <div className="lg:col-span-3 rounded-2xl overflow-hidden shadow-xl border border-border h-[400px] lg:h-[500px]">
             <iframe
               src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3916.485!2d-74.199!3d11.241!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2sBillar+Pool+Santa+Marta!5e0!3m2!1ses!2sco!4v1709416800000!5m2!1ses!2sco"
@@ -32,7 +30,6 @@ export default function Location() {
             />
           </div>
 
-          {/* Contact info */}
           <div className="lg:col-span-2 flex flex-col gap-6">
             <div className="rounded-2xl bg-[#0a2472] p-8 text-white">
               <h3 className="text-xl font-bold font-mono mb-6">Informacion de Contacto</h3>

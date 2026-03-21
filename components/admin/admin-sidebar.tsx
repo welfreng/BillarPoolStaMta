@@ -4,13 +4,17 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Boxes,
+  Building2,
   ClipboardList,
   LayoutDashboard,
   ReceiptText,
+  ShoppingCart,
   ShieldCheck,
   Tags,
+  Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/components/auth-context';
 import {
   Sidebar,
   SidebarContent,
@@ -28,6 +32,8 @@ import {
 const navigation = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, helper: 'Resumen ejecutivo' },
   { href: '/dashboard/productos', label: 'Productos', icon: Boxes, helper: 'Catalogo y stock' },
+  { href: '/dashboard/proveedores', label: 'Proveedores', icon: Building2, helper: 'Contactos de compra' },
+  { href: '/dashboard/ventas', label: 'Ventas', icon: ShoppingCart, helper: 'Salidas comerciales' },
   {
     href: '/dashboard/inventario',
     label: 'Inventario',
@@ -36,10 +42,20 @@ const navigation = [
   },
   { href: '/dashboard/compras', label: 'Compras', icon: ReceiptText, helper: 'Inversion y costos' },
   { href: '/dashboard/reportes', label: 'Reportes', icon: Tags, helper: 'Insights operativos' },
+  { href: '/dashboard/usuarios', label: 'Usuarios', icon: Users, helper: 'Roles y accesos' },
 ];
 
 export function AdminSidebar() {
   const pathname = usePathname();
+  const { role } = useAuth();
+  const visibleNavigation = role === 'sales'
+    ? navigation.filter(
+        (item) =>
+          item.href === '/dashboard' ||
+          item.href === '/dashboard/ventas' ||
+          item.href === '/dashboard/inventario'
+      )
+    : navigation;
 
   return (
     <Sidebar collapsible="icon" variant="inset" className="border-r-0">
@@ -65,7 +81,7 @@ export function AdminSidebar() {
           <SidebarGroupLabel>Modulos</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navigation.map((item) => {
+              {visibleNavigation.map((item) => {
                 const Icon = item.icon;
                 const active =
                   item.href === '/dashboard'
@@ -98,12 +114,6 @@ export function AdminSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-
-      <SidebarFooter className="px-4 pb-4">
-        <div className="rounded-2xl border bg-white/80 px-4 py-3 text-xs leading-5 text-slate-600">
-          Inventario con costos reales, presentaciones comerciales y alertas de stock.
-        </div>
-      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   );

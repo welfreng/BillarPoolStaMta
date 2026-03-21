@@ -4,7 +4,6 @@ import { ShieldCheck, Trophy, Clock } from "lucide-react"
 export default function Hero() {
   return (
     <section id="inicio" className="relative min-h-screen flex items-center overflow-hidden">
-      {/* Background image */}
       <div className="absolute inset-0">
         <Image
           src="/images/hero-billar.jpg"
@@ -51,7 +50,6 @@ export default function Hero() {
             </a>
           </div>
 
-          {/* Trust badges */}
           <div className="mt-16 grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-3xl w-full">
             <div className="flex items-center gap-3 rounded-xl bg-white/10 backdrop-blur-sm p-4 border border-white/10">
               <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[#d4a017]/20">

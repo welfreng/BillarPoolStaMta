@@ -15,11 +15,14 @@ const pageTitles: Record<string, string> = {
   '/dashboard/inventario': 'Control de inventario',
   '/dashboard/compras': 'Compras e inversion',
   '/dashboard/reportes': 'Reportes iniciales',
+  '/dashboard/ventas': 'Gestion de ventas',
+  '/dashboard/proveedores': 'Gestion de proveedores',
+  '/dashboard/usuarios': 'Usuarios y roles',
 };
 
 export function AdminHeader() {
   const pathname = usePathname();
-  const { user, logout } = useAuth();
+  const { user, role, logout } = useAuth();
   const title = useMemo(() => pageTitles[pathname] ?? 'Panel administrativo', [pathname]);
   const initials = (user?.displayName ?? user?.email ?? 'A')
     .split(' ')
@@ -40,20 +43,20 @@ export function AdminHeader() {
         </div>
 
         <div className="flex flex-col gap-3 md:flex-row md:items-center">
-          <div className="relative min-w-[260px]">
+          <div className="relative w-full md:min-w-[260px] md:max-w-sm">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <Input
-              placeholder="Buscar modulo, SKU o accion..."
+              placeholder="Buscar modulo o accion..."
               className="rounded-xl border-slate-200 bg-slate-50 pl-9"
               readOnly
             />
           </div>
 
-          <Button variant="outline" size="icon" className="rounded-xl">
+          <Button variant="outline" size="icon" className="rounded-xl self-start md:self-auto">
             <Bell className="h-4 w-4" />
           </Button>
 
-          <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2">
+          <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3 sm:flex-row sm:items-center">
             <Avatar className="h-10 w-10 rounded-xl">
               <AvatarFallback className="rounded-xl bg-slate-900 text-white">
                 {initials}
@@ -63,9 +66,11 @@ export function AdminHeader() {
               <p className="truncate text-sm font-semibold text-slate-900">
                 {user?.displayName ?? 'Administrador'}
               </p>
-              <p className="truncate text-xs text-slate-500">{user?.email}</p>
+              <p className="truncate text-xs text-slate-500">
+                {user?.email} · {role === 'sales' ? 'Rol ventas' : 'Rol administrador'}
+              </p>
             </div>
-            <Button variant="outline" size="sm" onClick={logout} className="rounded-xl">
+            <Button variant="outline" size="sm" onClick={logout} className="rounded-xl self-start sm:self-auto">
               Salir
             </Button>
           </div>

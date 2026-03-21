@@ -1,8 +1,10 @@
 'use client';
 
+import { useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { movementReasonLabels, movementReasonsByType, movementTypeLabels } from '@/lib/admin/catalogs';
 import type { Product } from '@/lib/admin/types';
 import { Button } from '@/components/ui/button';
 import {
@@ -39,7 +41,7 @@ export type MovementFormValues = z.infer<typeof movementSchema>;
 const defaultValues: MovementFormValues = {
   productId: '',
   type: 'entry',
-  reason: 'manual-adjustment',
+  reason: 'purchase',
   quantity: 1,
   notes: '',
   responsibleUser: 'Administrador',
@@ -54,27 +56,39 @@ export function MovementFormDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   products: Product[];
-  onSubmit: (values: MovementFormValues) => void;
+  onSubmit: (values: MovementFormValues) => Promise<void> | void;
 }) {
   const form = useForm<MovementFormValues>({
     resolver: zodResolver(movementSchema),
     defaultValues,
   });
+  const selectedType = form.watch('type');
+  const availableReasons = useMemo(
+    () => movementReasonsByType[selectedType] ?? movementReasonsByType.entry,
+    [selectedType]
+  );
+
+  useEffect(() => {
+    const currentReason = form.getValues('reason');
+    if (!availableReasons.includes(currentReason)) {
+      form.setValue('reason', availableReasons[0], { shouldValidate: true });
+    }
+  }, [availableReasons, form]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-h-[90vh] w-[calc(100vw-1rem)] max-w-2xl overflow-y-auto px-4 sm:w-[calc(100vw-2rem)]">
         <DialogHeader>
-          <DialogTitle>Registrar movimiento</DialogTitle>
+          <DialogTitle>Registrar movimiento de inventario</DialogTitle>
           <DialogDescription>
-            Entradas, salidas y ajustes manuales impactan el stock base del producto.
+            Usa opciones simples para registrar entradas, salidas o ajustes del stock.
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
           <form
-            onSubmit={form.handleSubmit((values) => {
-              onSubmit(values);
+            onSubmit={form.handleSubmit(async (values) => {
+              await onSubmit(values);
               form.reset(defaultValues);
             })}
             className="space-y-5"
@@ -117,9 +131,9 @@ export function MovementFormDialog({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="entry">Entrada</SelectItem>
-                        <SelectItem value="exit">Salida</SelectItem>
-                        <SelectItem value="adjustment">Ajuste</SelectItem>
+                        <SelectItem value="entry">{movementTypeLabels.entry}</SelectItem>
+                        <SelectItem value="exit">{movementTypeLabels.exit}</SelectItem>
+                        <SelectItem value="adjustment">{movementTypeLabels.adjustment}</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -128,26 +142,28 @@ export function MovementFormDialog({
               />
             </div>
 
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               <FormField
                 control={form.control}
                 name="reason"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Motivo</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                    >
                       <FormControl>
                         <SelectTrigger className="w-full">
                           <SelectValue />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="purchase">Compra</SelectItem>
-                        <SelectItem value="sale">Venta</SelectItem>
-                        <SelectItem value="manual-adjustment">Ajuste manual</SelectItem>
-                        <SelectItem value="damage">Dano o merma</SelectItem>
-                        <SelectItem value="initial-load">Carga inicial</SelectItem>
-                        <SelectItem value="transfer">Transferencia</SelectItem>
+                        {availableReasons.map((reason) => (
+                          <SelectItem key={reason} value={reason}>
+                            {movementReasonLabels[reason]}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -182,17 +198,17 @@ export function MovementFormDialog({
               />
             </div>
 
-            <FormField
-              control={form.control}
-              name="notes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Observaciones</FormLabel>
-                  <FormControl>
-                    <Textarea rows={4} placeholder="Describe la causa del movimiento" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
+              <FormField
+                control={form.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Observaciones</FormLabel>
+                    <FormControl>
+                      <Textarea rows={4} placeholder="Ejemplo: salida por venta en local o ajuste por conteo fisico" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
               )}
             />
 

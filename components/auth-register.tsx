@@ -89,7 +89,10 @@ export function AuthRegister() {
           email,
           telefono,
           uid: userCredential.user.uid,
+          role: 'sales',
+          status: 'active',
           createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
         });
       } catch (firestoreError) {
         console.error('Error guardando usuario en Firestore:', firestoreError);

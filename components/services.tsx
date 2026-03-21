@@ -31,7 +31,6 @@ const services = [
 export default function Services() {
   return (
     <section id="servicios" className="py-24 bg-[#0a1628] relative overflow-hidden">
-      {/* Subtle pattern */}
       <div className="absolute inset-0 opacity-5">
         <div
           className="absolute inset-0"
@@ -44,7 +43,6 @@ export default function Services() {
 
       <div className="relative z-10 mx-auto max-w-7xl px-4 lg:px-8">
         <div className="grid lg:grid-cols-2 gap-16 items-center">
-          {/* Left content */}
           <div>
             <p className="text-sm font-semibold tracking-widest uppercase text-[#d4a017] mb-2">
               Servicios Especializados
@@ -80,7 +78,6 @@ export default function Services() {
             </a>
           </div>
 
-          {/* Right image */}
           <div className="relative">
             <div className="relative rounded-2xl overflow-hidden shadow-2xl">
               <Image
@@ -98,7 +95,6 @@ export default function Services() {
                 </div>
               </div>
             </div>
-            {/* Decorative accent */}
             <div className="absolute -top-4 -right-4 w-24 h-24 rounded-full bg-[#d4a017]/20 blur-2xl" />
             <div className="absolute -bottom-4 -left-4 w-32 h-32 rounded-full bg-[#0a2472]/30 blur-2xl" />
           </div>

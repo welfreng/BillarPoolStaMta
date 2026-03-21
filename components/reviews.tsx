@@ -61,7 +61,6 @@ export default function Reviews() {
   return (
     <section id="resenas" className="py-24 bg-muted/50">
       <div className="mx-auto max-w-7xl px-4 lg:px-8">
-        {/* Section header */}
         <div className="text-center mb-16">
           <p className="text-sm font-semibold tracking-widest uppercase text-[#d4a017] mb-2">
             Testimonios
@@ -74,7 +73,6 @@ export default function Reviews() {
           </p>
         </div>
 
-        {/* Reviews grid */}
         <div className="grid md:grid-cols-3 gap-6">
           {currentReviews.map((review, i) => (
             <div
@@ -82,7 +80,6 @@ export default function Reviews() {
               className="rounded-2xl bg-card border border-border p-6 relative group hover:border-[#0a2472]/30 hover:shadow-lg transition-all"
             >
               <Quote className="h-8 w-8 text-[#0a2472]/10 absolute top-6 right-6" />
-              {/* Stars */}
               <div className="flex gap-1 mb-4">
                 {Array.from({ length: 5 }).map((_, j) => (
                   <Star
@@ -107,7 +104,6 @@ export default function Reviews() {
           ))}
         </div>
 
-        {/* Pagination */}
         {totalPages > 1 && (
           <div className="flex items-center justify-center gap-4 mt-10">
             <button

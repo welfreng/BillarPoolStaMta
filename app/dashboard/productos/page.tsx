@@ -1,19 +1,28 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { Eye, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import Image from 'next/image';
+import { useEffect, useMemo, useState } from 'react';
+import { Eye, ImagePlus, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { SectionHeader } from '@/components/admin/shared/section-header';
+import { CatalogImageDialog } from '@/components/admin/products/catalog-image-dialog';
 import { ProductFormDialog, type ProductFormValues } from '@/components/admin/products/product-form-dialog';
-import { ProductStatusBadge, StockBadge } from '@/components/admin/shared/status-badges';
+import { ProductStatusBadge } from '@/components/admin/shared/status-badges';
 import { useAdminData } from '@/components/admin/admin-data-context';
 import { useToast } from '@/hooks/use-toast';
-import { formatCurrency, formatNumber } from '@/lib/admin/calculations';
-import { getCategoryLabel, inventoryCategories, presentationOptions } from '@/lib/admin/catalogs';
+import { formatCurrency } from '@/lib/admin/calculations';
+import { getCategoryLabel, inventoryCategories } from '@/lib/admin/catalogs';
 import type { Product } from '@/lib/admin/types';
 
 const pageSize = 6;
@@ -23,67 +32,98 @@ export default function ProductosPage() {
   const { toast } = useToast();
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('all');
-  const [saleType, setSaleType] = useState('all');
   const [status, setStatus] = useState('all');
   const [page, setPage] = useState(1);
   const [openDialog, setOpenDialog] = useState(false);
+  const [openCatalogImageDialog, setOpenCatalogImageDialog] = useState(false);
+  const [openViewDialog, setOpenViewDialog] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | undefined>(products[0]);
   const [editingProduct, setEditingProduct] = useState<Product | undefined>();
+  const [imageZoom, setImageZoom] = useState(1);
+  const [imageOffset, setImageOffset] = useState({ x: 0, y: 0 });
+  const [isDraggingImage, setIsDraggingImage] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
       const matchesQuery =
-        [product.name, product.sku, product.brand, product.category, product.subcategory]
+        [product.name, product.brand, product.category, product.subcategory]
           .join(' ')
           .toLowerCase()
           .includes(query.toLowerCase());
       const matchesCategory = category === 'all' || product.category === category;
-      const matchesSaleType = saleType === 'all' || product.saleType === saleType;
       const matchesStatus = status === 'all' || product.status === status;
 
-      return matchesQuery && matchesCategory && matchesSaleType && matchesStatus;
+      return matchesQuery && matchesCategory && matchesStatus;
     });
-  }, [category, products, query, saleType, status]);
+  }, [category, products, query, status]);
 
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / pageSize));
   const paginatedProducts = filteredProducts.slice((page - 1) * pageSize, page * pageSize);
 
-  const handleSave = (values: ProductFormValues) => {
-    const presentationMap = new Map(
-      presentationOptions
-        .filter(
-          (option) =>
-            option.kind === values.purchasePresentation || option.kind === values.salePresentation
-        )
-        .map((option) => [option.id, option])
-    );
+  useEffect(() => {
+    if (openViewDialog) {
+      setImageZoom(1);
+      setImageOffset({ x: 0, y: 0 });
+    }
+  }, [openViewDialog, selectedProduct]);
 
-    const payload = {
-      ...values,
-      presentations: [...presentationMap.values()],
-    };
-
-    if (editingProduct) {
-      const updated = updateProduct(editingProduct.id, payload);
-      if (updated) {
-        setSelectedProduct(updated);
-        toast({ title: 'Producto actualizado', description: 'Los cambios fueron guardados.' });
-      }
-    } else {
-      const created = createProduct(payload);
-      setSelectedProduct(created);
-      toast({ title: 'Producto creado', description: 'El producto ya forma parte del inventario.' });
+  useEffect(() => {
+    if (products.length === 0) {
+      setSelectedProduct(undefined);
+      return;
     }
 
-    setEditingProduct(undefined);
-    setOpenDialog(false);
+    setSelectedProduct((current) => {
+      if (!current) return products[0];
+      return products.find((product) => product.id === current.id) ?? products[0];
+    });
+  }, [products]);
+
+  const handleSave = async (values: ProductFormValues) => {
+    try {
+      if (editingProduct) {
+        const updated = await updateProduct(editingProduct.id, values);
+        setSelectedProduct(updated);
+        toast({ title: 'Producto actualizado', description: 'Los cambios fueron guardados.' });
+      } else {
+        const created = await createProduct(values);
+        setSelectedProduct(created);
+        toast({ title: 'Producto creado', description: 'El producto ya forma parte del inventario.' });
+      }
+
+      setEditingProduct(undefined);
+      setOpenDialog(false);
+    } catch (error) {
+      console.error('Error guardando producto en Firestore:', error);
+      toast({
+        title: 'No se pudo guardar el producto',
+        description: 'Revisa la configuracion y permisos de Firebase para este proyecto.',
+        variant: 'destructive',
+      });
+      throw error;
+    }
   };
 
-  const handleDelete = (product: Product) => {
-    if (!window.confirm(`Deseas eliminar ${product.name}?`)) return;
-    deleteProduct(product.id);
-    setSelectedProduct(undefined);
-    toast({ title: 'Producto eliminado', description: 'El registro fue removido del panel.' });
+  const handleDelete = async (product: Product) => {
+    const relatedCountMessage =
+      'Tambien se eliminaran sus compras, movimientos y ventas relacionadas.';
+    if (!window.confirm(`Deseas eliminar ${product.name}?\n\n${relatedCountMessage}`)) return;
+    try {
+      await deleteProduct(product.id);
+      setSelectedProduct(undefined);
+      toast({
+        title: 'Producto eliminado',
+        description: 'El producto y sus registros relacionados fueron removidos del panel.',
+      });
+    } catch (error) {
+      console.error('Error eliminando producto en Firestore:', error);
+      toast({
+        title: 'No se pudo eliminar el producto',
+        description: 'Firestore rechazo la operacion o la conexion fallo.',
+        variant: 'destructive',
+      });
+    }
   };
 
   return (
@@ -91,24 +131,34 @@ export default function ProductosPage() {
       <SectionHeader
         eyebrow="Modulo CRUD"
         title="Productos e inventario base"
-        description="Administra el catalogo, costo unitario real, stock minimo, presentaciones comerciales y estado operativo de cada referencia."
+        description="Administra el catalogo del producto, su imagen, precio de venta y estado operativo."
         actions={
-          <Button
-            onClick={() => {
-              setEditingProduct(undefined);
-              setOpenDialog(true);
-            }}
-            className="rounded-xl"
-          >
-            <Plus className="mr-2 h-4 w-4" /> Nuevo producto
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpenCatalogImageDialog(true)}
+              className="rounded-xl"
+            >
+              <ImagePlus className="mr-2 h-4 w-4" /> Imagenes del catalogo web
+            </Button>
+            <Button
+              onClick={() => {
+                setEditingProduct(undefined);
+                setOpenDialog(true);
+              }}
+              className="rounded-xl"
+            >
+              <Plus className="mr-2 h-4 w-4" /> Nuevo producto
+            </Button>
+          </div>
         }
       />
 
       <div className="grid gap-6 xl:grid-cols-[1.4fr_0.8fr]">
-        <div className="space-y-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="grid gap-3 md:grid-cols-4">
-            <div className="relative md:col-span-2">
+        <div className="min-w-0 space-y-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="relative sm:col-span-2 xl:col-span-2">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
                 value={query}
@@ -116,7 +166,7 @@ export default function ProductosPage() {
                   setPage(1);
                   setQuery(event.target.value);
                 }}
-                placeholder="Buscar por nombre, SKU, marca o categoria"
+                placeholder="Buscar por nombre, marca o categoria"
                 className="pl-9"
               />
             </div>
@@ -158,103 +208,84 @@ export default function ProductosPage() {
             </Select>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-3">
-            <Select
-              value={saleType}
-              onValueChange={(value) => {
-                setSaleType(value);
-                setPage(1);
-              }}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Tipo de venta" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los tipos</SelectItem>
-                <SelectItem value="unit">Unidad</SelectItem>
-                <SelectItem value="bundle">Presentacion</SelectItem>
-                <SelectItem value="mixed">Mixto</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
           {paginatedProducts.length > 0 ? (
             <>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Producto</TableHead>
-                    <TableHead>Categoria</TableHead>
-                    <TableHead>Stock</TableHead>
-                    <TableHead>Costo real</TableHead>
-                    <TableHead>Venta</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paginatedProducts.map((product) => (
-                    <TableRow
-                      key={product.id}
-                      className="cursor-pointer"
-                      onClick={() => setSelectedProduct(product)}
-                    >
-                      <TableCell>
-                        <div>
-                          <p className="font-medium text-slate-900">{product.name}</p>
-                          <p className="text-xs text-slate-500">
-                            {product.sku} · {product.brand}
-                          </p>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <p className="text-sm text-slate-700">{getCategoryLabel(product.category)}</p>
-                        <p className="text-xs text-slate-500">{product.subcategory}</p>
-                      </TableCell>
-                      <TableCell>
-                        <p className="font-medium text-slate-900">{formatNumber(product.stockQuantity)}</p>
-                        <StockBadge product={product} />
-                      </TableCell>
-                      <TableCell>{formatCurrency(product.realUnitCost)}</TableCell>
-                      <TableCell>{formatCurrency(product.salePrice)}</TableCell>
-                      <TableCell>
-                        <ProductStatusBadge status={product.status} />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            onClick={() => setSelectedProduct(product)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            onClick={() => {
-                              setEditingProduct(product);
-                              setOpenDialog(true);
-                            }}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            onClick={() => handleDelete(product)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
+              <div className="min-w-0">
+                <Table className="min-w-[680px]">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Producto</TableHead>
+                      <TableHead>Categoria</TableHead>
+                      <TableHead>Venta</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedProducts.map((product) => (
+                      <TableRow
+                        key={product.id}
+                        className="cursor-pointer"
+                        onClick={() => setSelectedProduct(product)}
+                      >
+                        <TableCell>
+                          <div>
+                            <p className="font-medium text-slate-900">{product.name}</p>
+                            <p className="text-xs text-slate-500">{product.brand}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <p className="text-sm text-slate-700">{getCategoryLabel(product.category)}</p>
+                          <p className="text-xs text-slate-500">{product.subcategory}</p>
+                        </TableCell>
+                        <TableCell>{formatCurrency(product.salePrice)}</TableCell>
+                        <TableCell>
+                          <ProductStatusBadge status={product.status} />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setSelectedProduct(product);
+                                setOpenViewDialog(true);
+                              }}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setEditingProduct(product);
+                                setOpenDialog(true);
+                              }}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleDelete(product);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
 
               <div className="flex items-center justify-between border-t pt-4 text-sm text-slate-500">
                 <p>
@@ -295,23 +326,29 @@ export default function ProductosPage() {
           )}
         </div>
 
-        <aside className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <aside className="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
           {selectedProduct ? (
             <div className="space-y-5">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-sm font-medium text-cyan-700">Detalle del producto</p>
-                  <h3 className="mt-2 text-2xl font-semibold text-slate-950">{selectedProduct.name}</h3>
-                  <p className="mt-2 text-sm leading-6 text-slate-500">{selectedProduct.description}</p>
+              <div className="overflow-hidden rounded-3xl border border-slate-200 bg-slate-50">
+                <div className="relative aspect-[16/10] w-full">
+                  <Image
+                    src={selectedProduct.image}
+                    alt={selectedProduct.name}
+                    fill
+                    className="object-cover"
+                    style={{ transform: `rotate(${selectedProduct.imageRotation}deg)` }}
+                    unoptimized={selectedProduct.image.startsWith('data:')}
+                  />
                 </div>
-                <StockBadge product={selectedProduct} />
+              </div>
+
+              <div>
+                <p className="text-sm font-medium text-cyan-700">Vista del producto</p>
+                <h3 className="mt-2 text-2xl font-semibold text-slate-950">{selectedProduct.name}</h3>
+                <p className="mt-3 text-sm leading-6 text-slate-500">{selectedProduct.description}</p>
               </div>
 
               <div className="grid gap-3">
-                <div className="rounded-2xl bg-slate-50 p-4">
-                  <p className="text-xs text-slate-500">SKU</p>
-                  <p className="mt-1 font-semibold text-slate-900">{selectedProduct.sku}</p>
-                </div>
                 <div className="grid gap-3 md:grid-cols-2">
                   <div className="rounded-2xl bg-slate-50 p-4">
                     <p className="text-xs text-slate-500">Categoria</p>
@@ -325,42 +362,10 @@ export default function ProductosPage() {
                     <p className="mt-1 font-semibold text-slate-900">{selectedProduct.brand}</p>
                   </div>
                 </div>
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div className="rounded-2xl bg-slate-50 p-4">
-                    <p className="text-xs text-slate-500">Stock / minimo</p>
-                    <p className="mt-1 font-semibold text-slate-900">
-                      {formatNumber(selectedProduct.stockQuantity)} /{' '}
-                      {formatNumber(selectedProduct.stockMinimum)}
-                    </p>
-                  </div>
-                  <div className="rounded-2xl bg-slate-50 p-4">
-                    <p className="text-xs text-slate-500">Margen</p>
-                    <p className="mt-1 font-semibold text-slate-900">
-                      {selectedProduct.profitMargin.toFixed(1)}%
-                    </p>
-                  </div>
-                </div>
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div className="rounded-2xl bg-slate-50 p-4">
-                    <p className="text-xs text-slate-500">Costo real</p>
-                    <p className="mt-1 font-semibold text-slate-900">
-                      {formatCurrency(selectedProduct.realUnitCost)}
-                    </p>
-                  </div>
-                  <div className="rounded-2xl bg-slate-50 p-4">
-                    <p className="text-xs text-slate-500">Precio de venta</p>
-                    <p className="mt-1 font-semibold text-slate-900">
-                      {formatCurrency(selectedProduct.salePrice)}
-                    </p>
-                  </div>
-                </div>
-                <div className="rounded-2xl bg-cyan-50 p-4">
-                  <p className="text-xs text-cyan-700">Presentaciones</p>
-                  <p className="mt-1 text-sm font-medium text-slate-900">
-                    Compra: {selectedProduct.purchasePresentation} · Venta: {selectedProduct.salePresentation}
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    Factor de conversion: {formatNumber(selectedProduct.conversionFactor)} unidades base
+                <div className="rounded-2xl bg-slate-50 p-4">
+                  <p className="text-xs text-slate-500">Precio de venta</p>
+                  <p className="mt-1 font-semibold text-slate-900">
+                    {formatCurrency(selectedProduct.salePrice)}
                   </p>
                 </div>
               </div>
@@ -373,7 +378,7 @@ export default function ProductosPage() {
                 </EmptyMedia>
                 <EmptyTitle>Selecciona un producto</EmptyTitle>
                 <EmptyDescription>
-                  Aqui veras su ficha rapida, costo real, stock, ubicacion y presentaciones configuradas.
+                  Aqui veras la imagen del producto y su descripcion.
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>
@@ -387,6 +392,102 @@ export default function ProductosPage() {
         initialProduct={editingProduct}
         onSubmit={handleSave}
       />
+
+      <CatalogImageDialog
+        open={openCatalogImageDialog}
+        onOpenChange={setOpenCatalogImageDialog}
+        onSaved={() =>
+          toast({
+            title: 'Imagenes actualizadas',
+            description: 'Las tarjetas del catalogo web ya pueden mostrar las nuevas fotos.',
+          })
+        }
+      />
+
+      <Dialog open={openViewDialog} onOpenChange={setOpenViewDialog}>
+        <DialogContent className="max-h-[92vh] w-[calc(100vw-1rem)] max-w-6xl overflow-y-auto border-slate-800 bg-slate-950 p-0 text-white sm:w-[calc(100vw-2rem)]">
+          {selectedProduct ? (
+            <>
+              <div
+                className="overflow-hidden bg-black touch-none"
+                onWheel={(event) => {
+                  event.preventDefault();
+                  setImageZoom((current) => {
+                    const next = current + (event.deltaY < 0 ? 0.12 : -0.12);
+                    return Math.min(Math.max(Number(next.toFixed(2)), 1), 4);
+                  });
+                }}
+                onPointerDown={(event) => {
+                  setIsDraggingImage(true);
+                  setDragStart({
+                    x: event.clientX - imageOffset.x,
+                    y: event.clientY - imageOffset.y,
+                  });
+                }}
+                onPointerMove={(event) => {
+                  if (!isDraggingImage) return;
+                  setImageOffset({
+                    x: event.clientX - dragStart.x,
+                    y: event.clientY - dragStart.y,
+                  });
+                }}
+                onPointerUp={() => setIsDraggingImage(false)}
+                onPointerLeave={() => setIsDraggingImage(false)}
+              >
+                <div className="relative mx-auto aspect-[4/3] min-h-[40vh] w-full max-w-5xl sm:min-h-[55vh]">
+                  <Image
+                    src={selectedProduct.image}
+                    alt={selectedProduct.name}
+                    fill
+                    className="object-contain"
+                    style={{
+                      transform: `translate(${imageOffset.x}px, ${imageOffset.y}px) scale(${imageZoom}) rotate(${selectedProduct.imageRotation}deg)`,
+                      cursor: isDraggingImage ? 'grabbing' : 'grab',
+                    }}
+                    unoptimized={selectedProduct.image.startsWith('data:')}
+                  />
+                </div>
+              </div>
+              <div className="border-t border-slate-800 bg-slate-950 p-4 sm:p-6">
+                <DialogHeader>
+                  <DialogTitle className="text-white">{selectedProduct.name}</DialogTitle>
+                  <DialogDescription className="text-slate-400">
+                    {getCategoryLabel(selectedProduct.category)} · {selectedProduct.subcategory}
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="mt-4 space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+                    <p className="text-sm text-slate-300">
+                      Usa la rueda del mouse para zoom y arrastra la imagen para moverla.
+                    </p>
+                    <p className="text-sm font-medium text-cyan-300">
+                      Zoom: {(imageZoom * 100).toFixed(0)}%
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+                    <p className="text-xs text-slate-400">Descripcion</p>
+                    <p className="mt-2 text-sm leading-6 text-slate-200">
+                      {selectedProduct.description}
+                    </p>
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+                      <p className="text-xs text-slate-400">Marca</p>
+                      <p className="mt-1 font-semibold text-white">{selectedProduct.brand}</p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+                      <p className="text-xs text-slate-400">Precio de venta</p>
+                      <p className="mt-1 font-semibold text-white">
+                        {formatCurrency(selectedProduct.salePrice)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
