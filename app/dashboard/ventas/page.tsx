@@ -27,11 +27,19 @@ export default function VentasPage() {
   const editingSale = editingSaleId ? sales.find((sale) => sale.id === editingSaleId) ?? null : null;
   const returningSale = returningSaleId ? sales.find((sale) => sale.id === returningSaleId) ?? null : null;
   const initialSaleValues: SaleFormValues | null = editingSale
-    ? {
+      ? {
         productId: editingSale.productId,
         soldAt: editingSale.soldAt.slice(0, 10),
         quantity: editingSale.quantity,
         unitPrice: editingSale.unitPrice,
+        includeGift: editingSale.giftItems.length > 0,
+        giftItems:
+          editingSale.giftItems.length > 0
+            ? editingSale.giftItems.map((item) => ({
+                productId: item.productId,
+                quantity: item.quantity,
+              }))
+            : [{ productId: '', quantity: 1 }],
         customerName: editingSale.customerName,
         notes: editingSale.notes,
       }
@@ -143,6 +151,13 @@ export default function VentasPage() {
                   const netTotalSale = sale.totalSale - (sale.returnedSaleAmount ?? 0);
                   const netProfit =
                     sale.grossProfit - ((sale.returnedSaleAmount ?? 0) - (sale.returnedCostAmount ?? 0));
+                  const giftSummary = sale.giftItems
+                    .map((item) => {
+                      const product = getProductById(products, item.productId);
+                      return product ? `${product.name} x ${formatNumber(item.quantity)}` : null;
+                    })
+                    .filter(Boolean)
+                    .join(', ');
                   const returnStatus =
                     returnedQuantity <= 0
                       ? 'Sin devolucion'
@@ -157,6 +172,11 @@ export default function VentasPage() {
                           <p className="text-xs text-slate-500">
                             Stock restante: {formatNumber(product ? getProductStock(movements, product.id) : 0)}
                           </p>
+                          {giftSummary ? (
+                            <p className="text-xs text-violet-700">
+                              Obsequios: {giftSummary}
+                            </p>
+                          ) : null}
                         </div>
                       </TableCell>
                       <TableCell>{sale.customerName}</TableCell>
@@ -240,6 +260,7 @@ export default function VentasPage() {
             const payload = {
               ...values,
               soldAt: new Date(values.soldAt).toISOString(),
+              giftItems: values.includeGift ? values.giftItems : [],
               responsibleUser:
                 profile?.nombre?.trim() || user?.displayName || user?.email || 'Usuario de ventas',
             };

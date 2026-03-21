@@ -10,6 +10,7 @@ export const movementTypeLabels = {
 export const movementReasonLabels = {
   purchase: 'Compra',
   sale: 'Venta',
+  gift: 'Obsequio',
   return: 'Devolucion',
   'manual-adjustment': 'Ajuste manual',
   damage: 'Producto danado',
@@ -19,7 +20,7 @@ export const movementReasonLabels = {
 
 export const movementReasonsByType = {
   entry: ['purchase', 'initial-load', 'transfer'],
-  exit: ['sale', 'damage', 'transfer'],
+  exit: ['sale', 'gift', 'damage', 'transfer'],
   adjustment: ['manual-adjustment'],
 } as const;
 

@@ -51,6 +51,10 @@ export function MovementReasonBadge({ reason }: { reason: MovementReason }) {
     return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">Devolucion</Badge>;
   }
 
+  if (reason === 'gift') {
+    return <Badge className="bg-violet-100 text-violet-800 hover:bg-violet-100">Obsequio</Badge>;
+  }
+
   if (reason === 'sale') {
     return <Badge className="bg-rose-100 text-rose-800 hover:bg-rose-100">Venta</Badge>;
   }

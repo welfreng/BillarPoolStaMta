@@ -210,13 +210,29 @@ export default function ReportesPage() {
               <TableBody>
                 {sales.map((sale) => {
                   const product = products.find((item) => item.id === sale.productId);
+                  const giftSummary = sale.giftItems
+                    .map((item) => {
+                      const giftProduct = products.find((product) => product.id === item.productId);
+                      return giftProduct ? `${giftProduct.name} x ${formatNumber(item.quantity)}` : null;
+                    })
+                    .filter(Boolean)
+                    .join(', ');
                   const netRevenue = sale.totalSale - (sale.returnedSaleAmount ?? 0);
                   const netCost = sale.totalCost - (sale.returnedCostAmount ?? 0);
                   const netProfit =
                     sale.grossProfit - ((sale.returnedSaleAmount ?? 0) - (sale.returnedCostAmount ?? 0));
                   return (
                     <TableRow key={sale.id}>
-                      <TableCell>{product?.name ?? 'Producto'}</TableCell>
+                      <TableCell>
+                        <div>
+                          <p>{product?.name ?? 'Producto'}</p>
+                          {giftSummary ? (
+                            <p className="text-xs text-violet-700">
+                              Obsequios: {giftSummary}
+                            </p>
+                          ) : null}
+                        </div>
+                      </TableCell>
                       <TableCell>{sale.customerName}</TableCell>
                       <TableCell>{formatNumber(sale.quantity - (sale.returnedQuantity ?? 0))}</TableCell>
                       <TableCell>{formatCurrency(netRevenue)}</TableCell>

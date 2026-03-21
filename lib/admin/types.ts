@@ -6,6 +6,7 @@ export type MovementType = 'entry' | 'exit' | 'adjustment' | 'purchase';
 export type MovementReason =
   | 'purchase'
   | 'sale'
+  | 'gift'
   | 'return'
   | 'manual-adjustment'
   | 'damage'
@@ -94,6 +95,13 @@ export interface Purchase {
   notes?: string;
 }
 
+export interface SaleGiftItem {
+  productId: string;
+  quantity: number;
+  unitCost: number;
+  totalCost: number;
+}
+
 export interface Sale {
   id: string;
   productId: string;
@@ -104,6 +112,11 @@ export interface Sale {
   realUnitCost: number;
   totalCost: number;
   grossProfit: number;
+  giftItems: SaleGiftItem[];
+  giftedProductId?: string;
+  giftedQuantity: number;
+  giftedUnitCost: number;
+  giftedTotalCost: number;
   returnedQuantity: number;
   returnedSaleAmount: number;
   returnedCostAmount: number;

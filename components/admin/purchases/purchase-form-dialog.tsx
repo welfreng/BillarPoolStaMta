@@ -416,14 +416,14 @@ export function PurchaseFormDialog({
                       <FormField
                         control={form.control}
                         name={`items.${index}.productId`}
-                        render={({ field }) => (
+                        render={({ field: productField }) => (
                           <FormItem className="min-w-0 xl:col-span-12">
                             <FormLabel>Producto</FormLabel>
                             <FormControl>
                               <SearchableSelect
-                                value={field.value}
+                                value={productField.value}
                                 onChange={(value) => {
-                                  field.onChange(value);
+                                  productField.onChange(value);
                                   resetPack12Normalization(field.id);
                                   const product = products.find((item) => item.id === value);
                                   if (product) {

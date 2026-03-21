@@ -30,7 +30,7 @@ import { Textarea } from '@/components/ui/textarea';
 const movementSchema = z.object({
   productId: z.string().min(1, 'Selecciona un producto'),
   type: z.enum(['entry', 'exit', 'adjustment']),
-  reason: z.enum(['purchase', 'sale', 'manual-adjustment', 'damage', 'initial-load', 'transfer']),
+  reason: z.enum(['purchase', 'sale', 'gift', 'manual-adjustment', 'damage', 'initial-load', 'transfer']),
   quantity: z.coerce.number().positive('La cantidad debe ser mayor a cero'),
   notes: z.string().min(4, 'Agrega una observacion breve'),
   responsibleUser: z.string().min(2, 'Ingresa el responsable'),
@@ -64,7 +64,7 @@ export function MovementFormDialog({
   });
   const selectedType = form.watch('type');
   const availableReasons = useMemo(
-    () => movementReasonsByType[selectedType] ?? movementReasonsByType.entry,
+    () => [...(movementReasonsByType[selectedType] ?? movementReasonsByType.entry)] as MovementFormValues['reason'][],
     [selectedType]
   );
 
