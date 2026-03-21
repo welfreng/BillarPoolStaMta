@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -22,10 +22,19 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { formatNumber } from '@/lib/admin/calculations';
+import { formatNumber, getProductById } from '@/lib/admin/calculations';
+import type { Product, Sale } from '@/lib/admin/types';
 
 const saleReturnSchema = z.object({
+  saleId: z.string().min(1, 'Selecciona el producto a devolver'),
   returnedAt: z.string().min(1, 'Selecciona la fecha'),
   quantity: z.coerce.number().positive('Ingresa una cantidad valida'),
   notes: z.string().default(''),
@@ -34,6 +43,7 @@ const saleReturnSchema = z.object({
 export type SaleReturnFormValues = z.infer<typeof saleReturnSchema>;
 
 const defaultValues: SaleReturnFormValues = {
+  saleId: '',
   returnedAt: new Date().toISOString().slice(0, 10),
   quantity: 1,
   notes: '',
@@ -42,15 +52,15 @@ const defaultValues: SaleReturnFormValues = {
 export function SaleReturnDialog({
   open,
   onOpenChange,
-  remainingQuantity,
-  productName,
+  sales,
+  products,
   customerName,
   onSubmit,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  remainingQuantity: number;
-  productName: string;
+  sales: Sale[];
+  products: Product[];
   customerName: string;
   onSubmit: (values: SaleReturnFormValues) => Promise<void> | void;
 }) {
@@ -59,13 +69,37 @@ export function SaleReturnDialog({
     defaultValues,
   });
 
+  const returnableSales = useMemo(
+    () =>
+      sales.filter((sale) => {
+        const remainingQuantity = sale.quantity - (sale.returnedQuantity ?? 0);
+        return remainingQuantity > 0;
+      }),
+    [sales]
+  );
+
+  const selectedSaleId = form.watch('saleId');
+  const selectedSale = returnableSales.find((sale) => sale.id === selectedSaleId) ?? returnableSales[0] ?? null;
+  const remainingQuantity = selectedSale
+    ? Math.max(selectedSale.quantity - (selectedSale.returnedQuantity ?? 0), 0)
+    : 0;
+  const productName = selectedSale
+    ? getProductById(products, selectedSale.productId)?.name ?? 'Producto'
+    : 'Producto';
+
   useEffect(() => {
     if (!open) return;
     form.reset({
       ...defaultValues,
-      quantity: remainingQuantity > 0 ? 1 : 0,
+      saleId: returnableSales[0]?.id ?? '',
+      quantity: returnableSales.length > 0 ? 1 : 0,
     });
-  }, [form, open, remainingQuantity]);
+  }, [form, open, returnableSales]);
+
+  useEffect(() => {
+    if (!selectedSale) return;
+    form.setValue('quantity', remainingQuantity > 0 ? 1 : 0, { shouldValidate: true });
+  }, [form, remainingQuantity, selectedSaleId, selectedSale]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -73,13 +107,13 @@ export function SaleReturnDialog({
         <DialogHeader>
           <DialogTitle>Registrar devolucion</DialogTitle>
           <DialogDescription>
-            Esta devolucion regresara unidades al inventario y ajustara la venta original.
+            Selecciona el producto de la factura que vas a devolver y la cantidad correspondiente.
           </DialogDescription>
         </DialogHeader>
 
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-          <p className="font-medium text-slate-900">{productName}</p>
-          <p className="mt-1">Cliente: {customerName}</p>
+          <p className="font-medium text-slate-900">Cliente: {customerName}</p>
+          <p className="mt-1">Producto: {productName}</p>
           <p className="mt-1">Pendiente por devolver: {formatNumber(remainingQuantity)} uds</p>
         </div>
 
@@ -91,6 +125,35 @@ export function SaleReturnDialog({
             })}
             className="space-y-4"
           >
+            <FormField
+              control={form.control}
+              name="saleId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Producto de la venta</FormLabel>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <FormControl>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Selecciona producto" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {returnableSales.map((sale) => {
+                        const product = getProductById(products, sale.productId);
+                        const pending = sale.quantity - (sale.returnedQuantity ?? 0);
+                        return (
+                          <SelectItem key={sale.id} value={sale.id}>
+                            {(product?.name ?? 'Producto') + ` · Pendiente ${formatNumber(pending)}`}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <div className="grid gap-4 sm:grid-cols-2">
               <FormField
                 control={form.control}
@@ -138,7 +201,7 @@ export function SaleReturnDialog({
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={remainingQuantity <= 0}>
+              <Button type="submit" disabled={returnableSales.length === 0 || remainingQuantity <= 0}>
                 Guardar devolucion
               </Button>
             </DialogFooter>

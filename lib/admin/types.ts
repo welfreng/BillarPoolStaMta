@@ -102,8 +102,18 @@ export interface SaleGiftItem {
   totalCost: number;
 }
 
+export interface SaleLineItem {
+  productId: string;
+  quantity: number;
+  unitPrice: number;
+  realUnitCost: number;
+  totalSale: number;
+  totalCost: number;
+}
+
 export interface Sale {
   id: string;
+  saleBatchId?: string;
   productId: string;
   soldAt: string;
   quantity: number;
@@ -112,6 +122,7 @@ export interface Sale {
   realUnitCost: number;
   totalCost: number;
   grossProfit: number;
+  lineItems: SaleLineItem[];
   giftItems: SaleGiftItem[];
   giftedProductId?: string;
   giftedQuantity: number;

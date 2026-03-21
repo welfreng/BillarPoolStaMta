@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { MinusCircle, PlusCircle } from 'lucide-react';
+import { Check, ChevronsUpDown, MinusCircle, PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -25,6 +25,15 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -34,24 +43,112 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { formatCurrency, formatNumber, getProductRealUnitCost, getProductStock } from '@/lib/admin/calculations';
 import type { InventoryMovement, Product, Purchase } from '@/lib/admin/types';
+import { cn } from '@/lib/utils';
 
 const allowedGiftCategories = new Set(['estuches', 'guantes']);
+
+const saleLineItemSchema = z.object({
+  productId: z.string().default(''),
+  quantity: z.coerce.number().min(0, 'Ingresa una cantidad valida').default(0),
+  unitPrice: z.coerce.number().min(0, 'Ingresa un precio valido').default(0),
+});
 
 const saleGiftItemSchema = z.object({
   productId: z.string().default(''),
   quantity: z.coerce.number().min(0, 'Ingresa una cantidad valida').default(0),
 });
 
+function SearchableSelect({
+  value,
+  onChange,
+  placeholder,
+  searchPlaceholder,
+  emptyLabel,
+  options,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  searchPlaceholder: string;
+  emptyLabel: string;
+  options: Array<{ value: string; label: string }>;
+}) {
+  const [open, setOpen] = useState(false);
+  const selectedOption = options.find((option) => option.value === value);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          role="combobox"
+          className="w-full min-w-0 justify-between overflow-hidden px-3 font-normal"
+        >
+          <span className="truncate text-left">
+            {selectedOption ? selectedOption.label : placeholder}
+          </span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] min-w-[280px] p-0" align="start">
+        <Command>
+          <CommandInput placeholder={searchPlaceholder} />
+          <CommandList>
+            <CommandEmpty>{emptyLabel}</CommandEmpty>
+            <CommandGroup>
+              {options.map((option) => (
+                <CommandItem
+                  key={option.value}
+                  value={`${option.label} ${option.value}`}
+                  onSelect={() => {
+                    onChange(option.value);
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      'mr-2 h-4 w-4',
+                      value === option.value ? 'opacity-100' : 'opacity-0'
+                    )}
+                  />
+                  <span className="truncate">{option.label}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 const saleSchema = z.object({
-  productId: z.string().min(1, 'Selecciona un producto'),
   soldAt: z.string().min(1, 'Selecciona la fecha'),
-  quantity: z.coerce.number().positive('Ingresa una cantidad valida'),
-  unitPrice: z.coerce.number().min(0, 'Ingresa un precio valido'),
+  items: z.array(saleLineItemSchema).min(1, 'Agrega al menos un producto'),
   includeGift: z.boolean().default(false),
   giftItems: z.array(saleGiftItemSchema).default([]),
   customerName: z.string().min(2, 'Ingresa el nombre del cliente o referencia'),
   notes: z.string().default(''),
 }).superRefine((values, context) => {
+  values.items.forEach((item, index) => {
+    if (!item.productId) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['items', index, 'productId'],
+        message: 'Selecciona el producto',
+      });
+    }
+
+    if (item.quantity <= 0) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['items', index, 'quantity'],
+        message: 'La cantidad debe ser mayor a cero',
+      });
+    }
+  });
+
   if (!values.includeGift) return;
   if (values.giftItems.length === 0) {
     context.addIssue({
@@ -83,10 +180,8 @@ const saleSchema = z.object({
 export type SaleFormValues = z.infer<typeof saleSchema>;
 
 const defaultValues: SaleFormValues = {
-  productId: '',
   soldAt: new Date().toISOString().slice(0, 10),
-  quantity: 1,
-  unitPrice: 0,
+  items: [{ productId: '', quantity: 1, unitPrice: 0 }],
   includeGift: false,
   giftItems: [{ productId: '', quantity: 1 }],
   customerName: 'Cliente mostrador',
@@ -119,6 +214,15 @@ export function SaleFormDialog({
   const quantityInputRef = useRef<HTMLInputElement | null>(null);
   const { fields, append, remove, replace } = useFieldArray({
     control: form.control,
+    name: 'items',
+  });
+  const {
+    fields: giftFields,
+    append: appendGift,
+    remove: removeGift,
+    replace: replaceGifts,
+  } = useFieldArray({
+    control: form.control,
     name: 'giftItems',
   });
 
@@ -129,7 +233,7 @@ export function SaleFormDialog({
 
   useEffect(() => {
     if (!open) return;
-    if (!initialValues?.productId) return;
+    if (!initialValues?.items?.[0]?.productId) return;
 
     const focusTimer = window.setTimeout(() => {
       quantityInputRef.current?.focus();
@@ -137,20 +241,32 @@ export function SaleFormDialog({
     }, 50);
 
     return () => window.clearTimeout(focusTimer);
-  }, [initialValues?.productId, open]);
+  }, [initialValues?.items, open]);
 
   const values = form.watch();
-  const selectedProduct = products.find((product) => product.id === values.productId);
+  const selectedProductIds = new Set(values.items.map((item) => item.productId).filter(Boolean));
   const giftProducts = products.filter(
     (product) =>
-      product.id !== values.productId &&
+      !selectedProductIds.has(product.id) &&
       product.status === 'active' &&
       allowedGiftCategories.has(product.category)
   );
-  const availableStock = selectedProduct ? getProductStock(movements, selectedProduct.id) : 0;
-  const realUnitCost = selectedProduct ? getProductRealUnitCost(purchases, selectedProduct.id) : 0;
-  const quantity = Number(values.quantity) || 0;
-  const unitPrice = Number(values.unitPrice) || 0;
+  const saleSummaries = values.items.map((saleItem) => {
+    const product = products.find((item) => item.id === saleItem.productId);
+    const stock = product ? getProductStock(movements, product.id) : 0;
+    const realUnitCost = product ? getProductRealUnitCost(purchases, product.id) : 0;
+    const quantity = Number(saleItem.quantity) || 0;
+    const unitPrice = Number(saleItem.unitPrice) || 0;
+    return {
+      product,
+      stock,
+      quantity,
+      unitPrice,
+      realUnitCost,
+      totalSale: quantity * unitPrice,
+      totalCost: quantity * realUnitCost,
+    };
+  });
   const giftSummaries = values.includeGift
     ? values.giftItems.map((giftItem) => {
         const product = products.find((item) => item.id === giftItem.productId);
@@ -167,16 +283,16 @@ export function SaleFormDialog({
     : [];
 
   const totals = useMemo(() => {
-    const totalSale = quantity * unitPrice;
+    const totalSale = saleSummaries.reduce((sum, item) => sum + item.totalSale, 0);
     const totalGiftCost = giftSummaries.reduce((sum, item) => sum + item.totalCost, 0);
-    const totalCost = quantity * realUnitCost + totalGiftCost;
+    const totalCost = saleSummaries.reduce((sum, item) => sum + item.totalCost, 0) + totalGiftCost;
     return {
       totalSale,
       totalCost,
       totalGiftCost,
       grossProfit: totalSale - totalCost,
     };
-  }, [giftSummaries, quantity, realUnitCost, unitPrice]);
+  }, [giftSummaries, saleSummaries]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -199,43 +315,118 @@ export function SaleFormDialog({
             className="space-y-5"
           >
             <div className="grid gap-5 lg:grid-cols-[1.35fr_0.95fr]">
-              <FormField
-                control={form.control}
-                name="productId"
-                render={({ field }) => (
-                  <FormItem className="min-w-0">
-                    <FormLabel>Producto</FormLabel>
-                    <Select
-                      value={field.value}
-                      onValueChange={(value) => {
-                        field.onChange(value);
-                        const product = products.find((item) => item.id === value);
-                        if (product) {
-                          form.setValue('unitPrice', product.salePrice, { shouldValidate: true });
-                        }
-                        const currentGiftItems = form.getValues('giftItems').map((giftItem) =>
-                          giftItem.productId === value ? { ...giftItem, productId: '' } : giftItem
-                        );
-                        form.setValue('giftItems', currentGiftItems, { shouldValidate: true });
-                      }}
-                    >
-                      <FormControl>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Selecciona producto" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {products.map((product) => (
-                          <SelectItem key={product.id} value={product.id}>
-                            {product.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="space-y-4 lg:col-span-2">
+                {fields.map((saleField, index) => {
+                  const selectedProduct = products.find((product) => product.id === values.items[index]?.productId);
+                  const availableStock = selectedProduct ? getProductStock(movements, selectedProduct.id) : 0;
+                  return (
+                    <div key={saleField.id} className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                      <FormField
+                        control={form.control}
+                        name={`items.${index}.productId`}
+                        render={({ field }) => (
+                          <FormItem className="min-w-0">
+                            <FormLabel>Producto</FormLabel>
+                            <FormControl>
+                              <SearchableSelect
+                                value={field.value}
+                                onChange={(value) => {
+                                  field.onChange(value);
+                                  const product = products.find((item) => item.id === value);
+                                  if (product) {
+                                    form.setValue(`items.${index}.unitPrice`, product.salePrice, { shouldValidate: true });
+                                  }
+                                  const currentGiftItems = form.getValues('giftItems').map((giftItem) =>
+                                    giftItem.productId === value ? { ...giftItem, productId: '' } : giftItem
+                                  );
+                                  form.setValue('giftItems', currentGiftItems, { shouldValidate: true });
+                                }}
+                                placeholder="Selecciona producto"
+                                searchPlaceholder="Buscar producto..."
+                                emptyLabel="No se encontraron productos."
+                                options={products.map((product) => ({
+                                  value: product.id,
+                                  label: `${product.name} - ${product.brand}`,
+                                }))}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <div className="grid gap-4 sm:grid-cols-[minmax(120px,0.7fr)_minmax(160px,1fr)_auto] sm:items-end">
+                        <FormField
+                          control={form.control}
+                          name={`items.${index}.quantity`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Cantidad</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  max={Math.max(availableStock, 1)}
+                                  {...field}
+                                  ref={(element) => {
+                                    field.ref(element);
+                                    if (index === 0) quantityInputRef.current = element;
+                                  }}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`items.${index}.unitPrice`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Precio unidad</FormLabel>
+                              <FormControl>
+                                <Input type="number" min="0" step="0.01" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <div className="flex items-end sm:justify-end">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="rounded-xl"
+                            onClick={() => remove(index)}
+                            disabled={fields.length === 1}
+                          >
+                            <MinusCircle className="mr-2 h-4 w-4" />
+                            Quitar
+                          </Button>
+                        </div>
+                      </div>
+
+                      {selectedProduct ? (
+                        <div className="rounded-2xl bg-white p-3 text-sm text-slate-600">
+                          <span className="font-medium text-slate-900">Stock:</span> {formatNumber(availableStock)} uds
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+                <div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="rounded-xl"
+                    onClick={() => append({ productId: '', quantity: 1, unitPrice: 0 })}
+                  >
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Agregar producto
+                  </Button>
+                </div>
+              </div>
+
               <FormField
                 control={form.control}
                 name="customerName"
@@ -251,7 +442,7 @@ export function SaleFormDialog({
               />
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2">
               <FormField
                 control={form.control}
                 name="soldAt"
@@ -260,41 +451,6 @@ export function SaleFormDialog({
                     <FormLabel>Fecha de venta</FormLabel>
                     <FormControl>
                       <Input type="date" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="quantity"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Cantidad</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min="1"
-                        max={Math.max(availableStock, 1)}
-                        {...field}
-                        ref={(element) => {
-                          field.ref(element);
-                          quantityInputRef.current = element;
-                        }}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="unitPrice"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Precio por unidad</FormLabel>
-                    <FormControl>
-                      <Input type="number" min="0" step="0.01" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -315,9 +471,9 @@ export function SaleFormDialog({
                           const nextValue = checked === true;
                           field.onChange(nextValue);
                           if (!nextValue) {
-                            replace([{ productId: '', quantity: 1 }]);
+                            replaceGifts([{ productId: '', quantity: 1 }]);
                           } else if (form.getValues('giftItems').length === 0) {
-                            replace([{ productId: '', quantity: 1 }]);
+                            replaceGifts([{ productId: '', quantity: 1 }]);
                           }
                         }}
                       />
@@ -338,7 +494,7 @@ export function SaleFormDialog({
 
             {values.includeGift ? (
               <div className="space-y-4 rounded-2xl border border-violet-100 bg-violet-50/60 p-4">
-                {fields.map((giftField, index) => {
+                {giftFields.map((giftField, index) => {
                   const selectedGiftProduct = products.find(
                     (product) => product.id === values.giftItems[index]?.productId
                   );
@@ -389,8 +545,8 @@ export function SaleFormDialog({
                           variant="ghost"
                           size="sm"
                           className="rounded-xl"
-                          onClick={() => remove(index)}
-                          disabled={fields.length === 1}
+                          onClick={() => removeGift(index)}
+                          disabled={giftFields.length === 1}
                         >
                           <MinusCircle className="mr-2 h-4 w-4" />
                           Quitar
@@ -409,7 +565,7 @@ export function SaleFormDialog({
                     type="button"
                     variant="outline"
                     className="rounded-xl bg-white"
-                    onClick={() => append({ productId: '', quantity: 1 })}
+                    onClick={() => appendGift({ productId: '', quantity: 1 })}
                   >
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Agregar obsequio
@@ -437,13 +593,17 @@ export function SaleFormDialog({
               <div className={`mt-4 grid gap-3 ${hideFinancialSummary ? 'sm:grid-cols-1 xl:grid-cols-1' : 'sm:grid-cols-2 xl:grid-cols-4'}`}>
                 <div className="rounded-2xl bg-white p-4">
                   <p className="text-xs text-slate-500">Stock disponible</p>
-                  <p className="mt-1 font-semibold text-slate-900">{formatNumber(availableStock)} uds</p>
+                  <p className="mt-1 font-semibold text-slate-900">
+                    {formatNumber(saleSummaries.reduce((sum, item) => sum + item.quantity, 0))} uds
+                  </p>
                 </div>
                 {!hideFinancialSummary && (
                   <>
                     <div className="rounded-2xl bg-white p-4">
-                      <p className="text-xs text-slate-500">Costo unitario</p>
-                      <p className="mt-1 font-semibold text-slate-900">{formatCurrency(realUnitCost)}</p>
+                      <p className="text-xs text-slate-500">Costo total productos</p>
+                      <p className="mt-1 font-semibold text-slate-900">
+                        {formatCurrency(saleSummaries.reduce((sum, item) => sum + item.totalCost, 0))}
+                      </p>
                     </div>
                     <div className="rounded-2xl bg-white p-4">
                       <p className="text-xs text-slate-500">Ingreso total</p>
@@ -460,9 +620,9 @@ export function SaleFormDialog({
                   </>
                 )}
               </div>
-              {selectedProduct && availableStock === 0 ? (
+              {saleSummaries.some((item) => item.product && item.stock === 0) ? (
                 <p className="mt-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
-                  Este producto no tiene stock disponible.
+                  Uno de los productos de la venta no tiene stock disponible.
                 </p>
               ) : null}
               {values.includeGift && giftSummaries.some((gift) => gift.product && gift.stock === 0) ? (

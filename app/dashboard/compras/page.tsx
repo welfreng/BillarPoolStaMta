@@ -24,11 +24,13 @@ export default function ComprasPage() {
   const filteredPurchases = useMemo(() => {
     return purchases.filter((purchase) => {
       const product = getProductById(products, purchase.productId);
-      return `${product?.name ?? ''} ${purchase.supplier}`
+      const supplierName =
+        suppliers.find((supplier) => supplier.id === purchase.supplierId)?.name ?? purchase.supplier;
+      return `${product?.name ?? ''} ${supplierName}`
         .toLowerCase()
         .includes(query.toLowerCase());
     });
-  }, [products, purchases, query]);
+  }, [products, purchases, query, suppliers]);
 
   const totalInvestment = filteredPurchases.reduce(
     (accumulator, purchase) => accumulator + purchase.totalInvestment,
@@ -55,7 +57,9 @@ export default function ComprasPage() {
     >();
 
     filteredPurchases.forEach((purchase) => {
-      const key = purchase.purchaseBatchId ?? `${purchase.supplier}-${purchase.purchasedAt}`;
+      const key = purchase.purchaseBatchId ?? `${purchase.supplierId ?? purchase.supplier}-${purchase.purchasedAt}`;
+      const supplierName =
+        suppliers.find((supplier) => supplier.id === purchase.supplierId)?.name ?? purchase.supplier;
       const existing = groups.get(key);
       if (existing) {
         existing.items.push(purchase);
@@ -68,7 +72,7 @@ export default function ComprasPage() {
       groups.set(key, {
         key,
         batchId: purchase.purchaseBatchId,
-        supplier: purchase.supplier,
+        supplier: supplierName,
         source: purchase.source ?? 'purchase',
         purchasedAt: purchase.purchasedAt,
         totalPurchaseValue: purchase.purchaseValueTotal,
@@ -81,11 +85,14 @@ export default function ComprasPage() {
     return Array.from(groups.values()).sort(
       (a, b) => new Date(b.purchasedAt).getTime() - new Date(a.purchasedAt).getTime()
     );
-  }, [filteredPurchases]);
+  }, [filteredPurchases, suppliers]);
 
   const buildInitialValues = (groupItems: typeof filteredPurchases): PurchaseFormValues => ({
     supplierId: groupItems[0]?.supplierId ?? '',
-    supplier: groupItems[0]?.supplier ?? '',
+    supplier:
+      suppliers.find((supplier) => supplier.id === groupItems[0]?.supplierId)?.name ??
+      groupItems[0]?.supplier ??
+      '',
     purchasedAt: new Date(groupItems[0]?.purchasedAt ?? new Date().toISOString()).toISOString().slice(0, 10),
     shippingValueTotal: groupItems.reduce((sum, item) => sum + item.shippingValueTotal, 0),
     items: groupItems.map((item) => {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ClipboardList, Plus, Search } from 'lucide-react';
+import { ClipboardList, Eye, Plus, Search } from 'lucide-react';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,7 @@ import { SectionHeader } from '@/components/admin/shared/section-header';
 import { MovementReasonBadge } from '@/components/admin/shared/status-badges';
 import { MovementFormDialog } from '@/components/admin/inventory/movement-form-dialog';
 import { InitialStockDialog } from '@/components/admin/inventory/initial-stock-dialog';
+import { SaleDetailsDialog } from '@/components/admin/sales/sale-details-dialog';
 import { useAdminData } from '@/components/admin/admin-data-context';
 import { useAuth } from '@/components/auth-context';
 import { movementReasonLabels, movementTypeLabels } from '@/lib/admin/catalogs';
@@ -27,15 +28,17 @@ import {
 import { useToast } from '@/hooks/use-toast';
 
 export default function InventarioPage() {
-  const { movements, products, purchases, registerMovement, registerInitialStock } = useAdminData();
+  const { movements, products, purchases, sales, registerMovement, registerInitialStock } = useAdminData();
   const { role, profile, user } = useAuth();
   const { toast } = useToast();
   const [openDialog, setOpenDialog] = useState(false);
   const [openInitialStockDialog, setOpenInitialStockDialog] = useState(false);
+  const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [type, setType] = useState('all');
   const [productId, setProductId] = useState('all');
   const isSalesUser = role === 'sales';
+  const selectedSale = selectedSaleId ? sales.find((sale) => sale.id === selectedSaleId) ?? null : null;
 
   const filteredMovements = useMemo(() => {
     return movements.filter((movement) => {
@@ -203,12 +206,16 @@ export default function InventarioPage() {
                   <TableHead>Responsable</TableHead>
                   <TableHead>Costo</TableHead>
                   <TableHead>Fecha</TableHead>
+                  <TableHead className="text-right">Detalle</TableHead>
                 </TableRow>
               </TableHeader>
                 <TableBody>
                   {filteredMovements.map((movement) => {
                     const product = getProductById(products, movement.productId);
                     const isReturn = movement.reason === 'return';
+                    const relatedSale = movement.saleId
+                      ? sales.find((sale) => sale.id === movement.saleId) ?? null
+                      : null;
                     return (
                       <TableRow
                         key={movement.id}
@@ -238,6 +245,22 @@ export default function InventarioPage() {
                         <TableCell>{movement.responsibleUser}</TableCell>
                         <TableCell>{formatCurrency(movement.relatedUnitCost)}</TableCell>
                         <TableCell>{formatDateTime(movement.occurredAt)}</TableCell>
+                        <TableCell className="text-right">
+                          {relatedSale ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="rounded-xl"
+                              onClick={() => setSelectedSaleId(relatedSale.id)}
+                            >
+                              <Eye className="mr-2 h-4 w-4" />
+                              Ver venta
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-slate-400">Sin detalle</span>
+                          )}
+                        </TableCell>
                     </TableRow>
                   );
                 })}
@@ -317,6 +340,18 @@ export default function InventarioPage() {
                 throw error;
               }
             }}
+          />
+
+          <SaleDetailsDialog
+            open={Boolean(selectedSale)}
+            onOpenChange={(nextOpen) => {
+              if (!nextOpen) {
+                setSelectedSaleId(null);
+              }
+            }}
+            sale={selectedSale}
+            sales={sales}
+            products={products}
           />
         </>
       ) : null}

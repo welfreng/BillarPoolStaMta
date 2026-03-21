@@ -41,6 +41,7 @@ import type {
   Purchase,
   Sale,
   SaleGiftItem,
+  SaleLineItem,
   Supplier,
 } from '@/lib/admin/types';
 
@@ -81,10 +82,12 @@ interface RegisterInitialStockInput {
 }
 
 interface RegisterSaleInput {
-  productId: string;
   soldAt: string;
-  quantity: number;
-  unitPrice: number;
+  items: Array<{
+    productId: string;
+    quantity: number;
+    unitPrice: number;
+  }>;
   giftItems?: Array<{
     productId: string;
     quantity: number;
@@ -127,8 +130,8 @@ interface AdminDataContextValue {
   updatePurchaseBatch: (batchId: string, input: RegisterPurchaseInput) => Promise<Purchase[]>;
   deletePurchase: (purchaseId: string) => Promise<void>;
   deletePurchaseBatch: (batchId: string) => Promise<void>;
-  registerSale: (input: RegisterSaleInput) => Promise<Sale>;
-  updateSale: (saleId: string, input: RegisterSaleInput) => Promise<Sale>;
+  registerSale: (input: RegisterSaleInput) => Promise<Sale[]>;
+  updateSaleBatch: (saleBatchId: string, input: RegisterSaleInput) => Promise<Sale[]>;
   registerSaleReturn: (input: RegisterSaleReturnInput) => Promise<Sale>;
 }
 
@@ -239,6 +242,30 @@ function mapPurchaseDocument(documentId: string, data: DocumentData): Purchase {
 }
 
 function mapSaleDocument(documentId: string, data: DocumentData): Sale {
+  const legacyLineItems: SaleLineItem[] = data.productId
+    ? [
+        {
+          productId: String(data.productId ?? ''),
+          quantity: Number(data.quantity ?? 0),
+          unitPrice: Number(data.unitPrice ?? 0),
+          realUnitCost: Number(data.realUnitCost ?? 0),
+          totalSale: Number(data.totalSale ?? 0),
+          totalCost: Number(data.totalCost ?? 0),
+        },
+      ]
+    : [];
+  const lineItems: SaleLineItem[] = Array.isArray(data.lineItems)
+    ? data.lineItems
+        .map((item) => ({
+          productId: String(item?.productId ?? ''),
+          quantity: Number(item?.quantity ?? 0),
+          unitPrice: Number(item?.unitPrice ?? 0),
+          realUnitCost: Number(item?.realUnitCost ?? 0),
+          totalSale: Number(item?.totalSale ?? 0),
+          totalCost: Number(item?.totalCost ?? 0),
+        }))
+        .filter((item) => item.productId && item.quantity > 0)
+    : legacyLineItems;
   const legacyGiftedProductId = data.giftedProductId ? String(data.giftedProductId) : undefined;
   const legacyGiftedQuantity = Number(data.giftedQuantity ?? 0);
   const legacyGiftedUnitCost = Number(data.giftedUnitCost ?? 0);
@@ -263,14 +290,19 @@ function mapSaleDocument(documentId: string, data: DocumentData): Sale {
 
   return {
     id: documentId,
-    productId: String(data.productId ?? ''),
+    saleBatchId: data.saleBatchId ? String(data.saleBatchId) : undefined,
+    productId: String(data.productId ?? lineItems[0]?.productId ?? ''),
     soldAt: normalizeDateValue(data.soldAt),
-    quantity: Number(data.quantity ?? 0),
-    unitPrice: Number(data.unitPrice ?? 0),
-    totalSale: Number(data.totalSale ?? 0),
-    realUnitCost: Number(data.realUnitCost ?? 0),
-    totalCost: Number(data.totalCost ?? 0),
-    grossProfit: Number(data.grossProfit ?? 0),
+    quantity: Number(data.quantity ?? lineItems.reduce((sum, item) => sum + item.quantity, 0)),
+    unitPrice: Number(data.unitPrice ?? lineItems[0]?.unitPrice ?? 0),
+    totalSale: Number(data.totalSale ?? lineItems.reduce((sum, item) => sum + item.totalSale, 0)),
+    realUnitCost: Number(data.realUnitCost ?? lineItems[0]?.realUnitCost ?? 0),
+    totalCost: Number(data.totalCost ?? lineItems.reduce((sum, item) => sum + item.totalCost, 0)),
+    grossProfit: Number(
+      data.grossProfit ??
+        lineItems.reduce((sum, item) => sum + item.totalSale - item.totalCost, 0) - giftItems.reduce((sum, item) => sum + item.totalCost, 0)
+    ),
+    lineItems,
     giftItems,
     giftedProductId: legacyGiftedProductId,
     giftedQuantity: legacyGiftedQuantity,
@@ -291,9 +323,9 @@ function findMovementForSale(movements: InventoryMovement[], sale: Sale) {
     movements.find(
       (movement) =>
         movement.reason === 'sale' &&
-        movement.productId === sale.productId &&
+        movement.productId === sale.lineItems[0]?.productId &&
         movement.occurredAt === sale.soldAt &&
-        movement.quantity === -Math.abs(sale.quantity)
+        movement.quantity === -Math.abs(sale.lineItems[0]?.quantity ?? sale.quantity)
     )
   );
 }
@@ -435,7 +467,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       .filter((purchase) => purchase.productId === productId)
       .forEach((purchase) => batch.delete(doc(db, 'purchases', purchase.id)));
     sales
-      .filter((sale) => sale.productId === productId)
+      .filter((sale) => sale.lineItems.some((item) => item.productId === productId))
       .forEach((sale) => batch.delete(doc(db, 'sales', sale.id)));
     await batch.commit();
   };
@@ -768,15 +800,33 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   };
 
   const registerSale = async (input: RegisterSaleInput) => {
-    const targetProduct = products.find((product) => product.id === input.productId);
-    if (!targetProduct) {
-      throw new Error('No se encontro el producto para registrar la venta.');
+    if (input.items.length === 0) {
+      throw new Error('Agrega al menos un producto a la venta.');
     }
 
-    const availableStock = getProductStock(movements, input.productId);
-    if (input.quantity > availableStock) {
-      throw new Error('La cantidad vendida supera el stock disponible.');
-    }
+    const lineItems: SaleLineItem[] = input.items.map((item) => {
+      const targetProduct = products.find((product) => product.id === item.productId);
+      if (!targetProduct) {
+        throw new Error('No se encontro uno de los productos para registrar la venta.');
+      }
+      const quantity = Math.max(Number(item.quantity ?? 0), 0);
+      if (quantity <= 0) {
+        throw new Error('La cantidad vendida debe ser mayor a cero.');
+      }
+      const availableStock = getProductStock(movements, item.productId);
+      if (quantity > availableStock) {
+        throw new Error(`La cantidad vendida supera el stock disponible de ${targetProduct.name}.`);
+      }
+      const realUnitCost = getProductRealUnitCost(purchases, item.productId);
+      return {
+        productId: item.productId,
+        quantity,
+        unitPrice: Number(item.unitPrice ?? 0),
+        realUnitCost,
+        totalSale: quantity * Number(item.unitPrice ?? 0),
+        totalCost: quantity * realUnitCost,
+      };
+    });
 
     const requestedGiftTotals = new Map<string, number>();
     const giftItems: SaleGiftItem[] = (input.giftItems ?? []).map((item) => {
@@ -804,67 +854,75 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
 
     for (const [productId, requestedQuantity] of requestedGiftTotals) {
       const availableGiftStock = getProductStock(movements, productId);
-      const stockReservedBySale = productId === input.productId ? input.quantity : 0;
+      const stockReservedBySale = lineItems
+        .filter((item) => item.productId === productId)
+        .reduce((sum, item) => sum + item.quantity, 0);
       if (requestedQuantity > availableGiftStock - stockReservedBySale) {
         throw new Error('La cantidad de uno de los obsequios supera el stock disponible.');
       }
     }
 
-    const realUnitCost = getProductRealUnitCost(purchases, input.productId);
-    const totalSale = input.quantity * input.unitPrice;
+    const totalSale = lineItems.reduce((sum, item) => sum + item.totalSale, 0);
     const giftedTotalCost = giftItems.reduce((sum, item) => sum + item.totalCost, 0);
     const firstGiftItem = giftItems[0];
-    const totalCost = input.quantity * realUnitCost + giftedTotalCost;
+    const totalCost = lineItems.reduce((sum, item) => sum + item.totalCost, 0) + giftedTotalCost;
     const grossProfit = totalSale - totalCost;
 
-    const saleRef = doc(collection(db, 'sales'));
-    const movementRef = doc(collection(db, 'movements'));
-    const sale: Sale = {
-      id: saleRef.id,
-      productId: input.productId,
-      soldAt: input.soldAt,
-      quantity: input.quantity,
-      unitPrice: input.unitPrice,
-      totalSale,
-      realUnitCost,
-      totalCost,
-      grossProfit,
-      giftItems,
-      giftedProductId: firstGiftItem?.productId,
-      giftedQuantity: firstGiftItem?.quantity ?? 0,
-      giftedUnitCost: firstGiftItem?.unitCost ?? 0,
-      giftedTotalCost,
-      returnedQuantity: 0,
-      returnedSaleAmount: 0,
-      returnedCostAmount: 0,
-      customerName: input.customerName,
-      notes: input.notes,
-      responsibleUser: input.responsibleUser,
-    };
+    const saleBatchId = doc(collection(db, 'sale-batches')).id;
 
     const batch = writeBatch(db);
-    batch.set(doc(db, 'sales', sale.id), {
-      ...sale,
-      soldAt: Timestamp.fromDate(new Date(input.soldAt)),
-    });
-    batch.set(movementRef, {
-      id: movementRef.id,
-      saleId: sale.id,
-      productId: input.productId,
-      type: 'exit',
-      reason: 'sale',
-      quantity: -Math.abs(input.quantity),
-      notes: input.notes || `Venta registrada${input.customerName ? ` para ${input.customerName}` : ''}`,
-      occurredAt: Timestamp.fromDate(new Date(input.soldAt)),
-      responsibleUser: input.responsibleUser,
-      relatedUnitCost: realUnitCost,
+    const createdSales: Sale[] = lineItems.map((lineItem, index) => {
+      const saleRef = doc(collection(db, 'sales'));
+      const sale: Sale = {
+        id: saleRef.id,
+        saleBatchId,
+        productId: lineItem.productId,
+        soldAt: input.soldAt,
+        quantity: lineItem.quantity,
+        unitPrice: lineItem.unitPrice,
+        totalSale: lineItem.totalSale,
+        realUnitCost: lineItem.realUnitCost,
+        totalCost: lineItem.totalCost + (index === 0 ? giftedTotalCost : 0),
+        grossProfit: lineItem.totalSale - lineItem.totalCost - (index === 0 ? giftedTotalCost : 0),
+        lineItems: [lineItem],
+        giftItems: index === 0 ? giftItems : [],
+        giftedProductId: index === 0 ? firstGiftItem?.productId : undefined,
+        giftedQuantity: index === 0 ? firstGiftItem?.quantity ?? 0 : 0,
+        giftedUnitCost: index === 0 ? firstGiftItem?.unitCost ?? 0 : 0,
+        giftedTotalCost: index === 0 ? giftedTotalCost : 0,
+        returnedQuantity: 0,
+        returnedSaleAmount: 0,
+        returnedCostAmount: 0,
+        customerName: input.customerName,
+        notes: input.notes,
+        responsibleUser: input.responsibleUser,
+      };
+      batch.set(doc(db, 'sales', sale.id), {
+        ...sale,
+        giftedProductId: sale.giftedProductId ?? null,
+        soldAt: Timestamp.fromDate(new Date(input.soldAt)),
+      });
+      const movementRef = doc(collection(db, 'movements'));
+      batch.set(movementRef, {
+        id: movementRef.id,
+        saleId: sale.id,
+        productId: lineItem.productId,
+        type: 'exit',
+        reason: 'sale',
+        quantity: -Math.abs(lineItem.quantity),
+        notes: input.notes || `Venta registrada${input.customerName ? ` para ${input.customerName}` : ''}`,
+        occurredAt: Timestamp.fromDate(new Date(input.soldAt)),
+        responsibleUser: input.responsibleUser,
+        relatedUnitCost: lineItem.realUnitCost,
+      });
+      return sale;
     });
 
     for (const giftItem of giftItems) {
       const giftMovementRef = doc(collection(db, 'movements'));
       batch.set(giftMovementRef, {
         id: giftMovementRef.id,
-        saleId: sale.id,
+        saleId: createdSales[0].id,
         productId: giftItem.productId,
         type: 'exit',
         reason: 'gift',
@@ -880,23 +938,36 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
 
     await batch.commit();
 
-    return sale;
+    return createdSales;
   };
 
-  const updateSale = async (saleId: string, input: RegisterSaleInput) => {
-    const existingSale = sales.find((sale) => sale.id === saleId);
-    if (!existingSale) {
+  const updateSaleBatch = async (saleBatchId: string, input: RegisterSaleInput) => {
+    const existingSales = sales.filter((sale) => (sale.saleBatchId ?? sale.id) === saleBatchId);
+    if (existingSales.length === 0) {
       throw new Error('No se encontro la venta a editar.');
     }
-
-    const targetProduct = products.find((product) => product.id === input.productId);
-    if (!targetProduct) {
-      throw new Error('No se encontro el producto para actualizar la venta.');
-    }
-
-    const movementToUpdate = findMovementForSale(movements, existingSale);
-    const giftMovementsToUpdate = findGiftMovementForSale(movements, existingSale);
+    const existingSale = existingSales[0];
+    const giftMovementsToUpdate = existingSales.flatMap((sale) => findGiftMovementForSale(movements, sale));
     const requestedGiftTotals = new Map<string, number>();
+    const nextLineItems: SaleLineItem[] = input.items.map((item) => {
+      const targetProduct = products.find((product) => product.id === item.productId);
+      if (!targetProduct) {
+        throw new Error('No se encontro uno de los productos para actualizar la venta.');
+      }
+      const quantity = Math.max(Number(item.quantity ?? 0), 0);
+      if (quantity <= 0) {
+        throw new Error('La cantidad vendida debe ser mayor a cero.');
+      }
+      const realUnitCost = getProductRealUnitCost(purchases, item.productId);
+      return {
+        productId: item.productId,
+        quantity,
+        unitPrice: Number(item.unitPrice ?? 0),
+        realUnitCost,
+        totalSale: quantity * Number(item.unitPrice ?? 0),
+        totalCost: quantity * realUnitCost,
+      };
+    });
     const giftItems: SaleGiftItem[] = (input.giftItems ?? []).map((item) => {
       const productId = item.productId?.trim();
       const quantity = Math.max(Number(item.quantity ?? 0), 0);
@@ -921,21 +992,27 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     });
 
     const touchedProductIds = new Set<string>([
-      existingSale.productId,
-      input.productId,
-      ...existingSale.giftItems.map((item) => item.productId),
+      ...existingSales.flatMap((sale) => sale.lineItems.map((item) => item.productId)),
+      ...nextLineItems.map((item) => item.productId),
+      ...existingSales.flatMap((sale) => sale.giftItems.map((item) => item.productId)),
       ...giftItems.map((item) => item.productId),
     ].filter((value): value is string => Boolean(value)));
 
     for (const productId of touchedProductIds) {
       const restoredStock =
         getProductStock(movements, productId) +
-        (existingSale.productId === productId ? existingSale.quantity : 0) +
-        existingSale.giftItems
+        existingSales
+          .flatMap((sale) => sale.lineItems)
+          .filter((item) => item.productId === productId)
+          .reduce((sum, item) => sum + item.quantity, 0) +
+        existingSales
+          .flatMap((sale) => sale.giftItems)
           .filter((item) => item.productId === productId)
           .reduce((sum, item) => sum + item.quantity, 0);
       const requestedStock =
-        (input.productId === productId ? input.quantity : 0) +
+        nextLineItems
+          .filter((item) => item.productId === productId)
+          .reduce((sum, item) => sum + item.quantity, 0) +
         (requestedGiftTotals.get(productId) ?? 0);
 
       if (requestedStock > restoredStock) {
@@ -947,78 +1024,24 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    const realUnitCost = getProductRealUnitCost(purchases, input.productId);
-    const totalSale = input.quantity * input.unitPrice;
     const giftedTotalCost = giftItems.reduce((sum, item) => sum + item.totalCost, 0);
     const firstGiftItem = giftItems[0];
-    const totalCost = input.quantity * realUnitCost + giftedTotalCost;
-    const grossProfit = totalSale - totalCost;
-
-    const updatedSale: Sale = {
-      id: saleId,
-      productId: input.productId,
-      soldAt: input.soldAt,
-      quantity: input.quantity,
-      unitPrice: input.unitPrice,
-      totalSale,
-      realUnitCost,
-      totalCost,
-      grossProfit,
-      giftItems,
-      giftedProductId: firstGiftItem?.productId,
-      giftedQuantity: firstGiftItem?.quantity ?? 0,
-      giftedUnitCost: firstGiftItem?.unitCost ?? 0,
-      giftedTotalCost,
-      returnedQuantity: existingSale.returnedQuantity ?? 0,
-      returnedSaleAmount: existingSale.returnedSaleAmount ?? 0,
-      returnedCostAmount: existingSale.returnedCostAmount ?? 0,
-      customerName: input.customerName,
-      notes: input.notes,
-      responsibleUser: input.responsibleUser,
-    };
-
     const batch = writeBatch(db);
-    batch.update(doc(db, 'sales', saleId), {
-      ...updatedSale,
-      soldAt: Timestamp.fromDate(new Date(input.soldAt)),
-    });
-
-    if (movementToUpdate) {
-      batch.update(doc(db, 'movements', movementToUpdate.id), {
-        saleId,
-        productId: input.productId,
-        type: 'exit',
-        reason: 'sale',
-        quantity: -Math.abs(input.quantity),
-        notes: input.notes || `Venta registrada${input.customerName ? ` para ${input.customerName}` : ''}`,
-        occurredAt: Timestamp.fromDate(new Date(input.soldAt)),
-        responsibleUser: input.responsibleUser,
-        relatedUnitCost: realUnitCost,
-      });
-    }
-
+    existingSales.forEach((sale) => batch.delete(doc(db, 'sales', sale.id)));
+    movements
+      .filter((movement) => existingSales.some((sale) => sale.id === movement.saleId))
+      .forEach((movement) => batch.delete(doc(db, 'movements', movement.id)));
     giftMovementsToUpdate.forEach((movement) => batch.delete(doc(db, 'movements', movement.id)));
-
-    for (const giftItem of giftItems) {
-      const giftMovementRef = doc(collection(db, 'movements'));
-      batch.set(giftMovementRef, {
-        id: giftMovementRef.id,
-        saleId,
-        productId: giftItem.productId,
-        type: 'exit',
-        reason: 'gift',
-        quantity: -Math.abs(giftItem.quantity),
-        notes:
-          input.notes ||
-          `Obsequio asociado a venta${input.customerName ? ` para ${input.customerName}` : ''}`,
-        occurredAt: Timestamp.fromDate(new Date(input.soldAt)),
-        responsibleUser: input.responsibleUser,
-        relatedUnitCost: giftItem.unitCost,
-      });
-    }
-
     await batch.commit();
-    return updatedSale;
+
+    return registerSale({
+      ...input,
+      items: nextLineItems.map((item) => ({
+        productId: item.productId,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+      })),
+    });
   };
 
   const registerSaleReturn = async (input: RegisterSaleReturnInput) => {
@@ -1102,7 +1125,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         deletePurchase,
         deletePurchaseBatch,
         registerSale,
-        updateSale,
+        updateSaleBatch,
         registerSaleReturn,
       }}
     >

@@ -177,7 +177,7 @@ export function PurchaseFormDialog({
 
   useEffect(() => {
     if (!selectedSupplier) return;
-    form.setValue('supplier', selectedSupplier.contactName || selectedSupplier.name, {
+    form.setValue('supplier', selectedSupplier.name, {
       shouldValidate: true,
       shouldDirty: true,
     });

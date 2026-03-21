@@ -54,10 +54,8 @@ export default function DashboardPage() {
 
   const initialSaleValues: SaleFormValues | null = selectedProduct
     ? {
-        productId: selectedProduct.id,
         soldAt: new Date().toISOString().slice(0, 10),
-        quantity: 1,
-        unitPrice: selectedProduct.salePrice,
+        items: [{ productId: selectedProduct.id, quantity: 1, unitPrice: selectedProduct.salePrice }],
         includeGift: false,
         giftItems: [{ productId: '', quantity: 1 }],
         customerName: 'Cliente mostrador',
@@ -322,6 +320,7 @@ export default function DashboardPage() {
             await registerSale({
               ...values,
               soldAt: new Date(values.soldAt).toISOString(),
+              items: values.items,
               giftItems: values.includeGift ? values.giftItems : [],
               responsibleUser:
                 profile?.nombre?.trim() || user?.displayName || user?.email || 'Usuario de ventas',
