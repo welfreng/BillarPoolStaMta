@@ -352,6 +352,7 @@ export default function VentasPage() {
         sale={detailsSale}
         sales={sales}
         products={products}
+        showAdminView={!isSalesUser}
       />
 
       <SaleReturnDialog

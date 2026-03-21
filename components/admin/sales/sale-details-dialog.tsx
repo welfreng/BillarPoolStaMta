@@ -19,12 +19,14 @@ export function SaleDetailsDialog({
   sale,
   sales,
   products,
+  showAdminView = true,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   sale: Sale | null;
   sales: Sale[];
   products: Product[];
+  showAdminView?: boolean;
 }) {
   if (!sale) return null;
 
@@ -173,19 +175,22 @@ export function SaleDetailsDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="admin" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-2 rounded-2xl bg-slate-100 p-1">
-            <TabsTrigger value="admin" className="rounded-xl">
-              <BarChart3 className="mr-2 h-4 w-4" />
-              Administracion
-            </TabsTrigger>
-            <TabsTrigger value="invoice" className="rounded-xl">
-              <ReceiptText className="mr-2 h-4 w-4" />
-              Factura cliente
-            </TabsTrigger>
-          </TabsList>
+        <Tabs defaultValue={showAdminView ? 'admin' : 'invoice'} className="space-y-4">
+          {showAdminView ? (
+            <TabsList className="grid w-full grid-cols-2 rounded-2xl bg-slate-100 p-1">
+              <TabsTrigger value="admin" className="rounded-xl">
+                <BarChart3 className="mr-2 h-4 w-4" />
+                Administracion
+              </TabsTrigger>
+              <TabsTrigger value="invoice" className="rounded-xl">
+                <ReceiptText className="mr-2 h-4 w-4" />
+                Factura cliente
+              </TabsTrigger>
+            </TabsList>
+          ) : null}
 
-          <TabsContent value="admin" className="space-y-4">
+          {showAdminView ? (
+            <TabsContent value="admin" className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <p className="text-xs text-slate-500">Cliente</p>
@@ -326,7 +331,8 @@ export function SaleDetailsDialog({
                 {baseSale.notes?.trim() ? baseSale.notes : 'Sin observaciones registradas.'}
               </p>
             </div>
-          </TabsContent>
+            </TabsContent>
+          ) : null}
 
           <TabsContent value="invoice" className="space-y-4">
             <div className="flex justify-end">
