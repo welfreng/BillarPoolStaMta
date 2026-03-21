@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -116,6 +116,7 @@ export function SaleFormDialog({
     resolver: zodResolver(saleSchema),
     defaultValues,
   });
+  const quantityInputRef = useRef<HTMLInputElement | null>(null);
   const { fields, append, remove, replace } = useFieldArray({
     control: form.control,
     name: 'giftItems',
@@ -125,6 +126,18 @@ export function SaleFormDialog({
     if (!open) return;
     form.reset(initialValues ?? defaultValues);
   }, [form, initialValues, open]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (!initialValues?.productId) return;
+
+    const focusTimer = window.setTimeout(() => {
+      quantityInputRef.current?.focus();
+      quantityInputRef.current?.select();
+    }, 50);
+
+    return () => window.clearTimeout(focusTimer);
+  }, [initialValues?.productId, open]);
 
   const values = form.watch();
   const selectedProduct = products.find((product) => product.id === values.productId);
@@ -259,7 +272,16 @@ export function SaleFormDialog({
                   <FormItem>
                     <FormLabel>Cantidad</FormLabel>
                     <FormControl>
-                      <Input type="number" min="1" max={Math.max(availableStock, 1)} {...field} />
+                      <Input
+                        type="number"
+                        min="1"
+                        max={Math.max(availableStock, 1)}
+                        {...field}
+                        ref={(element) => {
+                          field.ref(element);
+                          quantityInputRef.current = element;
+                        }}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
