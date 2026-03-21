@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -27,6 +28,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  useSidebar,
 } from '@/components/ui/sidebar';
 
 const navigation = [
@@ -48,6 +50,7 @@ const navigation = [
 export function AdminSidebar() {
   const pathname = usePathname();
   const { role } = useAuth();
+  const { isMobile, setOpenMobile } = useSidebar();
   const visibleNavigation = role === 'sales'
     ? navigation.filter(
         (item) =>
@@ -56,6 +59,12 @@ export function AdminSidebar() {
           item.href === '/dashboard/inventario'
       )
     : navigation;
+
+  useEffect(() => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  }, [isMobile, pathname, setOpenMobile]);
 
   return (
     <Sidebar collapsible="icon" variant="inset" className="border-r-0">
@@ -99,7 +108,14 @@ export function AdminSidebar() {
                         active && 'bg-slate-900 text-white hover:bg-slate-900 hover:text-white'
                       )}
                     >
-                      <Link href={item.href}>
+                      <Link
+                        href={item.href}
+                        onClick={() => {
+                          if (isMobile) {
+                            setOpenMobile(false);
+                          }
+                        }}
+                      >
                         <Icon className="h-4 w-4" />
                         <span className="flex flex-col">
                           <span>{item.label}</span>
