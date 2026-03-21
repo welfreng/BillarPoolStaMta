@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { SectionHeader } from '@/components/admin/shared/section-header';
 import { MovementReasonBadge } from '@/components/admin/shared/status-badges';
 import { MovementFormDialog } from '@/components/admin/inventory/movement-form-dialog';
+import { InitialStockDialog } from '@/components/admin/inventory/initial-stock-dialog';
 import { useAdminData } from '@/components/admin/admin-data-context';
 import { useAuth } from '@/components/auth-context';
 import { movementReasonLabels, movementTypeLabels } from '@/lib/admin/catalogs';
@@ -26,10 +27,11 @@ import {
 import { useToast } from '@/hooks/use-toast';
 
 export default function InventarioPage() {
-  const { movements, products, purchases, registerMovement } = useAdminData();
+  const { movements, products, purchases, registerMovement, registerInitialStock } = useAdminData();
   const { role, profile, user } = useAuth();
   const { toast } = useToast();
   const [openDialog, setOpenDialog] = useState(false);
+  const [openInitialStockDialog, setOpenInitialStockDialog] = useState(false);
   const [query, setQuery] = useState('');
   const [type, setType] = useState('all');
   const [productId, setProductId] = useState('all');
@@ -70,9 +72,18 @@ export default function InventarioPage() {
         }
         actions={
           !isSalesUser ? (
-            <Button onClick={() => setOpenDialog(true)} className="w-full rounded-xl sm:w-auto">
-              <Plus className="mr-2 h-4 w-4" /> Registrar movimiento
-            </Button>
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+              <Button
+                variant="outline"
+                onClick={() => setOpenInitialStockDialog(true)}
+                className="w-full rounded-xl sm:w-auto"
+              >
+                <Plus className="mr-2 h-4 w-4" /> Carga inicial
+              </Button>
+              <Button onClick={() => setOpenDialog(true)} className="w-full rounded-xl sm:w-auto">
+                <Plus className="mr-2 h-4 w-4" /> Registrar movimiento
+              </Button>
+            </div>
           ) : null
         }
       />
@@ -249,34 +260,65 @@ export default function InventarioPage() {
       </div>
 
       {!isSalesUser ? (
-        <MovementFormDialog
-          open={openDialog}
-          onOpenChange={setOpenDialog}
-          products={products}
-          onSubmit={async (values) => {
-            try {
-              await registerMovement({
-                ...values,
-                responsibleUser:
-                  profile?.nombre?.trim() || user?.displayName || user?.email || values.responsibleUser,
-                relatedUnitCost: getProductRealUnitCost(purchases, values.productId),
-              });
-              setOpenDialog(false);
-              toast({
-                title: 'Movimiento registrado',
-                description: 'El stock fue actualizado correctamente.',
-              });
-            } catch (error) {
-              console.error('Error registrando movimiento en Firestore:', error);
-              toast({
-                title: 'No se pudo registrar el movimiento',
-                description: 'Revisa la configuracion y permisos de Firebase.',
-                variant: 'destructive',
-              });
-              throw error;
-            }
-          }}
-        />
+        <>
+          <InitialStockDialog
+            open={openInitialStockDialog}
+            onOpenChange={setOpenInitialStockDialog}
+            products={products}
+            onSubmit={async (values) => {
+              try {
+                await registerInitialStock({
+                  ...values,
+                  occurredAt: new Date(values.occurredAt).toISOString(),
+                  responsibleUser:
+                    profile?.nombre?.trim() || user?.displayName || user?.email || 'Administrador',
+                });
+                setOpenInitialStockDialog(false);
+                toast({
+                  title: 'Carga inicial registrada',
+                  description: 'El inventario quedo cargado sin exigir proveedor ni soporte.',
+                });
+              } catch (error) {
+                console.error('Error registrando carga inicial en Firestore:', error);
+                toast({
+                  title: 'No se pudo registrar la carga inicial',
+                  description: 'Revisa la configuracion y permisos de Firebase.',
+                  variant: 'destructive',
+                });
+                throw error;
+              }
+            }}
+          />
+
+          <MovementFormDialog
+            open={openDialog}
+            onOpenChange={setOpenDialog}
+            products={products}
+            onSubmit={async (values) => {
+              try {
+                await registerMovement({
+                  ...values,
+                  responsibleUser:
+                    profile?.nombre?.trim() || user?.displayName || user?.email || values.responsibleUser,
+                  relatedUnitCost: getProductRealUnitCost(purchases, values.productId),
+                });
+                setOpenDialog(false);
+                toast({
+                  title: 'Movimiento registrado',
+                  description: 'El stock fue actualizado correctamente.',
+                });
+              } catch (error) {
+                console.error('Error registrando movimiento en Firestore:', error);
+                toast({
+                  title: 'No se pudo registrar el movimiento',
+                  description: 'Revisa la configuracion y permisos de Firebase.',
+                  variant: 'destructive',
+                });
+                throw error;
+              }
+            }}
+          />
+        </>
       ) : null}
     </div>
   );

@@ -69,6 +69,16 @@ interface RegisterPurchaseInput {
   }>;
 }
 
+interface RegisterInitialStockInput {
+  productId: string;
+  quantity: number;
+  estimatedUnitCost: number;
+  occurredAt: string;
+  notes: string;
+  responsibleUser: string;
+  suggestedSalePrice?: number;
+}
+
 interface RegisterSaleInput {
   productId: string;
   soldAt: string;
@@ -103,6 +113,10 @@ interface AdminDataContextValue {
   updateSupplier: (supplierId: string, input: NewSupplierInput) => Promise<Supplier>;
   deleteSupplier: (supplierId: string) => Promise<void>;
   registerMovement: (input: RegisterMovementInput) => Promise<InventoryMovement>;
+  registerInitialStock: (input: RegisterInitialStockInput) => Promise<{
+    movement: InventoryMovement;
+    purchase: Purchase;
+  }>;
   registerPurchase: (input: RegisterPurchaseInput) => Promise<Purchase[]>;
   updatePurchase: (purchaseId: string, input: RegisterPurchaseInput) => Promise<Purchase>;
   updatePurchaseBatch: (batchId: string, input: RegisterPurchaseInput) => Promise<Purchase[]>;
@@ -197,6 +211,7 @@ function mapPurchaseDocument(documentId: string, data: DocumentData): Purchase {
     productId: String(data.productId ?? ''),
     supplierId: data.supplierId ? String(data.supplierId) : undefined,
     supplier: String(data.supplier ?? ''),
+    source: data.source === 'initial-load' ? 'initial-load' : 'purchase',
     purchasedAt: normalizeDateValue(data.purchasedAt),
     presentationQuantity: Number(data.presentationQuantity ?? 0),
     purchaseUnitValue: Number(data.purchaseUnitValue ?? 0),
@@ -212,6 +227,7 @@ function mapPurchaseDocument(documentId: string, data: DocumentData): Purchase {
     realUnitCost: Number(data.realUnitCost ?? 0),
     suggestedSalePrice: Number(data.suggestedSalePrice ?? 0),
     estimatedMargin: Number(data.estimatedMargin ?? 0),
+    notes: String(data.notes ?? ''),
   };
 }
 
@@ -471,6 +487,85 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
 
   const registerPurchase = async (input: RegisterPurchaseInput) => {
     return createPurchaseBatch(input);
+  };
+
+  const registerInitialStock = async (input: RegisterInitialStockInput) => {
+    const targetProduct = products.find((product) => product.id === input.productId);
+    if (!targetProduct) {
+      throw new Error('No se encontro el producto para cargar inventario inicial.');
+    }
+
+    const quantity = Number(input.quantity);
+    const estimatedUnitCost = Number(input.estimatedUnitCost);
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      throw new Error('La cantidad inicial debe ser mayor a cero.');
+    }
+    if (!Number.isFinite(estimatedUnitCost) || estimatedUnitCost < 0) {
+      throw new Error('El costo estimado debe ser un valor valido.');
+    }
+
+    const purchaseRef = doc(collection(db, 'purchases'));
+    const movementRef = doc(collection(db, 'movements'));
+    const purchaseValueTotal = Number((quantity * estimatedUnitCost).toFixed(2));
+    const purchase: Purchase = {
+      id: purchaseRef.id,
+      productId: input.productId,
+      supplier: 'Inventario inicial sin proveedor',
+      source: 'initial-load',
+      purchasedAt: input.occurredAt,
+      presentationQuantity: quantity,
+      purchaseUnitValue: estimatedUnitCost,
+      quantityPurchased: quantity,
+      purchasePresentation: 'unit',
+      conversionFactor: 1,
+      purchaseValueTotal,
+      shippingValueTotal: 0,
+      totalInvestment: purchaseValueTotal,
+      realUnitCost: estimatedUnitCost,
+      suggestedSalePrice: input.suggestedSalePrice ?? targetProduct.salePrice,
+      estimatedMargin: calculateMargin(estimatedUnitCost, input.suggestedSalePrice ?? targetProduct.salePrice),
+      notes: input.notes,
+    };
+    const movement: InventoryMovement = {
+      id: movementRef.id,
+      productId: input.productId,
+      purchaseId: purchase.id,
+      type: 'entry',
+      reason: 'initial-load',
+      quantity,
+      notes: input.notes,
+      occurredAt: input.occurredAt,
+      responsibleUser: input.responsibleUser,
+      relatedUnitCost: estimatedUnitCost,
+    };
+
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'purchases', purchase.id), {
+      ...purchase,
+      purchasedAt: Timestamp.fromDate(new Date(input.occurredAt)),
+    });
+    batch.set(doc(db, 'movements', movement.id), {
+      ...movement,
+      occurredAt: Timestamp.fromDate(new Date(input.occurredAt)),
+    });
+
+    if (
+      typeof input.suggestedSalePrice === 'number' &&
+      Number.isFinite(input.suggestedSalePrice) &&
+      input.suggestedSalePrice >= 0
+    ) {
+      batch.update(doc(db, 'products', input.productId), {
+        salePrice: input.suggestedSalePrice,
+        updatedAt: serverTimestamp(),
+      });
+    }
+
+    await batch.commit();
+
+    return {
+      movement,
+      purchase,
+    };
   };
 
   const createPurchaseBatch = async (input: RegisterPurchaseInput, existingBatchId?: string) => {
@@ -835,6 +930,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         updateSupplier,
         deleteSupplier,
         registerMovement,
+        registerInitialStock,
         registerPurchase,
         updatePurchase,
         updatePurchaseBatch,

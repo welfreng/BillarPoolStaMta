@@ -78,6 +78,7 @@ export interface Purchase {
   productId: string;
   supplierId?: string;
   supplier: string;
+  source?: 'purchase' | 'initial-load';
   purchasedAt: string;
   presentationQuantity: number;
   purchaseUnitValue: number;
@@ -90,6 +91,7 @@ export interface Purchase {
   realUnitCost: number;
   suggestedSalePrice: number;
   estimatedMargin: number;
+  notes?: string;
 }
 
 export interface Sale {

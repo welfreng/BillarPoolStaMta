@@ -45,6 +45,7 @@ export default function ComprasPage() {
         key: string;
         batchId?: string;
         supplier: string;
+        source: 'purchase' | 'initial-load';
         purchasedAt: string;
         totalPurchaseValue: number;
         totalInvestment: number;
@@ -68,6 +69,7 @@ export default function ComprasPage() {
         key,
         batchId: purchase.purchaseBatchId,
         supplier: purchase.supplier,
+        source: purchase.source ?? 'purchase',
         purchasedAt: purchase.purchasedAt,
         totalPurchaseValue: purchase.purchaseValueTotal,
         totalInvestment: purchase.totalInvestment,
@@ -229,6 +231,11 @@ export default function ComprasPage() {
                     <p className="text-xs text-slate-500">
                       {new Date(group.purchasedAt).toLocaleDateString('es-CO')} · {group.items.length} productos
                     </p>
+                    {group.source === 'initial-load' ? (
+                      <p className="mt-1 text-xs font-medium text-amber-700">
+                        Registro creado como carga inicial sin soporte.
+                      </p>
+                    ) : null}
                   </div>
                   <div className="flex flex-wrap gap-3 text-sm">
                     <div className="rounded-2xl bg-white px-3 py-2 text-slate-600">
