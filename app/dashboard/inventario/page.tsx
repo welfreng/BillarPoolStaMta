@@ -204,7 +204,7 @@ export default function InventarioPage() {
                   <TableHead>Cantidad</TableHead>
                   <TableHead>Motivo</TableHead>
                   <TableHead>Responsable</TableHead>
-                  <TableHead>Costo</TableHead>
+                  <TableHead>Valor</TableHead>
                   <TableHead>Fecha</TableHead>
                   <TableHead className="text-right">Detalle</TableHead>
                 </TableRow>
@@ -216,6 +216,34 @@ export default function InventarioPage() {
                     const relatedSale = movement.saleId
                       ? sales.find((sale) => sale.id === movement.saleId) ?? null
                       : null;
+                    const movementCost = Math.abs(movement.quantity) * movement.relatedUnitCost;
+                    const saleProfit = relatedSale
+                      ? relatedSale.grossProfit - ((relatedSale.returnedSaleAmount ?? 0) - (relatedSale.returnedCostAmount ?? 0))
+                      : 0;
+                    const valueLabel =
+                      movement.reason === 'sale' && relatedSale
+                        ? 'Utilidad venta'
+                        : movement.type === 'purchase' || movement.type === 'entry'
+                          ? 'Costo entrada'
+                          : movement.reason === 'return'
+                            ? 'Costo retorno'
+                            : 'Costo movimiento';
+                    const valueColorClass =
+                      movement.reason === 'sale' && relatedSale
+                        ? saleProfit >= 0
+                          ? 'text-emerald-700'
+                          : 'text-rose-700'
+                        : movement.type === 'purchase'
+                          ? 'text-amber-700'
+                          : movement.type === 'entry'
+                            ? 'text-cyan-700'
+                            : movement.reason === 'return'
+                              ? 'text-sky-700'
+                              : 'text-slate-700';
+                    const valueAmount =
+                      movement.reason === 'sale' && relatedSale
+                        ? saleProfit
+                        : movementCost;
                     return (
                       <TableRow
                         key={movement.id}
@@ -243,7 +271,12 @@ export default function InventarioPage() {
                           )}
                         </TableCell>
                         <TableCell>{movement.responsibleUser}</TableCell>
-                        <TableCell>{formatCurrency(movement.relatedUnitCost)}</TableCell>
+                        <TableCell>
+                          <div>
+                            <p className={`font-semibold ${valueColorClass}`}>{formatCurrency(valueAmount)}</p>
+                            <p className="text-xs text-slate-500">{valueLabel}</p>
+                          </div>
+                        </TableCell>
                         <TableCell>{formatDateTime(movement.occurredAt)}</TableCell>
                         <TableCell className="text-right">
                           {relatedSale ? (

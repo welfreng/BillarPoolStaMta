@@ -74,6 +74,7 @@ function SearchableSelect({
   options: Array<{ value: string; label: string }>;
 }) {
   const [open, setOpen] = useState(false);
+  const listRef = useRef<HTMLDivElement | null>(null);
   const selectedOption = options.find((option) => option.value === value);
 
   return (
@@ -94,7 +95,16 @@ function SearchableSelect({
       <PopoverContent className="w-[var(--radix-popover-trigger-width)] min-w-[280px] p-0" align="start">
         <Command>
           <CommandInput placeholder={searchPlaceholder} />
-          <CommandList>
+          <CommandList
+            ref={listRef}
+            onWheel={(event) => {
+              const element = listRef.current;
+              if (!element) return;
+              element.scrollTop += event.deltaY;
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+          >
             <CommandEmpty>{emptyLabel}</CommandEmpty>
             <CommandGroup>
               {options.map((option) => (

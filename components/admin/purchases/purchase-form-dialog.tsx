@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -93,7 +93,13 @@ function SearchableSelect({
   options: Array<{ value: string; label: string }>;
 }) {
   const [open, setOpen] = useState(false);
+  const listRef = useRef<HTMLDivElement | null>(null);
   const selectedOption = options.find((option) => option.value === value);
+  const handleWheel = (deltaY: number) => {
+    const element = listRef.current;
+    if (!element) return;
+    element.scrollTop += deltaY;
+  };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -110,10 +116,25 @@ function SearchableSelect({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[var(--radix-popover-trigger-width)] min-w-[280px] p-0" align="start">
+      <PopoverContent
+        className="w-[var(--radix-popover-trigger-width)] min-w-[280px] p-0"
+        align="start"
+        onWheelCapture={(event) => {
+          handleWheel(event.deltaY);
+          event.preventDefault();
+          event.stopPropagation();
+        }}
+      >
         <Command>
           <CommandInput placeholder={searchPlaceholder} />
-          <CommandList>
+          <CommandList
+            ref={listRef}
+            onWheel={(event) => {
+              handleWheel(event.deltaY);
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+          >
             <CommandEmpty>{emptyLabel}</CommandEmpty>
             <CommandGroup>
               {options.map((option) => (

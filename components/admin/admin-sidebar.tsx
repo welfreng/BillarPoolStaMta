@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -10,7 +11,6 @@ import {
   LayoutDashboard,
   ReceiptText,
   ShoppingCart,
-  ShieldCheck,
   Tags,
   Users,
 } from 'lucide-react';
@@ -72,7 +72,13 @@ export function AdminSidebar() {
         <div className="rounded-2xl border border-white/10 bg-slate-950 px-4 py-4 text-white shadow-lg">
           <div className="mb-3 flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-400/20">
-              <ShieldCheck className="h-6 w-6 text-cyan-300" />
+              <Image
+                src="/images/logo.png"
+                alt="Billar Pool Santa Marta"
+                width={28}
+                height={28}
+                className="h-7 w-7 object-contain"
+              />
             </div>
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">Billar Pool Santa Marta</p>
@@ -80,7 +86,7 @@ export function AdminSidebar() {
             </div>
           </div>
           <p className="text-xs leading-5 text-slate-300">
-            Base preparada para crecer a ventas, clientes, proveedores y reportes avanzados.
+            Bienvenido al panel de control.
           </p>
         </div>
       </SidebarHeader>

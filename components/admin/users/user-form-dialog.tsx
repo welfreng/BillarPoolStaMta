@@ -112,20 +112,21 @@ export function UserFormDialog({
             })}
             className="space-y-5"
           >
+            <FormField
+              control={form.control}
+              name="nombre"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nombre</FormLabel>
+                  <FormControl>
+                    <Input {...field} disabled={Boolean(initialUser)} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <div className="grid gap-4 md:grid-cols-2">
-              <FormField
-                control={form.control}
-                name="nombre"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nombre</FormLabel>
-                    <FormControl>
-                      <Input {...field} disabled={Boolean(initialUser)} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
               <FormField
                 control={form.control}
                 name="email"
@@ -139,9 +140,6 @@ export function UserFormDialog({
                   </FormItem>
                 )}
               />
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
               <FormField
                 control={form.control}
                 name="telefono"
@@ -155,7 +153,10 @@ export function UserFormDialog({
                   </FormItem>
                 )}
               />
-              {!initialUser && (
+            </div>
+
+            {!initialUser && (
+              <div className="grid gap-4 md:grid-cols-2">
                 <FormField
                   control={form.control}
                   name="password"
@@ -169,23 +170,20 @@ export function UserFormDialog({
                     </FormItem>
                   )}
                 />
-              )}
-            </div>
-
-            {!initialUser && (
-              <FormField
-                control={form.control}
-                name="confirmPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Confirmar contrasena</FormLabel>
-                    <FormControl>
-                      <Input type="password" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                <FormField
+                  control={form.control}
+                  name="confirmPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Confirmar contrasena</FormLabel>
+                      <FormControl>
+                        <Input type="password" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
             )}
 
             <div className="grid gap-4 md:grid-cols-2">

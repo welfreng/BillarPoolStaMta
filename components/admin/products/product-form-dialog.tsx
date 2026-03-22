@@ -1,11 +1,11 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { RotateCcw, RotateCw } from 'lucide-react';
+import { Check, ChevronsUpDown } from 'lucide-react';
 import { availableBrands, inventoryCategories } from '@/lib/admin/catalogs';
 import type { Product } from '@/lib/admin/types';
 import { Button } from '@/components/ui/button';
@@ -27,6 +27,15 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -34,6 +43,83 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
+
+function SearchableSelect({
+  value,
+  onChange,
+  placeholder,
+  searchPlaceholder,
+  emptyLabel,
+  options,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  searchPlaceholder: string;
+  emptyLabel: string;
+  options: Array<{ value: string; label: string }>;
+}) {
+  const [open, setOpen] = useState(false);
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const selectedOption = options.find((option) => option.value === value);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          role="combobox"
+          className="w-full min-w-0 justify-between overflow-hidden px-3 font-normal"
+        >
+          <span className="truncate text-left">
+            {selectedOption ? selectedOption.label : placeholder}
+          </span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] min-w-[280px] p-0" align="start">
+        <Command>
+          <CommandInput placeholder={searchPlaceholder} />
+          <CommandList
+            ref={listRef}
+            onWheel={(event) => {
+              const element = listRef.current;
+              if (!element) return;
+              element.scrollTop += event.deltaY;
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+          >
+            <CommandEmpty>{emptyLabel}</CommandEmpty>
+            <CommandGroup>
+              {options.map((option) => (
+                <CommandItem
+                  key={option.value}
+                  value={`${option.label} ${option.value}`}
+                  onSelect={() => {
+                    onChange(option.value);
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      'mr-2 h-4 w-4',
+                      value === option.value ? 'opacity-100' : 'opacity-0'
+                    )}
+                  />
+                  <span className="truncate">{option.label}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 const productSchema = z
   .object({
@@ -87,6 +173,7 @@ export function ProductFormDialog({
     resolver: zodResolver(productSchema),
     defaultValues,
   });
+  const { toast } = useToast();
 
   useEffect(() => {
     if (!initialProduct) {
@@ -114,6 +201,32 @@ export function ProductFormDialog({
     () => inventoryCategories.find((category) => category.id === selectedCategoryId),
     [selectedCategoryId]
   );
+  const loadImageFile = (file: File) =>
+    new Promise<{ dataUrl: string; width: number; height: number }>((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onerror = () => reject(new Error('No se pudo leer la imagen seleccionada.'));
+      reader.onload = () => {
+        const result = reader.result;
+        if (typeof result !== 'string') {
+          reject(new Error('No se pudo procesar la imagen seleccionada.'));
+          return;
+        }
+
+        const image = new window.Image();
+        image.onload = () => {
+          resolve({
+            dataUrl: result,
+            width: image.width,
+            height: image.height,
+          });
+        };
+        image.onerror = () => reject(new Error('La imagen no es valida o esta dañada.'));
+        image.src = result;
+      };
+
+      reader.readAsDataURL(file);
+    });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -170,29 +283,25 @@ export function ProductFormDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Categoria</FormLabel>
-                    <Select
-                      value={field.value}
-                      onValueChange={(value) => {
+                    <FormControl>
+                      <SearchableSelect
+                        value={field.value}
+                        onChange={(value) => {
                         field.onChange(value);
                         const nextCategory = inventoryCategories.find((category) => category.id === value);
                         form.setValue('subcategory', nextCategory?.subcategories[0] ?? '', {
                           shouldValidate: true,
                         });
-                      }}
-                    >
-                      <FormControl>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Selecciona" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {inventoryCategories.map((category) => (
-                          <SelectItem key={category.id} value={category.id}>
-                            {category.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                        }}
+                        placeholder="Selecciona categoria"
+                        searchPlaceholder="Buscar categoria..."
+                        emptyLabel="No se encontraron categorias."
+                        options={inventoryCategories.map((category) => ({
+                          value: category.id,
+                          label: category.label,
+                        }))}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -295,22 +404,41 @@ export function ProductFormDialog({
                     <Input
                       type="file"
                       accept="image/*"
-                      onChange={(event) => {
+                      onChange={async (event) => {
                         const file = event.target.files?.[0];
                         if (!file) return;
 
-                        const reader = new FileReader();
-                        reader.onload = () => {
-                          const result = reader.result;
-                          if (typeof result === 'string') {
-                            field.onChange(result);
+                        try {
+                          const imageData = await loadImageFile(file);
+                          if (imageData.width !== imageData.height) {
+                            form.clearErrors('image');
+                            field.onChange(defaultValues.image);
                             form.setValue('imageRotation', 0, { shouldValidate: true });
+                            toast({
+                              title: 'Imagen no recomendada',
+                              description: `La imagen seleccionada mide ${imageData.width} x ${imageData.height} px y no es cuadrada. Se dejara la imagen predeterminada para mantener una vista consistente.`,
+                              variant: 'destructive',
+                            });
+                            event.target.value = '';
+                            return;
                           }
-                        };
-                        reader.readAsDataURL(file);
+
+                          form.clearErrors('image');
+                          field.onChange(imageData.dataUrl);
+                          form.setValue('imageRotation', 0, { shouldValidate: true });
+                        } catch (error) {
+                          form.setError('image', {
+                            type: 'manual',
+                            message: error instanceof Error ? error.message : 'No se pudo cargar la imagen.',
+                          });
+                          event.target.value = '';
+                        }
                       }}
                     />
                   </FormControl>
+                  <p className="text-xs text-slate-500">
+                    Recomendado: imagen cuadrada de 1024 x 1024 px en JPG o PNG para que se vea bien en catalogos, tablas y futuras piezas impresas.
+                  </p>
                   <p className="text-xs text-slate-500">
                     La imagen se guarda junto al registro del producto en el modelo actual de la app.
                   </p>
@@ -322,28 +450,6 @@ export function ProductFormDialog({
             <div className="overflow-hidden rounded-3xl border border-slate-200 bg-slate-50">
               <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
                 <p className="text-sm font-medium text-slate-700">Vista previa</p>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      form.setValue('imageRotation', ((selectedRotation - 90) % 360 + 360) % 360)
-                    }
-                  >
-                    <RotateCcw className="mr-2 h-4 w-4" />
-                    Girar izquierda
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => form.setValue('imageRotation', (selectedRotation + 90) % 360)}
-                  >
-                    <RotateCw className="mr-2 h-4 w-4" />
-                    Girar derecha
-                  </Button>
-                </div>
               </div>
               <div className="relative aspect-[16/8] w-full">
                 <Image
