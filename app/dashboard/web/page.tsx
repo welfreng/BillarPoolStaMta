@@ -100,16 +100,20 @@ export default function WebPageManagementPage() {
         title="Pagina web y contenido visual"
         description="Administra las imagenes del catalogo publico y una galeria corta de trabajos para la seccion de servicios."
         actions={
-          <Button type="button" className="rounded-xl" onClick={() => setOpenCatalogImageDialog(true)}>
+          <Button
+            type="button"
+            className="w-full rounded-xl sm:w-auto"
+            onClick={() => setOpenCatalogImageDialog(true)}
+          >
             <ImagePlus className="mr-2 h-4 w-4" />
             Imagenes de productos
           </Button>
         }
       />
 
-      <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
+      <div className="grid gap-6 2xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-start gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
             <div className="rounded-2xl bg-cyan-50 p-3">
               <Globe className="h-5 w-5 text-cyan-700" />
             </div>
@@ -126,11 +130,11 @@ export default function WebPageManagementPage() {
             <p className="mt-2 text-sm leading-6 text-slate-600">
               Lo mejor es concentrar aqui todo lo visual de la web: fotos del catalogo, galeria de servicios y luego textos destacados si decides cambiarlos despues.
             </p>
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-4 grid gap-2 sm:flex sm:flex-wrap">
               <Button
                 type="button"
                 variant="outline"
-                className="rounded-xl"
+                className="w-full rounded-xl sm:w-auto"
                 onClick={() => setOpenCatalogImageDialog(true)}
               >
                 <ImagePlus className="mr-2 h-4 w-4" />
@@ -139,7 +143,7 @@ export default function WebPageManagementPage() {
               <Button
                 type="button"
                 variant="outline"
-                className="rounded-xl"
+                className="w-full rounded-xl sm:w-auto"
                 onClick={handleSyncPublicStock}
                 disabled={syncingPublicStock}
               >
@@ -158,7 +162,7 @@ export default function WebPageManagementPage() {
             </p>
           </div>
 
-          <div className="mt-5 grid gap-4 md:grid-cols-3">
+          <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {serviceSlots.map((slot) => {
               const image = draftServiceImages[slot] || '';
               return (
@@ -229,16 +233,21 @@ export default function WebPageManagementPage() {
             </p>
           </div>
 
-          <div className="mt-5 flex flex-wrap justify-end gap-2">
+          <div className="mt-5 grid gap-2 sm:flex sm:flex-wrap sm:justify-end">
             <Button
               type="button"
               variant="outline"
-              className="rounded-xl"
+              className="w-full rounded-xl sm:w-auto"
               onClick={() => setDraftServiceImages(serviceImages)}
             >
               Restaurar cambios
             </Button>
-            <Button type="button" className="rounded-xl" onClick={handleSaveServiceImages} disabled={savingServices}>
+            <Button
+              type="button"
+              className="w-full rounded-xl sm:w-auto"
+              onClick={handleSaveServiceImages}
+              disabled={savingServices}
+            >
               <Save className="mr-2 h-4 w-4" />
               {savingServices ? 'Guardando...' : 'Guardar galeria'}
             </Button>
