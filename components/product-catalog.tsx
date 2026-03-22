@@ -374,7 +374,7 @@ export default function ProductCatalog({
 
       <Dialog open={Boolean(selectedProduct)} onOpenChange={(open) => !open && setSelectedProductId(null)}>
         {selectedProduct ? (
-          <DialogContent className="max-h-[90vh] w-[calc(100vw-1rem)] max-w-4xl overflow-y-auto rounded-3xl px-4 sm:w-[calc(100vw-2rem)] sm:px-6">
+          <DialogContent className="max-h-[90vh] w-[calc(100vw-1rem)] max-w-5xl overflow-y-auto rounded-3xl px-4 sm:w-[calc(100vw-2rem)] sm:px-6">
             <DialogHeader>
               <DialogTitle className="text-2xl font-semibold text-slate-950">{selectedProduct.name}</DialogTitle>
               <DialogDescription>
@@ -382,30 +382,40 @@ export default function ProductCatalog({
               </DialogDescription>
             </DialogHeader>
 
-            <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-              <div className="relative min-h-[320px] overflow-hidden rounded-3xl border border-slate-200 bg-slate-50">
+            <div className="space-y-6">
+              <div className="relative min-h-[360px] overflow-hidden rounded-3xl border border-slate-200 bg-slate-50 sm:min-h-[460px]">
                 <Image
                   src={selectedProduct.image || defaultImage}
                   alt={selectedProduct.name}
                   fill
-                  className="object-cover"
+                  className="object-contain"
                   unoptimized={selectedProduct.image.startsWith("data:")}
                 />
               </div>
 
-              <div className="space-y-5">
-                <div className="rounded-3xl border border-[#0a2472]/10 bg-[#0a2472]/5 p-5">
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Precio sugerido</p>
-                  <p className="mt-2 text-3xl font-bold text-[#0a2472]">
-                    {selectedProduct.salePrice > 0 ? formatCurrency(selectedProduct.salePrice) : "Consultar"}
-                  </p>
+              <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+                <div className="rounded-3xl border border-slate-200 bg-white p-5">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Producto</p>
+                      <h3 className="mt-2 font-mono text-2xl font-bold text-slate-950">{selectedProduct.name}</h3>
+                    </div>
+                    <div className="rounded-2xl bg-[#0a2472]/5 px-4 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Precio sugerido</p>
+                      <p className="mt-1 text-2xl font-bold text-[#0a2472]">
+                        {selectedProduct.salePrice > 0 ? formatCurrency(selectedProduct.salePrice) : "Consultar"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 rounded-2xl bg-slate-50 p-4">
+                    <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Descripcion</h3>
+                    <p className="mt-3 text-sm leading-7 text-slate-600">{selectedProduct.description}</p>
+                  </div>
                 </div>
 
-                <div className="rounded-3xl border border-slate-200 bg-white p-5">
-                  <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Informacion</h3>
-                  <p className="mt-3 text-sm leading-7 text-slate-600">{selectedProduct.description}</p>
-
-                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                <div className="space-y-4">
+                  <div className="grid gap-3 sm:grid-cols-2">
                     <div className="rounded-2xl bg-slate-50 p-4">
                       <p className="text-xs text-slate-500">Marca</p>
                       <p className="mt-1 font-medium text-slate-900">{selectedProduct.brand || "Por confirmar"}</p>
@@ -417,14 +427,14 @@ export default function ProductCatalog({
                   </div>
 
                   {selectedProduct.subcategory ? (
-                    <div className="mt-3 rounded-2xl bg-slate-50 p-4">
+                    <div className="rounded-2xl bg-slate-50 p-4">
                       <p className="text-xs text-slate-500">Subcategoria</p>
                       <p className="mt-1 font-medium text-slate-900">{selectedProduct.subcategory}</p>
                     </div>
                   ) : null}
 
                   {selectedProduct.details.length > 0 ? (
-                    <div className="mt-5">
+                    <div className="rounded-3xl border border-slate-200 bg-white p-5">
                       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Detalle rapido</p>
                       <div className="mt-3 space-y-2">
                         {selectedProduct.details.map((detail) => (
@@ -435,17 +445,17 @@ export default function ProductCatalog({
                       </div>
                     </div>
                   ) : null}
-                </div>
 
-                <a
-                  href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#1a5632] px-5 py-4 text-base font-semibold text-white transition-colors hover:bg-[#1a5632]/90"
-                >
-                  <MessageCircle className="h-5 w-5" />
-                  Contactar por WhatsApp
-                </a>
+                  <a
+                    href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#1a5632] px-5 py-4 text-base font-semibold text-white transition-colors hover:bg-[#1a5632]/90"
+                  >
+                    <MessageCircle className="h-5 w-5" />
+                    Contactar por WhatsApp
+                  </a>
+                </div>
               </div>
             </div>
           </DialogContent>
