@@ -1,0 +1,261 @@
+'use client';
+
+import Image from 'next/image';
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
+import { doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
+import { Globe, ImagePlus, RefreshCcw, Save } from 'lucide-react';
+import { SectionHeader } from '@/components/admin/shared/section-header';
+import { CatalogImageDialog } from '@/components/admin/products/catalog-image-dialog';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+import { useAdminData } from '@/components/admin/admin-data-context';
+import { db } from '@/lib/firebase';
+
+function loadFileAsDataUrl(
+  event: ChangeEvent<HTMLInputElement>,
+  onLoaded: (value: string) => void
+) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    if (typeof reader.result === 'string') {
+      onLoaded(reader.result);
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+export default function WebPageManagementPage() {
+  const { toast } = useToast();
+  const { syncPublicProductStocks } = useAdminData();
+  const [openCatalogImageDialog, setOpenCatalogImageDialog] = useState(false);
+  const [serviceImages, setServiceImages] = useState<string[]>([]);
+  const [draftServiceImages, setDraftServiceImages] = useState<string[]>([]);
+  const [savingServices, setSavingServices] = useState(false);
+  const [syncingPublicStock, setSyncingPublicStock] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      doc(db, 'siteAssets', 'services-gallery'),
+      (snapshot) => {
+        const data = snapshot.data();
+        const nextImages = Array.isArray(data?.images)
+          ? data.images.filter((item): item is string => typeof item === 'string').slice(0, 3)
+          : [];
+
+        setServiceImages(nextImages);
+        setDraftServiceImages(nextImages);
+      },
+      (error) => {
+        console.error('Error leyendo galeria de servicios:', error);
+        setServiceImages([]);
+        setDraftServiceImages([]);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  const serviceSlots = useMemo(() => Array.from({ length: 3 }, (_, index) => index), []);
+
+  const handleSaveServiceImages = async () => {
+    setSavingServices(true);
+    try {
+      await setDoc(
+        doc(db, 'siteAssets', 'services-gallery'),
+        {
+          images: draftServiceImages.filter(Boolean).slice(0, 3),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+      toast({
+        title: 'Galeria de servicios actualizada',
+        description: 'Las fotos del torno y trabajos realizados ya quedaron listas para la web.',
+      });
+    } finally {
+      setSavingServices(false);
+    }
+  };
+
+  const handleSyncPublicStock = async () => {
+    setSyncingPublicStock(true);
+    try {
+      const updatedProducts = await syncPublicProductStocks();
+      toast({
+        title: 'Stock web sincronizado',
+        description: `La tienda virtual ya quedo actualizada. Productos sincronizados: ${updatedProducts}.`,
+      });
+    } finally {
+      setSyncingPublicStock(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <SectionHeader
+        eyebrow="Gestion web"
+        title="Pagina web y contenido visual"
+        description="Administra las imagenes del catalogo publico y una galeria corta de trabajos para la seccion de servicios."
+        actions={
+          <Button type="button" className="rounded-xl" onClick={() => setOpenCatalogImageDialog(true)}>
+            <ImagePlus className="mr-2 h-4 w-4" />
+            Imagenes de productos
+          </Button>
+        }
+      />
+
+      <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
+        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-start gap-3">
+            <div className="rounded-2xl bg-cyan-50 p-3">
+              <Globe className="h-5 w-5 text-cyan-700" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-slate-950">Catalogo y tienda virtual</h2>
+              <p className="mt-1 text-sm leading-6 text-slate-500">
+                Desde aqui puedes cambiar las fotos que se ven en la portada destacada y en la tienda virtual sin tocar el inventario.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-5">
+            <p className="text-sm font-medium text-slate-900">Recomendacion</p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Lo mejor es concentrar aqui todo lo visual de la web: fotos del catalogo, galeria de servicios y luego textos destacados si decides cambiarlos despues.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-xl"
+                onClick={() => setOpenCatalogImageDialog(true)}
+              >
+                <ImagePlus className="mr-2 h-4 w-4" />
+                Gestionar imagenes del catalogo
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-xl"
+                onClick={handleSyncPublicStock}
+                disabled={syncingPublicStock}
+              >
+                <RefreshCcw className="mr-2 h-4 w-4" />
+                {syncingPublicStock ? 'Sincronizando stock...' : 'Sincronizar stock web'}
+              </Button>
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-950">Trabajos del torno en servicios</h2>
+            <p className="mt-1 text-sm leading-6 text-slate-500">
+              Sube maximo 3 imagenes de cambios de casquillo, suela u otros trabajos en tacos. Asi se ve profesional y no recarga la pagina.
+            </p>
+          </div>
+
+          <div className="mt-5 grid gap-4 md:grid-cols-3">
+            {serviceSlots.map((slot) => {
+              const image = draftServiceImages[slot] || '';
+              return (
+                <div key={slot} className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                    <div className="relative aspect-[4/5] w-full">
+                      {image ? (
+                        <Image
+                          src={image}
+                          alt={`Trabajo ${slot + 1}`}
+                          fill
+                          className="object-cover"
+                          unoptimized={image.startsWith('data:')}
+                        />
+                      ) : (
+                        <div className="flex h-full items-center justify-center px-4 text-center text-sm text-slate-400">
+                          Sin imagen cargada
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 space-y-3">
+                    <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:border-cyan-400 hover:bg-cyan-50">
+                      <ImagePlus className="h-4 w-4" />
+                      Subir imagen
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(event) =>
+                          loadFileAsDataUrl(event, (value) =>
+                            setDraftServiceImages((current) => {
+                              const next = [...current];
+                              next[slot] = value;
+                              return next;
+                            })
+                          )
+                        }
+                      />
+                    </label>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full rounded-xl"
+                      onClick={() =>
+                        setDraftServiceImages((current) => {
+                          const next = [...current];
+                          next[slot] = '';
+                          return next;
+                        })
+                      }
+                    >
+                      <RefreshCcw className="mr-2 h-4 w-4" />
+                      Limpiar
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-5 flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            <p className="font-medium">Sugerencia visual</p>
+            <p>
+              Lo mejor es mostrar solo 2 o 3 fotos pequeñas de trabajos reales debajo del bloque del torno. Asi inspiran confianza sin que la pagina se vea empañada o recargada.
+            </p>
+          </div>
+
+          <div className="mt-5 flex flex-wrap justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-xl"
+              onClick={() => setDraftServiceImages(serviceImages)}
+            >
+              Restaurar cambios
+            </Button>
+            <Button type="button" className="rounded-xl" onClick={handleSaveServiceImages} disabled={savingServices}>
+              <Save className="mr-2 h-4 w-4" />
+              {savingServices ? 'Guardando...' : 'Guardar galeria'}
+            </Button>
+          </div>
+        </section>
+      </div>
+
+      <CatalogImageDialog
+        open={openCatalogImageDialog}
+        onOpenChange={setOpenCatalogImageDialog}
+        onSaved={() =>
+          toast({
+            title: 'Imagenes actualizadas',
+            description: 'La tienda virtual ya puede mostrar las nuevas fotos.',
+          })
+        }
+      />
+    </div>
+  );
+}

@@ -21,3 +21,43 @@
 [error] 
 [error] Error: Failed to authenticate, have you run firebase login?
 [debug] [2026-03-20T20:28:01.077Z] <<< [apiv2][status] GET https://firebase-public.firebaseio.com/cli.json 200
+[debug] [2026-03-22T20:12:47.896Z] ----------------------------------------------------------------------
+[debug] [2026-03-22T20:12:47.903Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\HP\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\firebase-tools\lib\bin\firebase.js deploy --only firestore:rules
+[debug] [2026-03-22T20:12:47.904Z] CLI Version:   15.11.0
+[debug] [2026-03-22T20:12:47.904Z] Platform:      win32
+[debug] [2026-03-22T20:12:47.905Z] Node Version:  v24.14.0
+[debug] [2026-03-22T20:12:47.905Z] Time:          Sun Mar 22 2026 15:12:47 GMT-0500 (hora estándar de Colombia)
+[debug] [2026-03-22T20:12:47.905Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-03-22T20:12:47.914Z] >>> [apiv2][query] GET https://firebase-public.firebaseio.com/cli.json [none]
+[error] 
+[error] Error: No currently active project.
+To run this command, you need to specify a project. You have two options:
+- Run this command with --project <alias_or_project_id>.
+- Set an active project by running firebase use --add, then rerun this command.
+To list all the Firebase projects to which you have access, run firebase projects:list.
+To learn about active projects for the CLI, visit https://firebase.google.com/docs/cli#project_aliases
+
+
+[debug] [2026-03-22T20:43:03.751Z] ----------------------------------------------------------------------
+[debug] [2026-03-22T20:43:03.766Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\HP\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\firebase-tools\lib\bin\firebase.js deploy --only firestore:rules,firestore:indexes --project billarpoolstamta-5d4ac
+[debug] [2026-03-22T20:43:03.770Z] CLI Version:   15.11.0
+[debug] [2026-03-22T20:43:03.772Z] Platform:      win32
+[debug] [2026-03-22T20:43:03.772Z] Node Version:  v24.14.0
+[debug] [2026-03-22T20:43:03.773Z] Time:          Sun Mar 22 2026 15:43:03 GMT-0500 (hora estándar de Colombia)
+[debug] [2026-03-22T20:43:03.774Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-03-22T20:43:03.786Z] >>> [apiv2][query] GET https://firebase-public.firebaseio.com/cli.json [none]
+[debug] [2026-03-22T20:43:13.905Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-03-22T20:43:14.085Z] Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at GoogleAuth.getApplicationDefaultAsync (C:\Users\HP\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\google-auth-library\build\src\auth\googleauth.js:287:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async GoogleAuth._GoogleAuth_determineClient (C:\Users\HP\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\google-auth-library\build\src\auth\googleauth.js:834:32)
+    at async GoogleAuth.getClient (C:\Users\HP\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\google-auth-library\build\src\auth\googleauth.js:698:20)
+    at async GoogleAuth.getAccessToken (C:\Users\HP\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\google-auth-library\build\src\auth\googleauth.js:722:24)
+    at async autoAuth (C:\Users\HP\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\firebase-tools\lib\requireAuth.js:28:19)
+    at async requireAuth (C:\Users\HP\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\firebase-tools\lib\requireAuth.js:90:20)
+    at async requirePermissions (C:\Users\HP\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\firebase-tools\lib\requirePermissions.js:17:5)
+    at async C:\Users\HP\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\firebase-tools\lib\command.js:264:17
+[error] 
+[error] Error: Failed to authenticate, have you run firebase login?

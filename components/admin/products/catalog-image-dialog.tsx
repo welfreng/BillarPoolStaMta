@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
-import { doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
+import { collection, doc, onSnapshot, serverTimestamp, setDoc, type DocumentData } from 'firebase/firestore';
 import { ImagePlus, RefreshCcw, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -14,7 +14,14 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { db } from '@/lib/firebase';
-import { publicCatalogProducts } from '@/lib/public-catalog';
+
+interface WebCatalogProduct {
+  id: string;
+  name: string;
+  brand: string;
+  image: string;
+  status: 'active' | 'draft' | 'archived';
+}
 
 function loadFileAsDataUrl(
   event: ChangeEvent<HTMLInputElement>,
@@ -32,6 +39,19 @@ function loadFileAsDataUrl(
   reader.readAsDataURL(file);
 }
 
+function mapProduct(documentId: string, data: DocumentData): WebCatalogProduct {
+  return {
+    id: documentId,
+    name: String(data.name ?? 'Producto'),
+    brand: String(data.brand ?? ''),
+    image: String(data.image ?? '/images/logo.png'),
+    status:
+      data.status === 'draft' || data.status === 'archived' || data.status === 'active'
+        ? data.status
+        : 'active',
+  };
+}
+
 export function CatalogImageDialog({
   open,
   onOpenChange,
@@ -42,12 +62,28 @@ export function CatalogImageDialog({
   onSaved?: () => void;
 }) {
   const [overrides, setOverrides] = useState<Record<string, string>>({});
+  const [products, setProducts] = useState<WebCatalogProduct[]>([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!open) return;
 
-    const unsubscribe = onSnapshot(
+    const unsubscribeProducts = onSnapshot(
+      collection(db, 'products'),
+      (snapshot) => {
+        const nextProducts = snapshot.docs
+          .map((item) => mapProduct(item.id, item.data()))
+          .filter((item) => item.status === 'active')
+          .sort((left, right) => left.name.localeCompare(right.name));
+        setProducts(nextProducts);
+      },
+      (error) => {
+        console.error('Error leyendo productos del catalogo web:', error);
+        setProducts([]);
+      }
+    );
+
+    const unsubscribeImages = onSnapshot(
       doc(db, 'siteAssets', 'catalog-images'),
       (snapshot) => {
         const data = snapshot.data();
@@ -63,16 +99,19 @@ export function CatalogImageDialog({
       }
     );
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeProducts();
+      unsubscribeImages();
+    };
   }, [open]);
 
   const previewItems = useMemo(
     () =>
-      publicCatalogProducts.map((item) => ({
+      products.map((item) => ({
         ...item,
         previewImage: overrides[item.id] || item.image,
       })),
-    [overrides]
+    [overrides, products]
   );
 
   const handleSave = async () => {
@@ -107,7 +146,7 @@ export function CatalogImageDialog({
         <DialogHeader>
           <DialogTitle>Imagenes del catalogo web</DialogTitle>
           <DialogDescription>
-            Aqui solo cambias las imagenes de las tarjetas del catalogo publico. Los textos de la pagina no se modifican.
+            Aqui cambias las imagenes de los productos que se muestran en la tienda virtual y en los destacados.
           </DialogDescription>
         </DialogHeader>
 
@@ -128,7 +167,7 @@ export function CatalogImageDialog({
 
               <div className="mt-4">
                 <p className="font-semibold text-slate-900">{item.name}</p>
-                <p className="mt-1 text-xs text-slate-500">{item.tag}</p>
+                <p className="mt-1 text-xs text-slate-500">{item.brand || 'Sin marca registrada'}</p>
               </div>
 
               <div className="mt-4 space-y-3">

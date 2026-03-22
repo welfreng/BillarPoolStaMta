@@ -35,10 +35,10 @@ export default function Hero() {
 
           <div className="mt-8 flex flex-col sm:flex-row gap-4">
             <a
-              href="#productos"
+              href="/tienda-virtual"
               className="inline-flex items-center justify-center rounded-lg bg-[#d4a017] px-8 py-4 text-base font-bold text-[#0a1628] hover:bg-[#d4a017]/90 transition-all hover:scale-105 shadow-lg shadow-[#d4a017]/25"
             >
-              Ver Catalogo
+              Ir a Tienda Virtual
             </a>
             <a
               href="https://wa.me/573006775284?text=Hola%2C%20me%20interesa%20conocer%20sus%20productos"

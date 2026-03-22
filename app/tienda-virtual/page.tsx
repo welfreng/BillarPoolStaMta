@@ -1,20 +1,14 @@
 import Navbar from "@/components/navbar"
-import Hero from "@/components/hero"
 import ProductCatalog from "@/components/product-catalog"
-import Services from "@/components/services"
-import Location from "@/components/location"
 import Footer from "@/components/footer"
 import WhatsAppButton from "@/components/whatsapp-button"
 
-export default function Home() {
+export default function TiendaVirtualPage() {
   return (
     <>
       <Navbar />
-      <main>
-        <Hero />
-        <ProductCatalog featuredOnly />
-        <Services />
-        <Location />
+      <main className="pt-20">
+        <ProductCatalog sectionId="tienda-virtual" />
       </main>
       <Footer />
       <WhatsAppButton />

@@ -14,6 +14,7 @@ const pageTitles: Record<string, string> = {
   '/dashboard/productos': 'Gestion de productos',
   '/dashboard/inventario': 'Control de inventario',
   '/dashboard/compras': 'Compras e inversion',
+  '/dashboard/web': 'Pagina web',
   '/dashboard/reportes': 'Reportes iniciales',
   '/dashboard/ventas': 'Gestion de ventas',
   '/dashboard/proveedores': 'Gestion de proveedores',
@@ -44,6 +45,8 @@ export function AdminHeader() {
       { label: 'Registrar movimiento', helper: 'Abrir inventario', href: '/dashboard/inventario' },
       { label: 'Compras', helper: 'Ir al modulo de compras', href: '/dashboard/compras' },
       { label: 'Registrar compra', helper: 'Abrir compras', href: '/dashboard/compras' },
+      { label: 'Pagina web', helper: 'Gestionar catalogo y servicios web', href: '/dashboard/web' },
+      { label: 'Tienda virtual', helper: 'Cambiar fotos del catalogo web', href: '/dashboard/web' },
       { label: 'Reportes', helper: 'Ver indicadores del negocio', href: '/dashboard/reportes' },
       { label: 'Usuarios', helper: 'Gestionar accesos y roles', href: '/dashboard/usuarios' },
     ];

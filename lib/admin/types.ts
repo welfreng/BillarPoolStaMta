@@ -27,6 +27,8 @@ export interface Product {
   subcategory: string;
   brand: string;
   salePrice: number;
+  featured: boolean;
+  publicStock: number;
   image: string;
   imageRotation: number;
   status: ProductStatus;

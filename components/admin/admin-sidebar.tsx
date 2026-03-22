@@ -8,6 +8,7 @@ import {
   Boxes,
   Building2,
   ClipboardList,
+  Globe,
   LayoutDashboard,
   ReceiptText,
   ShoppingCart,
@@ -43,6 +44,7 @@ const navigation = [
     helper: 'Movimientos y kardex',
   },
   { href: '/dashboard/compras', label: 'Compras', icon: ReceiptText, helper: 'Inversion y costos' },
+  { href: '/dashboard/web', label: 'Pagina web', icon: Globe, helper: 'Catalogo y servicios web' },
   { href: '/dashboard/reportes', label: 'Reportes', icon: Tags, helper: 'Insights operativos' },
   { href: '/dashboard/usuarios', label: 'Usuarios', icon: Users, helper: 'Roles y accesos' },
 ];

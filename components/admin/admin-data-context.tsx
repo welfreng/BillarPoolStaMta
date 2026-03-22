@@ -45,7 +45,7 @@ import type {
   Supplier,
 } from '@/lib/admin/types';
 
-type NewProductInput = Omit<Product, 'id' | 'createdAt' | 'updatedAt'>;
+type NewProductInput = Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'publicStock'>;
 type NewSupplierInput = Omit<Supplier, 'id' | 'createdAt' | 'updatedAt'>;
 
 interface RegisterMovementInput {
@@ -114,6 +114,7 @@ interface AdminDataContextValue {
   sales: Sale[];
   summary: DashboardSummary;
   latestMovements: InventoryMovement[];
+  syncPublicProductStocks: () => Promise<number>;
   createProduct: (input: NewProductInput) => Promise<Product>;
   updateProduct: (productId: string, input: NewProductInput) => Promise<Product>;
   deleteProduct: (productId: string) => Promise<void>;
@@ -159,6 +160,8 @@ function mapProductDocument(documentId: string, data: DocumentData): Product {
     subcategory: String(data.subcategory ?? ''),
     brand: String(data.brand ?? ''),
     salePrice: Number(data.salePrice ?? 0),
+    featured: Boolean(data.featured ?? false),
+    publicStock: Number(data.publicStock ?? 0),
     image: String(data.image ?? '/images/logo.png'),
     imageRotation: Number(data.imageRotation ?? 0),
     status:
@@ -168,6 +171,15 @@ function mapProductDocument(documentId: string, data: DocumentData): Product {
     createdAt: normalizeDateValue(data.createdAt),
     updatedAt: normalizeDateValue(data.updatedAt),
   };
+}
+
+function getPublicStockFromMovements(movements: Array<{ productId: string; quantity: number }>, productId: string) {
+  return Math.max(
+    movements
+      .filter((movement) => movement.productId === productId)
+      .reduce((total, movement) => total + movement.quantity, 0),
+    0
+  );
 }
 
 function mapSupplierDocument(documentId: string, data: DocumentData): Supplier {
@@ -420,18 +432,72 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const buildPublicStockMap = (
+    baseMovements: InventoryMovement[],
+    touchedProductIds: string[],
+    addedMovements: Array<{ productId: string; quantity: number }> = []
+  ) => {
+    const uniqueProductIds = Array.from(new Set(touchedProductIds.filter(Boolean)));
+    const projectedMovements = [
+      ...baseMovements.map((movement) => ({ productId: movement.productId, quantity: movement.quantity })),
+      ...addedMovements,
+    ];
+
+    return new Map(
+      uniqueProductIds.map((productId) => [
+        productId,
+        getPublicStockFromMovements(projectedMovements, productId),
+      ])
+    );
+  };
+
+  const applyPublicStockMapToBatch = (
+    batch: ReturnType<typeof writeBatch>,
+    stockMap: Map<string, number>
+  ) => {
+    stockMap.forEach((publicStock, productId) => {
+      batch.set(
+        doc(db, 'products', productId),
+        {
+          publicStock,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+    });
+  };
+
+  const syncPublicProductStocks = async () => {
+    const batch = writeBatch(db);
+    products.forEach((product) => {
+      const publicStock = getProductStock(movements, product.id);
+      batch.set(
+        doc(db, 'products', product.id),
+        {
+          publicStock,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+    });
+    await batch.commit();
+    return products.length;
+  };
+
   const createProduct = async (input: NewProductInput) => {
     const createdAt = new Date().toISOString();
     const productRef = doc(collection(db, 'products'));
     const newProduct: Product = {
       ...input,
       id: productRef.id,
+      publicStock: 0,
       createdAt,
       updatedAt: createdAt,
     };
 
     await setDoc(productRef, {
       ...input,
+      publicStock: 0,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
@@ -453,6 +519,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     return {
       ...existingProduct,
       ...input,
+      publicStock: existingProduct.publicStock,
       updatedAt: new Date().toISOString(),
     };
   };
@@ -547,10 +614,18 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         input.relatedUnitCost ?? getProductRealUnitCost(purchases, input.productId),
     };
 
-    await setDoc(movementRef, {
+    const batch = writeBatch(db);
+    batch.set(movementRef, {
       ...movement,
       occurredAt: serverTimestamp(),
     });
+    applyPublicStockMapToBatch(
+      batch,
+      buildPublicStockMap(movements, [input.productId], [
+        { productId: input.productId, quantity: normalizedQuantity },
+      ])
+    );
+    await batch.commit();
 
     return movement;
   };
@@ -630,6 +705,13 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       });
     }
 
+    applyPublicStockMapToBatch(
+      batch,
+      buildPublicStockMap(movements, [input.productId], [
+        { productId: input.productId, quantity },
+      ])
+    );
+
     await batch.commit();
 
     return {
@@ -638,7 +720,11 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     };
   };
 
-  const createPurchaseBatch = async (input: RegisterPurchaseInput, existingBatchId?: string) => {
+  const createPurchaseBatch = async (
+    input: RegisterPurchaseInput,
+    existingBatchId?: string,
+    baseMovements: InventoryMovement[] = movements
+  ) => {
     if (input.items.length === 0) {
       throw new Error('Agrega al menos un producto a la compra.');
     }
@@ -661,6 +747,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     const batchId = existingBatchId ?? doc(collection(db, 'purchase-batches')).id;
     const batch = writeBatch(db);
     const purchasesCreated: Purchase[] = [];
+    const stockDeltas: Array<{ productId: string; quantity: number }> = [];
 
     input.items.forEach((item, index) => {
       const conversionFactor = 1;
@@ -724,11 +811,21 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         responsibleUser: 'Administrador',
         relatedUnitCost: totals.realUnitCost,
       });
+      stockDeltas.push({ productId: item.productId, quantity: quantityPurchased });
       batch.update(doc(db, 'products', item.productId), {
         salePrice: item.suggestedSalePrice,
         updatedAt: serverTimestamp(),
       });
     });
+
+    applyPublicStockMapToBatch(
+      batch,
+      buildPublicStockMap(
+        baseMovements,
+        stockDeltas.map((item) => item.productId),
+        stockDeltas
+      )
+    );
 
     await batch.commit();
 
@@ -748,7 +845,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       .forEach((movement) => batch.delete(doc(db, 'movements', movement.id)));
     await batch.commit();
 
-    return createPurchaseBatch(input, batchId);
+    const remainingMovements = movements.filter((movement) => movement.purchaseBatchId !== batchId);
+    return createPurchaseBatch(input, batchId, remainingMovements);
   };
 
   const updatePurchase = async (purchaseId: string, input: RegisterPurchaseInput) => {
@@ -767,7 +865,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       .forEach((movement) => batch.delete(doc(db, 'movements', movement.id)));
     await batch.commit();
 
-    const [updatedPurchase] = await createPurchaseBatch(input, targetPurchase.purchaseBatchId);
+    const remainingMovements = movements.filter((movement) => movement.purchaseId !== purchaseId);
+    const [updatedPurchase] = await createPurchaseBatch(input, targetPurchase.purchaseBatchId, remainingMovements);
     return updatedPurchase;
   };
 
@@ -779,9 +878,15 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
 
     const batch = writeBatch(db);
     batch.delete(doc(db, 'purchases', purchaseId));
-    movements
-      .filter((movement) => movement.purchaseId === purchaseId)
-      .forEach((movement) => batch.delete(doc(db, 'movements', movement.id)));
+    const removedMovements = movements.filter((movement) => movement.purchaseId === purchaseId);
+    removedMovements.forEach((movement) => batch.delete(doc(db, 'movements', movement.id)));
+    applyPublicStockMapToBatch(
+      batch,
+      buildPublicStockMap(
+        movements.filter((movement) => movement.purchaseId !== purchaseId),
+        removedMovements.map((movement) => movement.productId)
+      )
+    );
     await batch.commit();
   };
 
@@ -793,13 +898,19 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
 
     const batch = writeBatch(db);
     targetPurchases.forEach((purchase) => batch.delete(doc(db, 'purchases', purchase.id)));
-    movements
-      .filter((movement) => movement.purchaseBatchId === batchId)
-      .forEach((movement) => batch.delete(doc(db, 'movements', movement.id)));
+    const removedMovements = movements.filter((movement) => movement.purchaseBatchId === batchId);
+    removedMovements.forEach((movement) => batch.delete(doc(db, 'movements', movement.id)));
+    applyPublicStockMapToBatch(
+      batch,
+      buildPublicStockMap(
+        movements.filter((movement) => movement.purchaseBatchId !== batchId),
+        removedMovements.map((movement) => movement.productId)
+      )
+    );
     await batch.commit();
   };
 
-  const registerSale = async (input: RegisterSaleInput) => {
+  const registerSaleInternal = async (input: RegisterSaleInput, baseMovements: InventoryMovement[] = movements) => {
     if (input.items.length === 0) {
       throw new Error('Agrega al menos un producto a la venta.');
     }
@@ -853,7 +964,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     });
 
     for (const [productId, requestedQuantity] of requestedGiftTotals) {
-      const availableGiftStock = getProductStock(movements, productId);
+      const availableGiftStock = getProductStock(baseMovements, productId);
       const stockReservedBySale = lineItems
         .filter((item) => item.productId === productId)
         .reduce((sum, item) => sum + item.quantity, 0);
@@ -871,6 +982,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     const saleBatchId = doc(collection(db, 'sale-batches')).id;
 
     const batch = writeBatch(db);
+    const stockDeltas: Array<{ productId: string; quantity: number }> = [];
     const createdSales: Sale[] = lineItems.map((lineItem, index) => {
       const saleRef = doc(collection(db, 'sales'));
       const sale: Sale = {
@@ -915,6 +1027,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         responsibleUser: input.responsibleUser,
         relatedUnitCost: lineItem.realUnitCost,
       });
+      stockDeltas.push({ productId: lineItem.productId, quantity: -Math.abs(lineItem.quantity) });
       return sale;
     });
 
@@ -934,11 +1047,25 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         responsibleUser: input.responsibleUser,
         relatedUnitCost: giftItem.unitCost,
       });
+      stockDeltas.push({ productId: giftItem.productId, quantity: -Math.abs(giftItem.quantity) });
     }
+
+    applyPublicStockMapToBatch(
+      batch,
+      buildPublicStockMap(
+        baseMovements,
+        stockDeltas.map((item) => item.productId),
+        stockDeltas
+      )
+    );
 
     await batch.commit();
 
     return createdSales;
+  };
+
+  const registerSale = async (input: RegisterSaleInput) => {
+    return registerSaleInternal(input, movements);
   };
 
   const updateSaleBatch = async (saleBatchId: string, input: RegisterSaleInput) => {
@@ -1034,14 +1161,18 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     giftMovementsToUpdate.forEach((movement) => batch.delete(doc(db, 'movements', movement.id)));
     await batch.commit();
 
-    return registerSale({
+    const remainingMovements = movements.filter(
+      (movement) => !existingSales.some((sale) => sale.id === movement.saleId)
+    );
+
+    return registerSaleInternal({
       ...input,
       items: nextLineItems.map((item) => ({
         productId: item.productId,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
       })),
-    });
+    }, remainingMovements);
   };
 
   const registerSaleReturn = async (input: RegisterSaleReturnInput) => {
@@ -1083,6 +1214,12 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       responsibleUser: input.responsibleUser,
       relatedUnitCost: sale.realUnitCost,
     });
+    applyPublicStockMapToBatch(
+      batch,
+      buildPublicStockMap(movements, [sale.productId], [
+        { productId: sale.productId, quantity: Math.abs(input.quantity) },
+      ])
+    );
 
     await batch.commit();
 
@@ -1111,6 +1248,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         sales,
         summary,
         latestMovements,
+        syncPublicProductStocks,
         createProduct,
         updateProduct,
         deleteProduct,

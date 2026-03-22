@@ -9,6 +9,7 @@ import { Check, ChevronsUpDown } from 'lucide-react';
 import { availableBrands, inventoryCategories } from '@/lib/admin/catalogs';
 import type { Product } from '@/lib/admin/types';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -129,6 +130,7 @@ const productSchema = z
     subcategory: z.string(),
     brand: z.string().min(1, 'Ingresa o selecciona una marca'),
     salePrice: z.coerce.number().min(0),
+    featured: z.boolean().default(false),
     image: z.string().min(1, 'Carga una imagen del producto'),
     imageRotation: z.coerce.number(),
     status: z.enum(['active', 'draft', 'archived']),
@@ -153,6 +155,7 @@ const defaultValues: ProductFormValues = {
   subcategory: 'Grafito',
   brand: availableBrands[0],
   salePrice: 0,
+  featured: false,
   image: '/images/logo.png',
   imageRotation: 0,
   status: 'active',
@@ -188,6 +191,7 @@ export function ProductFormDialog({
       subcategory: initialProduct.subcategory,
       brand: initialProduct.brand,
       salePrice: initialProduct.salePrice,
+      featured: initialProduct.featured,
       image: initialProduct.image,
       imageRotation: initialProduct.imageRotation,
       status: initialProduct.status,
@@ -370,6 +374,29 @@ export function ProductFormDialog({
                   </FormItem>
                 )}
               />
+              <FormField
+                control={form.control}
+                name="featured"
+                render={({ field }) => (
+                  <FormItem className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                    <div className="flex items-start gap-3">
+                      <FormControl>
+                        <Checkbox checked={field.value} onCheckedChange={(checked) => field.onChange(checked === true)} />
+                      </FormControl>
+                      <div className="space-y-1">
+                        <FormLabel className="text-sm font-medium text-slate-950">Mostrar como producto destacado</FormLabel>
+                        <p className="text-sm text-slate-500">
+                          Si lo activas, este producto puede aparecer en la portada como referencia destacada.
+                        </p>
+                      </div>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-1">
               <FormField
                 control={form.control}
                 name="status"

@@ -17,6 +17,11 @@ service cloud.firestore {
         get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.role == 'sales';
     }
 
+    function isPublicStockSyncUpdate() {
+      return resource != null &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['publicStock', 'updatedAt']);
+    }
+
     match /usuarios/{userId} {
       allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
       allow create: if signedIn() && (request.auth.uid == userId || isAdmin());
@@ -25,8 +30,12 @@ service cloud.firestore {
     }
 
     match /products/{productId} {
-      allow read: if signedIn();
-      allow create, update, delete: if isAdmin();
+      allow read: if signedIn() || (
+        resource.data.status == 'active' &&
+        resource.data.publicStock > 0
+      );
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (isSales() && isPublicStockSyncUpdate());
     }
 
     match /siteAssets/{documentId} {

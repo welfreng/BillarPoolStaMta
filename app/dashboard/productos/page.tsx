@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { useEffect, useMemo, useState } from 'react';
-import { Eye, ImagePlus, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { Eye, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { Button } from '@/components/ui/button';
 import {
@@ -16,7 +16,6 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { SectionHeader } from '@/components/admin/shared/section-header';
-import { CatalogImageDialog } from '@/components/admin/products/catalog-image-dialog';
 import { ProductFormDialog, type ProductFormValues } from '@/components/admin/products/product-form-dialog';
 import { ProductStatusBadge } from '@/components/admin/shared/status-badges';
 import { useAdminData } from '@/components/admin/admin-data-context';
@@ -35,7 +34,6 @@ export default function ProductosPage() {
   const [status, setStatus] = useState('all');
   const [page, setPage] = useState(1);
   const [openDialog, setOpenDialog] = useState(false);
-  const [openCatalogImageDialog, setOpenCatalogImageDialog] = useState(false);
   const [openViewDialog, setOpenViewDialog] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | undefined>(products[0]);
   const [editingProduct, setEditingProduct] = useState<Product | undefined>();
@@ -133,25 +131,15 @@ export default function ProductosPage() {
         title="Productos e inventario base"
         description="Administra el catalogo del producto, su imagen, precio de venta y estado operativo."
         actions={
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpenCatalogImageDialog(true)}
-              className="rounded-xl"
-            >
-              <ImagePlus className="mr-2 h-4 w-4" /> Imagenes del catalogo web
-            </Button>
-            <Button
-              onClick={() => {
-                setEditingProduct(undefined);
-                setOpenDialog(true);
-              }}
-              className="rounded-xl"
-            >
-              <Plus className="mr-2 h-4 w-4" /> Nuevo producto
-            </Button>
-          </div>
+          <Button
+            onClick={() => {
+              setEditingProduct(undefined);
+              setOpenDialog(true);
+            }}
+            className="rounded-xl"
+          >
+            <Plus className="mr-2 h-4 w-4" /> Nuevo producto
+          </Button>
         }
       />
 
@@ -217,6 +205,7 @@ export default function ProductosPage() {
                       <TableHead>Producto</TableHead>
                       <TableHead>Categoria</TableHead>
                       <TableHead>Venta</TableHead>
+                      <TableHead>Destacado</TableHead>
                       <TableHead>Estado</TableHead>
                       <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
@@ -239,6 +228,11 @@ export default function ProductosPage() {
                           <p className="text-xs text-slate-500">{product.subcategory}</p>
                         </TableCell>
                         <TableCell>{formatCurrency(product.salePrice)}</TableCell>
+                        <TableCell>
+                          <span className={product.featured ? 'font-medium text-emerald-700' : 'text-slate-400'}>
+                            {product.featured ? 'Si' : 'No'}
+                          </span>
+                        </TableCell>
                         <TableCell>
                           <ProductStatusBadge status={product.status} />
                         </TableCell>
@@ -368,6 +362,12 @@ export default function ProductosPage() {
                     {formatCurrency(selectedProduct.salePrice)}
                   </p>
                 </div>
+                <div className="rounded-2xl bg-slate-50 p-4">
+                  <p className="text-xs text-slate-500">Producto destacado</p>
+                  <p className={`mt-1 font-semibold ${selectedProduct.featured ? 'text-emerald-700' : 'text-slate-600'}`}>
+                    {selectedProduct.featured ? 'Si, visible en portada' : 'No'}
+                  </p>
+                </div>
               </div>
             </div>
           ) : (
@@ -392,18 +392,6 @@ export default function ProductosPage() {
         initialProduct={editingProduct}
         onSubmit={handleSave}
       />
-
-      <CatalogImageDialog
-        open={openCatalogImageDialog}
-        onOpenChange={setOpenCatalogImageDialog}
-        onSaved={() =>
-          toast({
-            title: 'Imagenes actualizadas',
-            description: 'Las tarjetas del catalogo web ya pueden mostrar las nuevas fotos.',
-          })
-        }
-      />
-
       <Dialog open={openViewDialog} onOpenChange={setOpenViewDialog}>
         <DialogContent className="max-h-[92vh] w-[calc(100vw-1rem)] max-w-6xl overflow-y-auto border-slate-800 bg-slate-950 p-0 text-white sm:w-[calc(100vw-2rem)]">
           {selectedProduct ? (
