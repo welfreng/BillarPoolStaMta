@@ -46,6 +46,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { optimizeImageFile } from '@/lib/image-upload';
 
 function SearchableSelect({
   value,
@@ -436,14 +437,18 @@ export function ProductFormDialog({
                         if (!file) return;
 
                         try {
-                          const imageData = await loadImageFile(file);
-                          if (imageData.width !== imageData.height) {
+                          const imageData = await optimizeImageFile(file, {
+                            maxWidth: 1200,
+                            maxHeight: 1200,
+                            quality: 0.84,
+                          });
+                          if (imageData.originalWidth !== imageData.originalHeight) {
                             form.clearErrors('image');
                             field.onChange(defaultValues.image);
                             form.setValue('imageRotation', 0, { shouldValidate: true });
                             toast({
                               title: 'Imagen no recomendada',
-                              description: `La imagen seleccionada mide ${imageData.width} x ${imageData.height} px y no es cuadrada. Se dejara la imagen predeterminada para mantener una vista consistente.`,
+                              description: `La imagen seleccionada mide ${imageData.originalWidth} x ${imageData.originalHeight} px y no es cuadrada. Se dejara la imagen predeterminada para mantener una vista consistente.`,
                               variant: 'destructive',
                             });
                             event.target.value = '';
@@ -467,18 +472,18 @@ export function ProductFormDialog({
                     Recomendado: imagen cuadrada de 1024 x 1024 px en JPG o PNG para que se vea bien en catalogos, tablas y futuras piezas impresas.
                   </p>
                   <p className="text-xs text-slate-500">
-                    La imagen se guarda junto al registro del producto en el modelo actual de la app.
+                    La imagen se optimiza automaticamente al cargarla para que pese menos y se vea mejor desde movil o PC.
                   </p>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            <div className="overflow-hidden rounded-3xl border border-slate-200 bg-slate-50">
+            <div className="overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-100">
               <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
                 <p className="text-sm font-medium text-slate-700">Vista previa</p>
               </div>
-              <div className="relative aspect-[16/8] w-full">
+              <div className="relative aspect-square w-full bg-gradient-to-br from-white via-slate-50 to-slate-100">
                 <Image
                   src={selectedImage}
                   alt="Vista previa del producto"

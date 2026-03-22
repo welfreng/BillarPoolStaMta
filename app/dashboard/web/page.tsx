@@ -10,21 +10,22 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useAdminData } from '@/components/admin/admin-data-context';
 import { db } from '@/lib/firebase';
+import { optimizeImageFile } from '@/lib/image-upload';
 
-function loadFileAsDataUrl(
+async function loadFileAsDataUrl(
   event: ChangeEvent<HTMLInputElement>,
   onLoaded: (value: string) => void
 ) {
   const file = event.target.files?.[0];
   if (!file) return;
 
-  const reader = new FileReader();
-  reader.onload = () => {
-    if (typeof reader.result === 'string') {
-      onLoaded(reader.result);
-    }
-  };
-  reader.readAsDataURL(file);
+  const optimizedImage = await optimizeImageFile(file, {
+    maxWidth: 1400,
+    maxHeight: 1400,
+    quality: 0.82,
+  });
+  onLoaded(optimizedImage.dataUrl);
+  event.target.value = '';
 }
 
 export default function WebPageManagementPage() {
@@ -74,6 +75,14 @@ export default function WebPageManagementPage() {
       toast({
         title: 'Galeria de servicios actualizada',
         description: 'Las fotos del torno y trabajos realizados ya quedaron listas para la web.',
+      });
+    } catch (error) {
+      console.error('Error guardando galeria de servicios:', error);
+      toast({
+        title: 'No se pudo guardar la galeria',
+        description:
+          'Revisa el tamano de las fotos o intenta subirlas otra vez. Ahora la carga se optimiza para movil.',
+        variant: 'destructive',
       });
     } finally {
       setSavingServices(false);
@@ -160,6 +169,7 @@ export default function WebPageManagementPage() {
             <p className="mt-1 text-sm leading-6 text-slate-500">
               Sube maximo 3 imagenes de cambios de casquillo, suela u otros trabajos en tacos. Asi se ve profesional y no recarga la pagina.
             </p>
+            <p>Las imagenes ahora se optimizan automaticamente al subirlas desde el celular.</p>
           </div>
 
           <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -167,7 +177,7 @@ export default function WebPageManagementPage() {
               const image = draftServiceImages[slot] || '';
               return (
                 <div key={slot} className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-100">
                     <div className="relative aspect-[4/5] w-full">
                       {image ? (
                         <Image
@@ -193,15 +203,25 @@ export default function WebPageManagementPage() {
                         type="file"
                         accept="image/*"
                         className="hidden"
-                        onChange={(event) =>
-                          loadFileAsDataUrl(event, (value) =>
-                            setDraftServiceImages((current) => {
-                              const next = [...current];
-                              next[slot] = value;
-                              return next;
-                            })
-                          )
-                        }
+                        onChange={async (event) => {
+                          try {
+                            await loadFileAsDataUrl(event, (value) =>
+                              setDraftServiceImages((current) => {
+                                const next = [...current];
+                                next[slot] = value;
+                                return next;
+                              })
+                            );
+                          } catch (error) {
+                            console.error('Error preparando imagen de servicios:', error);
+                            toast({
+                              title: 'No se pudo cargar la imagen',
+                              description:
+                                'Intenta con otra foto o vuelve a seleccionarla. En movil la imagen se comprime antes de guardarse.',
+                              variant: 'destructive',
+                            });
+                          }
+                        }}
                       />
                     </label>
 

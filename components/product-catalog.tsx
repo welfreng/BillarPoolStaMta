@@ -278,7 +278,7 @@ export default function ProductCatalog({
                       key={product.id}
                       className="group overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
                     >
-                      <div className="relative h-28 overflow-hidden sm:h-32">
+                      <div className="relative h-28 overflow-hidden bg-gradient-to-br from-white via-slate-50 to-slate-100 sm:h-32">
                         <Image
                           src={product.image || defaultImage}
                           alt={product.name}
@@ -383,12 +383,12 @@ export default function ProductCatalog({
             </DialogHeader>
 
             <div className="space-y-6">
-              <div className="relative min-h-[360px] overflow-hidden rounded-3xl border border-slate-200 bg-slate-50 sm:min-h-[460px]">
+              <div className="relative min-h-[360px] overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-100 sm:min-h-[460px]">
                 <Image
                   src={selectedProduct.image || defaultImage}
                   alt={selectedProduct.name}
                   fill
-                  className="object-contain"
+                  className="object-cover"
                   unoptimized={selectedProduct.image.startsWith("data:")}
                 />
               </div>

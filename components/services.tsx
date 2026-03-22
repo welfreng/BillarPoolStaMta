@@ -128,7 +128,7 @@ export default function Services() {
             {serviceImages.length > 0 ? (
               <div className="mt-5 grid grid-cols-3 gap-3">
                 {serviceImages.map((image, index) => (
-                  <div key={`${image}-${index}`} className="overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-lg">
+                  <div key={`${image}-${index}`} className="overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-white via-slate-100 to-slate-200 shadow-lg">
                     <div className="relative aspect-[4/5] w-full">
                       <Image
                         src={image}
