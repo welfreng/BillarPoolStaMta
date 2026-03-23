@@ -40,17 +40,29 @@ function loadImageElement(src: string) {
   });
 }
 
-export async function optimizeImageFile(
-  file: File,
-  options: OptimizeImageOptions
-): Promise<OptimizedImageResult> {
-  const source = await readFileAsDataUrl(file);
-  const image = await loadImageElement(source);
-  const scale = Math.min(1, options.maxWidth / image.width, options.maxHeight / image.height);
-  const width = Math.max(1, Math.round(image.width * scale));
-  const height = Math.max(1, Math.round(image.height * scale));
-  const canvas = document.createElement('canvas');
+function loadImageFromObjectUrl(file: File) {
+  const objectUrl = URL.createObjectURL(file);
 
+  return new Promise<{ image: HTMLImageElement; cleanup: () => void }>((resolve, reject) => {
+    const image = new window.Image();
+    const cleanup = () => URL.revokeObjectURL(objectUrl);
+
+    image.onload = () => resolve({ image, cleanup });
+    image.onerror = () => {
+      cleanup();
+      reject(new Error('No se pudo procesar la imagen seleccionada.'));
+    };
+    image.src = objectUrl;
+  });
+}
+
+function renderImageToDataUrl(
+  image: HTMLImageElement,
+  width: number,
+  height: number,
+  options: OptimizeImageOptions
+) {
+  const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
 
@@ -61,11 +73,60 @@ export async function optimizeImageFile(
 
   context.drawImage(image, 0, 0, width, height);
 
+  const dataUrl = canvas.toDataURL(options.outputType ?? 'image/jpeg', options.quality ?? 0.84);
+  if (!dataUrl || dataUrl === 'data:,') {
+    throw new Error('No se pudo preparar la imagen para guardarla.');
+  }
+
+  return dataUrl;
+}
+
+export async function optimizeImageFile(
+  file: File,
+  options: OptimizeImageOptions
+): Promise<OptimizedImageResult> {
+  let loadedImage: HTMLImageElement | null = null;
+  let cleanup: () => void = () => {};
+
+  try {
+    const loaded = await loadImageFromObjectUrl(file);
+    loadedImage = loaded.image;
+    cleanup = loaded.cleanup;
+  } catch {
+    const source = await readFileAsDataUrl(file);
+    loadedImage = await loadImageElement(source);
+  }
+
+  const scale = Math.min(1, options.maxWidth / loadedImage.width, options.maxHeight / loadedImage.height);
+  const targetWidth = Math.max(1, Math.round(loadedImage.width * scale));
+  const targetHeight = Math.max(1, Math.round(loadedImage.height * scale));
+
+  let width = targetWidth;
+  let height = targetHeight;
+  let dataUrl = '';
+
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      dataUrl = renderImageToDataUrl(loadedImage, width, height, options);
+      break;
+    } catch (error) {
+      if (attempt === 3) {
+        cleanup();
+        throw error;
+      }
+
+      width = Math.max(1, Math.round(width * 0.72));
+      height = Math.max(1, Math.round(height * 0.72));
+    }
+  }
+
+  cleanup();
+
   return {
-    dataUrl: canvas.toDataURL(options.outputType ?? 'image/jpeg', options.quality ?? 0.84),
+    dataUrl,
     width,
     height,
-    originalWidth: image.width,
-    originalHeight: image.height,
+    originalWidth: loadedImage.width,
+    originalHeight: loadedImage.height,
   };
 }

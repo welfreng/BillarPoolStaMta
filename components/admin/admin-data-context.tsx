@@ -87,10 +87,10 @@ interface RegisterSaleInput {
     productId: string;
     quantity: number;
     unitPrice: number;
-  }>;
-  giftItems?: Array<{
-    productId: string;
-    quantity: number;
+    giftItems?: Array<{
+      productId: string;
+      quantity: number;
+    }>;
   }>;
   customerName: string;
   notes: string;
@@ -140,6 +140,10 @@ const AdminDataContext = createContext<AdminDataContextValue | undefined>(undefi
 
 function generateId(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function targetProductName(products: Product[], productId: string) {
+  return products.find((product) => product.id === productId)?.name ?? 'producto';
 }
 
 function normalizeDateValue(value: unknown) {
@@ -915,21 +919,24 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       throw new Error('Agrega al menos un producto a la venta.');
     }
 
-    const lineItems: SaleLineItem[] = input.items.map((item) => {
+    const lineRecords = input.items.map((item) => {
       const targetProduct = products.find((product) => product.id === item.productId);
       if (!targetProduct) {
         throw new Error('No se encontro uno de los productos para registrar la venta.');
       }
+
       const quantity = Math.max(Number(item.quantity ?? 0), 0);
       if (quantity <= 0) {
         throw new Error('La cantidad vendida debe ser mayor a cero.');
       }
-      const availableStock = getProductStock(movements, item.productId);
+
+      const availableStock = getProductStock(baseMovements, item.productId);
       if (quantity > availableStock) {
         throw new Error(`La cantidad vendida supera el stock disponible de ${targetProduct.name}.`);
       }
+
       const realUnitCost = getProductRealUnitCost(purchases, item.productId);
-      return {
+      const lineItem: SaleLineItem = {
         productId: item.productId,
         quantity,
         unitPrice: Number(item.unitPrice ?? 0),
@@ -937,54 +944,81 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         totalSale: quantity * Number(item.unitPrice ?? 0),
         totalCost: quantity * realUnitCost,
       };
+
+      const giftItems: SaleGiftItem[] = [];
+      if ((item.giftItems?.length ?? 0) > 0) {
+        if (targetProduct.category !== 'tacos') {
+          throw new Error(`Solo los tacos de billar pueden llevar obsequio. Revisa ${targetProduct.name}.`);
+        }
+        const seenGiftCategories = new Set<string>();
+        item.giftItems?.forEach((giftItemInput) => {
+          const giftProductId = giftItemInput.productId?.trim();
+          const giftQuantity = Math.max(Number(giftItemInput.quantity ?? 0), 0);
+
+          if (!giftProductId) {
+            throw new Error(`Selecciona el obsequio para ${targetProduct.name}.`);
+          }
+          if (giftQuantity <= 0) {
+            throw new Error(`La cantidad del obsequio debe ser mayor a cero para ${targetProduct.name}.`);
+          }
+
+          const giftedProduct = products.find((product) => product.id === giftProductId);
+          if (!giftedProduct) {
+            throw new Error('No se encontro uno de los productos obsequiados.');
+          }
+          if (!['guantes', 'estuches'].includes(giftedProduct.category)) {
+            throw new Error(`Los obsequios para ${targetProduct.name} solo pueden ser un guante y un estuche.`);
+          }
+          if (giftQuantity !== 1) {
+            throw new Error(`Cada obsequio para ${targetProduct.name} debe tener cantidad 1.`);
+          }
+          if (seenGiftCategories.has(giftedProduct.category)) {
+            throw new Error(`No repitas el mismo tipo de obsequio para ${targetProduct.name}.`);
+          }
+          seenGiftCategories.add(giftedProduct.category);
+
+          const giftUnitCost = getProductRealUnitCost(purchases, giftProductId);
+          giftItems.push({
+            productId: giftProductId,
+            quantity: giftQuantity,
+            unitCost: giftUnitCost,
+            totalCost: giftQuantity * giftUnitCost,
+          });
+        });
+      }
+
+      return { lineItem, giftItems };
     });
 
     const requestedGiftTotals = new Map<string, number>();
-    const giftItems: SaleGiftItem[] = (input.giftItems ?? []).map((item) => {
-      const productId = item.productId?.trim();
-      const quantity = Math.max(Number(item.quantity ?? 0), 0);
-      if (!productId) {
-        throw new Error('Selecciona el producto obsequiado.');
-      }
-      if (quantity <= 0) {
-        throw new Error('La cantidad del obsequio debe ser mayor a cero.');
-      }
-      const giftedProduct = products.find((product) => product.id === productId);
-      if (!giftedProduct) {
-        throw new Error('No se encontro uno de los productos obsequiados.');
-      }
-      requestedGiftTotals.set(productId, (requestedGiftTotals.get(productId) ?? 0) + quantity);
-      const unitCost = getProductRealUnitCost(purchases, productId);
-      return {
-        productId,
-        quantity,
-        unitCost,
-        totalCost: quantity * unitCost,
-      };
+    lineRecords.forEach((record) => {
+      record.giftItems.forEach((giftItem) => {
+        requestedGiftTotals.set(
+          giftItem.productId,
+          (requestedGiftTotals.get(giftItem.productId) ?? 0) + giftItem.quantity
+        );
+      });
     });
 
     for (const [productId, requestedQuantity] of requestedGiftTotals) {
       const availableGiftStock = getProductStock(baseMovements, productId);
-      const stockReservedBySale = lineItems
-        .filter((item) => item.productId === productId)
-        .reduce((sum, item) => sum + item.quantity, 0);
+      const stockReservedBySale = lineRecords
+        .filter((record) => record.lineItem.productId === productId)
+        .reduce((sum, record) => sum + record.lineItem.quantity, 0);
+
       if (requestedQuantity > availableGiftStock - stockReservedBySale) {
         throw new Error('La cantidad de uno de los obsequios supera el stock disponible.');
       }
     }
 
-    const totalSale = lineItems.reduce((sum, item) => sum + item.totalSale, 0);
-    const giftedTotalCost = giftItems.reduce((sum, item) => sum + item.totalCost, 0);
-    const firstGiftItem = giftItems[0];
-    const totalCost = lineItems.reduce((sum, item) => sum + item.totalCost, 0) + giftedTotalCost;
-    const grossProfit = totalSale - totalCost;
-
     const saleBatchId = doc(collection(db, 'sale-batches')).id;
 
     const batch = writeBatch(db);
     const stockDeltas: Array<{ productId: string; quantity: number }> = [];
-    const createdSales: Sale[] = lineItems.map((lineItem, index) => {
+    const createdSales: Sale[] = lineRecords.map(({ lineItem, giftItems }) => {
       const saleRef = doc(collection(db, 'sales'));
+      const giftedTotalCost = giftItems.reduce((sum, item) => sum + item.totalCost, 0);
+      const firstGiftItem = giftItems[0];
       const sale: Sale = {
         id: saleRef.id,
         saleBatchId,
@@ -994,14 +1028,14 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         unitPrice: lineItem.unitPrice,
         totalSale: lineItem.totalSale,
         realUnitCost: lineItem.realUnitCost,
-        totalCost: lineItem.totalCost + (index === 0 ? giftedTotalCost : 0),
-        grossProfit: lineItem.totalSale - lineItem.totalCost - (index === 0 ? giftedTotalCost : 0),
+        totalCost: lineItem.totalCost + giftedTotalCost,
+        grossProfit: lineItem.totalSale - lineItem.totalCost - giftedTotalCost,
         lineItems: [lineItem],
-        giftItems: index === 0 ? giftItems : [],
-        giftedProductId: index === 0 ? firstGiftItem?.productId : undefined,
-        giftedQuantity: index === 0 ? firstGiftItem?.quantity ?? 0 : 0,
-        giftedUnitCost: index === 0 ? firstGiftItem?.unitCost ?? 0 : 0,
-        giftedTotalCost: index === 0 ? giftedTotalCost : 0,
+        giftItems,
+        giftedProductId: firstGiftItem?.productId,
+        giftedQuantity: firstGiftItem?.quantity ?? 0,
+        giftedUnitCost: firstGiftItem?.unitCost ?? 0,
+        giftedTotalCost,
         returnedQuantity: 0,
         returnedSaleAmount: 0,
         returnedCostAmount: 0,
@@ -1028,27 +1062,28 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         relatedUnitCost: lineItem.realUnitCost,
       });
       stockDeltas.push({ productId: lineItem.productId, quantity: -Math.abs(lineItem.quantity) });
+
+      giftItems.forEach((giftItem) => {
+        const giftMovementRef = doc(collection(db, 'movements'));
+        batch.set(giftMovementRef, {
+          id: giftMovementRef.id,
+          saleId: sale.id,
+          productId: giftItem.productId,
+          type: 'exit',
+          reason: 'gift',
+          quantity: -Math.abs(giftItem.quantity),
+          notes:
+            input.notes ||
+            `Obsequio asociado a ${targetProductName(products, lineItem.productId)}${input.customerName ? ` para ${input.customerName}` : ''}`,
+          occurredAt: Timestamp.fromDate(new Date(input.soldAt)),
+          responsibleUser: input.responsibleUser,
+          relatedUnitCost: giftItem.unitCost,
+        });
+        stockDeltas.push({ productId: giftItem.productId, quantity: -Math.abs(giftItem.quantity) });
+      });
+
       return sale;
     });
-
-    for (const giftItem of giftItems) {
-      const giftMovementRef = doc(collection(db, 'movements'));
-      batch.set(giftMovementRef, {
-        id: giftMovementRef.id,
-        saleId: createdSales[0].id,
-        productId: giftItem.productId,
-        type: 'exit',
-        reason: 'gift',
-        quantity: -Math.abs(giftItem.quantity),
-        notes:
-          input.notes ||
-          `Obsequio asociado a venta${input.customerName ? ` para ${input.customerName}` : ''}`,
-        occurredAt: Timestamp.fromDate(new Date(input.soldAt)),
-        responsibleUser: input.responsibleUser,
-        relatedUnitCost: giftItem.unitCost,
-      });
-      stockDeltas.push({ productId: giftItem.productId, quantity: -Math.abs(giftItem.quantity) });
-    }
 
     applyPublicStockMapToBatch(
       batch,
@@ -1073,10 +1108,9 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     if (existingSales.length === 0) {
       throw new Error('No se encontro la venta a editar.');
     }
-    const existingSale = existingSales[0];
     const giftMovementsToUpdate = existingSales.flatMap((sale) => findGiftMovementForSale(movements, sale));
     const requestedGiftTotals = new Map<string, number>();
-    const nextLineItems: SaleLineItem[] = input.items.map((item) => {
+    const nextLineRecords = input.items.map((item) => {
       const targetProduct = products.find((product) => product.id === item.productId);
       if (!targetProduct) {
         throw new Error('No se encontro uno de los productos para actualizar la venta.');
@@ -1086,7 +1120,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         throw new Error('La cantidad vendida debe ser mayor a cero.');
       }
       const realUnitCost = getProductRealUnitCost(purchases, item.productId);
-      return {
+      const lineItem: SaleLineItem = {
         productId: item.productId,
         quantity,
         unitPrice: Number(item.unitPrice ?? 0),
@@ -1094,35 +1128,55 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         totalSale: quantity * Number(item.unitPrice ?? 0),
         totalCost: quantity * realUnitCost,
       };
-    });
-    const giftItems: SaleGiftItem[] = (input.giftItems ?? []).map((item) => {
-      const productId = item.productId?.trim();
-      const quantity = Math.max(Number(item.quantity ?? 0), 0);
-      if (!productId) {
-        throw new Error('Selecciona el producto obsequiado.');
+
+      const giftItems: SaleGiftItem[] = [];
+      if ((item.giftItems?.length ?? 0) > 0) {
+        if (targetProduct.category !== 'tacos') {
+          throw new Error(`Solo los tacos de billar pueden llevar obsequio. Revisa ${targetProduct.name}.`);
+        }
+        const seenGiftCategories = new Set<string>();
+        item.giftItems?.forEach((giftItemInput) => {
+          const productId = giftItemInput.productId?.trim();
+          const quantity = Math.max(Number(giftItemInput.quantity ?? 0), 0);
+          if (!productId) {
+            throw new Error(`Selecciona el obsequio para ${targetProduct.name}.`);
+          }
+          if (quantity <= 0) {
+            throw new Error(`La cantidad del obsequio debe ser mayor a cero para ${targetProduct.name}.`);
+          }
+          const giftedProduct = products.find((product) => product.id === productId);
+          if (!giftedProduct) {
+            throw new Error('No se encontro uno de los productos obsequiados.');
+          }
+          if (!['guantes', 'estuches'].includes(giftedProduct.category)) {
+            throw new Error(`Los obsequios para ${targetProduct.name} solo pueden ser un guante y un estuche.`);
+          }
+          if (quantity !== 1) {
+            throw new Error(`Cada obsequio para ${targetProduct.name} debe tener cantidad 1.`);
+          }
+          if (seenGiftCategories.has(giftedProduct.category)) {
+            throw new Error(`No repitas el mismo tipo de obsequio para ${targetProduct.name}.`);
+          }
+          seenGiftCategories.add(giftedProduct.category);
+          requestedGiftTotals.set(productId, (requestedGiftTotals.get(productId) ?? 0) + quantity);
+          const unitCost = getProductRealUnitCost(purchases, productId);
+          giftItems.push({
+            productId,
+            quantity,
+            unitCost,
+            totalCost: quantity * unitCost,
+          });
+        });
       }
-      if (quantity <= 0) {
-        throw new Error('La cantidad del obsequio debe ser mayor a cero.');
-      }
-      const giftedProduct = products.find((product) => product.id === productId);
-      if (!giftedProduct) {
-        throw new Error('No se encontro uno de los productos obsequiados.');
-      }
-      requestedGiftTotals.set(productId, (requestedGiftTotals.get(productId) ?? 0) + quantity);
-      const unitCost = getProductRealUnitCost(purchases, productId);
-      return {
-        productId,
-        quantity,
-        unitCost,
-        totalCost: quantity * unitCost,
-      };
+
+      return { lineItem, giftItems };
     });
 
     const touchedProductIds = new Set<string>([
       ...existingSales.flatMap((sale) => sale.lineItems.map((item) => item.productId)),
-      ...nextLineItems.map((item) => item.productId),
+      ...nextLineRecords.map((record) => record.lineItem.productId),
       ...existingSales.flatMap((sale) => sale.giftItems.map((item) => item.productId)),
-      ...giftItems.map((item) => item.productId),
+      ...nextLineRecords.flatMap((record) => record.giftItems.map((item) => item.productId)),
     ].filter((value): value is string => Boolean(value)));
 
     for (const productId of touchedProductIds) {
@@ -1137,9 +1191,9 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
           .filter((item) => item.productId === productId)
           .reduce((sum, item) => sum + item.quantity, 0);
       const requestedStock =
-        nextLineItems
-          .filter((item) => item.productId === productId)
-          .reduce((sum, item) => sum + item.quantity, 0) +
+        nextLineRecords
+          .filter((record) => record.lineItem.productId === productId)
+          .reduce((sum, record) => sum + record.lineItem.quantity, 0) +
         (requestedGiftTotals.get(productId) ?? 0);
 
       if (requestedStock > restoredStock) {
@@ -1151,8 +1205,6 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    const giftedTotalCost = giftItems.reduce((sum, item) => sum + item.totalCost, 0);
-    const firstGiftItem = giftItems[0];
     const batch = writeBatch(db);
     existingSales.forEach((sale) => batch.delete(doc(db, 'sales', sale.id)));
     movements
@@ -1167,10 +1219,14 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
 
     return registerSaleInternal({
       ...input,
-      items: nextLineItems.map((item) => ({
-        productId: item.productId,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
+      items: nextLineRecords.map((record) => ({
+        productId: record.lineItem.productId,
+        quantity: record.lineItem.quantity,
+        unitPrice: record.lineItem.unitPrice,
+        giftItems: record.giftItems.map((giftItem) => ({
+          productId: giftItem.productId,
+          quantity: giftItem.quantity,
+        })),
       })),
     }, remainingMovements);
   };

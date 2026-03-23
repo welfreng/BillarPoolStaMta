@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { collection, doc, onSnapshot, serverTimestamp, type DocumentData, writeBatch } from 'firebase/firestore';
 import { ImagePlus, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -69,6 +69,7 @@ export function CatalogImageDialog({
   const [products, setProducts] = useState<WebCatalogProduct[]>([]);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
+  const fileInputsRef = useRef<Record<string, HTMLInputElement | null>>({});
 
   useEffect(() => {
     if (!open) return;
@@ -210,29 +211,38 @@ export function CatalogImageDialog({
               </div>
 
               <div className="mt-4 space-y-3">
-                <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:border-cyan-400 hover:bg-cyan-50">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full rounded-xl border-dashed"
+                  onClick={() => fileInputsRef.current[item.id]?.click()}
+                >
                   <ImagePlus className="h-4 w-4" />
                   Subir nueva imagen
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={async (event) => {
-                      try {
-                        await loadFileAsDataUrl(event, (value) =>
-                          setOverrides((current) => ({ ...current, [item.id]: value }))
-                        );
-                      } catch (error) {
-                        console.error('Error preparando imagen del catalogo:', error);
-                        toast({
-                          title: 'No se pudo cargar la imagen',
-                          description: 'Prueba con otra foto. Ahora el sistema la comprime automaticamente.',
-                          variant: 'destructive',
-                        });
-                      }
-                    }}
-                  />
-                </label>
+                </Button>
+                <input
+                  ref={(element) => {
+                    fileInputsRef.current[item.id] = element;
+                  }}
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  onChange={async (event) => {
+                    try {
+                      await loadFileAsDataUrl(event, (value) =>
+                        setOverrides((current) => ({ ...current, [item.id]: value }))
+                      );
+                    } catch (error) {
+                      console.error('Error preparando imagen del catalogo:', error);
+                      toast({
+                        title: 'No se pudo cargar la imagen',
+                        description:
+                          'Prueba con otra foto. Si viene muy pesada del celular, ahora intentamos reducirla automaticamente.',
+                        variant: 'destructive',
+                      });
+                    }
+                  }}
+                />
               </div>
             </div>
             ))}

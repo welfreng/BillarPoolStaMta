@@ -33,6 +33,7 @@ export function SaleDetailsDialog({
   const groupedSales = sales.filter((item) => (item.saleBatchId ?? item.id) === (sale.saleBatchId ?? sale.id));
   const baseSale = groupedSales[0] ?? sale;
   const lineItems = groupedSales.flatMap((item) => item.lineItems);
+  const giftItems = groupedSales.flatMap((item) => item.giftItems);
   const netRevenue = groupedSales.reduce((sum, item) => sum + item.totalSale - (item.returnedSaleAmount ?? 0), 0);
   const totalCost = groupedSales.reduce((sum, item) => sum + item.totalCost, 0);
   const netCost = groupedSales.reduce((sum, item) => sum + item.totalCost - (item.returnedCostAmount ?? 0), 0);
@@ -65,8 +66,8 @@ export function SaleDetailsDialog({
       .join('');
 
     const giftRows =
-      baseSale.giftItems.length > 0
-        ? baseSale.giftItems
+      giftItems.length > 0
+        ? giftItems
             .map((item) => {
               const product = getProductById(products, item.productId);
               return `<p>${formatNumber(item.quantity)} x ${product?.name ?? 'Producto obsequiado'}</p>`;
@@ -274,9 +275,9 @@ export function SaleDetailsDialog({
             <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
                 <h3 className="text-sm font-semibold text-slate-950">Obsequios de la venta</h3>
-                {baseSale.giftItems.length > 0 ? (
+                {giftItems.length > 0 ? (
                   <div className="mt-4 space-y-3">
-                    {baseSale.giftItems.map((giftItem, index) => {
+                    {giftItems.map((giftItem, index) => {
                       const giftProduct = getProductById(products, giftItem.productId);
                       return (
                         <div
@@ -384,9 +385,9 @@ export function SaleDetailsDialog({
               <div className="mt-5 grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <h4 className="text-sm font-semibold text-slate-950">Obsequios</h4>
-                  {baseSale.giftItems.length > 0 ? (
+                  {giftItems.length > 0 ? (
                     <div className="mt-3 space-y-2 text-sm text-slate-600">
-                      {baseSale.giftItems.map((giftItem, index) => {
+                      {giftItems.map((giftItem, index) => {
                         const giftProduct = getProductById(products, giftItem.productId);
                         return (
                           <p key={`${giftItem.productId}-${index}`}>

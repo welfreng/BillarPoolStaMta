@@ -55,9 +55,14 @@ export default function DashboardPage() {
   const initialSaleValues: SaleFormValues | null = selectedProduct
     ? {
         soldAt: new Date().toISOString().slice(0, 10),
-        items: [{ productId: selectedProduct.id, quantity: 1, unitPrice: selectedProduct.salePrice }],
-        includeGift: false,
-        giftItems: [{ productId: '', quantity: 1 }],
+        items: [
+          {
+            productId: selectedProduct.id,
+            quantity: 1,
+            unitPrice: selectedProduct.salePrice,
+            giftItems: [],
+          },
+        ],
         customerName: 'Cliente mostrador',
         notes: '',
       }
@@ -321,7 +326,6 @@ export default function DashboardPage() {
               ...values,
               soldAt: new Date(values.soldAt).toISOString(),
               items: values.items,
-              giftItems: values.includeGift ? values.giftItems : [],
               responsibleUser:
                 profile?.nombre?.trim() || user?.displayName || user?.email || 'Usuario de ventas',
             });

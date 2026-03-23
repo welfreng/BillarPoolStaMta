@@ -55,23 +55,19 @@ export default function VentasPage() {
   const returningSale = returningGroup?.sales[0] ?? null;
   const detailsSale = detailsSaleId ? sales.find((sale) => sale.id === detailsSaleId) ?? null : null;
   const initialSaleValues: SaleFormValues | null = editingSale
-      ? {
+    ? {
         soldAt: editingSale.soldAt.slice(0, 10),
         items: (editingGroup?.sales ?? [editingSale]).flatMap((sale) =>
           sale.lineItems.map((item) => ({
             productId: item.productId,
             quantity: item.quantity,
             unitPrice: item.unitPrice,
+            giftItems: sale.giftItems.map((giftItem) => ({
+              productId: giftItem.productId,
+              quantity: giftItem.quantity,
+            })),
           }))
         ),
-        includeGift: editingSale.giftItems.length > 0,
-        giftItems:
-          editingSale.giftItems.length > 0
-            ? editingSale.giftItems.map((item) => ({
-                productId: item.productId,
-                quantity: item.quantity,
-              }))
-            : [{ productId: '', quantity: 1 }],
         customerName: editingSale.customerName,
         notes: editingSale.notes,
       }
@@ -190,7 +186,8 @@ export default function VentasPage() {
                     (sum, sale) => sum + sale.grossProfit - ((sale.returnedSaleAmount ?? 0) - (sale.returnedCostAmount ?? 0)),
                     0
                   );
-                  const giftSummary = baseSale.giftItems
+                  const giftSummary = group.sales
+                    .flatMap((sale) => sale.giftItems)
                     .map((item) => {
                       const product = getProductById(products, item.productId);
                       return product ? `${product.name} x ${formatNumber(item.quantity)}` : null;
@@ -316,7 +313,6 @@ export default function VentasPage() {
             const payload = {
               ...values,
               soldAt: new Date(values.soldAt).toISOString(),
-              giftItems: values.includeGift ? values.giftItems : [],
               responsibleUser:
                 profile?.nombre?.trim() || user?.displayName || user?.email || 'Usuario de ventas',
             };
