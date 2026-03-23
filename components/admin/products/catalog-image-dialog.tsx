@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
-import { collection, doc, onSnapshot, serverTimestamp, setDoc, type DocumentData } from 'firebase/firestore';
+import { collection, doc, onSnapshot, serverTimestamp, type DocumentData, writeBatch } from 'firebase/firestore';
 import { ImagePlus, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -89,13 +89,27 @@ export function CatalogImageDialog({
     );
 
     const unsubscribeImages = onSnapshot(
-      doc(db, 'siteAssets', 'catalog-images'),
+      collection(db, 'siteAssets'),
       (snapshot) => {
-        const data = snapshot.data();
-        const images =
-          data && typeof data === 'object' && data.images && typeof data.images === 'object'
-            ? (data.images as Record<string, string>)
-            : {};
+        const images: Record<string, string> = {};
+
+        snapshot.docs.forEach((item) => {
+          if (item.id === 'catalog-images') {
+            const data = item.data();
+            if (data && typeof data === 'object' && data.images && typeof data.images === 'object') {
+              Object.assign(images, data.images as Record<string, string>);
+            }
+            return;
+          }
+
+          if (!item.id.startsWith('catalog-image-')) return;
+          const productId = String(item.data().productId ?? item.id.replace('catalog-image-', ''));
+          const image = item.data().image;
+          if (typeof image === 'string' && productId) {
+            images[productId] = image;
+          }
+        });
+
         setOverrides(images);
       },
       (error) => {
@@ -130,16 +144,28 @@ export function CatalogImageDialog({
   const handleSave = async () => {
     setSaving(true);
     try {
-      await setDoc(
-        doc(db, 'siteAssets', 'catalog-images'),
-        {
-          images: overrides,
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true }
-      );
+      const batch = writeBatch(db);
+      Object.entries(overrides).forEach(([productId, image]) => {
+        batch.set(
+          doc(db, 'siteAssets', `catalog-image-${productId}`),
+          {
+            productId,
+            image,
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
+      });
+      await batch.commit();
       onSaved?.();
       onOpenChange(false);
+    } catch (error) {
+      console.error('Error guardando imagenes del catalogo:', error);
+      toast({
+        title: 'No se pudieron guardar las imagenes',
+        description: 'Intenta de nuevo. Ahora cada imagen se guarda por producto para evitar bloqueos.',
+        variant: 'destructive',
+      });
     } finally {
       setSaving(false);
     }

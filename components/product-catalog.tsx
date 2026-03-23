@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
-import { collection, doc, onSnapshot, query as firestoreQuery, type DocumentData, where } from "firebase/firestore"
+import { collection, onSnapshot, query as firestoreQuery, type DocumentData, where } from "firebase/firestore"
 import { MessageCircle, Search, ShoppingBag, Tag } from "lucide-react"
 import { db } from "@/lib/firebase"
 import { publicCatalogCategories, publicCatalogProducts } from "@/lib/public-catalog"
@@ -98,13 +98,26 @@ export default function ProductCatalog({
     )
 
     const unsubscribeImages = onSnapshot(
-      doc(db, "siteAssets", "catalog-images"),
+      collection(db, "siteAssets"),
       (snapshot) => {
-        const data = snapshot.data()
-        const images =
-          data && typeof data === "object" && data.images && typeof data.images === "object"
-            ? (data.images as Record<string, string>)
-            : {}
+        const images: Record<string, string> = {}
+
+        snapshot.docs.forEach((item) => {
+          if (item.id === "catalog-images") {
+            const data = item.data()
+            if (data && typeof data === "object" && data.images && typeof data.images === "object") {
+              Object.assign(images, data.images as Record<string, string>)
+            }
+            return
+          }
+
+          if (!item.id.startsWith("catalog-image-")) return
+          const productId = String(item.data().productId ?? item.id.replace("catalog-image-", ""))
+          const image = item.data().image
+          if (typeof image === "string" && productId) {
+            images[productId] = image
+          }
+        })
         setImageOverrides(images)
       },
       (error) => {
