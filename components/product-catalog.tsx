@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
 import { collection, onSnapshot, query as firestoreQuery, type DocumentData, where } from "firebase/firestore"
 import { MessageCircle, Search, ShoppingBag, Tag } from "lucide-react"
@@ -76,6 +76,8 @@ export default function ProductCatalog({
   const [products, setProducts] = useState<CatalogProduct[]>([])
   const [imageOverrides, setImageOverrides] = useState<Record<string, string>>({})
   const [query, setQuery] = useState("")
+  const [previewSides, setPreviewSides] = useState<Record<string, "left" | "right">>({})
+  const productCardRefs = useRef<Record<string, HTMLElement | null>>({})
 
   useEffect(() => {
     const unsubscribeProducts = onSnapshot(
@@ -220,6 +222,24 @@ export default function ProductCatalog({
     ? `Hola, me interesa el producto ${selectedProduct.name} por ${formatCurrency(selectedProduct.salePrice)}. Quiero mas informacion.`
     : "Hola, quiero informacion sobre sus productos."
 
+  const setPreviewSideFromViewport = (productId: string) => {
+    const card = productCardRefs.current[productId]
+    if (!card || typeof window === "undefined") return
+
+    const previewWidth = 280
+    const previewGap = 16
+    const rect = card.getBoundingClientRect()
+    const roomOnRight = window.innerWidth - rect.right
+    const roomOnLeft = rect.left
+
+    const nextSide: "left" | "right" =
+      roomOnRight >= previewWidth + previewGap || roomOnRight >= roomOnLeft ? "right" : "left"
+
+    setPreviewSides((current) =>
+      current[productId] === nextSide ? current : { ...current, [productId]: nextSide }
+    )
+  }
+
   return (
     <section id={sectionId} className="bg-background py-24">
       <div className="mx-auto max-w-7xl px-4 lg:px-8">
@@ -286,22 +306,56 @@ export default function ProductCatalog({
                 ) : null}
 
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                  {group.items.map((product) => (
+                  {group.items.map((product) => {
+                    const previewSide = previewSides[product.id] ?? "right"
+
+                    return (
                     <article
                       key={product.id}
-                      className="group overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+                      ref={(element) => {
+                        productCardRefs.current[product.id] = element
+                      }}
+                      onMouseEnter={() => setPreviewSideFromViewport(product.id)}
+                      className="group relative overflow-visible rounded-2xl border border-border bg-card shadow-sm transition-all duration-300 hover:z-20 hover:-translate-y-1 hover:shadow-xl"
                     >
                       <div className="relative h-28 overflow-hidden bg-gradient-to-br from-white via-slate-50 to-slate-100 sm:h-32">
                         <Image
                           src={product.image || defaultImage}
                           alt={product.name}
                           fill
-                          className="object-cover transition-transform duration-500 group-hover:scale-105"
+                          className="object-cover transition-transform duration-500 group-hover:scale-110"
                           unoptimized={product.image.startsWith("data:")}
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-[#0a1628]/70 via-transparent to-transparent" />
                         <div className="absolute left-2.5 top-2.5 z-10 inline-flex items-center rounded-full bg-[#0a2472] px-2 py-1 text-[10px] font-semibold text-white">
                           {product.tag}
+                        </div>
+                      </div>
+
+                      <div
+                        className={`pointer-events-none absolute top-1/2 z-30 hidden w-[280px] -translate-y-1/2 rounded-[28px] border border-slate-200 bg-white/98 p-3 opacity-0 shadow-2xl shadow-slate-900/20 transition-all delay-0 duration-300 group-hover:opacity-100 group-hover:delay-300 lg:block ${
+                          previewSide === "left"
+                            ? "left-auto right-full mr-4 ml-0 group-hover:-translate-x-2"
+                            : "left-full right-auto ml-4 mr-0 group-hover:translate-x-2"
+                        }`}
+                      >
+                        <div className="relative aspect-[4/5] overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-100">
+                          <Image
+                            src={product.image || defaultImage}
+                            alt={`${product.name} vista ampliada`}
+                            fill
+                            className="object-contain p-3"
+                            unoptimized={product.image.startsWith("data:")}
+                          />
+                        </div>
+                        <div className="mt-3 flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-slate-950">{product.name}</p>
+                            <p className="text-xs text-slate-500">{product.brand || "Sin marca"}</p>
+                          </div>
+                          <span className="shrink-0 rounded-full bg-slate-950 px-2.5 py-1 text-[10px] font-semibold text-white">
+                            Vista completa
+                          </span>
                         </div>
                       </div>
 
@@ -336,7 +390,7 @@ export default function ProductCatalog({
                         </button>
                       </div>
                     </article>
-                  ))}
+                  )})}
                 </div>
               </div>
             ))}

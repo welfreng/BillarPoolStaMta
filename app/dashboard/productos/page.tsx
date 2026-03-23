@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { useEffect, useMemo, useState } from 'react';
+import { collection, onSnapshot } from 'firebase/firestore';
 import { Eye, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { Button } from '@/components/ui/button';
@@ -23,6 +24,7 @@ import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/admin/calculations';
 import { getCategoryLabel, inventoryCategories } from '@/lib/admin/catalogs';
 import type { Product } from '@/lib/admin/types';
+import { db } from '@/lib/firebase';
 
 const pageSize = 6;
 
@@ -41,6 +43,7 @@ export default function ProductosPage() {
   const [imageOffset, setImageOffset] = useState({ x: 0, y: 0 });
   const [isDraggingImage, setIsDraggingImage] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [catalogImageOverrides, setCatalogImageOverrides] = useState<Record<string, string>>({});
 
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
@@ -77,6 +80,44 @@ export default function ProductosPage() {
       return products.find((product) => product.id === current.id) ?? products[0];
     });
   }, [products]);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      collection(db, 'siteAssets'),
+      (snapshot) => {
+        const nextOverrides: Record<string, string> = {};
+
+        snapshot.docs.forEach((item) => {
+          if (item.id === 'catalog-images') {
+            const data = item.data();
+            if (data && typeof data === 'object' && data.images && typeof data.images === 'object') {
+              Object.assign(nextOverrides, data.images as Record<string, string>);
+            }
+            return;
+          }
+
+          if (!item.id.startsWith('catalog-image-')) return;
+          const productId = String(item.data().productId ?? item.id.replace('catalog-image-', ''));
+          const image = item.data().image;
+          if (typeof image === 'string' && productId) {
+            nextOverrides[productId] = image;
+          }
+        });
+
+        setCatalogImageOverrides(nextOverrides);
+      },
+      (error) => {
+        console.error('Error leyendo imagenes del catalogo web:', error);
+        setCatalogImageOverrides({});
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  const selectedProductPreviewImage = selectedProduct
+    ? catalogImageOverrides[selectedProduct.id] || selectedProduct.image
+    : '/images/logo.png';
 
   const handleSave = async (values: ProductFormValues) => {
     try {
@@ -326,12 +367,12 @@ export default function ProductosPage() {
               <div className="overflow-hidden rounded-3xl border border-slate-200 bg-slate-50">
                 <div className="relative aspect-[16/10] w-full">
                   <Image
-                    src={selectedProduct.image}
+                    src={selectedProductPreviewImage}
                     alt={selectedProduct.name}
                     fill
                     className="object-cover"
                     style={{ transform: `rotate(${selectedProduct.imageRotation}deg)` }}
-                    unoptimized={selectedProduct.image.startsWith('data:')}
+                    unoptimized={selectedProductPreviewImage.startsWith('data:')}
                   />
                 </div>
               </div>
@@ -424,7 +465,7 @@ export default function ProductosPage() {
               >
                 <div className="relative mx-auto aspect-[4/3] min-h-[40vh] w-full max-w-5xl sm:min-h-[55vh]">
                   <Image
-                    src={selectedProduct.image}
+                    src={selectedProductPreviewImage}
                     alt={selectedProduct.name}
                     fill
                     className="object-contain"
@@ -432,7 +473,7 @@ export default function ProductosPage() {
                       transform: `translate(${imageOffset.x}px, ${imageOffset.y}px) scale(${imageZoom}) rotate(${selectedProduct.imageRotation}deg)`,
                       cursor: isDraggingImage ? 'grabbing' : 'grab',
                     }}
-                    unoptimized={selectedProduct.image.startsWith('data:')}
+                    unoptimized={selectedProductPreviewImage.startsWith('data:')}
                   />
                 </div>
               </div>

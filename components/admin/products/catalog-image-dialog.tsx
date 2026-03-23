@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
-import { collection, doc, onSnapshot, serverTimestamp, type DocumentData, writeBatch } from 'firebase/firestore';
+import { collection, doc, onSnapshot, serverTimestamp, type DocumentData, updateDoc, writeBatch } from 'firebase/firestore';
 import { ImagePlus, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -68,6 +68,7 @@ export function CatalogImageDialog({
   const [overrides, setOverrides] = useState<Record<string, string>>({});
   const [products, setProducts] = useState<WebCatalogProduct[]>([]);
   const [saving, setSaving] = useState(false);
+  const [applyingBaseId, setApplyingBaseId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const fileInputsRef = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -172,6 +173,30 @@ export function CatalogImageDialog({
     }
   };
 
+  const handleApplyAsBase = async (productId: string, image: string) => {
+    setApplyingBaseId(productId);
+    try {
+      await updateDoc(doc(db, 'products', productId), {
+        image,
+        imageRotation: 0,
+        updatedAt: serverTimestamp(),
+      });
+      toast({
+        title: 'Imagen base actualizada',
+        description: 'La imagen activa de web ahora tambien quedo como imagen base del producto.',
+      });
+    } catch (error) {
+      console.error('Error actualizando imagen base del producto:', error);
+      toast({
+        title: 'No se pudo actualizar la imagen base',
+        description: 'Intenta de nuevo. El producto no pudo sincronizar su imagen base.',
+        variant: 'destructive',
+      });
+    } finally {
+      setApplyingBaseId(null);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] max-w-6xl overflow-y-auto">
@@ -208,6 +233,11 @@ export function CatalogImageDialog({
               <div className="mt-4">
                 <p className="font-semibold text-slate-900">{item.name}</p>
                 <p className="mt-1 text-xs text-slate-500">{item.brand || 'Sin marca registrada'}</p>
+                <p className="mt-2 text-xs text-slate-500">
+                  {overrides[item.id]
+                    ? 'Esta imagen esta activa en la web y puedes pasarla como base del producto.'
+                    : 'La imagen mostrada ya coincide con la imagen base del producto.'}
+                </p>
               </div>
 
               <div className="mt-4 space-y-3">
@@ -243,6 +273,15 @@ export function CatalogImageDialog({
                     }
                   }}
                 />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full rounded-xl"
+                  disabled={!overrides[item.id] || applyingBaseId === item.id}
+                  onClick={() => handleApplyAsBase(item.id, item.previewImage)}
+                >
+                  {applyingBaseId === item.id ? 'Actualizando base...' : 'Usar esta imagen como base'}
+                </Button>
               </div>
             </div>
             ))}
