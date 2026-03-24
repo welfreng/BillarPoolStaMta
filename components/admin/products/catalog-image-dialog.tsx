@@ -181,7 +181,7 @@ export function CatalogImageDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] w-[calc(100vw-2rem)] max-w-7xl overflow-y-auto px-6 sm:px-8">
+      <DialogContent className="max-h-[92vh] w-[calc(100vw-1rem)] max-w-7xl overflow-y-auto px-4 sm:px-5 lg:px-6">
         <DialogHeader>
           <DialogTitle>Imagenes del catalogo web</DialogTitle>
           <DialogDescription>
@@ -197,9 +197,9 @@ export function CatalogImageDialog({
             className="rounded-xl"
           />
 
-          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {filteredItems.map((item) => (
-            <div key={item.id} className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div key={item.id} className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm">
               <div className="overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-100">
                 <div className="relative aspect-square w-full">
                   <Image
@@ -212,7 +212,7 @@ export function CatalogImageDialog({
                 </div>
               </div>
 
-              <div className="mt-4">
+              <div className="mt-3">
                 <p className="font-semibold text-slate-900">{item.name}</p>
                 <p className="mt-1 text-xs text-slate-500">{item.brand || 'Sin marca registrada'}</p>
                 <p className="mt-1 text-[11px] text-slate-400">ID: {item.id}</p>
@@ -224,11 +224,11 @@ export function CatalogImageDialog({
                 </p>
               </div>
 
-              <div className="mt-4 space-y-3">
+              <div className="mt-3 space-y-2.5">
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-auto w-full rounded-xl border-dashed px-3 py-3 text-xs leading-tight whitespace-normal sm:text-sm"
+                  className="h-auto w-full rounded-xl border-dashed px-3 py-3 text-center text-[11px] leading-tight whitespace-normal break-words sm:text-xs"
                   disabled={savingProductId === item.id}
                   onClick={() => fileInputsRef.current[item.id]?.click()}
                 >
@@ -266,7 +266,7 @@ export function CatalogImageDialog({
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-auto rounded-xl px-3 py-2.5 text-[11px] leading-tight whitespace-normal sm:text-xs"
+                  className="h-auto rounded-xl px-3 py-2.5 text-center text-[11px] leading-tight whitespace-normal break-words sm:text-xs"
                   disabled={!draftImages[item.id] || savingProductId === item.id}
                   onClick={() =>
                     setDraftImages((current) => {
@@ -281,7 +281,7 @@ export function CatalogImageDialog({
                   </Button>
                   <Button
                     type="button"
-                    className="h-auto rounded-xl px-3 py-2.5 text-[11px] leading-tight whitespace-normal sm:text-xs"
+                    className="h-auto rounded-xl px-3 py-2.5 text-center text-[11px] leading-tight whitespace-normal break-words sm:text-xs"
                     disabled={!draftImages[item.id] || savingProductId === item.id}
                     onClick={async () => {
                       const draftImage = draftImages[item.id];
