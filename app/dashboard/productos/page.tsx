@@ -21,6 +21,11 @@ import { ProductFormDialog, type ProductFormValues } from '@/components/admin/pr
 import { ProductStatusBadge } from '@/components/admin/shared/status-badges';
 import { useAdminData } from '@/components/admin/admin-data-context';
 import { useToast } from '@/hooks/use-toast';
+import {
+  extractCatalogImageOverrides,
+  resolveCatalogImageOverride,
+  type CatalogImageOverrideMaps,
+} from '@/lib/catalog-image-overrides';
 import { formatCurrency } from '@/lib/admin/calculations';
 import { getCategoryLabel, inventoryCategories } from '@/lib/admin/catalogs';
 import type { Product } from '@/lib/admin/types';
@@ -43,7 +48,10 @@ export default function ProductosPage() {
   const [imageOffset, setImageOffset] = useState({ x: 0, y: 0 });
   const [isDraggingImage, setIsDraggingImage] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [catalogImageOverrides, setCatalogImageOverrides] = useState<Record<string, string>>({});
+  const [catalogImageOverrides, setCatalogImageOverrides] = useState<CatalogImageOverrideMaps>({
+    byProductId: {},
+    byProductName: {},
+  });
 
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
@@ -85,30 +93,11 @@ export default function ProductosPage() {
     const unsubscribe = onSnapshot(
       collection(db, 'siteAssets'),
       (snapshot) => {
-        const nextOverrides: Record<string, string> = {};
-
-        snapshot.docs.forEach((item) => {
-          if (item.id === 'catalog-images') {
-            const data = item.data();
-            if (data && typeof data === 'object' && data.images && typeof data.images === 'object') {
-              Object.assign(nextOverrides, data.images as Record<string, string>);
-            }
-            return;
-          }
-
-          if (!item.id.startsWith('catalog-image-')) return;
-          const productId = String(item.data().productId ?? item.id.replace('catalog-image-', ''));
-          const image = item.data().image;
-          if (typeof image === 'string' && productId) {
-            nextOverrides[productId] = image;
-          }
-        });
-
-        setCatalogImageOverrides(nextOverrides);
+        setCatalogImageOverrides(extractCatalogImageOverrides(snapshot));
       },
       (error) => {
         console.error('Error leyendo imagenes del catalogo web:', error);
-        setCatalogImageOverrides({});
+        setCatalogImageOverrides({ byProductId: {}, byProductName: {} });
       }
     );
 
@@ -116,7 +105,12 @@ export default function ProductosPage() {
   }, []);
 
   const selectedProductPreviewImage = selectedProduct
-    ? catalogImageOverrides[selectedProduct.id] || selectedProduct.image
+    ? resolveCatalogImageOverride(
+        selectedProduct.id,
+        selectedProduct.name,
+        selectedProduct.image,
+        catalogImageOverrides
+      )
     : '/images/logo.png';
 
   const handleSave = async (values: ProductFormValues) => {

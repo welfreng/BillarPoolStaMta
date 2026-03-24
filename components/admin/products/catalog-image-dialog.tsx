@@ -2,18 +2,23 @@
 
 import Image from 'next/image';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
-import { collection, doc, onSnapshot, serverTimestamp, type DocumentData, updateDoc, writeBatch } from 'firebase/firestore';
-import { ImagePlus, Save } from 'lucide-react';
+import { collection, doc, onSnapshot, serverTimestamp, setDoc, type DocumentData } from 'firebase/firestore';
+import { ImagePlus, LoaderCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import {
+  extractCatalogImageOverrides,
+  normalizeCatalogImageName,
+  resolveCatalogImageOverride,
+  type CatalogImageOverrideMaps,
+} from '@/lib/catalog-image-overrides';
 import { db } from '@/lib/firebase';
 import { optimizeImageFile } from '@/lib/image-upload';
 import { useToast } from '@/hooks/use-toast';
@@ -65,10 +70,9 @@ export function CatalogImageDialog({
   onSaved?: () => void;
 }) {
   const { toast } = useToast();
-  const [overrides, setOverrides] = useState<Record<string, string>>({});
+  const [overrides, setOverrides] = useState<CatalogImageOverrideMaps>({ byProductId: {}, byProductName: {} });
   const [products, setProducts] = useState<WebCatalogProduct[]>([]);
-  const [saving, setSaving] = useState(false);
-  const [applyingBaseId, setApplyingBaseId] = useState<string | null>(null);
+  const [savingProductId, setSavingProductId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const fileInputsRef = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -93,30 +97,11 @@ export function CatalogImageDialog({
     const unsubscribeImages = onSnapshot(
       collection(db, 'siteAssets'),
       (snapshot) => {
-        const images: Record<string, string> = {};
-
-        snapshot.docs.forEach((item) => {
-          if (item.id === 'catalog-images') {
-            const data = item.data();
-            if (data && typeof data === 'object' && data.images && typeof data.images === 'object') {
-              Object.assign(images, data.images as Record<string, string>);
-            }
-            return;
-          }
-
-          if (!item.id.startsWith('catalog-image-')) return;
-          const productId = String(item.data().productId ?? item.id.replace('catalog-image-', ''));
-          const image = item.data().image;
-          if (typeof image === 'string' && productId) {
-            images[productId] = image;
-          }
-        });
-
-        setOverrides(images);
+        setOverrides(extractCatalogImageOverrides(snapshot));
       },
       (error) => {
         console.error('Error leyendo imagenes del catalogo:', error);
-        setOverrides({});
+        setOverrides({ byProductId: {}, byProductName: {} });
       }
     );
 
@@ -130,7 +115,7 @@ export function CatalogImageDialog({
     () =>
       products.map((item) => ({
         ...item,
-        previewImage: overrides[item.id] || item.image,
+        previewImage: resolveCatalogImageOverride(item.id, item.name, item.image, overrides),
       })),
     [overrides, products]
   );
@@ -143,57 +128,56 @@ export function CatalogImageDialog({
     );
   }, [previewItems, search]);
 
-  const handleSave = async () => {
-    setSaving(true);
+  const handleSaveProductImage = async (productId: string, productName: string, image: string) => {
+    setSavingProductId(productId);
     try {
-      const batch = writeBatch(db);
-      Object.entries(overrides).forEach(([productId, image]) => {
-        batch.set(
-          doc(db, 'siteAssets', `catalog-image-${productId}`),
-          {
-            productId,
-            image,
-            updatedAt: serverTimestamp(),
-          },
-          { merge: true }
-        );
-      });
-      await batch.commit();
-      onSaved?.();
-      onOpenChange(false);
-    } catch (error) {
-      console.error('Error guardando imagenes del catalogo:', error);
-      toast({
-        title: 'No se pudieron guardar las imagenes',
-        description: 'Intenta de nuevo. Ahora cada imagen se guarda por producto para evitar bloqueos.',
-        variant: 'destructive',
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
+      const normalizedProductName = normalizeCatalogImageName(productName);
 
-  const handleApplyAsBase = async (productId: string, image: string) => {
-    setApplyingBaseId(productId);
-    try {
-      await updateDoc(doc(db, 'products', productId), {
-        image,
-        imageRotation: 0,
-        updatedAt: serverTimestamp(),
-      });
+      await setDoc(
+        doc(db, 'siteAssets', `catalog-image-${productId}`),
+        {
+          productId,
+          productName,
+          productNameKey: normalizedProductName,
+          image,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      await setDoc(
+        doc(db, 'siteAssets', 'catalog-images'),
+        {
+          [`images.${productId}`]: image,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      setOverrides((current) => ({
+        byProductId: {
+          ...current.byProductId,
+          [productId]: image,
+        },
+        byProductName: {
+          ...current.byProductName,
+          [normalizedProductName]: image,
+        },
+      }));
+
       toast({
-        title: 'Imagen base actualizada',
-        description: 'La imagen activa de web ahora tambien quedo como imagen base del producto.',
+        title: 'Imagen actualizada',
+        description: `${productName} ya quedó actualizada en la web.`,
       });
     } catch (error) {
-      console.error('Error actualizando imagen base del producto:', error);
+      console.error('Error guardando imagen del catalogo:', error);
       toast({
-        title: 'No se pudo actualizar la imagen base',
-        description: 'Intenta de nuevo. El producto no pudo sincronizar su imagen base.',
+        title: 'No se pudo guardar la imagen',
+        description: 'Intenta de nuevo. La foto no se alcanzó a publicar en la web.',
         variant: 'destructive',
       });
     } finally {
-      setApplyingBaseId(null);
+      setSavingProductId(null);
     }
   };
 
@@ -233,8 +217,10 @@ export function CatalogImageDialog({
               <div className="mt-4">
                 <p className="font-semibold text-slate-900">{item.name}</p>
                 <p className="mt-1 text-xs text-slate-500">{item.brand || 'Sin marca registrada'}</p>
+                <p className="mt-1 text-[11px] text-slate-400">ID: {item.id}</p>
                 <p className="mt-2 text-xs text-slate-500">
-                  {overrides[item.id]
+                  {overrides.byProductId[item.id] ||
+                    overrides.byProductName[normalizeCatalogImageName(item.name)]
                     ? 'Esta imagen esta activa en la web y puedes pasarla como base del producto.'
                     : 'La imagen mostrada ya coincide con la imagen base del producto.'}
                 </p>
@@ -244,11 +230,16 @@ export function CatalogImageDialog({
                 <Button
                   type="button"
                   variant="outline"
-                  className="w-full rounded-xl border-dashed"
+                  className="w-full rounded-xl border-dashed px-3 py-5 text-xs sm:text-sm"
+                  disabled={savingProductId === item.id}
                   onClick={() => fileInputsRef.current[item.id]?.click()}
                 >
-                  <ImagePlus className="h-4 w-4" />
-                  Subir nueva imagen
+                  {savingProductId === item.id ? (
+                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ImagePlus className="h-4 w-4" />
+                  )}
+                  {savingProductId === item.id ? 'Guardando imagen...' : 'Subir y publicar imagen'}
                 </Button>
                 <input
                   ref={(element) => {
@@ -259,9 +250,21 @@ export function CatalogImageDialog({
                   className="sr-only"
                   onChange={async (event) => {
                     try {
-                      await loadFileAsDataUrl(event, (value) =>
-                        setOverrides((current) => ({ ...current, [item.id]: value }))
-                      );
+                      let nextImage = '';
+                      await loadFileAsDataUrl(event, (value) => {
+                        nextImage = value;
+                        setOverrides((current) => ({
+                          byProductId: { ...current.byProductId, [item.id]: value },
+                          byProductName: {
+                            ...current.byProductName,
+                            [normalizeCatalogImageName(item.name)]: value,
+                          },
+                        }));
+                      });
+                      if (nextImage) {
+                        await handleSaveProductImage(item.id, item.name, nextImage);
+                        onSaved?.();
+                      }
                     } catch (error) {
                       console.error('Error preparando imagen del catalogo:', error);
                       toast({
@@ -273,30 +276,11 @@ export function CatalogImageDialog({
                     }
                   }}
                 />
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full rounded-xl"
-                  disabled={!overrides[item.id] || applyingBaseId === item.id}
-                  onClick={() => handleApplyAsBase(item.id, item.previewImage)}
-                >
-                  {applyingBaseId === item.id ? 'Actualizando base...' : 'Usar esta imagen como base'}
-                </Button>
               </div>
             </div>
             ))}
           </div>
         </div>
-
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            Cerrar
-          </Button>
-          <Button type="button" onClick={handleSave} disabled={saving}>
-            <Save className="mr-2 h-4 w-4" />
-            {saving ? 'Guardando...' : 'Guardar imagenes'}
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

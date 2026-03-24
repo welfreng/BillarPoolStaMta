@@ -4,6 +4,11 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
 import { collection, onSnapshot, query as firestoreQuery, type DocumentData, where } from "firebase/firestore"
 import { MessageCircle, Search, ShoppingBag, Tag } from "lucide-react"
+import {
+  extractCatalogImageOverrides,
+  resolveCatalogImageOverride,
+  type CatalogImageOverrideMaps,
+} from "@/lib/catalog-image-overrides"
 import { db } from "@/lib/firebase"
 import { publicCatalogCategories, publicCatalogProducts } from "@/lib/public-catalog"
 import { formatCurrency } from "@/lib/admin/calculations"
@@ -74,7 +79,10 @@ export default function ProductCatalog({
   const [activeCategory, setActiveCategory] = useState("todos")
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null)
   const [products, setProducts] = useState<CatalogProduct[]>([])
-  const [imageOverrides, setImageOverrides] = useState<Record<string, string>>({})
+  const [imageOverrides, setImageOverrides] = useState<CatalogImageOverrideMaps>({
+    byProductId: {},
+    byProductName: {},
+  })
   const [query, setQuery] = useState("")
   const [previewSides, setPreviewSides] = useState<Record<string, "left" | "right">>({})
   const productCardRefs = useRef<Record<string, HTMLElement | null>>({})
@@ -102,29 +110,11 @@ export default function ProductCatalog({
     const unsubscribeImages = onSnapshot(
       collection(db, "siteAssets"),
       (snapshot) => {
-        const images: Record<string, string> = {}
-
-        snapshot.docs.forEach((item) => {
-          if (item.id === "catalog-images") {
-            const data = item.data()
-            if (data && typeof data === "object" && data.images && typeof data.images === "object") {
-              Object.assign(images, data.images as Record<string, string>)
-            }
-            return
-          }
-
-          if (!item.id.startsWith("catalog-image-")) return
-          const productId = String(item.data().productId ?? item.id.replace("catalog-image-", ""))
-          const image = item.data().image
-          if (typeof image === "string" && productId) {
-            images[productId] = image
-          }
-        })
-        setImageOverrides(images)
+        setImageOverrides(extractCatalogImageOverrides(snapshot))
       },
       (error) => {
         console.error("Error leyendo imagenes del catalogo:", error)
-        setImageOverrides({})
+        setImageOverrides({ byProductId: {}, byProductName: {} })
       }
     )
 
@@ -138,7 +128,7 @@ export default function ProductCatalog({
     () =>
       products.map((product) => ({
         ...product,
-        image: imageOverrides[product.id] || product.image || defaultImage,
+        image: resolveCatalogImageOverride(product.id, product.name, product.image || defaultImage, imageOverrides),
       })),
     [imageOverrides, products]
   )
