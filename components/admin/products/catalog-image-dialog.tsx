@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { collection, doc, onSnapshot, serverTimestamp, setDoc, type DocumentData } from 'firebase/firestore';
-import { ImagePlus, LoaderCircle } from 'lucide-react';
+import { Check, ImagePlus, LoaderCircle, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -71,6 +71,7 @@ export function CatalogImageDialog({
 }) {
   const { toast } = useToast();
   const [overrides, setOverrides] = useState<CatalogImageOverrideMaps>({ byProductId: {}, byProductName: {} });
+  const [draftImages, setDraftImages] = useState<Record<string, string>>({});
   const [products, setProducts] = useState<WebCatalogProduct[]>([]);
   const [savingProductId, setSavingProductId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -115,9 +116,10 @@ export function CatalogImageDialog({
     () =>
       products.map((item) => ({
         ...item,
-        previewImage: resolveCatalogImageOverride(item.id, item.name, item.image, overrides),
+        previewImage:
+          draftImages[item.id] ?? resolveCatalogImageOverride(item.id, item.name, item.image, overrides),
       })),
-    [overrides, products]
+    [draftImages, overrides, products]
   );
   const filteredItems = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -145,15 +147,6 @@ export function CatalogImageDialog({
         { merge: true }
       );
 
-      await setDoc(
-        doc(db, 'siteAssets', 'catalog-images'),
-        {
-          [`images.${productId}`]: image,
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true }
-      );
-
       setOverrides((current) => ({
         byProductId: {
           ...current.byProductId,
@@ -164,6 +157,11 @@ export function CatalogImageDialog({
           [normalizedProductName]: image,
         },
       }));
+      setDraftImages((current) => {
+        const next = { ...current };
+        delete next[productId];
+        return next;
+      });
 
       toast({
         title: 'Imagen actualizada',
@@ -183,7 +181,7 @@ export function CatalogImageDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] max-w-6xl overflow-y-auto">
+      <DialogContent className="max-h-[92vh] w-[calc(100vw-2rem)] max-w-7xl overflow-y-auto px-6 sm:px-8">
         <DialogHeader>
           <DialogTitle>Imagenes del catalogo web</DialogTitle>
           <DialogDescription>
@@ -199,7 +197,7 @@ export function CatalogImageDialog({
             className="rounded-xl"
           />
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
             {filteredItems.map((item) => (
             <div key={item.id} className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
               <div className="overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-100">
@@ -230,7 +228,7 @@ export function CatalogImageDialog({
                 <Button
                   type="button"
                   variant="outline"
-                  className="w-full rounded-xl border-dashed px-3 py-5 text-xs sm:text-sm"
+                  className="h-auto w-full rounded-xl border-dashed px-3 py-3 text-xs leading-tight whitespace-normal sm:text-sm"
                   disabled={savingProductId === item.id}
                   onClick={() => fileInputsRef.current[item.id]?.click()}
                 >
@@ -250,21 +248,9 @@ export function CatalogImageDialog({
                   className="sr-only"
                   onChange={async (event) => {
                     try {
-                      let nextImage = '';
-                      await loadFileAsDataUrl(event, (value) => {
-                        nextImage = value;
-                        setOverrides((current) => ({
-                          byProductId: { ...current.byProductId, [item.id]: value },
-                          byProductName: {
-                            ...current.byProductName,
-                            [normalizeCatalogImageName(item.name)]: value,
-                          },
-                        }));
-                      });
-                      if (nextImage) {
-                        await handleSaveProductImage(item.id, item.name, nextImage);
-                        onSaved?.();
-                      }
+                      await loadFileAsDataUrl(event, (value) =>
+                        setDraftImages((current) => ({ ...current, [item.id]: value }))
+                      );
                     } catch (error) {
                       console.error('Error preparando imagen del catalogo:', error);
                       toast({
@@ -276,6 +262,42 @@ export function CatalogImageDialog({
                     }
                   }}
                 />
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-auto rounded-xl px-3 py-2.5 text-[11px] leading-tight whitespace-normal sm:text-xs"
+                  disabled={!draftImages[item.id] || savingProductId === item.id}
+                  onClick={() =>
+                    setDraftImages((current) => {
+                        const next = { ...current };
+                        delete next[item.id];
+                        return next;
+                      })
+                    }
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    Descartar cambio
+                  </Button>
+                  <Button
+                    type="button"
+                    className="h-auto rounded-xl px-3 py-2.5 text-[11px] leading-tight whitespace-normal sm:text-xs"
+                    disabled={!draftImages[item.id] || savingProductId === item.id}
+                    onClick={async () => {
+                      const draftImage = draftImages[item.id];
+                      if (!draftImage) return;
+                      await handleSaveProductImage(item.id, item.name, draftImage);
+                      onSaved?.();
+                    }}
+                  >
+                    {savingProductId === item.id ? (
+                      <LoaderCircle className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Check className="h-4 w-4" />
+                    )}
+                    {savingProductId === item.id ? 'Guardando...' : 'Guardar cambio'}
+                  </Button>
+                </div>
               </div>
             </div>
             ))}
