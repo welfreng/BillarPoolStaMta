@@ -181,10 +181,9 @@ export default function ProductCatalog({
     return (featuredProducts.length > 0 ? featuredProducts : availableCatalogProducts).slice(0, 5)
   }, [availableCatalogProducts, featuredOnly, filteredProducts])
   const groupedProducts = useMemo(() => {
-    const sourceProducts = featuredOnly ? visibleProducts : filteredProducts
     const grouped = new Map<string, CatalogProduct[]>()
 
-    sourceProducts.forEach((product) => {
+    filteredProducts.forEach((product) => {
       const categoryKey = product.category || "otros"
       const currentItems = grouped.get(categoryKey) ?? []
       currentItems.push(product)
@@ -203,7 +202,7 @@ export default function ProductCatalog({
         label: categoryLabels.get(category) ?? category,
         items,
       }))
-  }, [featuredOnly, filteredProducts, visibleProducts])
+  }, [filteredProducts])
 
   const selectedProduct = availableCatalogProducts.find((product) => product.id === selectedProductId) ?? null
   const selectedCategoryLabel =
@@ -279,11 +278,100 @@ export default function ProductCatalog({
           </div>
         ) : null}
 
-        {groupedProducts.length > 0 ? (
-          <div className="space-y-10">
-            {groupedProducts.map((group) => (
-              <div key={group.category} className="space-y-4">
-                {!featuredOnly ? (
+        {(featuredOnly ? visibleProducts.length > 0 : groupedProducts.length > 0) ? (
+          featuredOnly ? (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+              {visibleProducts.map((product) => {
+                const previewSide = previewSides[product.id] ?? "right"
+
+                return (
+                  <article
+                    key={product.id}
+                    ref={(element) => {
+                      productCardRefs.current[product.id] = element
+                    }}
+                    onMouseEnter={() => setPreviewSideFromViewport(product.id)}
+                    className="group relative overflow-visible rounded-2xl border border-border bg-card shadow-sm transition-all duration-300 hover:z-20 hover:-translate-y-1 hover:shadow-xl"
+                  >
+                    <div className="relative h-28 overflow-hidden bg-gradient-to-br from-white via-slate-50 to-slate-100 sm:h-32">
+                      <Image
+                        src={product.image || defaultImage}
+                        alt={product.name}
+                        fill
+                        className="object-cover transition-transform duration-500 group-hover:scale-110"
+                        unoptimized={product.image.startsWith("data:")}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#0a1628]/70 via-transparent to-transparent" />
+                      <div className="absolute left-2.5 top-2.5 z-10 inline-flex items-center rounded-full bg-[#0a2472] px-2 py-1 text-[10px] font-semibold text-white">
+                        {product.tag}
+                      </div>
+                    </div>
+
+                    <div
+                      className={`pointer-events-none absolute top-1/2 z-30 hidden w-[280px] -translate-y-1/2 rounded-[28px] border border-slate-200 bg-white/98 p-3 opacity-0 shadow-2xl shadow-slate-900/20 transition-all delay-0 duration-300 group-hover:opacity-100 group-hover:delay-300 lg:block ${
+                        previewSide === "left"
+                          ? "left-auto right-full mr-4 ml-0 group-hover:-translate-x-2"
+                          : "left-full right-auto ml-4 mr-0 group-hover:translate-x-2"
+                      }`}
+                    >
+                      <div className="relative aspect-[4/5] overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-100">
+                        <Image
+                          src={product.image || defaultImage}
+                          alt={`${product.name} vista ampliada`}
+                          fill
+                          className="object-contain p-3"
+                          unoptimized={product.image.startsWith("data:")}
+                        />
+                      </div>
+                      <div className="mt-3 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-slate-950">{product.name}</p>
+                          <p className="text-xs text-slate-500">{product.brand || "Sin marca"}</p>
+                        </div>
+                        <span className="shrink-0 rounded-full bg-slate-950 px-2.5 py-1 text-[10px] font-semibold text-white">
+                          Vista completa
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2.5 p-3">
+                      <div className="space-y-1">
+                        <h3 className="line-clamp-2 font-mono text-sm font-bold leading-snug text-foreground sm:text-base">
+                          {product.name}
+                        </h3>
+                        <p className="hidden line-clamp-2 text-xs leading-5 text-muted-foreground sm:block">
+                          {product.description}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center justify-between rounded-2xl bg-[#0a2472]/5 px-2.5 py-2">
+                        <div>
+                          <p className="text-[11px] uppercase tracking-wide text-slate-500">Precio</p>
+                          <p className="text-sm font-bold text-[#0a2472] sm:text-base">
+                            {product.salePrice > 0 ? formatCurrency(product.salePrice) : "Consultar"}
+                          </p>
+                        </div>
+                        <div className="rounded-xl bg-[#d4a017]/15 p-1.5 text-[#a17708]">
+                          <Tag className="h-3.5 w-3.5" />
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => setSelectedProductId(product.id)}
+                        className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-[#0a2472] px-2.5 py-2 text-[11px] font-semibold text-white transition-colors hover:bg-[#d4a017] hover:text-[#0a1628] sm:text-xs"
+                      >
+                        Ver producto
+                        <ShoppingBag className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </article>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="space-y-10">
+              {groupedProducts.map((group) => (
+                <div key={group.category} className="space-y-4">
                   <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-3">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#d4a017]">Categoria</p>
@@ -293,98 +381,99 @@ export default function ProductCatalog({
                       {group.items.length} productos
                     </div>
                   </div>
-                ) : null}
 
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                  {group.items.map((product) => {
-                    const previewSide = previewSides[product.id] ?? "right"
+                  <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                    {group.items.map((product) => {
+                      const previewSide = previewSides[product.id] ?? "right"
 
-                    return (
-                    <article
-                      key={product.id}
-                      ref={(element) => {
-                        productCardRefs.current[product.id] = element
-                      }}
-                      onMouseEnter={() => setPreviewSideFromViewport(product.id)}
-                      className="group relative overflow-visible rounded-2xl border border-border bg-card shadow-sm transition-all duration-300 hover:z-20 hover:-translate-y-1 hover:shadow-xl"
-                    >
-                      <div className="relative h-28 overflow-hidden bg-gradient-to-br from-white via-slate-50 to-slate-100 sm:h-32">
-                        <Image
-                          src={product.image || defaultImage}
-                          alt={product.name}
-                          fill
-                          className="object-cover transition-transform duration-500 group-hover:scale-110"
-                          unoptimized={product.image.startsWith("data:")}
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-[#0a1628]/70 via-transparent to-transparent" />
-                        <div className="absolute left-2.5 top-2.5 z-10 inline-flex items-center rounded-full bg-[#0a2472] px-2 py-1 text-[10px] font-semibold text-white">
-                          {product.tag}
-                        </div>
-                      </div>
-
-                      <div
-                        className={`pointer-events-none absolute top-1/2 z-30 hidden w-[280px] -translate-y-1/2 rounded-[28px] border border-slate-200 bg-white/98 p-3 opacity-0 shadow-2xl shadow-slate-900/20 transition-all delay-0 duration-300 group-hover:opacity-100 group-hover:delay-300 lg:block ${
-                          previewSide === "left"
-                            ? "left-auto right-full mr-4 ml-0 group-hover:-translate-x-2"
-                            : "left-full right-auto ml-4 mr-0 group-hover:translate-x-2"
-                        }`}
-                      >
-                        <div className="relative aspect-[4/5] overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-100">
-                          <Image
-                            src={product.image || defaultImage}
-                            alt={`${product.name} vista ampliada`}
-                            fill
-                            className="object-contain p-3"
-                            unoptimized={product.image.startsWith("data:")}
-                          />
-                        </div>
-                        <div className="mt-3 flex items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-slate-950">{product.name}</p>
-                            <p className="text-xs text-slate-500">{product.brand || "Sin marca"}</p>
-                          </div>
-                          <span className="shrink-0 rounded-full bg-slate-950 px-2.5 py-1 text-[10px] font-semibold text-white">
-                            Vista completa
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2.5 p-3">
-                        <div className="space-y-1">
-                          <h3 className="line-clamp-2 font-mono text-sm font-bold leading-snug text-foreground sm:text-base">
-                            {product.name}
-                          </h3>
-                          <p className="hidden line-clamp-2 text-xs leading-5 text-muted-foreground sm:block">
-                            {product.description}
-                          </p>
-                        </div>
-
-                        <div className="flex items-center justify-between rounded-2xl bg-[#0a2472]/5 px-2.5 py-2">
-                          <div>
-                            <p className="text-[11px] uppercase tracking-wide text-slate-500">Precio</p>
-                            <p className="text-sm font-bold text-[#0a2472] sm:text-base">
-                              {product.salePrice > 0 ? formatCurrency(product.salePrice) : "Consultar"}
-                            </p>
-                          </div>
-                          <div className="rounded-xl bg-[#d4a017]/15 p-1.5 text-[#a17708]">
-                            <Tag className="h-3.5 w-3.5" />
-                          </div>
-                        </div>
-
-                        <button
-                          onClick={() => setSelectedProductId(product.id)}
-                          className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-[#0a2472] px-2.5 py-2 text-[11px] font-semibold text-white transition-colors hover:bg-[#d4a017] hover:text-[#0a1628] sm:text-xs"
+                      return (
+                        <article
+                          key={product.id}
+                          ref={(element) => {
+                            productCardRefs.current[product.id] = element
+                          }}
+                          onMouseEnter={() => setPreviewSideFromViewport(product.id)}
+                          className="group relative overflow-visible rounded-2xl border border-border bg-card shadow-sm transition-all duration-300 hover:z-20 hover:-translate-y-1 hover:shadow-xl"
                         >
-                          Ver producto
-                          <ShoppingBag className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </article>
-                  )})}
+                          <div className="relative h-28 overflow-hidden bg-gradient-to-br from-white via-slate-50 to-slate-100 sm:h-32">
+                            <Image
+                              src={product.image || defaultImage}
+                              alt={product.name}
+                              fill
+                              className="object-cover transition-transform duration-500 group-hover:scale-110"
+                              unoptimized={product.image.startsWith("data:")}
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-[#0a1628]/70 via-transparent to-transparent" />
+                            <div className="absolute left-2.5 top-2.5 z-10 inline-flex items-center rounded-full bg-[#0a2472] px-2 py-1 text-[10px] font-semibold text-white">
+                              {product.tag}
+                            </div>
+                          </div>
+
+                          <div
+                            className={`pointer-events-none absolute top-1/2 z-30 hidden w-[280px] -translate-y-1/2 rounded-[28px] border border-slate-200 bg-white/98 p-3 opacity-0 shadow-2xl shadow-slate-900/20 transition-all delay-0 duration-300 group-hover:opacity-100 group-hover:delay-300 lg:block ${
+                              previewSide === "left"
+                                ? "left-auto right-full mr-4 ml-0 group-hover:-translate-x-2"
+                                : "left-full right-auto ml-4 mr-0 group-hover:translate-x-2"
+                            }`}
+                          >
+                            <div className="relative aspect-[4/5] overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-100">
+                              <Image
+                                src={product.image || defaultImage}
+                                alt={`${product.name} vista ampliada`}
+                                fill
+                                className="object-contain p-3"
+                                unoptimized={product.image.startsWith("data:")}
+                              />
+                            </div>
+                            <div className="mt-3 flex items-center justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-semibold text-slate-950">{product.name}</p>
+                                <p className="text-xs text-slate-500">{product.brand || "Sin marca"}</p>
+                              </div>
+                              <span className="shrink-0 rounded-full bg-slate-950 px-2.5 py-1 text-[10px] font-semibold text-white">
+                                Vista completa
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2.5 p-3">
+                            <div className="space-y-1">
+                              <h3 className="line-clamp-2 font-mono text-sm font-bold leading-snug text-foreground sm:text-base">
+                                {product.name}
+                              </h3>
+                              <p className="hidden line-clamp-2 text-xs leading-5 text-muted-foreground sm:block">
+                                {product.description}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center justify-between rounded-2xl bg-[#0a2472]/5 px-2.5 py-2">
+                              <div>
+                                <p className="text-[11px] uppercase tracking-wide text-slate-500">Precio</p>
+                                <p className="text-sm font-bold text-[#0a2472] sm:text-base">
+                                  {product.salePrice > 0 ? formatCurrency(product.salePrice) : "Consultar"}
+                                </p>
+                              </div>
+                              <div className="rounded-xl bg-[#d4a017]/15 p-1.5 text-[#a17708]">
+                                <Tag className="h-3.5 w-3.5" />
+                              </div>
+                            </div>
+
+                            <button
+                              onClick={() => setSelectedProductId(product.id)}
+                              className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-[#0a2472] px-2.5 py-2 text-[11px] font-semibold text-white transition-colors hover:bg-[#d4a017] hover:text-[#0a1628] sm:text-xs"
+                            >
+                              Ver producto
+                              <ShoppingBag className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </article>
+                      )
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )
         ) : (
           <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 px-6 py-12 text-center text-slate-600">
             {featuredOnly
