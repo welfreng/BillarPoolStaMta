@@ -33,7 +33,7 @@ export const inventoryCategories: CategoryOption[] = [
   {
     id: 'tizas',
     label: 'Tizas',
-    subcategories: ['Por unidad', 'Caja x 12', 'Caja x 144'],
+    subcategories: ['Por unidad', 'Caja x 12', 'Caja x 81','Caja x 144' ],
   },
   {
     id: 'guantes',

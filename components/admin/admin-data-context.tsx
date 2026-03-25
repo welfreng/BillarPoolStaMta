@@ -740,12 +740,18 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    const totalPurchasedUnits = input.items.reduce(
-      (total, item) => total + Number(item.presentationQuantity || 0),
+    const normalizedItems = input.items.map((item) => ({
+      ...item,
+      presentationQuantity: Number(item.presentationQuantity || 0),
+      purchaseUnitValue: Number(item.purchaseUnitValue || 0),
+      suggestedSalePrice: Number(item.suggestedSalePrice || 0),
+    }));
+    const totalPurchasedUnits = normalizedItems.reduce(
+      (total, item) => total + item.presentationQuantity,
       0
     );
-    const totalPurchaseValue = input.items.reduce(
-      (total, item) => total + Number((Number(item.purchaseUnitValue || 0) * Number(item.presentationQuantity || 0)).toFixed(2)),
+    const totalPurchaseValue = normalizedItems.reduce(
+      (total, item) => total + Number((item.purchaseUnitValue * item.presentationQuantity).toFixed(2)),
       0
     );
     const batchId = existingBatchId ?? doc(collection(db, 'purchase-batches')).id;
@@ -753,9 +759,9 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     const purchasesCreated: Purchase[] = [];
     const stockDeltas: Array<{ productId: string; quantity: number }> = [];
 
-    input.items.forEach((item, index) => {
+    normalizedItems.forEach((item, index) => {
       const conversionFactor = 1;
-      const quantityPurchased = Number(item.presentationQuantity) || 0;
+      const quantityPurchased = item.presentationQuantity;
       const purchaseValueTotal = Number((item.purchaseUnitValue * item.presentationQuantity).toFixed(2));
       const shippingShare =
         totalPurchasedUnits > 0

@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { useFieldArray, useForm } from 'react-hook-form';
+import { useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Check, ChevronsUpDown, MinusCircle, PlusCircle } from 'lucide-react';
+import { Check, ChevronsUpDown, MinusCircle, Pencil, PlusCircle } from 'lucide-react';
 import {
   calculatePurchaseTotals,
   formatCurrency,
@@ -29,6 +29,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Command,
   CommandEmpty,
@@ -56,6 +57,13 @@ const purchaseSchema = z.object({
 });
 
 export type PurchaseFormValues = z.infer<typeof purchaseSchema>;
+type PurchaseLineFormValue = PurchaseFormValues['items'][number];
+type DraftPurchaseLine = {
+  productId: string;
+  presentationQuantity: string;
+  purchaseUnitValue: string;
+  suggestedSalePrice: string;
+};
 
 const defaultLine: PurchaseFormValues['items'][number] = {
   productId: '',
@@ -72,8 +80,38 @@ const defaultValues: PurchaseFormValues = {
   items: [defaultLine],
 };
 
+function createDefaultPurchaseLine(): DraftPurchaseLine {
+  return {
+    productId: '',
+    presentationQuantity: '',
+    purchaseUnitValue: '',
+    suggestedSalePrice: '',
+  };
+}
+
+function createDraftPurchaseLineFromValue(line?: PurchaseLineFormValue): DraftPurchaseLine {
+  if (!line) return createDefaultPurchaseLine();
+  return {
+    productId: line.productId ?? '',
+    presentationQuantity: String(line.presentationQuantity ?? ''),
+    purchaseUnitValue: String(line.purchaseUnitValue ?? ''),
+    suggestedSalePrice: String(line.suggestedSalePrice ?? ''),
+  };
+}
+
+function isRoyalPremiumChalk(product?: Product) {
+  if (!product) return false;
+  return product.category === 'tizas' && /royal\s*premium/i.test(`${product.name} ${product.brand}`);
+}
+
+function isZ1Chalk(product?: Product) {
+  if (!product) return false;
+  return product.category === 'tizas' && /\bz1\b/i.test(`${product.name} ${product.brand}`);
+}
+
 function isPackOf12Product(product?: Product) {
   if (!product) return false;
+  if (isRoyalPremiumChalk(product) || isZ1Chalk(product)) return false;
   return /x\s*12/i.test(product.subcategory) || /x\s*12/i.test(product.name);
 }
 
@@ -182,18 +220,48 @@ export function PurchaseFormDialog({
     resolver: zodResolver(purchaseSchema),
     defaultValues: initialValues ?? defaultValues,
   });
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, update } = useFieldArray({
     control: form.control,
     name: 'items',
   });
   const [pack12NormalizedByField, setPack12NormalizedByField] = useState<Record<string, boolean>>({});
+  const [lineDialogOpen, setLineDialogOpen] = useState(false);
+  const [editingLineIndex, setEditingLineIndex] = useState<number | null>(null);
+  const [draftLine, setDraftLine] = useState<DraftPurchaseLine>(createDefaultPurchaseLine());
+  const [lineError, setLineError] = useState('');
 
   useEffect(() => {
-    form.reset(initialValues ?? defaultValues);
+    const nextValues = initialValues
+      ? {
+          ...initialValues,
+          items: initialValues.items.length > 0 ? initialValues.items : [createDefaultPurchaseLine()],
+        }
+      : defaultValues;
+    form.reset(nextValues);
     setPack12NormalizedByField({});
+    setLineDialogOpen(false);
+    setEditingLineIndex(null);
+    setDraftLine(createDefaultPurchaseLine());
+    setLineError('');
   }, [form, initialValues, open]);
 
-  const values = form.watch();
+  const watchedSupplierId = useWatch({
+    control: form.control,
+    name: 'supplierId',
+  });
+  const watchedShippingValueTotal = useWatch({
+    control: form.control,
+    name: 'shippingValueTotal',
+  });
+  const watchedItems = useWatch({
+    control: form.control,
+    name: 'items',
+  }) ?? defaultValues.items;
+  const values = {
+    supplierId: watchedSupplierId,
+    shippingValueTotal: watchedShippingValueTotal,
+    items: watchedItems,
+  };
   const selectedSupplier = suppliers.find((supplier) => supplier.id === values.supplierId);
 
   useEffect(() => {
@@ -251,6 +319,65 @@ export function PurchaseFormDialog({
     [totalPurchasedUnits, values.items, values.shippingValueTotal]
   );
   const shippingPerUnit = totalPurchasedUnits > 0 ? (Number(values.shippingValueTotal) || 0) / totalPurchasedUnits : 0;
+  const firstItem = values.items[0] ?? createDefaultPurchaseLine();
+  const firstItemProduct = products.find((product) => product.id === firstItem.productId);
+  const firstPreview = previewItems[0] ?? null;
+  const firstItemIsPack12 = isPackOf12Product(firstItemProduct);
+  const draftProduct = products.find((product) => product.id === draftLine.productId);
+  const isDraftPack12 = isPackOf12Product(draftProduct);
+  const draftQuantity = Number(draftLine.presentationQuantity) || 0;
+  const draftPurchaseValueTotal = (Number(draftLine.purchaseUnitValue) || 0) * draftQuantity;
+
+  const openNewLineDialog = () => {
+    setEditingLineIndex(null);
+    setDraftLine(createDefaultPurchaseLine());
+    setLineError('');
+    setLineDialogOpen(true);
+  };
+
+  const openEditLineDialog = (index: number) => {
+    setEditingLineIndex(index);
+    setDraftLine(createDraftPurchaseLineFromValue(values.items[index]));
+    setLineError('');
+    setLineDialogOpen(true);
+  };
+
+  const saveDraftLine = () => {
+    if (!draftLine.productId) {
+      setLineError('Selecciona un producto.');
+      return;
+    }
+    if ((Number(draftLine.presentationQuantity) || 0) <= 0) {
+      setLineError('La cantidad debe ser mayor a cero.');
+      return;
+    }
+    if ((Number(draftLine.purchaseUnitValue) || 0) < 0) {
+      setLineError('El valor de compra no puede ser negativo.');
+      return;
+    }
+    if ((Number(draftLine.suggestedSalePrice) || 0) < 0) {
+      setLineError('El precio sugerido no puede ser negativo.');
+      return;
+    }
+
+    const normalizedDraftLine = {
+      productId: draftLine.productId,
+      presentationQuantity: Number(draftLine.presentationQuantity) || 0,
+      purchaseUnitValue: Number(draftLine.purchaseUnitValue) || 0,
+      suggestedSalePrice: Number(draftLine.suggestedSalePrice) || 0,
+    };
+
+    if (editingLineIndex === null) {
+      append(normalizedDraftLine);
+    } else {
+      update(editingLineIndex, normalizedDraftLine);
+    }
+
+    setLineDialogOpen(false);
+    setEditingLineIndex(null);
+    setDraftLine(createDefaultPurchaseLine());
+    setLineError('');
+  };
 
   const moveFocusToNextField = (event: ReactKeyboardEvent<HTMLFormElement>) => {
     if (event.key !== 'Enter' || event.shiftKey) return;
@@ -313,6 +440,7 @@ export function PurchaseFormDialog({
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[94vh] w-[calc(100vw-1rem)] max-w-6xl overflow-y-auto px-3 sm:w-[calc(100vw-2rem)] sm:px-6">
         <DialogHeader>
@@ -409,72 +537,70 @@ export function PurchaseFormDialog({
                 </div>
             </section>
 
-            <div className="space-y-4">
+            <section className="min-w-0 space-y-5 rounded-3xl border border-slate-200 bg-slate-50/60 p-4 sm:p-5 lg:p-6">
               <div>
                 <div>
-                  <p className="text-sm font-medium text-slate-900">Productos de la compra</p>
-                  <p className="text-sm text-slate-500">Agrega todas las referencias incluidas en este pedido.</p>
+                  <p className="text-sm font-semibold text-slate-950">Productos de la compra</p>
                 </div>
               </div>
 
-              {fields.map((field, index) => {
-                const preview = previewItems[index];
-                const selectedProduct = products.find((item) => item.id === values.items[index]?.productId);
-                const isPack12 = isPackOf12Product(selectedProduct);
-                return (
-                  <div key={field.id} className="rounded-3xl border border-slate-200 bg-slate-50/70 p-4 shadow-sm sm:p-5">
-                    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <p className="font-medium text-slate-900">Producto {index + 1}</p>
-                      {fields.length > 1 && (
-                        <Button type="button" variant="ghost" size="sm" onClick={() => remove(index)}>
-                          <MinusCircle className="mr-2 h-4 w-4" />
-                          Quitar
-                        </Button>
+              {fields.length <= 1 ? (
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full bg-slate-100 px-2 text-xs font-semibold text-slate-700">
+                        #1
+                      </span>
+                      <p className="text-sm font-medium text-slate-900">Producto principal</p>
+                    </div>
+                    {firstItemProduct ? (
+                      <span className="rounded-full bg-cyan-50 px-3 py-1 text-xs font-medium text-cyan-800">
+                        Compra activa
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <div className="grid gap-4">
+                    <FormField
+                      control={form.control}
+                      name="items.0.productId"
+                      render={({ field }) => (
+                        <FormItem className="min-w-0">
+                          <FormLabel>Producto</FormLabel>
+                          <FormControl>
+                            <SearchableSelect
+                              value={field.value}
+                              onChange={(value) => {
+                                field.onChange(value);
+                                resetPack12Normalization(fields[0]?.id ?? 'primary-line');
+                                const product = products.find((item) => item.id === value);
+                                if (product) {
+                                  form.setValue('items.0.suggestedSalePrice', product.salePrice, {
+                                    shouldValidate: true,
+                                  });
+                                }
+                              }}
+                              placeholder="Selecciona producto"
+                              searchPlaceholder="Buscar producto..."
+                              emptyLabel="No se encontraron productos."
+                              options={products.map((product) => ({
+                                value: product.id,
+                                label: `${product.name} - ${product.brand}`,
+                              }))}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
                       )}
-                    </div>
+                    />
 
-                    <div className="grid gap-4 xl:grid-cols-12">
+                    <div className="grid gap-4 sm:grid-cols-[minmax(124px,0.72fr)_minmax(160px,0.92fr)] lg:grid-cols-3 sm:items-end">
                       <FormField
                         control={form.control}
-                        name={`items.${index}.productId`}
-                        render={({ field: productField }) => (
-                          <FormItem className="min-w-0 xl:col-span-12">
-                            <FormLabel>Producto</FormLabel>
-                            <FormControl>
-                              <SearchableSelect
-                                value={productField.value}
-                                onChange={(value) => {
-                                  productField.onChange(value);
-                                  resetPack12Normalization(field.id);
-                                  const product = products.find((item) => item.id === value);
-                                  if (product) {
-                                    form.setValue(`items.${index}.suggestedSalePrice`, product.salePrice, {
-                                      shouldValidate: true,
-                                    });
-                                  }
-                                }}
-                                placeholder="Selecciona producto"
-                                searchPlaceholder="Buscar producto..."
-                                emptyLabel="No se encontraron productos."
-                                options={products.map((product) => ({
-                                  value: product.id,
-                                  label: `${product.name} - ${product.brand}`,
-                                }))}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
-                    <div className="mt-4 grid gap-4 xl:grid-cols-12">
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.presentationQuantity`}
+                        name="items.0.presentationQuantity"
                         render={({ field }) => (
-                          <FormItem className="min-w-0 xl:col-span-4">
-                            <FormLabel>{isPack12 ? 'Cantidad comprada en unidades' : 'Cantidad comprada'}</FormLabel>
+                          <FormItem>
+                            <FormLabel>{firstItemIsPack12 ? 'Cantidad en unidades' : 'Cantidad comprada'}</FormLabel>
                             <FormControl>
                               <Input
                                 type="number"
@@ -482,29 +608,25 @@ export function PurchaseFormDialog({
                                 {...field}
                                 onChange={(event) => {
                                   field.onChange(event);
-                                  resetPack12Normalization(fields[index].id);
+                                  resetPack12Normalization(fields[0]?.id ?? 'primary-line');
                                 }}
                                 onBlur={(event) => {
                                   field.onBlur();
-                                  normalizePack12Line(index, fields[index].id);
+                                  normalizePack12Line(0, fields[0]?.id ?? 'primary-line');
                                 }}
                               />
                             </FormControl>
-                            {isPack12 ? (
-                              <p className="text-xs leading-5 text-slate-500">
-                                Ingresa las unidades. Al salir del campo, el sistema las convierte a paquetes de 12.
-                              </p>
-                            ) : null}
                             <FormMessage />
                           </FormItem>
                         )}
                       />
+
                       <FormField
                         control={form.control}
-                        name={`items.${index}.purchaseUnitValue`}
+                        name="items.0.purchaseUnitValue"
                         render={({ field }) => (
-                          <FormItem className="min-w-0 xl:col-span-4">
-                            <FormLabel>{isPack12 ? 'Valor unitario por pieza' : 'Valor unitario de compra'}</FormLabel>
+                          <FormItem>
+                            <FormLabel>{firstItemIsPack12 ? 'Valor unitario por pieza' : 'Valor unitario de compra'}</FormLabel>
                             <FormControl>
                               <Input
                                 type="number"
@@ -513,28 +635,24 @@ export function PurchaseFormDialog({
                                 {...field}
                                 onChange={(event) => {
                                   field.onChange(event);
-                                  resetPack12Normalization(fields[index].id);
+                                  resetPack12Normalization(fields[0]?.id ?? 'primary-line');
                                 }}
                                 onBlur={() => {
                                   field.onBlur();
-                                  normalizePack12Line(index, fields[index].id);
+                                  normalizePack12Line(0, fields[0]?.id ?? 'primary-line');
                                 }}
                               />
                             </FormControl>
-                            {isPack12 ? (
-                              <p className="text-xs leading-5 text-slate-500">
-                                Ingresa el valor por unidad. El sistema lo multiplica por 12 para dejar el valor por paquete.
-                              </p>
-                            ) : null}
                             <FormMessage />
                           </FormItem>
                         )}
                       />
+
                       <FormField
                         control={form.control}
-                        name={`items.${index}.suggestedSalePrice`}
+                        name="items.0.suggestedSalePrice"
                         render={({ field }) => (
-                          <FormItem className="min-w-0 xl:col-span-4">
+                          <FormItem>
                             <FormLabel>Precio sugerido de venta</FormLabel>
                             <FormControl>
                               <Input type="number" min="0" step="0.01" {...field} />
@@ -545,43 +663,115 @@ export function PurchaseFormDialog({
                       />
                     </div>
 
-                    <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                      <div className="rounded-2xl bg-white p-4">
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div className="rounded-2xl bg-slate-50 p-4">
                         <p className="text-xs text-slate-500">
-                          {isPack12 ? 'Cantidad convertida a paquetes' : 'Cantidad comprada'}
+                          {firstItemIsPack12 ? 'Cantidad convertida a paquetes' : 'Cantidad comprada'}
                         </p>
                         <p className="mt-1 font-semibold text-slate-900">
-                          {formatNumber(preview?.quantityPurchased ?? 0)} articulos
+                          {formatNumber(firstPreview?.quantityPurchased ?? 0)} articulos
                         </p>
                       </div>
-                      <div className="rounded-2xl bg-white p-4">
+                      <div className="rounded-2xl bg-slate-50 p-4">
                         <p className="text-xs text-slate-500">Valor total compra</p>
                         <p className="mt-1 font-semibold text-slate-900">
-                          {formatCurrency(preview?.purchaseValueTotal ?? 0)}
+                          {formatCurrency(firstPreview?.purchaseValueTotal ?? 0)}
                         </p>
                       </div>
-                      <div className="rounded-2xl bg-white p-4">
+                      <div className="rounded-2xl bg-slate-50 p-4">
                         <p className="text-xs text-slate-500">Envio asignado</p>
                         <p className="mt-1 font-semibold text-slate-900">
-                          {formatCurrency(preview?.shippingShare ?? 0)}
+                          {formatCurrency(firstPreview?.shippingShare ?? 0)}
                         </p>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
 
-              <div className="flex justify-start">
+                    {firstItemProduct ? (
+                      <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-slate-50 px-3 py-2.5 text-sm text-slate-600">
+                        <span className="truncate">{firstItemProduct.name} - {firstItemProduct.brand || 'Sin marca'}</span>
+                        <span className="font-medium text-slate-900">Total linea: {formatCurrency(firstPreview?.purchaseValueTotal ?? 0)}</span>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+
+              {fields.length > 1 ? (
+                <div className="space-y-3">
+                  {fields.map((field, index) => {
+                    const preview = previewItems[index];
+                    const selectedProduct = products.find((item) => item.id === values.items[index]?.productId);
+                    const isPack12 = isPackOf12Product(selectedProduct);
+                    return (
+                      <div key={field.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="min-w-0 space-y-1">
+                            <p className="font-medium text-slate-900">
+                              {selectedProduct?.name ?? 'Producto'} x {formatNumber(preview?.quantityPurchased ?? 0)}
+                            </p>
+                            <p className="text-sm text-slate-500">
+                              Valor unitario: {formatCurrency(values.items[index]?.purchaseUnitValue ?? 0)}
+                            </p>
+                            <p className="text-sm text-slate-500">
+                              Precio sugerido: {formatCurrency(values.items[index]?.suggestedSalePrice ?? 0)}
+                            </p>
+                            <p className="text-sm text-slate-500">
+                              Total linea: {formatCurrency(preview?.purchaseValueTotal ?? 0)}
+                            </p>
+                            <p className="text-sm text-slate-400">
+                              {isPack12 ? 'Conversion por paquete aplicada' : 'Sin conversion automatica'}
+                            </p>
+                          </div>
+
+                          <div className="flex gap-2 sm:shrink-0">
+                            <Button type="button" variant="ghost" size="sm" className="rounded-xl" onClick={() => openEditLineDialog(index)}>
+                              <Pencil className="mr-2 h-4 w-4" />
+                              Editar
+                            </Button>
+                            <Button type="button" variant="ghost" size="sm" className="rounded-xl" onClick={() => remove(index)}>
+                              <MinusCircle className="mr-2 h-4 w-4" />
+                              Quitar
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-8 text-center text-sm text-slate-500">
+                  Si la compra tiene mas de un producto, usa `Agregar producto` para sumarlo a la lista.
+                </div>
+              )}
+
+              <FormField
+                control={form.control}
+                name="items"
+                render={() => <FormMessage />}
+              />
+
+              <div className="space-y-3">
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => append({ ...defaultLine })}
+                  className="w-full rounded-xl bg-white"
+                  onClick={openNewLineDialog}
                 >
                   <PlusCircle className="mr-2 h-4 w-4" />
                   Agregar producto
                 </Button>
+
+                <div className="flex flex-col gap-2 rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-emerald-950">Total acumulado de la compra</p>
+                    <p className="text-xs text-emerald-800">
+                      {formatNumber(totalPurchasedUnits)} unidades en {formatNumber(fields.length)} lineas
+                    </p>
+                  </div>
+                  <p className="text-lg font-semibold text-emerald-950">{formatCurrency(totalPurchaseValue)}</p>
+                </div>
               </div>
-            </div>
+            </section>
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
@@ -593,5 +783,151 @@ export function PurchaseFormDialog({
         </Form>
       </DialogContent>
     </Dialog>
+
+    <Dialog open={lineDialogOpen} onOpenChange={setLineDialogOpen}>
+      <DialogContent className="w-[calc(100vw-1rem)] max-w-xl px-4 sm:w-[calc(100vw-2rem)] sm:px-5">
+        <DialogHeader>
+          <DialogTitle>{editingLineIndex === null ? 'Agregar producto a la compra' : 'Editar producto de la compra'}</DialogTitle>
+          <DialogDescription>
+            Selecciona el producto y define cantidad, valor de compra y precio sugerido.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Producto</Label>
+            <SearchableSelect
+              value={draftLine.productId}
+              onChange={(value) => {
+                const product = products.find((item) => item.id === value);
+                setDraftLine((current) => ({
+                  ...current,
+                  productId: value,
+                  suggestedSalePrice:
+                    product?.salePrice !== undefined ? String(product.salePrice) : current.suggestedSalePrice,
+                }));
+                setLineError('');
+              }}
+              placeholder="Selecciona producto"
+              searchPlaceholder="Buscar producto..."
+              emptyLabel="No se encontraron productos."
+              options={products.map((product) => ({
+                value: product.id,
+                label: `${product.name} - ${product.brand}`,
+              }))}
+            />
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>{isDraftPack12 ? 'Cantidad en unidades' : 'Cantidad comprada'}</Label>
+              <Input
+                type="number"
+                min="1"
+                value={draftLine.presentationQuantity}
+                onChange={(event) => {
+                  setDraftLine((current) => ({
+                    ...current,
+                    presentationQuantity: event.target.value,
+                  }));
+                  setLineError('');
+                }}
+                onBlur={() => {
+                  const product = products.find((item) => item.id === draftLine.productId);
+                  if (!isPackOf12Product(product)) return;
+                  const quantityEntered = Number(draftLine.presentationQuantity) || 0;
+                  const unitValueEntered = Number(draftLine.purchaseUnitValue) || 0;
+                  if (quantityEntered < 12 || unitValueEntered <= 0) return;
+                  setDraftLine((current) => ({
+                    ...current,
+                    presentationQuantity: String(Number((quantityEntered / 12).toFixed(2))),
+                    purchaseUnitValue: String(Number((unitValueEntered * 12).toFixed(2))),
+                  }));
+                }}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>{isDraftPack12 ? 'Valor unitario por pieza' : 'Valor unitario de compra'}</Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={draftLine.purchaseUnitValue}
+                onChange={(event) => {
+                  setDraftLine((current) => ({
+                    ...current,
+                    purchaseUnitValue: event.target.value,
+                  }));
+                  setLineError('');
+                }}
+                onBlur={() => {
+                  const product = products.find((item) => item.id === draftLine.productId);
+                  if (!isPackOf12Product(product)) return;
+                  const quantityEntered = Number(draftLine.presentationQuantity) || 0;
+                  const unitValueEntered = Number(draftLine.purchaseUnitValue) || 0;
+                  if (quantityEntered < 12 || unitValueEntered <= 0) return;
+                  setDraftLine((current) => ({
+                    ...current,
+                    presentationQuantity: String(Number((quantityEntered / 12).toFixed(2))),
+                    purchaseUnitValue: String(Number((unitValueEntered * 12).toFixed(2))),
+                  }));
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Precio sugerido de venta</Label>
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              value={draftLine.suggestedSalePrice}
+              onChange={(event) => {
+                setDraftLine((current) => ({
+                  ...current,
+                  suggestedSalePrice: event.target.value,
+                }));
+                setLineError('');
+              }}
+            />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl bg-slate-50 p-4">
+              <p className="text-xs text-slate-500">{isDraftPack12 ? 'Cantidad convertida' : 'Cantidad comprada'}</p>
+              <p className="mt-1 font-semibold text-slate-900">{formatNumber(draftQuantity)} articulos</p>
+            </div>
+            <div className="rounded-2xl bg-slate-50 p-4">
+              <p className="text-xs text-slate-500">Valor total compra</p>
+              <p className="mt-1 font-semibold text-slate-900">{formatCurrency(draftPurchaseValueTotal)}</p>
+            </div>
+            <div className="rounded-2xl bg-slate-50 p-4">
+              <p className="text-xs text-slate-500">Envio estimado</p>
+              <p className="mt-1 font-semibold text-slate-900">
+                {formatCurrency((Number(values.shippingValueTotal) || 0) * (draftQuantity > 0 && totalPurchasedUnits > 0 ? draftQuantity / (editingLineIndex === null ? totalPurchasedUnits + draftQuantity : Math.max(totalPurchasedUnits - (Number(values.items[editingLineIndex]?.presentationQuantity) || 0) + draftQuantity, draftQuantity)) : 0))}
+              </p>
+            </div>
+          </div>
+
+          {lineError ? (
+            <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
+              {lineError}
+            </p>
+          ) : null}
+        </div>
+
+        <DialogFooter className="gap-3">
+          <Button type="button" variant="outline" onClick={() => setLineDialogOpen(false)}>
+            Cancelar
+          </Button>
+          <Button type="button" onClick={saveDraftLine}>
+            {editingLineIndex === null ? 'Agregar producto' : 'Guardar cambios'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
