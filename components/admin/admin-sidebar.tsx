@@ -14,6 +14,7 @@ import {
   ShoppingCart,
   Tags,
   Users,
+  Wrench,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/components/auth-context';
@@ -38,6 +39,7 @@ const navigation = [
   { href: '/dashboard/productos', label: 'Productos', icon: Boxes, helper: 'Catalogo y stock' },
   { href: '/dashboard/proveedores', label: 'Proveedores', icon: Building2, helper: 'Contactos de compra' },
   { href: '/dashboard/ventas', label: 'Ventas', icon: ShoppingCart, helper: 'Salidas comerciales' },
+  { href: '/dashboard/servicios', label: 'Servicios', icon: Wrench, helper: 'Torno e instalaciones' },
   {
     href: '/dashboard/inventario',
     label: 'Inventario',
@@ -59,6 +61,7 @@ export function AdminSidebar() {
         (item) =>
           item.href === '/dashboard' ||
           item.href === '/dashboard/ventas' ||
+          item.href === '/dashboard/servicios' ||
           item.href === '/dashboard/inventario'
       )
     : navigation;

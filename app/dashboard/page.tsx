@@ -325,6 +325,7 @@ export default function DashboardPage() {
             await registerSale({
               ...values,
               soldAt: new Date(values.soldAt).toISOString(),
+              actorRole: role ?? 'admin',
               items: values.items,
               responsibleUser:
                 profile?.nombre?.trim() || user?.displayName || user?.email || 'Usuario de ventas',

@@ -5,6 +5,7 @@ import type {
   Product,
   Purchase,
   Sale,
+  ServiceOrder,
   StockAlert,
 } from '@/lib/admin/types';
 
@@ -113,7 +114,8 @@ export function getDashboardSummary(
   products: Product[],
   movements: InventoryMovement[],
   purchases: Purchase[],
-  sales: Sale[]
+  sales: Sale[],
+  services: ServiceOrder[] = []
 ): DashboardSummary {
   const inventorySummary = products.reduce<DashboardSummary>(
     (summary, product) => {
@@ -146,7 +148,7 @@ export function getDashboardSummary(
     }
   );
 
-  return sales.reduce<DashboardSummary>((summary, sale) => {
+  const salesSummary = sales.reduce<DashboardSummary>((summary, sale) => {
     const netRevenue = sale.totalSale - (sale.returnedSaleAmount ?? 0);
     const netProfit =
       sale.grossProfit - ((sale.returnedSaleAmount ?? 0) - (sale.returnedCostAmount ?? 0));
@@ -157,6 +159,13 @@ export function getDashboardSummary(
     summary.realizedProfit += netProfit;
     return summary;
   }, inventorySummary);
+
+  return services.reduce<DashboardSummary>((summary, service) => {
+    summary.salesCount += 1;
+    summary.totalRevenue += service.totalRevenue;
+    summary.realizedProfit += service.grossProfit;
+    return summary;
+  }, salesSummary);
 }
 
 export function getLatestMovements(movements: InventoryMovement[], limit = 6) {

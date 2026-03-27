@@ -6,6 +6,7 @@ export type MovementType = 'entry' | 'exit' | 'adjustment' | 'purchase';
 export type MovementReason =
   | 'purchase'
   | 'sale'
+  | 'service'
   | 'gift'
   | 'return'
   | 'manual-adjustment'
@@ -66,6 +67,7 @@ export interface InventoryMovement {
   purchaseId?: string;
   purchaseBatchId?: string;
   saleId?: string;
+  serviceOrderId?: string;
   type: MovementType;
   reason: MovementReason;
   quantity: number;
@@ -134,6 +136,33 @@ export interface Sale {
   returnedSaleAmount: number;
   returnedCostAmount: number;
   customerName: string;
+  notes: string;
+  responsibleUser: string;
+}
+
+export type ServiceType =
+  | 'tip-installation'
+  | 'tip-ferrule-installation'
+  | 'extension-installation';
+
+export interface ServiceMaterialItem {
+  productId: string;
+  quantity: number;
+  unitCost: number;
+  totalCost: number;
+}
+
+export interface ServiceOrder {
+  id: string;
+  serviceType: ServiceType;
+  performedAt: string;
+  customerName: string;
+  cueReference: string;
+  servicePrice: number;
+  totalRevenue: number;
+  totalMaterialCost: number;
+  grossProfit: number;
+  materials: ServiceMaterialItem[];
   notes: string;
   responsibleUser: string;
 }

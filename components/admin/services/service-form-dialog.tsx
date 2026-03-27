@@ -1,0 +1,467 @@
+'use client';
+
+import { useEffect, useMemo } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { formatCurrency, formatNumber, getProductRealUnitCost, getProductStock } from '@/lib/admin/calculations';
+import { serviceTypeLabels } from '@/lib/admin/catalogs';
+import type { InventoryMovement, Product, Purchase, ServiceType } from '@/lib/admin/types';
+
+const serviceSchema = z.object({
+  serviceType: z.enum(['tip-installation', 'tip-ferrule-installation', 'extension-installation']),
+  performedAt: z.string().min(1, 'Selecciona la fecha'),
+  customerName: z.string().min(2, 'Ingresa el cliente'),
+  cueReference: z.string().min(2, 'Describe el taco o referencia'),
+  servicePrice: z.coerce.number().positive('Ingresa un valor valido para el servicio'),
+  tipProductId: z.string().default(''),
+  ferruleProductId: z.string().default(''),
+  suppressorProductId: z.string().default(''),
+  includeSuppressor: z.boolean().default(false),
+  extensionProductId: z.string().default(''),
+  bumperProductId: z.string().default(''),
+  notes: z.string().default(''),
+}).superRefine((values, context) => {
+  if (!values.tipProductId && (values.serviceType === 'tip-installation' || values.serviceType === 'tip-ferrule-installation')) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['tipProductId'], message: 'Selecciona el casquillo.' });
+  }
+  if (values.serviceType === 'tip-ferrule-installation' && !values.ferruleProductId) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['ferruleProductId'], message: 'Selecciona la virola.' });
+  }
+  if (values.includeSuppressor && !values.suppressorProductId) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['suppressorProductId'], message: 'Selecciona el supresor.' });
+  }
+  if (values.serviceType === 'extension-installation' && !values.extensionProductId) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['extensionProductId'], message: 'Selecciona la extension.' });
+  }
+  if (values.serviceType === 'extension-installation' && !values.bumperProductId) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['bumperProductId'], message: 'Selecciona el parachoque.' });
+  }
+});
+
+export type ServiceFormValues = z.infer<typeof serviceSchema>;
+
+const defaultValues: ServiceFormValues = {
+  serviceType: 'tip-installation',
+  performedAt: new Date().toISOString().slice(0, 10),
+  customerName: '',
+  cueReference: '',
+  servicePrice: 0,
+  tipProductId: '',
+  ferruleProductId: '',
+  suppressorProductId: '',
+  includeSuppressor: false,
+  extensionProductId: '',
+  bumperProductId: '',
+  notes: '',
+};
+
+export function ServiceFormDialog({
+  open,
+  onOpenChange,
+  products,
+  purchases,
+  movements,
+  hideFinancialSummary = false,
+  onSubmit,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  products: Product[];
+  purchases: Purchase[];
+  movements: InventoryMovement[];
+  hideFinancialSummary?: boolean;
+  onSubmit: (values: ServiceFormValues) => Promise<void> | void;
+}) {
+  const form = useForm<ServiceFormValues>({
+    resolver: zodResolver(serviceSchema),
+    defaultValues,
+  });
+
+  useEffect(() => {
+    if (open) {
+      form.reset(defaultValues);
+    }
+  }, [form, open]);
+
+  const values = form.watch();
+  const tipOptions = useMemo(() => products.filter((item) => item.status === 'active' && item.category === 'casquillos-o-suelas'), [products]);
+  const ferruleOptions = useMemo(() => products.filter((item) => item.status === 'active' && item.category === 'virolas'), [products]);
+  const suppressorOptions = useMemo(() => products.filter((item) => item.status === 'active' && item.category === 'supresores'), [products]);
+  const extensionOptions = useMemo(() => products.filter((item) => item.status === 'active' && item.category === 'extensiones'), [products]);
+  const bumperOptions = useMemo(() => products.filter((item) => item.status === 'active' && item.category === 'cauchos-para-tacos'), [products]);
+
+  const selectedMaterials = [
+    values.tipProductId,
+    values.serviceType === 'tip-ferrule-installation' ? values.ferruleProductId : '',
+    values.includeSuppressor ? values.suppressorProductId : '',
+    values.serviceType === 'extension-installation' ? values.extensionProductId : '',
+    values.serviceType === 'extension-installation' ? values.bumperProductId : '',
+  ].filter(Boolean);
+
+  const materialSummary = selectedMaterials.map((productId) => {
+    const product = products.find((item) => item.id === productId);
+    const unitCost = product ? getProductRealUnitCost(purchases, product.id) : 0;
+    const stock = product ? getProductStock(movements, product.id) : 0;
+    return {
+      productId,
+      name: product?.name ?? 'Producto',
+      unitCost,
+      stock,
+    };
+  });
+
+  const totalMaterialCost = materialSummary.reduce((sum, item) => sum + item.unitCost, 0);
+  const estimatedProfit = (Number(values.servicePrice) || 0) - totalMaterialCost;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[92vh] w-[calc(100vw-1rem)] max-w-[96vw] overflow-y-auto px-4 sm:w-[calc(100vw-2rem)] lg:max-w-4xl">
+        <DialogHeader>
+          <DialogTitle>Registrar servicio de torno</DialogTitle>
+          <DialogDescription>
+            Registra el valor del trabajo y descuenta del inventario los productos usados en el servicio.
+          </DialogDescription>
+        </DialogHeader>
+
+        <Form {...form}>
+          <form
+            onSubmit={form.handleSubmit(async (submittedValues) => {
+              await onSubmit(submittedValues);
+              form.reset(defaultValues);
+            })}
+            className="space-y-6"
+          >
+            <div className="grid gap-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="serviceType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tipo de servicio</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {Object.entries(serviceTypeLabels).map(([value, label]) => (
+                          <SelectItem key={value} value={value}>
+                            {label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="performedAt"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Fecha del servicio</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="customerName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cliente</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Nombre del cliente" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="cueReference"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Taco o referencia</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ejemplo: taco Cuetec de Juan" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid gap-4 rounded-3xl border border-slate-200 bg-slate-50/60 p-5 lg:grid-cols-2">
+              {(values.serviceType === 'tip-installation' || values.serviceType === 'tip-ferrule-installation') && (
+                <FormField
+                  control={form.control}
+                  name="tipProductId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Casquillo</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecciona el casquillo" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {tipOptions.map((product) => (
+                            <SelectItem key={product.id} value={product.id}>
+                              {product.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              {values.serviceType === 'tip-ferrule-installation' && (
+                <FormField
+                  control={form.control}
+                  name="ferruleProductId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Virola</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecciona la virola" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {ferruleOptions.map((product) => (
+                            <SelectItem key={product.id} value={product.id}>
+                              {product.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              {values.serviceType === 'extension-installation' && (
+                <>
+                  <FormField
+                    control={form.control}
+                    name="extensionProductId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Extension</FormLabel>
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecciona la extension" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {extensionOptions.map((product) => (
+                              <SelectItem key={product.id} value={product.id}>
+                                {product.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="bumperProductId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Parachoque</FormLabel>
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecciona el parachoque" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {bumperOptions.map((product) => (
+                              <SelectItem key={product.id} value={product.id}>
+                                {product.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </>
+              )}
+
+              {(values.serviceType === 'tip-installation' || values.serviceType === 'tip-ferrule-installation') && (
+                <div className="space-y-3 lg:col-span-2">
+                  <FormField
+                    control={form.control}
+                    name="includeSuppressor"
+                    render={({ field }) => (
+                      <FormItem className="rounded-2xl border border-slate-200 bg-white p-4">
+                        <div className="flex items-center gap-3">
+                          <FormControl>
+                            <Checkbox checked={field.value} onCheckedChange={(checked) => field.onChange(checked === true)} />
+                          </FormControl>
+                          <div>
+                            <FormLabel>Agregar supresor</FormLabel>
+                            <p className="text-sm text-slate-500">Activalo si este trabajo tambien lleva supresor.</p>
+                          </div>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+
+                  {values.includeSuppressor && (
+                    <FormField
+                      control={form.control}
+                      name="suppressorProductId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Supresor</FormLabel>
+                          <Select value={field.value} onValueChange={field.onChange}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecciona el supresor" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {suppressorOptions.map((product) => (
+                                <SelectItem key={product.id} value={product.id}>
+                                  {product.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="grid gap-4 rounded-3xl border border-cyan-100 bg-cyan-50/70 p-5 lg:grid-cols-[1.1fr_0.9fr]">
+              <div className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="servicePrice"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Valor del servicio</FormLabel>
+                      <FormControl>
+                        <Input type="number" min="0" step="0.01" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Notas</FormLabel>
+                      <FormControl>
+                        <Textarea rows={4} placeholder="Observaciones del trabajo realizado" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="rounded-3xl border border-cyan-100 bg-white p-4">
+                <p className="text-sm font-semibold text-slate-950">Resumen del servicio</p>
+                <div className="mt-4 space-y-3">
+                  {materialSummary.length > 0 ? (
+                    materialSummary.map((item) => (
+                      <div key={item.productId} className="rounded-2xl bg-slate-50 px-3 py-2 text-sm">
+                        <p className="font-medium text-slate-900">{item.name}</p>
+                        <p className="text-slate-500">Stock: {formatNumber(item.stock)} uds</p>
+                        {!hideFinancialSummary ? (
+                          <p className="text-slate-500">Costo real: {formatCurrency(item.unitCost)}</p>
+                        ) : null}
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-slate-500">
+                      {hideFinancialSummary
+                        ? 'Selecciona los insumos para revisar disponibilidad y registrar el trabajo.'
+                        : 'Selecciona los insumos para calcular el costo del trabajo.'}
+                    </p>
+                  )}
+
+                  <div className="rounded-2xl bg-slate-950 px-4 py-3 text-white">
+                    <p className="text-sm">Valor servicio: {formatCurrency(Number(values.servicePrice) || 0)}</p>
+                    {!hideFinancialSummary ? (
+                      <>
+                        <p className="mt-1 text-sm">Costo materiales: {formatCurrency(totalMaterialCost)}</p>
+                        <p className="mt-2 text-lg font-semibold">Utilidad estimada: {formatCurrency(estimatedProfit)}</p>
+                      </>
+                    ) : (
+                      <p className="mt-2 text-sm text-slate-300">El sistema descontara automaticamente los materiales del inventario.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit">Guardar servicio</Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}

@@ -313,6 +313,7 @@ export default function VentasPage() {
             const payload = {
               ...values,
               soldAt: new Date(values.soldAt).toISOString(),
+              actorRole: role ?? 'admin',
               responsibleUser:
                 profile?.nombre?.trim() || user?.displayName || user?.email || 'Usuario de ventas',
             };

@@ -30,7 +30,7 @@ import {
   getProductRealUnitCost,
   getProductStock,
 } from '@/lib/admin/calculations';
-import { initialMovements, initialProducts, initialPurchases, initialSales, initialSuppliers } from '@/lib/admin/mock-data';
+import { initialMovements, initialProducts, initialPurchases, initialSales, initialServices, initialSuppliers } from '@/lib/admin/mock-data';
 import { db } from '@/lib/firebase';
 import { SITE_LOGO } from '@/lib/branding';
 import type {
@@ -43,7 +43,11 @@ import type {
   Sale,
   SaleGiftItem,
   SaleLineItem,
+  ServiceMaterialItem,
+  ServiceOrder,
+  ServiceType,
   Supplier,
+  UserRole,
 } from '@/lib/admin/types';
 
 type NewProductInput = Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'publicStock'>;
@@ -96,6 +100,7 @@ interface RegisterSaleInput {
   customerName: string;
   notes: string;
   responsibleUser: string;
+  actorRole?: UserRole;
 }
 
 interface RegisterSaleReturnInput {
@@ -106,6 +111,21 @@ interface RegisterSaleReturnInput {
   responsibleUser: string;
 }
 
+interface RegisterServiceInput {
+  serviceType: ServiceType;
+  performedAt: string;
+  customerName: string;
+  cueReference: string;
+  servicePrice: number;
+  materials: Array<{
+    productId: string;
+    quantity: number;
+  }>;
+  notes: string;
+  responsibleUser: string;
+  actorRole?: UserRole;
+}
+
 interface AdminDataContextValue {
   loading: boolean;
   products: Product[];
@@ -113,6 +133,7 @@ interface AdminDataContextValue {
   movements: InventoryMovement[];
   purchases: Purchase[];
   sales: Sale[];
+  services: ServiceOrder[];
   summary: DashboardSummary;
   latestMovements: InventoryMovement[];
   syncPublicProductStocks: () => Promise<number>;
@@ -135,6 +156,7 @@ interface AdminDataContextValue {
   registerSale: (input: RegisterSaleInput) => Promise<Sale[]>;
   updateSaleBatch: (saleBatchId: string, input: RegisterSaleInput) => Promise<Sale[]>;
   registerSaleReturn: (input: RegisterSaleReturnInput) => Promise<Sale>;
+  registerService: (input: RegisterServiceInput) => Promise<ServiceOrder>;
 }
 
 const AdminDataContext = createContext<AdminDataContextValue | undefined>(undefined);
@@ -208,6 +230,7 @@ function mapMovementDocument(documentId: string, data: DocumentData): InventoryM
     purchaseId: data.purchaseId ? String(data.purchaseId) : undefined,
     purchaseBatchId: data.purchaseBatchId ? String(data.purchaseBatchId) : undefined,
     saleId: data.saleId ? String(data.saleId) : undefined,
+    serviceOrderId: data.serviceOrderId ? String(data.serviceOrderId) : undefined,
     type:
       data.type === 'entry' || data.type === 'exit' || data.type === 'adjustment' || data.type === 'purchase'
         ? data.type
@@ -215,6 +238,7 @@ function mapMovementDocument(documentId: string, data: DocumentData): InventoryM
     reason:
       data.reason === 'purchase' ||
       data.reason === 'sale' ||
+      data.reason === 'service' ||
       data.reason === 'gift' ||
       data.reason === 'return' ||
       data.reason === 'manual-adjustment' ||
@@ -334,6 +358,45 @@ function mapSaleDocument(documentId: string, data: DocumentData): Sale {
   };
 }
 
+function mapServiceDocument(documentId: string, data: DocumentData): ServiceOrder {
+  const materials: ServiceMaterialItem[] = Array.isArray(data.materials)
+    ? data.materials
+        .map((item) => ({
+          productId: String(item?.productId ?? ''),
+          quantity: Number(item?.quantity ?? 0),
+          unitCost: Number(item?.unitCost ?? 0),
+          totalCost: Number(item?.totalCost ?? 0),
+        }))
+        .filter((item) => item.productId && item.quantity > 0)
+    : [];
+
+  return {
+    id: documentId,
+    serviceType:
+      data.serviceType === 'tip-installation' ||
+      data.serviceType === 'tip-ferrule-installation' ||
+      data.serviceType === 'extension-installation'
+        ? data.serviceType
+        : 'tip-installation',
+    performedAt: normalizeDateValue(data.performedAt),
+    customerName: String(data.customerName ?? ''),
+    cueReference: String(data.cueReference ?? ''),
+    servicePrice: Number(data.servicePrice ?? data.totalRevenue ?? 0),
+    totalRevenue: Number(data.totalRevenue ?? data.servicePrice ?? 0),
+    totalMaterialCost: Number(
+      data.totalMaterialCost ?? materials.reduce((sum, item) => sum + item.totalCost, 0)
+    ),
+    grossProfit: Number(
+      data.grossProfit ??
+        Number(data.totalRevenue ?? data.servicePrice ?? 0) -
+          materials.reduce((sum, item) => sum + item.totalCost, 0)
+    ),
+    materials,
+    notes: String(data.notes ?? ''),
+    responsibleUser: String(data.responsibleUser ?? 'Administrador'),
+  };
+}
+
 function findMovementForSale(movements: InventoryMovement[], sale: Sale) {
   return (
     movements.find((movement) => movement.saleId === sale.id && movement.reason === 'sale') ??
@@ -358,12 +421,33 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   const [movements, setMovements] = useState<InventoryMovement[]>(initialMovements);
   const [purchases, setPurchases] = useState<Purchase[]>(initialPurchases);
   const [sales, setSales] = useState<Sale[]>(initialSales);
+  const [services, setServices] = useState<ServiceOrder[]>(initialServices);
+
+  const queueAdminNotification = (
+    batch: ReturnType<typeof writeBatch>,
+    input: {
+      title: string;
+      message: string;
+      href: string;
+      createdAt: string;
+    }
+  ) => {
+    const notificationRef = doc(collection(db, 'admin-notifications'));
+    batch.set(notificationRef, {
+      id: notificationRef.id,
+      title: input.title,
+      message: input.message,
+      href: input.href,
+      read: false,
+      createdAt: Timestamp.fromDate(new Date(input.createdAt)),
+    });
+  };
 
   useEffect(() => {
     const readyCollections = new Set<string>();
     const markReady = (collectionName: string) => {
       readyCollections.add(collectionName);
-      if (readyCollections.size === 5) {
+      if (readyCollections.size === 6) {
         setLoading(false);
       }
     };
@@ -428,12 +512,25 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       }
     );
 
+    const unsubServices = onSnapshot(
+      query(collection(db, 'services'), orderBy('performedAt', 'desc')),
+      (snapshot) => {
+        setServices(snapshot.docs.map((item) => mapServiceDocument(item.id, item.data())));
+        markReady('services');
+      },
+      (error) => {
+        console.error('Error leyendo servicios desde Firestore:', error);
+        markReady('services');
+      }
+    );
+
     return () => {
       unsubProducts();
       unsubSuppliers();
       unsubMovements();
       unsubPurchases();
       unsubSales();
+      unsubServices();
     };
   }, []);
 
@@ -1101,6 +1198,16 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       )
     );
 
+    if (input.actorRole === 'sales') {
+      const soldUnits = createdSales.reduce((sum, sale) => sum + sale.quantity, 0);
+      queueAdminNotification(batch, {
+        title: 'Nueva venta registrada',
+        message: `${input.responsibleUser} registro ${createdSales.length} item(s) para ${input.customerName || 'cliente'} por ${soldUnits} unidad(es).`,
+        href: '/dashboard/ventas',
+        createdAt: input.soldAt,
+      });
+    }
+
     await batch.commit();
 
     return createdSales;
@@ -1294,9 +1401,118 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     };
   };
 
+  const registerService = async (input: RegisterServiceInput) => {
+    if ((Number(input.servicePrice) || 0) <= 0) {
+      throw new Error('El valor del servicio debe ser mayor a cero.');
+    }
+
+    if (input.materials.length === 0) {
+      throw new Error('Agrega al menos un producto consumido por el servicio.');
+    }
+
+    const materialMap = new Map<string, number>();
+    input.materials.forEach((item) => {
+      const productId = item.productId?.trim();
+      const quantity = Math.max(Number(item.quantity ?? 0), 0);
+      if (!productId) {
+        throw new Error('Selecciona todos los productos usados en el servicio.');
+      }
+      if (quantity <= 0) {
+        throw new Error('La cantidad de cada producto consumido debe ser mayor a cero.');
+      }
+      materialMap.set(productId, (materialMap.get(productId) ?? 0) + quantity);
+    });
+
+    const materials: ServiceMaterialItem[] = Array.from(materialMap.entries()).map(([productId, quantity]) => {
+      const product = products.find((item) => item.id === productId);
+      if (!product) {
+        throw new Error('Uno de los productos del servicio no existe en el inventario.');
+      }
+
+      const availableStock = getProductStock(movements, productId);
+      if (quantity > availableStock) {
+        throw new Error(`La cantidad usada supera el stock disponible de ${product.name}.`);
+      }
+
+      const unitCost = getProductRealUnitCost(purchases, productId);
+      return {
+        productId,
+        quantity,
+        unitCost,
+        totalCost: quantity * unitCost,
+      };
+    });
+
+    const serviceRef = doc(collection(db, 'services'));
+    const totalMaterialCost = materials.reduce((sum, item) => sum + item.totalCost, 0);
+    const totalRevenue = Number(input.servicePrice) || 0;
+    const grossProfit = totalRevenue - totalMaterialCost;
+    const service: ServiceOrder = {
+      id: serviceRef.id,
+      serviceType: input.serviceType,
+      performedAt: input.performedAt,
+      customerName: input.customerName,
+      cueReference: input.cueReference,
+      servicePrice: totalRevenue,
+      totalRevenue,
+      totalMaterialCost,
+      grossProfit,
+      materials,
+      notes: input.notes,
+      responsibleUser: input.responsibleUser,
+    };
+
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'services', service.id), {
+      ...service,
+      performedAt: Timestamp.fromDate(new Date(input.performedAt)),
+    });
+
+    const stockDeltas: Array<{ productId: string; quantity: number }> = [];
+    materials.forEach((material) => {
+      const movementRef = doc(collection(db, 'movements'));
+      batch.set(movementRef, {
+        id: movementRef.id,
+        serviceOrderId: service.id,
+        productId: material.productId,
+        type: 'exit',
+        reason: 'service',
+        quantity: -Math.abs(material.quantity),
+        notes:
+          input.notes ||
+          `Consumo por servicio para ${input.customerName || 'cliente'}${input.cueReference ? ` - ${input.cueReference}` : ''}`,
+        occurredAt: Timestamp.fromDate(new Date(input.performedAt)),
+        responsibleUser: input.responsibleUser,
+        relatedUnitCost: material.unitCost,
+      });
+      stockDeltas.push({ productId: material.productId, quantity: -Math.abs(material.quantity) });
+    });
+
+    applyPublicStockMapToBatch(
+      batch,
+      buildPublicStockMap(
+        movements,
+        stockDeltas.map((item) => item.productId),
+        stockDeltas
+      )
+    );
+
+    if (input.actorRole === 'sales') {
+      queueAdminNotification(batch, {
+        title: 'Nuevo servicio registrado',
+        message: `${input.responsibleUser} registro ${input.customerName || 'un cliente'} en ${input.serviceType}.`,
+        href: '/dashboard/servicios',
+        createdAt: input.performedAt,
+      });
+    }
+
+    await batch.commit();
+    return service;
+  };
+
   const summary = useMemo(
-    () => getDashboardSummary(products, movements, purchases, sales),
-    [movements, products, purchases, sales]
+    () => getDashboardSummary(products, movements, purchases, sales, services),
+    [movements, products, purchases, sales, services]
   );
   const latestMovements = useMemo(() => getLatestMovements(movements), [movements]);
 
@@ -1309,6 +1525,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         movements,
         purchases,
         sales,
+        services,
         summary,
         latestMovements,
         syncPublicProductStocks,
@@ -1328,6 +1545,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         registerSale,
         updateSaleBatch,
         registerSaleReturn,
+        registerService,
       }}
     >
       {children}

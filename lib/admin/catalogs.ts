@@ -10,6 +10,7 @@ export const movementTypeLabels = {
 export const movementReasonLabels = {
   purchase: 'Compra',
   sale: 'Venta',
+  service: 'Servicio de torno',
   gift: 'Obsequio',
   return: 'Devolucion',
   'manual-adjustment': 'Ajuste manual',
@@ -20,8 +21,14 @@ export const movementReasonLabels = {
 
 export const movementReasonsByType = {
   entry: ['purchase', 'initial-load', 'transfer'],
-  exit: ['sale', 'gift', 'damage', 'transfer'],
+  exit: ['sale', 'service', 'gift', 'damage', 'transfer'],
   adjustment: ['manual-adjustment'],
+} as const;
+
+export const serviceTypeLabels = {
+  'tip-installation': 'Instalacion de casquillo',
+  'tip-ferrule-installation': 'Instalacion de casquillo y virola',
+  'extension-installation': 'Instalacion de extension',
 } as const;
 
 export const inventoryCategories: CategoryOption[] = [

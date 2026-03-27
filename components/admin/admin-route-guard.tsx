@@ -22,7 +22,12 @@ export function AdminRouteGuard({ children }: { children: React.ReactNode }) {
     }
 
     if (!loading && user && role === 'sales') {
-      const allowedRoutes = new Set(['/dashboard', '/dashboard/ventas', '/dashboard/inventario']);
+      const allowedRoutes = new Set([
+        '/dashboard',
+        '/dashboard/ventas',
+        '/dashboard/servicios',
+        '/dashboard/inventario',
+      ]);
       if (!allowedRoutes.has(pathname)) {
         router.replace('/dashboard/ventas');
       }
@@ -52,6 +57,7 @@ export function AdminRouteGuard({ children }: { children: React.ReactNode }) {
     role === 'sales' &&
     pathname !== '/dashboard' &&
     pathname !== '/dashboard/ventas' &&
+    pathname !== '/dashboard/servicios' &&
     pathname !== '/dashboard/inventario'
   ) {
     return null;
