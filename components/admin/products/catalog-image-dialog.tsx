@@ -22,6 +22,7 @@ import {
 import { db } from '@/lib/firebase';
 import { optimizeImageFile } from '@/lib/image-upload';
 import { useToast } from '@/hooks/use-toast';
+import { SITE_LOGO } from '@/lib/branding';
 
 interface WebCatalogProduct {
   id: string;
@@ -52,7 +53,7 @@ function mapProduct(documentId: string, data: DocumentData): WebCatalogProduct {
     id: documentId,
     name: String(data.name ?? 'Producto'),
     brand: String(data.brand ?? ''),
-    image: String(data.image ?? '/images/logo.png'),
+    image: String(data.image ?? SITE_LOGO),
     status:
       data.status === 'draft' || data.status === 'archived' || data.status === 'active'
         ? data.status

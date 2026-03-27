@@ -21,6 +21,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
+import { SITE_LOGO } from '@/lib/branding';
 
 const loginSchema = z.object({
   email: z.string().email('Email invalido'),
@@ -100,7 +101,7 @@ export function AuthLogin() {
               <div className="space-y-5">
                 <div className="relative mx-auto aspect-square w-full max-w-[320px] sm:max-w-[360px]">
                   <Image
-                    src="/images/logo.png"
+                    src={SITE_LOGO}
                     alt="Billar Pool Santa Marta"
                     fill
                     className="object-contain drop-shadow-[0_18px_45px_rgba(0,0,0,0.45)]"

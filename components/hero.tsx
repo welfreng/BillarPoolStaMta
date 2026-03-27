@@ -1,5 +1,6 @@
 import Image from "next/image"
 import { ShieldCheck, Trophy, Clock } from "lucide-react"
+import { SITE_LOGO } from "@/lib/branding"
 
 export default function Hero() {
   return (
@@ -18,7 +19,7 @@ export default function Hero() {
       <div className="relative z-10 mx-auto max-w-7xl px-4 py-32 lg:px-8 w-full">
         <div className="flex flex-col items-center text-center">
           <Image
-            src="/images/logo.png"
+            src={SITE_LOGO}
             alt="Billar Pool Santa Marta Logo"
             width={180}
             height={180}

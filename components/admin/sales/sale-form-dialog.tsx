@@ -471,7 +471,7 @@ export function SaleFormDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-h-[92vh] w-[calc(100vw-1rem)] max-w-[96vw] overflow-y-auto px-4 pb-32 sm:w-[calc(100vw-2rem)] sm:px-5 lg:max-w-[740px] lg:px-6 xl:px-7">
+        <DialogContent className="max-h-[92vh] w-[calc(100vw-1rem)] max-w-[96vw] overflow-y-auto px-4 pb-32 sm:w-[calc(100vw-2rem)] sm:px-5 lg:max-w-[1120px] lg:px-6 xl:max-w-[1240px] xl:px-8">
           <DialogHeader>
             <DialogTitle>{initialValues ? 'Editar venta' : 'Registrar venta'}</DialogTitle>
             <DialogDescription>
@@ -861,7 +861,7 @@ export function SaleFormDialog({
       </Dialog>
 
       <Dialog open={lineDialogOpen} onOpenChange={setLineDialogOpen}>
-        <DialogContent className="w-[calc(100vw-1rem)] max-w-xl px-4 sm:w-[calc(100vw-2rem)] sm:px-5">
+        <DialogContent className="w-[calc(100vw-1rem)] max-w-[96vw] px-4 sm:w-[calc(100vw-2rem)] sm:px-5 lg:max-w-3xl">
           <DialogHeader>
             <DialogTitle>{editingLineIndex === null ? 'Agregar producto a la venta' : 'Editar producto de la venta'}</DialogTitle>
             <DialogDescription>

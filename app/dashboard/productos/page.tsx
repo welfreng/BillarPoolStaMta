@@ -30,6 +30,7 @@ import { formatCurrency } from '@/lib/admin/calculations';
 import { getCategoryLabel, inventoryCategories } from '@/lib/admin/catalogs';
 import type { Product } from '@/lib/admin/types';
 import { db } from '@/lib/firebase';
+import { SITE_LOGO } from '@/lib/branding';
 
 const pageSize = 6;
 
@@ -111,7 +112,7 @@ export default function ProductosPage() {
         selectedProduct.image,
         catalogImageOverrides
       )
-    : '/images/logo.png';
+    : SITE_LOGO;
 
   const handleSave = async (values: ProductFormValues) => {
     try {

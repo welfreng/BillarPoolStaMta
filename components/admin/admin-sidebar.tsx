@@ -31,6 +31,7 @@ import {
   SidebarRail,
   useSidebar,
 } from '@/components/ui/sidebar';
+import { SITE_LOGO } from '@/lib/branding';
 
 const navigation = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, helper: 'Resumen ejecutivo' },
@@ -75,7 +76,7 @@ export function AdminSidebar() {
           <div className="mb-3 flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-400/20">
               <Image
-                src="/images/logo.png"
+                src={SITE_LOGO}
                 alt="Billar Pool Santa Marta"
                 width={28}
                 height={28}

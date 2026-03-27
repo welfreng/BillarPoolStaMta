@@ -47,6 +47,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { optimizeImageFile } from '@/lib/image-upload';
+import { SITE_LOGO } from '@/lib/branding';
 
 function SearchableSelect({
   value,
@@ -157,7 +158,7 @@ const defaultValues: ProductFormValues = {
   brand: availableBrands[0],
   salePrice: 0,
   featured: false,
-  image: '/images/logo.png',
+  image: SITE_LOGO,
   imageRotation: 0,
   status: 'active',
 };

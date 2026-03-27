@@ -3,6 +3,7 @@ import { Inter, Montserrat } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { AuthProvider } from '@/components/auth-context'
 import { Toaster } from '@/components/ui/toaster'
+import { SITE_LOGO } from '@/lib/branding'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
@@ -13,8 +14,8 @@ export const metadata: Metadata = {
   description: 'Mas de 12 anos al servicio. Venta de tacos de billar, guantes, tizas, estuches, panos, bolas, triangulos, virolas, casquillos y mas. Servicio de torno profesional. Santa Marta, Colombia.',
   keywords: 'billar, pool, tacos, accesorios billar, santa marta, guantes billar, tizas billar, panos billar, estuches, virolas, casquillos',
   icons: {
-    icon: '/images/logo.png',
-    apple: '/images/logo.png',
+    icon: SITE_LOGO,
+    apple: SITE_LOGO,
   },
 }
 

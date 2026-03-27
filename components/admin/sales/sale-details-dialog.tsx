@@ -13,6 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatCurrency, formatDateTime, formatNumber, getProductById } from '@/lib/admin/calculations';
+import { SITE_LOGO } from '@/lib/branding';
 import type { Product, Sale } from '@/lib/admin/types';
 
 type InvoiceLine = {
@@ -102,20 +103,19 @@ async function buildInvoicePdf({
   let cursorY = 18;
 
   const logoDataUrl = await loadImageAsDataUrl(logoUrl);
-  doc.addImage(logoDataUrl, 'PNG', marginX, cursorY - 2, 26, 26);
-
   doc.setFillColor(10, 37, 64);
-  doc.roundedRect(48, cursorY - 2, pageWidth - 64, 26, 4, 4, 'F');
+  doc.roundedRect(marginX, cursorY - 2, pageWidth - marginX * 2, 30, 6, 6, 'F');
+  doc.addImage(logoDataUrl, 'PNG', marginX + 4, cursorY, 22, 22);
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(18);
-  doc.text('Billar Pool Santa Marta', 54, cursorY + 7);
+  doc.text('Billar Pool Santa Marta', 44, cursorY + 8);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
-  doc.text('Factura / comprobante de venta', 54, cursorY + 13);
-  doc.text(`Fecha: ${formatDateTime(sale.soldAt)}`, 54, cursorY + 19);
+  doc.text('Factura / comprobante de venta', 44, cursorY + 15);
+  doc.text(`Fecha: ${formatDateTime(sale.soldAt)}`, 44, cursorY + 21.5);
 
-  cursorY += 34;
+  cursorY += 38;
 
   doc.setFillColor(248, 250, 252);
   doc.setDrawColor(203, 213, 225);
@@ -271,8 +271,7 @@ export function SaleDetailsDialog({
   const returnedUnits = groupedSales.reduce((sum, item) => sum + (item.returnedQuantity ?? 0), 0);
   const returnedAmount = groupedSales.reduce((sum, item) => sum + (item.returnedSaleAmount ?? 0), 0);
   const returnedCost = groupedSales.reduce((sum, item) => sum + (item.returnedCostAmount ?? 0), 0);
-  const invoiceLogoUrl =
-    typeof window !== 'undefined' ? `${window.location.origin}/images/logo.png` : '/images/logo.png';
+  const invoiceLogoUrl = typeof window !== 'undefined' ? `${window.location.origin}${SITE_LOGO}` : SITE_LOGO;
   const invoiceLines: InvoiceLine[] = lineItems.map((item) => {
     const product = getProductById(products, item.productId);
     return {
@@ -336,9 +335,10 @@ export function SaleDetailsDialog({
             h1, h2, h3, p { margin: 0; }
             .sheet { background:#fff; border:1px solid #cbd5e1; border-radius:24px; padding:24px; }
             .header { display:flex; justify-content:space-between; gap:24px; margin-bottom:24px; align-items:flex-start; }
-            .brand-row { display:flex; align-items:center; gap:16px; }
-            .brand-row img { width:70px; height:70px; object-fit:contain; border-radius:18px; background:#fff; border:1px solid #cbd5e1; padding:8px; }
-            .brand-card { background:linear-gradient(135deg, #082f49, #0f766e); color:#fff; border-radius:20px; padding:18px 20px; min-width:320px; }
+            .brand-card { display:flex; align-items:center; gap:16px; background:linear-gradient(135deg, #082f49, #0f766e); color:#fff; border-radius:20px; padding:16px 18px; min-width:430px; }
+            .brand-copy { display:flex; flex-direction:column; justify-content:center; }
+            .brand-logo { width:86px; height:86px; display:flex; align-items:center; justify-content:center; border-radius:18px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.16); padding:6px; flex-shrink:0; }
+            .brand-logo img { width:100%; height:100%; object-fit:contain; }
             .brand-card h1 { font-size: 28px; margin-bottom: 6px; }
             .muted { color:#475569; font-size:14px; }
             .brand-card .muted { color:#dbeafe; }
@@ -354,9 +354,11 @@ export function SaleDetailsDialog({
         <body>
           <div class="sheet">
             <div class="header">
-              <div class="brand-row">
-                <img src="${invoiceLogoUrl}" alt="Logo Billar Pool Santa Marta" />
-                <div class="brand-card">
+              <div class="brand-card">
+                <div class="brand-logo">
+                  <img src="${invoiceLogoUrl}" alt="Logo Billar Pool Santa Marta" />
+                </div>
+                <div class="brand-copy">
                   <h1>Billar Pool Santa Marta</h1>
                   <p class="muted">Factura / comprobante de venta</p>
                   <p class="muted">Fecha: ${formatDateTime(baseSale.soldAt)}</p>
@@ -485,7 +487,7 @@ export function SaleDetailsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] w-[calc(100vw-1rem)] max-w-4xl overflow-y-auto px-4 sm:w-[calc(100vw-2rem)]">
+      <DialogContent className="max-h-[92vh] w-[calc(100vw-1rem)] max-w-[96vw] overflow-y-auto px-4 sm:w-[calc(100vw-2rem)] lg:max-w-[900px] lg:px-5 xl:max-w-[980px] xl:px-6">
         <DialogHeader>
           <DialogTitle>Detalle de la venta</DialogTitle>
           <DialogDescription>
@@ -676,14 +678,16 @@ export function SaleDetailsDialog({
 
             <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex items-start gap-4">
-                  <div className="flex h-[72px] w-[72px] items-center justify-center rounded-2xl border border-slate-200 bg-white p-3">
-                    <img src={invoiceLogoUrl} alt="Logo Billar Pool Santa Marta" className="h-12 w-12 object-contain" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Factura de venta</p>
-                    <h3 className="mt-2 text-2xl font-semibold text-slate-950">Billar Pool Santa Marta</h3>
-                    <p className="mt-2 text-sm text-slate-500">Fecha: {formatDateTime(baseSale.soldAt)}</p>
+                <div className="rounded-3xl bg-gradient-to-br from-[#082f49] to-[#0f766e] p-3 text-white shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-[70px] w-[70px] items-center justify-center rounded-2xl border border-white/20 bg-white/8 p-2">
+                      <img src={invoiceLogoUrl} alt="Logo Billar Pool Santa Marta" className="h-full w-full object-contain" />
+                    </div>
+                    <div className="flex min-w-0 flex-col justify-center">
+                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-100">Factura de venta</p>
+                      <h3 className="mt-1 text-lg font-semibold text-white">Billar Pool Santa Marta</h3>
+                      <p className="mt-1 text-xs text-cyan-100 sm:text-sm">Fecha: {formatDateTime(baseSale.soldAt)}</p>
+                    </div>
                   </div>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
@@ -700,7 +704,7 @@ export function SaleDetailsDialog({
               </div>
 
               <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200">
-                <div className="grid grid-cols-[0.8fr_2fr_1fr_1fr] gap-3 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <div className="hidden grid-cols-[0.8fr_2.2fr_1fr_1fr] gap-3 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 md:grid">
                   <p>Cantidad</p>
                   <p>Producto</p>
                   <p>Valor unitario</p>
@@ -712,12 +716,24 @@ export function SaleDetailsDialog({
                     return (
                       <div
                         key={`${item.productId}-${index}`}
-                        className="grid grid-cols-[0.8fr_2fr_1fr_1fr] gap-3 px-4 py-4 text-sm text-slate-700"
+                        className="grid gap-3 px-4 py-4 text-sm text-slate-700 md:grid-cols-[0.8fr_2.2fr_1fr_1fr] md:items-center"
                       >
-                        <p className="font-medium text-slate-900">{formatNumber(item.quantity)}</p>
-                        <p>{product?.name ?? 'Producto'}</p>
-                        <p>{formatCurrency(item.unitPrice)}</p>
-                        <p className="font-medium text-slate-900">{formatCurrency(item.totalSale)}</p>
+                        <div className="grid grid-cols-2 gap-3 md:contents">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 md:hidden">Cantidad</p>
+                          <p className="font-medium text-slate-900">{formatNumber(item.quantity)}</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 md:contents">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 md:hidden">Producto</p>
+                          <p>{product?.name ?? 'Producto'}</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 md:contents">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 md:hidden">Valor unitario</p>
+                          <p>{formatCurrency(item.unitPrice)}</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 md:contents">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 md:hidden">Total</p>
+                          <p className="font-medium text-slate-900">{formatCurrency(item.totalSale)}</p>
+                        </div>
                       </div>
                     );
                   })}

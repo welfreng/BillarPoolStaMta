@@ -32,6 +32,7 @@ import {
 } from '@/lib/admin/calculations';
 import { initialMovements, initialProducts, initialPurchases, initialSales, initialSuppliers } from '@/lib/admin/mock-data';
 import { db } from '@/lib/firebase';
+import { SITE_LOGO } from '@/lib/branding';
 import type {
   DashboardSummary,
   InventoryMovement,
@@ -166,7 +167,7 @@ function mapProductDocument(documentId: string, data: DocumentData): Product {
     salePrice: Number(data.salePrice ?? 0),
     featured: Boolean(data.featured ?? false),
     publicStock: Number(data.publicStock ?? 0),
-    image: String(data.image ?? '/images/logo.png'),
+    image: String(data.image ?? SITE_LOGO),
     imageRotation: Number(data.imageRotation ?? 0),
     status:
       data.status === 'draft' || data.status === 'archived' || data.status === 'active'

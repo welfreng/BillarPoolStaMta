@@ -7,6 +7,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useAuth } from "@/components/auth-context"
 import { Button } from "@/components/ui/button"
+import { SITE_LOGO } from "@/lib/branding"
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
@@ -28,7 +29,7 @@ export default function Navbar() {
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 lg:px-8">
         <Link href={isHomePage ? "#inicio" : "/"} className="flex items-center gap-3">
           <Image
-            src="/images/logo.png"
+            src={SITE_LOGO}
             alt="Billar Pool Santa Marta"
             width={50}
             height={50}

@@ -103,7 +103,7 @@ export function SaleReturnDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100vw-1rem)] max-w-lg px-4 sm:w-[calc(100vw-2rem)]">
+      <DialogContent className="w-[calc(100vw-1rem)] max-w-[96vw] px-4 sm:w-[calc(100vw-2rem)] lg:max-w-3xl">
         <DialogHeader>
           <DialogTitle>Registrar devolucion</DialogTitle>
           <DialogDescription>

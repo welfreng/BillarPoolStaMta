@@ -20,6 +20,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { SITE_LOGO } from "@/lib/branding"
 
 interface CatalogProduct {
   id: string
@@ -37,7 +38,7 @@ interface CatalogProduct {
   details: string[]
 }
 
-const defaultImage = "/images/logo.png"
+const defaultImage = SITE_LOGO
 const whatsappNumber = "573006775284"
 const categoryLabels = new Map(publicCatalogCategories.map((category) => [category.id, category.label]))
 const categoryOrder = new Map(publicCatalogCategories.map((category, index) => [category.id, index]))

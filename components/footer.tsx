@@ -4,6 +4,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Phone, MapPin, Clock } from "lucide-react"
+import { SITE_LOGO } from "@/lib/branding"
 
 export default function Footer() {
   const pathname = usePathname()
@@ -24,7 +25,7 @@ export default function Footer() {
           <div className="lg:col-span-1">
             <div className="mb-4 flex items-center gap-3">
               <Image
-                src="/images/logo.png"
+                src={SITE_LOGO}
                 alt="Billar Pool Santa Marta"
                 width={45}
                 height={45}
