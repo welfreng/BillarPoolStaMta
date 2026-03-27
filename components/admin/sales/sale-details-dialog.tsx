@@ -1,6 +1,8 @@
 'use client';
 
-import { BarChart3, Printer, ReceiptText } from 'lucide-react';
+import { useState } from 'react';
+import { jsPDF } from 'jspdf';
+import { BarChart3, Download, Printer, ReceiptText, Share2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -12,6 +14,227 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatCurrency, formatDateTime, formatNumber, getProductById } from '@/lib/admin/calculations';
 import type { Product, Sale } from '@/lib/admin/types';
+
+type InvoiceLine = {
+  quantity: number;
+  name: string;
+  unitPrice: number;
+  total: number;
+};
+
+type InvoiceGift = {
+  quantity: number;
+  name: string;
+};
+
+function escapeHtml(value: string) {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function fileNameFromSale(sale: Sale) {
+  const date = sale.soldAt.slice(0, 10) || new Date().toISOString().slice(0, 10);
+  const customer = (sale.customerName || 'cliente')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase();
+
+  return `factura-${date}-${customer || 'venta'}.pdf`;
+}
+
+async function loadImageAsDataUrl(src: string) {
+  const response = await fetch(src);
+  const blob = await response.blob();
+
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result);
+        return;
+      }
+
+      reject(new Error('No se pudo convertir el logo.'));
+    };
+    reader.onerror = () => reject(new Error('No se pudo leer el logo.'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function buildInvoicePdf({
+  sale,
+  logoUrl,
+  lineItems,
+  giftItems,
+  subtotal,
+  netRevenue,
+  returnedUnits,
+  returnedAmount,
+  notes,
+  responsibleUser,
+}: {
+  sale: Sale;
+  logoUrl: string;
+  lineItems: InvoiceLine[];
+  giftItems: InvoiceGift[];
+  subtotal: number;
+  netRevenue: number;
+  returnedUnits: number;
+  returnedAmount: number;
+  notes: string;
+  responsibleUser: string;
+}) {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const marginX = 16;
+  let cursorY = 18;
+
+  const logoDataUrl = await loadImageAsDataUrl(logoUrl);
+  doc.addImage(logoDataUrl, 'PNG', marginX, cursorY - 2, 26, 26);
+
+  doc.setFillColor(10, 37, 64);
+  doc.roundedRect(48, cursorY - 2, pageWidth - 64, 26, 4, 4, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.text('Billar Pool Santa Marta', 54, cursorY + 7);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.text('Factura / comprobante de venta', 54, cursorY + 13);
+  doc.text(`Fecha: ${formatDateTime(sale.soldAt)}`, 54, cursorY + 19);
+
+  cursorY += 34;
+
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(203, 213, 225);
+  doc.roundedRect(marginX, cursorY, pageWidth - marginX * 2, 24, 4, 4, 'FD');
+  doc.setTextColor(71, 85, 105);
+  doc.setFontSize(9);
+  doc.text('Cliente', marginX + 4, cursorY + 7);
+  doc.text('Atendido por', marginX + 110, cursorY + 7);
+  doc.setTextColor(15, 23, 42);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.text(sale.customerName || 'Cliente mostrador', marginX + 4, cursorY + 15);
+  doc.text(responsibleUser, marginX + 110, cursorY + 15);
+
+  cursorY += 34;
+
+  doc.setFillColor(226, 232, 240);
+  doc.roundedRect(marginX, cursorY, pageWidth - marginX * 2, 10, 2, 2, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(51, 65, 85);
+  doc.text('Cant.', marginX + 4, cursorY + 6.5);
+  doc.text('Producto', marginX + 22, cursorY + 6.5);
+  doc.text('Vr. unitario', marginX + 120, cursorY + 6.5);
+  doc.text('Total', marginX + 165, cursorY + 6.5);
+
+  cursorY += 14;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(15, 23, 42);
+
+  lineItems.forEach((item) => {
+    if (cursorY > pageHeight - 42) {
+      doc.addPage();
+      cursorY = 20;
+    }
+
+    doc.setDrawColor(226, 232, 240);
+    doc.line(marginX, cursorY + 6, pageWidth - marginX, cursorY + 6);
+    doc.text(String(item.quantity), marginX + 4, cursorY);
+    doc.text(item.name.slice(0, 55), marginX + 22, cursorY);
+    doc.text(formatCurrency(item.unitPrice), marginX + 120, cursorY, { align: 'left' });
+    doc.text(formatCurrency(item.total), pageWidth - marginX - 2, cursorY, { align: 'right' });
+    cursorY += 10;
+  });
+
+  cursorY += 4;
+  doc.setFillColor(248, 250, 252);
+  doc.roundedRect(116, cursorY, pageWidth - 132, returnedAmount > 0 ? 25 : 17, 4, 4, 'FD');
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.setTextColor(71, 85, 105);
+  doc.text('Subtotal', 122, cursorY + 7);
+  doc.text(formatCurrency(subtotal), pageWidth - marginX - 2, cursorY + 7, { align: 'right' });
+  if (returnedAmount > 0) {
+    doc.text('Devoluciones', 122, cursorY + 14);
+    doc.text(`- ${formatCurrency(returnedAmount)}`, pageWidth - marginX - 2, cursorY + 14, { align: 'right' });
+  }
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(15, 23, 42);
+  doc.text('Total factura', 122, cursorY + (returnedAmount > 0 ? 21 : 14));
+  doc.text(formatCurrency(netRevenue), pageWidth - marginX - 2, cursorY + (returnedAmount > 0 ? 21 : 14), {
+    align: 'right',
+  });
+
+  cursorY += returnedAmount > 0 ? 33 : 25;
+
+  if (giftItems.length > 0 || returnedUnits > 0 || notes.trim()) {
+    const extrasHeight =
+      16 +
+      (giftItems.length > 0 ? giftItems.length * 6 + 8 : 8) +
+      (returnedUnits > 0 ? 10 : 0) +
+      (notes.trim() ? 12 : 0);
+
+    if (cursorY + extrasHeight > pageHeight - 20) {
+      doc.addPage();
+      cursorY = 20;
+    }
+
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(marginX, cursorY, pageWidth - marginX * 2, extrasHeight, 4, 4, 'FD');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text('Complementos de la factura', marginX + 4, cursorY + 8);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9.5);
+
+    let extrasY = cursorY + 16;
+
+    if (giftItems.length > 0) {
+      doc.text('Obsequios:', marginX + 4, extrasY);
+      extrasY += 6;
+      giftItems.forEach((item) => {
+        doc.text(`- ${formatNumber(item.quantity)} x ${item.name}`, marginX + 8, extrasY);
+        extrasY += 6;
+      });
+    } else {
+      doc.text('Obsequios: Sin obsequios registrados.', marginX + 4, extrasY);
+      extrasY += 8;
+    }
+
+    if (returnedUnits > 0) {
+      doc.text(
+        `Devoluciones registradas: ${formatNumber(returnedUnits)} uds por ${formatCurrency(returnedAmount)}`,
+        marginX + 4,
+        extrasY
+      );
+      extrasY += 10;
+    }
+
+    if (notes.trim()) {
+      doc.text(`Notas: ${notes}`, marginX + 4, extrasY, {
+        maxWidth: pageWidth - marginX * 2 - 8,
+      });
+    }
+  }
+
+  return doc;
+}
 
 export function SaleDetailsDialog({
   open,
@@ -28,6 +251,8 @@ export function SaleDetailsDialog({
   products: Product[];
   showAdminView?: boolean;
 }) {
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+
   if (!sale) return null;
 
   const groupedSales = sales.filter((item) => (item.saleBatchId ?? item.id) === (sale.saleBatchId ?? sale.id));
@@ -46,32 +271,43 @@ export function SaleDetailsDialog({
   const returnedUnits = groupedSales.reduce((sum, item) => sum + (item.returnedQuantity ?? 0), 0);
   const returnedAmount = groupedSales.reduce((sum, item) => sum + (item.returnedSaleAmount ?? 0), 0);
   const returnedCost = groupedSales.reduce((sum, item) => sum + (item.returnedCostAmount ?? 0), 0);
+  const invoiceLogoUrl =
+    typeof window !== 'undefined' ? `${window.location.origin}/images/logo.png` : '/images/logo.png';
+  const invoiceLines: InvoiceLine[] = lineItems.map((item) => {
+    const product = getProductById(products, item.productId);
+    return {
+      quantity: item.quantity,
+      name: product?.name ?? 'Producto',
+      unitPrice: item.unitPrice,
+      total: item.totalSale,
+    };
+  });
+  const invoiceGifts: InvoiceGift[] = giftItems.map((item) => {
+    const product = getProductById(products, item.productId);
+    return {
+      quantity: item.quantity,
+      name: product?.name ?? 'Producto obsequiado',
+    };
+  });
 
-  const handlePrint = () => {
-    const printWindow = window.open('', '_blank', 'width=950,height=760');
-    if (!printWindow) return;
-
-    const rows = lineItems
-      .map((item) => {
-        const product = getProductById(products, item.productId);
-        return `
+  const getReceiptHtml = () => {
+    const rows = invoiceLines
+      .map(
+        (item) => `
           <tr>
             <td>${formatNumber(item.quantity)}</td>
-            <td>${product?.name ?? 'Producto'}</td>
+            <td>${escapeHtml(item.name)}</td>
             <td>${formatCurrency(item.unitPrice)}</td>
-            <td>${formatCurrency(item.totalSale)}</td>
+            <td>${formatCurrency(item.total)}</td>
           </tr>
-        `;
-      })
+        `
+      )
       .join('');
 
     const giftRows =
-      giftItems.length > 0
-        ? giftItems
-            .map((item) => {
-              const product = getProductById(products, item.productId);
-              return `<p>${formatNumber(item.quantity)} x ${product?.name ?? 'Producto obsequiado'}</p>`;
-            })
+      invoiceGifts.length > 0
+        ? invoiceGifts
+            .map((item) => `<p>${formatNumber(item.quantity)} x ${escapeHtml(item.name)}</p>`)
             .join('')
         : '<p>Sin obsequios</p>';
 
@@ -89,81 +325,162 @@ export function SaleDetailsDialog({
         `
         : '';
 
-    const receiptHtml = `
+    return `
       <!doctype html>
       <html lang="es">
         <head>
           <meta charset="utf-8" />
           <title>Factura de venta</title>
           <style>
-            body { font-family: Arial, sans-serif; color: #0f172a; margin: 28px; }
+            body { font-family: Arial, sans-serif; color: #0f172a; margin: 28px; background: #f8fafc; }
             h1, h2, h3, p { margin: 0; }
-            .header { display:flex; justify-content:space-between; gap:24px; margin-bottom:24px; }
-            .brand h1 { font-size: 28px; margin-bottom: 6px; }
+            .sheet { background:#fff; border:1px solid #cbd5e1; border-radius:24px; padding:24px; }
+            .header { display:flex; justify-content:space-between; gap:24px; margin-bottom:24px; align-items:flex-start; }
+            .brand-row { display:flex; align-items:center; gap:16px; }
+            .brand-row img { width:70px; height:70px; object-fit:contain; border-radius:18px; background:#fff; border:1px solid #cbd5e1; padding:8px; }
+            .brand-card { background:linear-gradient(135deg, #082f49, #0f766e); color:#fff; border-radius:20px; padding:18px 20px; min-width:320px; }
+            .brand-card h1 { font-size: 28px; margin-bottom: 6px; }
             .muted { color:#475569; font-size:14px; }
+            .brand-card .muted { color:#dbeafe; }
             .box { border:1px solid #cbd5e1; border-radius:16px; padding:16px; margin-bottom:16px; }
             table { width:100%; border-collapse: collapse; margin-top: 12px; }
             th, td { border-bottom:1px solid #e2e8f0; padding:10px 8px; text-align:left; font-size:14px; }
             th { background:#f8fafc; }
             .totals { margin-top:16px; display:grid; gap:8px; justify-content:end; }
             .total-row { display:flex; justify-content:space-between; gap:24px; min-width:280px; }
+            .hero { background:linear-gradient(135deg, rgba(8,47,73,.08), rgba(15,118,110,.08)); border:1px solid #bae6fd; border-radius:18px; padding:16px; margin-bottom:16px; }
           </style>
         </head>
         <body>
-          <div class="header">
-            <div class="brand">
-              <h1>Billar Pool Santa Marta</h1>
-              <p class="muted">Factura / comprobante de venta</p>
-              <p class="muted">Fecha: ${formatDateTime(baseSale.soldAt)}</p>
+          <div class="sheet">
+            <div class="header">
+              <div class="brand-row">
+                <img src="${invoiceLogoUrl}" alt="Logo Billar Pool Santa Marta" />
+                <div class="brand-card">
+                  <h1>Billar Pool Santa Marta</h1>
+                  <p class="muted">Factura / comprobante de venta</p>
+                  <p class="muted">Fecha: ${formatDateTime(baseSale.soldAt)}</p>
+                </div>
+              </div>
+              <div class="box" style="min-width:280px;">
+                <p class="muted">Cliente</p>
+                <p style="font-weight:700; margin-top:6px;">${escapeHtml(baseSale.customerName)}</p>
+                <p class="muted" style="margin-top:8px;">Responsable: ${escapeHtml(baseSale.responsibleUser)}</p>
+              </div>
             </div>
-            <div class="box" style="min-width:280px;">
-              <p class="muted">Cliente</p>
-              <p style="font-weight:700; margin-top:6px;">${baseSale.customerName}</p>
-              <p class="muted" style="margin-top:8px;">Responsable: ${baseSale.responsibleUser}</p>
+
+            <div class="hero">
+              <p style="font-size:13px; color:#155e75;">Gracias por tu compra. Este comprobante resume la venta registrada en el sistema.</p>
             </div>
-          </div>
 
-          <div class="box">
-            <h3>Detalle de productos</h3>
-            <table>
-              <thead>
-                <tr>
-                  <th>Cantidad</th>
-                  <th>Producto</th>
-                  <th>Valor unitario</th>
-                  <th>Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${rows}
-              </tbody>
-            </table>
-            <div class="totals">
-              <div class="total-row"><span>Subtotal</span><strong>${formatCurrency(subtotal)}</strong></div>
-              <div class="total-row"><span>Total factura</span><strong>${formatCurrency(netRevenue)}</strong></div>
+            <div class="box">
+              <h3>Detalle de productos</h3>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Cantidad</th>
+                    <th>Producto</th>
+                    <th>Valor unitario</th>
+                    <th>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${rows}
+                </tbody>
+              </table>
+              <div class="totals">
+                <div class="total-row"><span>Subtotal</span><strong>${formatCurrency(subtotal)}</strong></div>
+                ${
+                  returnedAmount > 0
+                    ? `<div class="total-row"><span>Devoluciones</span><strong>- ${formatCurrency(returnedAmount)}</strong></div>`
+                    : ''
+                }
+                <div class="total-row"><span>Total factura</span><strong>${formatCurrency(netRevenue)}</strong></div>
+              </div>
             </div>
-          </div>
 
-          ${returnsHtml}
+            ${returnsHtml}
 
-          <div class="box">
-            <h3>Obsequios</h3>
-            <div style="margin-top:10px;" class="muted">${giftRows}</div>
-          </div>
+            <div class="box">
+              <h3>Obsequios</h3>
+              <div style="margin-top:10px;" class="muted">${giftRows}</div>
+            </div>
 
-          <div class="box">
-            <h3>Notas</h3>
-            <p class="muted" style="margin-top:10px;">${baseSale.notes?.trim() ? baseSale.notes : 'Sin observaciones registradas.'}</p>
+            <div class="box">
+              <h3>Notas</h3>
+              <p class="muted" style="margin-top:10px;">${escapeHtml(
+                baseSale.notes?.trim() ? baseSale.notes : 'Sin observaciones registradas.'
+              )}</p>
+            </div>
           </div>
         </body>
       </html>
     `;
+  };
+
+  const exportPdf = async () =>
+    buildInvoicePdf({
+      sale: baseSale,
+      logoUrl: invoiceLogoUrl,
+      lineItems: invoiceLines,
+      giftItems: invoiceGifts,
+      subtotal,
+      netRevenue,
+      returnedUnits,
+      returnedAmount,
+      notes: baseSale.notes?.trim() ? baseSale.notes : '',
+      responsibleUser: baseSale.responsibleUser,
+    });
+
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank', 'width=950,height=760');
+    if (!printWindow) return;
 
     printWindow.document.open();
-    printWindow.document.write(receiptHtml);
+    printWindow.document.write(getReceiptHtml());
     printWindow.document.close();
     printWindow.focus();
     printWindow.print();
+  };
+
+  const handleDownloadPdf = async () => {
+    try {
+      setIsExportingPdf(true);
+      const doc = await exportPdf();
+      doc.save(fileNameFromSale(baseSale));
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
+  const handleSharePdf = async () => {
+    try {
+      setIsExportingPdf(true);
+      const doc = await exportPdf();
+      const pdfBlob = doc.output('blob');
+      const pdfFile = new File([pdfBlob], fileNameFromSale(baseSale), { type: 'application/pdf' });
+      const shareMessage = `Factura de ${baseSale.customerName} - ${formatCurrency(netRevenue)}`;
+
+      if (
+        navigator.share &&
+        navigator.canShare &&
+        navigator.canShare({
+          files: [pdfFile],
+        })
+      ) {
+        await navigator.share({
+          title: 'Factura de venta',
+          text: shareMessage,
+          files: [pdfFile],
+        });
+        return;
+      }
+
+      doc.save(pdfFile.name);
+      window.open(`https://wa.me/?text=${encodeURIComponent(`${shareMessage}. Adjunto el PDF descargado.`)}`, '_blank');
+    } finally {
+      setIsExportingPdf(false);
+    }
   };
 
   return (
@@ -172,7 +489,7 @@ export function SaleDetailsDialog({
         <DialogHeader>
           <DialogTitle>Detalle de la venta</DialogTitle>
           <DialogDescription>
-            Revisa la utilidad en vista administrativa o cambia a la factura del cliente para imprimir.
+            Revisa la utilidad en vista administrativa o cambia a la factura del cliente para imprimir, descargar o compartir el PDF.
           </DialogDescription>
         </DialogHeader>
 
@@ -336,25 +653,50 @@ export function SaleDetailsDialog({
           ) : null}
 
           <TabsContent value="invoice" className="space-y-4">
-            <div className="flex justify-end">
+            <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
               <Button type="button" variant="outline" className="rounded-xl" onClick={handlePrint}>
                 <Printer className="mr-2 h-4 w-4" />
                 Imprimir factura
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-xl"
+                onClick={() => void handleDownloadPdf()}
+                disabled={isExportingPdf}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                {isExportingPdf ? 'Generando PDF...' : 'Descargar PDF'}
+              </Button>
+              <Button type="button" className="rounded-xl" onClick={() => void handleSharePdf()} disabled={isExportingPdf}>
+                <Share2 className="mr-2 h-4 w-4" />
+                {isExportingPdf ? 'Preparando...' : 'Compartir PDF por WhatsApp'}
               </Button>
             </div>
 
             <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Factura de venta</p>
-                  <h3 className="mt-2 text-2xl font-semibold text-slate-950">Billar Pool Santa Marta</h3>
-                  <p className="mt-2 text-sm text-slate-500">Fecha: {formatDateTime(baseSale.soldAt)}</p>
+                <div className="flex items-start gap-4">
+                  <div className="flex h-[72px] w-[72px] items-center justify-center rounded-2xl border border-slate-200 bg-white p-3">
+                    <img src={invoiceLogoUrl} alt="Logo Billar Pool Santa Marta" className="h-12 w-12 object-contain" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Factura de venta</p>
+                    <h3 className="mt-2 text-2xl font-semibold text-slate-950">Billar Pool Santa Marta</h3>
+                    <p className="mt-2 text-sm text-slate-500">Fecha: {formatDateTime(baseSale.soldAt)}</p>
+                  </div>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
                   <p className="text-slate-500">Cliente</p>
                   <p className="mt-1 font-semibold text-slate-950">{baseSale.customerName}</p>
                   <p className="mt-2 text-slate-500">Atendido por: {baseSale.responsibleUser}</p>
                 </div>
+              </div>
+
+              <div className="mt-5 rounded-2xl border border-cyan-100 bg-gradient-to-r from-cyan-50 to-teal-50 p-4">
+                <p className="text-sm text-cyan-900">
+                  Gracias por tu compra. Puedes imprimir esta factura o compartirla como PDF por WhatsApp.
+                </p>
               </div>
 
               <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200">

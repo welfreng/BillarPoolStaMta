@@ -234,7 +234,7 @@ export function PurchaseFormDialog({
     const nextValues = initialValues
       ? {
           ...initialValues,
-          items: initialValues.items.length > 0 ? initialValues.items : [createDefaultPurchaseLine()],
+          items: initialValues.items.length > 0 ? initialValues.items : [defaultLine],
         }
       : defaultValues;
     form.reset(nextValues);

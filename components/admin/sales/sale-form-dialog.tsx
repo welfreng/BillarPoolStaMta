@@ -94,11 +94,24 @@ function SearchableSelect({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[var(--radix-popover-trigger-width)] min-w-[280px] p-0" align="start">
+      <PopoverContent
+        className="w-[var(--radix-popover-trigger-width)] min-w-[280px] p-0"
+        align="start"
+        side="bottom"
+        sideOffset={8}
+        avoidCollisions={false}
+      >
         <Command>
           <CommandInput placeholder={searchPlaceholder} />
           <CommandList
             ref={listRef}
+            onWheelCapture={(event) => {
+              const element = listRef.current;
+              if (!element) return;
+              element.scrollTop += event.deltaY;
+              event.preventDefault();
+              event.stopPropagation();
+            }}
             onWheel={(event) => {
               const element = listRef.current;
               if (!element) return;
@@ -198,6 +211,12 @@ const saleSchema = z
 export type SaleFormValues = z.infer<typeof saleSchema>;
 type SaleLineFormValue = SaleFormValues['items'][number];
 type GiftCategory = 'guantes' | 'estuches';
+type DraftSaleLine = {
+  productId: string;
+  quantity: string;
+  unitPrice: string;
+  giftItems: SaleLineFormValue['giftItems'];
+};
 
 function createDefaultLineItem(): SaleLineFormValue {
   return {
@@ -205,6 +224,26 @@ function createDefaultLineItem(): SaleLineFormValue {
     quantity: 1,
     unitPrice: 0,
     giftItems: [],
+  };
+}
+
+function createDefaultDraftLine(): DraftSaleLine {
+  return {
+    productId: '',
+    quantity: '',
+    unitPrice: '',
+    giftItems: [],
+  };
+}
+
+function createDraftLineFromValue(line?: SaleLineFormValue): DraftSaleLine {
+  if (!line) return createDefaultDraftLine();
+
+  return {
+    productId: line.productId ?? '',
+    quantity: line.quantity ? String(line.quantity) : '',
+    unitPrice: line.unitPrice ? String(line.unitPrice) : '',
+    giftItems: line.giftItems ?? [],
   };
 }
 
@@ -234,13 +273,13 @@ function getGiftProductIdByCategory(
   return items.find((item) => products.find((product) => product.id === item.productId)?.category === category)?.productId ?? '';
 }
 
-function setGiftSelectionByCategory(
-  line: SaleLineFormValue,
+function setGiftSelectionByCategory<T extends { giftItems: SaleLineFormValue['giftItems'] }>(
+  line: T,
   products: Product[],
   category: GiftCategory,
   productId: string,
   enabled: boolean
-) {
+): T {
   const nextItems = normalizeGiftItems(
     line.giftItems.filter((item) => {
       const product = products.find((current) => current.id === item.productId);
@@ -297,7 +336,7 @@ export function SaleFormDialog({
 
   const [lineDialogOpen, setLineDialogOpen] = useState(false);
   const [editingLineIndex, setEditingLineIndex] = useState<number | null>(null);
-  const [draftLine, setDraftLine] = useState<SaleLineFormValue>(createDefaultLineItem());
+  const [draftLine, setDraftLine] = useState<DraftSaleLine>(createDefaultDraftLine());
   const [lineError, setLineError] = useState<string>('');
 
   useEffect(() => {
@@ -379,21 +418,23 @@ export function SaleFormDialog({
 
   const openNewLineDialog = () => {
     setEditingLineIndex(null);
-    setDraftLine(createDefaultLineItem());
+    setDraftLine(createDefaultDraftLine());
     setLineError('');
     setLineDialogOpen(true);
   };
 
   const openEditLineDialog = (index: number) => {
     setEditingLineIndex(index);
-    setDraftLine(values.items[index] ?? createDefaultLineItem());
+    setDraftLine(createDraftLineFromValue(values.items[index]));
     setLineError('');
     setLineDialogOpen(true);
   };
 
   const saveDraftLine = () => {
     const normalizedDraftLine = {
-      ...draftLine,
+      productId: draftLine.productId,
+      quantity: Number(draftLine.quantity) || 0,
+      unitPrice: Number(draftLine.unitPrice) || 0,
       giftItems: normalizeGiftItems(draftLine.giftItems, products),
     };
 
@@ -423,14 +464,14 @@ export function SaleFormDialog({
 
     setLineDialogOpen(false);
     setEditingLineIndex(null);
-    setDraftLine(createDefaultLineItem());
+    setDraftLine(createDefaultDraftLine());
     setLineError('');
   };
 
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-h-[92vh] w-[calc(100vw-1rem)] max-w-[96vw] overflow-y-auto px-4 pb-24 sm:w-[calc(100vw-2rem)] sm:px-5 lg:max-w-[740px] lg:px-6 xl:px-7">
+        <DialogContent className="max-h-[92vh] w-[calc(100vw-1rem)] max-w-[96vw] overflow-y-auto px-4 pb-32 sm:w-[calc(100vw-2rem)] sm:px-5 lg:max-w-[740px] lg:px-6 xl:px-7">
           <DialogHeader>
             <DialogTitle>{initialValues ? 'Editar venta' : 'Registrar venta'}</DialogTitle>
             <DialogDescription>
@@ -495,11 +536,6 @@ export function SaleFormDialog({
                       </span>
                       <p className="text-sm font-medium text-slate-900">Producto principal</p>
                     </div>
-                    {firstLineSummary?.product ? (
-                      <span className="rounded-full bg-cyan-50 px-3 py-1 text-xs font-medium text-cyan-800">
-                        Stock: {formatNumber(firstLineSummary.stock)} uds
-                      </span>
-                    ) : null}
                   </div>
 
                   <div className="grid gap-4">
@@ -537,6 +573,18 @@ export function SaleFormDialog({
                         </FormItem>
                       )}
                     />
+
+                    {firstLineSummary?.product ? (
+                      <div className="rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-cyan-800">Stock disponible</p>
+                        <p className="mt-1 text-lg font-semibold text-cyan-950">
+                          {formatNumber(firstLineSummary.stock)} unidades
+                        </p>
+                        <p className="mt-1 text-sm text-cyan-900">
+                          {firstLineSummary.product.name} - {firstLineSummary.product.brand || 'Sin marca'}
+                        </p>
+                      </div>
+                    ) : null}
 
                     <div className="grid gap-4 sm:grid-cols-[minmax(124px,0.72fr)_minmax(160px,0.92fr)] sm:items-end">
                       <FormField
@@ -831,7 +879,8 @@ export function SaleFormDialog({
                   setDraftLine((current) => ({
                     ...current,
                     productId: value,
-                    unitPrice: product?.salePrice ?? current.unitPrice,
+                    quantity: current.quantity || '1',
+                    unitPrice: product?.salePrice !== undefined ? String(product.salePrice) : current.unitPrice,
                     giftItems: current.giftItems.filter((giftItem) => giftItem.productId !== value),
                   }));
                   setLineError('');
@@ -847,6 +896,14 @@ export function SaleFormDialog({
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
+              {draftLine.productId ? (
+                <div className="sm:col-span-2 rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-cyan-800">Stock disponible</p>
+                  <p className="mt-1 text-lg font-semibold text-cyan-950">
+                    {formatNumber(getProductStock(movements, draftLine.productId))} unidades
+                  </p>
+                </div>
+              ) : null}
               <div className="space-y-2">
                 <Label>Cantidad</Label>
                 <Input
@@ -855,7 +912,7 @@ export function SaleFormDialog({
                   max={Math.max(draftLine.productId ? getProductStock(movements, draftLine.productId) : 1, 1)}
                   value={draftLine.quantity}
                   onChange={(event) => {
-                    setDraftLine((current) => ({ ...current, quantity: Number(event.target.value) }));
+                    setDraftLine((current) => ({ ...current, quantity: event.target.value }));
                     setLineError('');
                   }}
                 />
@@ -869,7 +926,7 @@ export function SaleFormDialog({
                   step="0.01"
                   value={draftLine.unitPrice}
                   onChange={(event) => {
-                    setDraftLine((current) => ({ ...current, unitPrice: Number(event.target.value) }));
+                    setDraftLine((current) => ({ ...current, unitPrice: event.target.value }));
                     setLineError('');
                   }}
                 />
