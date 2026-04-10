@@ -10,6 +10,7 @@ import {
   ClipboardList,
   Globe,
   LayoutDashboard,
+  ShieldCheck,
   ReceiptText,
   ShoppingCart,
   Tags,
@@ -21,7 +22,6 @@ import { useAuth } from '@/components/auth-context';
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -39,6 +39,7 @@ const navigation = [
   { href: '/dashboard/productos', label: 'Productos', icon: Boxes, helper: 'Catalogo y stock' },
   { href: '/dashboard/proveedores', label: 'Proveedores', icon: Building2, helper: 'Contactos de compra' },
   { href: '/dashboard/ventas', label: 'Ventas', icon: ShoppingCart, helper: 'Salidas comerciales' },
+  { href: '/dashboard/autorizaciones', label: 'Autorizaciones', icon: ShieldCheck, helper: 'Aprobaciones pendientes' },
   { href: '/dashboard/servicios', label: 'Servicios', icon: Wrench, helper: 'Torno e instalaciones' },
   {
     href: '/dashboard/inventario',
@@ -56,15 +57,18 @@ export function AdminSidebar() {
   const pathname = usePathname();
   const { role } = useAuth();
   const { isMobile, setOpenMobile } = useSidebar();
-  const visibleNavigation = role === 'sales'
-    ? navigation.filter(
-        (item) =>
-          item.href === '/dashboard' ||
-          item.href === '/dashboard/ventas' ||
-          item.href === '/dashboard/servicios' ||
-          item.href === '/dashboard/inventario'
-      )
-    : navigation;
+  const visibleNavigation =
+    role === 'sales'
+      ? navigation.filter(
+          (item) =>
+            item.href === '/dashboard' ||
+            item.href === '/dashboard/ventas' ||
+            item.href === '/dashboard/servicios' ||
+            item.href === '/dashboard/inventario'
+        )
+      : role === 'courier'
+        ? navigation.filter((item) => item.href === '/dashboard')
+        : navigation;
 
   useEffect(() => {
     if (isMobile) {

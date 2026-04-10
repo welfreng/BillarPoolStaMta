@@ -1,63 +1,119 @@
-[debug] [2026-03-20T20:27:56.169Z] ----------------------------------------------------------------------
-[debug] [2026-03-20T20:27:56.175Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\HP\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\firebase-tools\lib\bin\firebase.js deploy --only firestore:rules --project billarpoolstamta-5d4ac
-[debug] [2026-03-20T20:27:56.176Z] CLI Version:   15.11.0
-[debug] [2026-03-20T20:27:56.176Z] Platform:      win32
-[debug] [2026-03-20T20:27:56.176Z] Node Version:  v24.14.0
-[debug] [2026-03-20T20:27:56.177Z] Time:          Fri Mar 20 2026 15:27:56 GMT-0500 (hora estándar de Colombia)
-[debug] [2026-03-20T20:27:56.177Z] ----------------------------------------------------------------------
+[debug] [2026-04-04T14:03:42.245Z] ----------------------------------------------------------------------
+[debug] [2026-04-04T14:03:42.250Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\HP\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\firebase-tools\lib\bin\firebase.js login
+[debug] [2026-04-04T14:03:42.251Z] CLI Version:   15.13.0
+[debug] [2026-04-04T14:03:42.251Z] Platform:      win32
+[debug] [2026-04-04T14:03:42.252Z] Node Version:  v24.14.0
+[debug] [2026-04-04T14:03:42.252Z] Time:          Sat Apr 04 2026 09:03:42 GMT-0500 (hora estándar de Colombia)
+[debug] [2026-04-04T14:03:42.252Z] ----------------------------------------------------------------------
 [debug] 
-[debug] [2026-03-20T20:27:56.185Z] >>> [apiv2][query] GET https://firebase-public.firebaseio.com/cli.json [none]
-[debug] [2026-03-20T20:28:00.713Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
-[debug] [2026-03-20T20:28:00.757Z] Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
-    at GoogleAuth.getApplicationDefaultAsync (C:\Users\HP\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\google-auth-library\build\src\auth\googleauth.js:287:15)
-    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
-    at async GoogleAuth._GoogleAuth_determineClient (C:\Users\HP\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\google-auth-library\build\src\auth\googleauth.js:834:32)
-    at async GoogleAuth.getClient (C:\Users\HP\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\google-auth-library\build\src\auth\googleauth.js:698:20)
-    at async GoogleAuth.getAccessToken (C:\Users\HP\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\google-auth-library\build\src\auth\googleauth.js:722:24)
-    at async autoAuth (C:\Users\HP\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\firebase-tools\lib\requireAuth.js:28:19)
-    at async requireAuth (C:\Users\HP\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\firebase-tools\lib\requireAuth.js:90:20)
-    at async requirePermissions (C:\Users\HP\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\firebase-tools\lib\requirePermissions.js:17:5)
-    at async C:\Users\HP\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\firebase-tools\lib\command.js:264:17
 [error] 
-[error] Error: Failed to authenticate, have you run firebase login?
-[debug] [2026-03-20T20:28:01.077Z] <<< [apiv2][status] GET https://firebase-public.firebaseio.com/cli.json 200
-[debug] [2026-03-22T20:12:47.896Z] ----------------------------------------------------------------------
-[debug] [2026-03-22T20:12:47.903Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\HP\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\firebase-tools\lib\bin\firebase.js deploy --only firestore:rules
-[debug] [2026-03-22T20:12:47.904Z] CLI Version:   15.11.0
-[debug] [2026-03-22T20:12:47.904Z] Platform:      win32
-[debug] [2026-03-22T20:12:47.905Z] Node Version:  v24.14.0
-[debug] [2026-03-22T20:12:47.905Z] Time:          Sun Mar 22 2026 15:12:47 GMT-0500 (hora estándar de Colombia)
-[debug] [2026-03-22T20:12:47.905Z] ----------------------------------------------------------------------
+[error] Error: Cannot run login in non-interactive mode. See login:ci to generate a token for use in non-interactive environments.
+[debug] [2026-04-04T14:04:28.111Z] ----------------------------------------------------------------------
+[debug] [2026-04-04T14:04:28.117Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\HP\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\firebase-tools\lib\bin\firebase.js deploy --only firestore:rules,firestore:indexes --project billarpoolstamta-5d4ac
+[debug] [2026-04-04T14:04:28.118Z] CLI Version:   15.13.0
+[debug] [2026-04-04T14:04:28.118Z] Platform:      win32
+[debug] [2026-04-04T14:04:28.118Z] Node Version:  v24.14.0
+[debug] [2026-04-04T14:04:28.119Z] Time:          Sat Apr 04 2026 09:04:28 GMT-0500 (hora estándar de Colombia)
+[debug] [2026-04-04T14:04:28.119Z] ----------------------------------------------------------------------
 [debug] 
-[debug] [2026-03-22T20:12:47.914Z] >>> [apiv2][query] GET https://firebase-public.firebaseio.com/cli.json [none]
-[error] 
-[error] Error: No currently active project.
-To run this command, you need to specify a project. You have two options:
-- Run this command with --project <alias_or_project_id>.
-- Set an active project by running firebase use --add, then rerun this command.
-To list all the Firebase projects to which you have access, run firebase projects:list.
-To learn about active projects for the CLI, visit https://firebase.google.com/docs/cli#project_aliases
-
-
-[debug] [2026-03-22T20:43:03.751Z] ----------------------------------------------------------------------
-[debug] [2026-03-22T20:43:03.766Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\HP\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\firebase-tools\lib\bin\firebase.js deploy --only firestore:rules,firestore:indexes --project billarpoolstamta-5d4ac
-[debug] [2026-03-22T20:43:03.770Z] CLI Version:   15.11.0
-[debug] [2026-03-22T20:43:03.772Z] Platform:      win32
-[debug] [2026-03-22T20:43:03.772Z] Node Version:  v24.14.0
-[debug] [2026-03-22T20:43:03.773Z] Time:          Sun Mar 22 2026 15:43:03 GMT-0500 (hora estándar de Colombia)
-[debug] [2026-03-22T20:43:03.774Z] ----------------------------------------------------------------------
-[debug] 
-[debug] [2026-03-22T20:43:03.786Z] >>> [apiv2][query] GET https://firebase-public.firebaseio.com/cli.json [none]
-[debug] [2026-03-22T20:43:13.905Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
-[debug] [2026-03-22T20:43:14.085Z] Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
-    at GoogleAuth.getApplicationDefaultAsync (C:\Users\HP\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\google-auth-library\build\src\auth\googleauth.js:287:15)
-    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
-    at async GoogleAuth._GoogleAuth_determineClient (C:\Users\HP\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\google-auth-library\build\src\auth\googleauth.js:834:32)
-    at async GoogleAuth.getClient (C:\Users\HP\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\google-auth-library\build\src\auth\googleauth.js:698:20)
-    at async GoogleAuth.getAccessToken (C:\Users\HP\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\google-auth-library\build\src\auth\googleauth.js:722:24)
-    at async autoAuth (C:\Users\HP\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\firebase-tools\lib\requireAuth.js:28:19)
-    at async requireAuth (C:\Users\HP\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\firebase-tools\lib\requireAuth.js:90:20)
-    at async requirePermissions (C:\Users\HP\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\firebase-tools\lib\requirePermissions.js:17:5)
-    at async C:\Users\HP\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\firebase-tools\lib\command.js:264:17
-[error] 
-[error] Error: Failed to authenticate, have you run firebase login?
+[debug] [2026-04-04T14:04:31.321Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-04-04T14:04:31.323Z] > authorizing via signed-in user (webnextwave@gmail.com)
+[debug] [2026-04-04T14:04:31.324Z] [iam] checking project billarpoolstamta-5d4ac for permissions ["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]
+[debug] [2026-04-04T14:04:31.328Z] Checked if tokens are valid: true, expires at: 1775314960760
+[debug] [2026-04-04T14:04:31.328Z] Checked if tokens are valid: true, expires at: 1775314960760
+[debug] [2026-04-04T14:04:31.332Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/billarpoolstamta-5d4ac:testIamPermissions [none]
+[debug] [2026-04-04T14:04:31.332Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/billarpoolstamta-5d4ac:testIamPermissions  x-goog-user-project=billarpoolstamta-5d4ac
+[debug] [2026-04-04T14:04:31.333Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/billarpoolstamta-5d4ac:testIamPermissions {"permissions":["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]}
+[debug] [2026-04-04T14:04:32.000Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/billarpoolstamta-5d4ac:testIamPermissions 200
+[debug] [2026-04-04T14:04:32.001Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/billarpoolstamta-5d4ac:testIamPermissions {"permissions":["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]}
+[info] 
+[info] === Deploying to 'billarpoolstamta-5d4ac'...
+[info] 
+[info] i  deploying firestore 
+[info] i  firestore: ensuring required API firestore.googleapis.com is enabled... 
+[debug] [2026-04-04T14:04:32.007Z] Checked if tokens are valid: true, expires at: 1775314960760
+[debug] [2026-04-04T14:04:32.007Z] Checked if tokens are valid: true, expires at: 1775314960760
+[debug] [2026-04-04T14:04:32.008Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/billarpoolstamta-5d4ac/services/firestore.googleapis.com [none]
+[debug] [2026-04-04T14:04:32.008Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/billarpoolstamta-5d4ac/services/firestore.googleapis.com  x-goog-user-project=billarpoolstamta-5d4ac
+[debug] [2026-04-04T14:04:32.796Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/billarpoolstamta-5d4ac/services/firestore.googleapis.com 200
+[debug] [2026-04-04T14:04:32.797Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/billarpoolstamta-5d4ac/services/firestore.googleapis.com [omitted]
+[info] +  firestore: required API firestore.googleapis.com is enabled 
+[info] i  firestore: ensuring required API firestore.googleapis.com is enabled... 
+[debug] [2026-04-04T14:04:32.807Z] Checked if tokens are valid: true, expires at: 1775314960760
+[debug] [2026-04-04T14:04:32.807Z] Checked if tokens are valid: true, expires at: 1775314960760
+[debug] [2026-04-04T14:04:32.807Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/billarpoolstamta-5d4ac/databases/(default) [none]
+[debug] [2026-04-04T14:04:33.565Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/billarpoolstamta-5d4ac/databases/(default) 200
+[debug] [2026-04-04T14:04:33.566Z] <<< [apiv2][body] GET https://firestore.googleapis.com/v1/projects/billarpoolstamta-5d4ac/databases/(default) {"name":"projects/billarpoolstamta-5d4ac/databases/(default)","uid":"b8576ef2-6dab-4d4b-8b6e-027d4f039fe3","createTime":"2026-03-17T16:40:34.303799Z","updateTime":"2026-03-17T16:40:34.303799Z","locationId":"nam5","type":"FIRESTORE_NATIVE","concurrencyMode":"PESSIMISTIC","versionRetentionPeriod":"3600s","earliestVersionTime":"2026-04-04T13:04:33.604770Z","appEngineIntegrationMode":"DISABLED","keyPrefix":"s","pointInTimeRecoveryEnablement":"POINT_IN_TIME_RECOVERY_DISABLED","deleteProtectionState":"DELETE_PROTECTION_DISABLED","databaseEdition":"STANDARD","freeTier":true,"realtimeUpdatesMode":"REALTIME_UPDATES_MODE_ENABLED","etag":"IKns/82u1JMDMPS+5Ly5p5MD"}
+[info] i  firestore: reading indexes from firestore.indexes.json... 
+[info] i  cloud.firestore: checking firestore.rules for compilation errors... 
+[debug] [2026-04-04T14:04:33.571Z] Checked if tokens are valid: true, expires at: 1775314960760
+[debug] [2026-04-04T14:04:33.571Z] Checked if tokens are valid: true, expires at: 1775314960760
+[debug] [2026-04-04T14:04:33.572Z] >>> [apiv2][query] POST https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac:test [none]
+[debug] [2026-04-04T14:04:33.572Z] >>> [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac:test [omitted]
+[debug] [2026-04-04T14:04:33.943Z] <<< [apiv2][status] POST https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac:test 200
+[debug] [2026-04-04T14:04:33.943Z] <<< [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac:test {}
+[info] +  cloud.firestore: rules file firestore.rules compiled successfully 
+[debug] [2026-04-04T14:04:33.946Z] Checked if tokens are valid: true, expires at: 1775314960760
+[debug] [2026-04-04T14:04:33.946Z] Checked if tokens are valid: true, expires at: 1775314960760
+[debug] [2026-04-04T14:04:33.947Z] >>> [apiv2][query] GET https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac/releases pageSize=10&pageToken=
+[debug] [2026-04-04T14:04:34.095Z] <<< [apiv2][status] GET https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac/releases 200
+[debug] [2026-04-04T14:04:34.095Z] <<< [apiv2][body] GET https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac/releases {"releases":[{"name":"projects/billarpoolstamta-5d4ac/releases/cloud.firestore","rulesetName":"projects/billarpoolstamta-5d4ac/rulesets/a6dd9588-e798-42b4-990b-5f2d67c79f4a","createTime":"2026-03-17T16:40:35.582379Z","updateTime":"2026-04-04T13:53:51.044295Z"}]}
+[debug] [2026-04-04T14:04:34.096Z] Checked if tokens are valid: true, expires at: 1775314960760
+[debug] [2026-04-04T14:04:34.097Z] Checked if tokens are valid: true, expires at: 1775314960760
+[debug] [2026-04-04T14:04:34.097Z] >>> [apiv2][query] GET https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac/rulesets/a6dd9588-e798-42b4-990b-5f2d67c79f4a [none]
+[debug] [2026-04-04T14:04:34.237Z] <<< [apiv2][status] GET https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac/rulesets/a6dd9588-e798-42b4-990b-5f2d67c79f4a 200
+[debug] [2026-04-04T14:04:34.238Z] <<< [apiv2][body] GET https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac/rulesets/a6dd9588-e798-42b4-990b-5f2d67c79f4a [omitted]
+[info] i  firestore: latest version of firestore.rules already up to date, skipping upload... 
+[info] i  firestore: deploying indexes... 
+[debug] [2026-04-04T14:04:34.243Z] Checked if tokens are valid: true, expires at: 1775314960760
+[debug] [2026-04-04T14:04:34.243Z] Checked if tokens are valid: true, expires at: 1775314960760
+[debug] [2026-04-04T14:04:34.243Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/billarpoolstamta-5d4ac/databases/(default)/collectionGroups/-/indexes [none]
+[debug] [2026-04-04T14:04:34.418Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/billarpoolstamta-5d4ac/databases/(default)/collectionGroups/-/indexes 200
+[debug] [2026-04-04T14:04:34.419Z] <<< [apiv2][body] GET https://firestore.googleapis.com/v1/projects/billarpoolstamta-5d4ac/databases/(default)/collectionGroups/-/indexes {"indexes":[{"name":"projects/billarpoolstamta-5d4ac/databases/(default)/collectionGroups/products/indexes/CICAgOjXh4EK","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"publicStock","order":"ASCENDING"},{"fieldPath":"__name__","order":"ASCENDING"}],"state":"READY","density":"SPARSE_ALL"},{"name":"projects/billarpoolstamta-5d4ac/databases/(default)/collectionGroups/products/indexes/CICAgJiUpoMK","queryScope":"COLLECTION","fields":[{"fieldPath":"availableForDelivery","order":"ASCENDING"},{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"publicStock","order":"ASCENDING"},{"fieldPath":"__name__","order":"ASCENDING"}],"state":"READY","density":"SPARSE_ALL"}]}
+[debug] [2026-04-04T14:04:34.419Z] Checked if tokens are valid: true, expires at: 1775314960760
+[debug] [2026-04-04T14:04:34.420Z] Checked if tokens are valid: true, expires at: 1775314960760
+[debug] [2026-04-04T14:04:34.420Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/billarpoolstamta-5d4ac/databases/(default)/collectionGroups/-/fields?filter=indexConfig.usesAncestorConfig=false OR ttlConfig:* [none]
+[debug] [2026-04-04T14:04:34.568Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/billarpoolstamta-5d4ac/databases/(default)/collectionGroups/-/fields?filter=indexConfig.usesAncestorConfig=false OR ttlConfig:* 200
+[debug] [2026-04-04T14:04:34.569Z] <<< [apiv2][body] GET https://firestore.googleapis.com/v1/projects/billarpoolstamta-5d4ac/databases/(default)/collectionGroups/-/fields?filter=indexConfig.usesAncestorConfig=false OR ttlConfig:* {"fields":[{"name":"projects/billarpoolstamta-5d4ac/databases/(default)/collectionGroups/__default__/fields/*","indexConfig":{"indexes":[{"queryScope":"COLLECTION","fields":[{"fieldPath":"*","order":"ASCENDING"}],"state":"READY"},{"queryScope":"COLLECTION","fields":[{"fieldPath":"*","order":"DESCENDING"}],"state":"READY"},{"queryScope":"COLLECTION","fields":[{"fieldPath":"*","arrayConfig":"CONTAINS"}],"state":"READY"}]}}]}
+[debug] [2026-04-04T14:04:34.570Z] Checked if tokens are valid: true, expires at: 1775314960760
+[debug] [2026-04-04T14:04:34.570Z] Checked if tokens are valid: true, expires at: 1775314960760
+[debug] [2026-04-04T14:04:34.570Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/billarpoolstamta-5d4ac/databases/(default) [none]
+[debug] [2026-04-04T14:04:34.710Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/billarpoolstamta-5d4ac/databases/(default) 200
+[debug] [2026-04-04T14:04:34.711Z] <<< [apiv2][body] GET https://firestore.googleapis.com/v1/projects/billarpoolstamta-5d4ac/databases/(default) {"name":"projects/billarpoolstamta-5d4ac/databases/(default)","uid":"b8576ef2-6dab-4d4b-8b6e-027d4f039fe3","createTime":"2026-03-17T16:40:34.303799Z","updateTime":"2026-03-17T16:40:34.303799Z","locationId":"nam5","type":"FIRESTORE_NATIVE","concurrencyMode":"PESSIMISTIC","versionRetentionPeriod":"3600s","earliestVersionTime":"2026-04-04T13:04:34.753489Z","appEngineIntegrationMode":"DISABLED","keyPrefix":"s","pointInTimeRecoveryEnablement":"POINT_IN_TIME_RECOVERY_DISABLED","deleteProtectionState":"DELETE_PROTECTION_DISABLED","databaseEdition":"STANDARD","freeTier":true,"realtimeUpdatesMode":"REALTIME_UPDATES_MODE_ENABLED","etag":"IKL5xc6u1JMDMPS+5Ly5p5MD"}
+[info] i  firestore: there are 1 indexes defined in your project that are not present in your firestore indexes file. To delete them, run this command with the --force flag. 
+[debug] [2026-04-04T14:04:34.713Z] Skipping existing index: {"collectionGroup":"products","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"publicStock","order":"ASCENDING"},{"fieldPath":"__name__","order":"ASCENDING"}]}
+[debug] [2026-04-04T14:04:34.713Z] Creating new index: {"collectionGroup":"product_variants","queryScope":"COLLECTION","fields":[{"fieldPath":"productId","order":"ASCENDING"},{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"sortOrder","order":"ASCENDING"}]}
+[debug] [2026-04-04T14:04:34.713Z] Checked if tokens are valid: true, expires at: 1775314960760
+[debug] [2026-04-04T14:04:34.714Z] Checked if tokens are valid: true, expires at: 1775314960760
+[debug] [2026-04-04T14:04:34.714Z] >>> [apiv2][query] POST https://firestore.googleapis.com/v1/projects/billarpoolstamta-5d4ac/databases/(default)/collectionGroups/product_variants/indexes [none]
+[debug] [2026-04-04T14:04:34.714Z] >>> [apiv2][body] POST https://firestore.googleapis.com/v1/projects/billarpoolstamta-5d4ac/databases/(default)/collectionGroups/product_variants/indexes {"fields":[{"fieldPath":"productId","order":"ASCENDING"},{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"sortOrder","order":"ASCENDING"}],"queryScope":"COLLECTION"}
+[debug] [2026-04-04T14:04:35.082Z] <<< [apiv2][status] POST https://firestore.googleapis.com/v1/projects/billarpoolstamta-5d4ac/databases/(default)/collectionGroups/product_variants/indexes 200
+[debug] [2026-04-04T14:04:35.082Z] <<< [apiv2][body] POST https://firestore.googleapis.com/v1/projects/billarpoolstamta-5d4ac/databases/(default)/collectionGroups/product_variants/indexes {"name":"projects/billarpoolstamta-5d4ac/databases/(default)/operations/S0E0MW1pSmdBQ0lDDCoDIGIzYzdlMTU3NDdlZC0zMTliLTdmZTQtOGY4Zi05N2MzMzdlYSQac2VuaWxlcGlwCQpBEg","metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.IndexOperationMetadata","startTime":"2026-04-04T14:04:35.022174Z","index":"projects/billarpoolstamta-5d4ac/databases/(default)/collectionGroups/product_variants/indexes/CICAgJim14AK","state":"INITIALIZING"}}
+[debug] [2026-04-04T14:04:35.082Z] Creating new index: {"collectionGroup":"inventory_movements","queryScope":"COLLECTION","fields":[{"fieldPath":"productId","order":"ASCENDING"},{"fieldPath":"occurredAt","order":"DESCENDING"}]}
+[debug] [2026-04-04T14:04:35.083Z] Checked if tokens are valid: true, expires at: 1775314960760
+[debug] [2026-04-04T14:04:35.083Z] Checked if tokens are valid: true, expires at: 1775314960760
+[debug] [2026-04-04T14:04:35.083Z] >>> [apiv2][query] POST https://firestore.googleapis.com/v1/projects/billarpoolstamta-5d4ac/databases/(default)/collectionGroups/inventory_movements/indexes [none]
+[debug] [2026-04-04T14:04:35.083Z] >>> [apiv2][body] POST https://firestore.googleapis.com/v1/projects/billarpoolstamta-5d4ac/databases/(default)/collectionGroups/inventory_movements/indexes {"fields":[{"fieldPath":"productId","order":"ASCENDING"},{"fieldPath":"occurredAt","order":"DESCENDING"}],"queryScope":"COLLECTION"}
+[debug] [2026-04-04T14:04:35.423Z] <<< [apiv2][status] POST https://firestore.googleapis.com/v1/projects/billarpoolstamta-5d4ac/databases/(default)/collectionGroups/inventory_movements/indexes 200
+[debug] [2026-04-04T14:04:35.423Z] <<< [apiv2][body] POST https://firestore.googleapis.com/v1/projects/billarpoolstamta-5d4ac/databases/(default)/collectionGroups/inventory_movements/indexes {"name":"projects/billarpoolstamta-5d4ac/databases/(default)/operations/S0lvOUZqSmdBQ0lDDCoDIDliNDgzNmI4YjFhMS1hMTFhLWJlZjQtMmI2Yy1hYjJjOWUwZiQac2VuaWxlcGlwCQpBEg","metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.IndexOperationMetadata","startTime":"2026-04-04T14:04:35.413168Z","index":"projects/billarpoolstamta-5d4ac/databases/(default)/collectionGroups/inventory_movements/indexes/CICAgJjF9oIK","state":"INITIALIZING"}}
+[debug] [2026-04-04T14:04:35.423Z] Creating new index: {"collectionGroup":"purchase_items","queryScope":"COLLECTION","fields":[{"fieldPath":"purchaseId","order":"ASCENDING"},{"fieldPath":"purchasedAt","order":"DESCENDING"}]}
+[debug] [2026-04-04T14:04:35.424Z] Checked if tokens are valid: true, expires at: 1775314960760
+[debug] [2026-04-04T14:04:35.424Z] Checked if tokens are valid: true, expires at: 1775314960760
+[debug] [2026-04-04T14:04:35.424Z] >>> [apiv2][query] POST https://firestore.googleapis.com/v1/projects/billarpoolstamta-5d4ac/databases/(default)/collectionGroups/purchase_items/indexes [none]
+[debug] [2026-04-04T14:04:35.424Z] >>> [apiv2][body] POST https://firestore.googleapis.com/v1/projects/billarpoolstamta-5d4ac/databases/(default)/collectionGroups/purchase_items/indexes {"fields":[{"fieldPath":"purchaseId","order":"ASCENDING"},{"fieldPath":"purchasedAt","order":"DESCENDING"}],"queryScope":"COLLECTION"}
+[debug] [2026-04-04T14:04:35.817Z] <<< [apiv2][status] POST https://firestore.googleapis.com/v1/projects/billarpoolstamta-5d4ac/databases/(default)/collectionGroups/purchase_items/indexes 200
+[debug] [2026-04-04T14:04:35.818Z] <<< [apiv2][body] POST https://firestore.googleapis.com/v1/projects/billarpoolstamta-5d4ac/databases/(default)/collectionGroups/purchase_items/indexes {"name":"projects/billarpoolstamta-5d4ac/databases/(default)/operations/S01acUZqSmdBQ0lDDCoDIDM0ODU2MTc1YWE2Yi03NzFhLTlhODQtYzAxMi1mNTJmZTc0MyQac2VuaWxlcGlwCQpBEg","metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.IndexOperationMetadata","startTime":"2026-04-04T14:04:35.783839Z","index":"projects/billarpoolstamta-5d4ac/databases/(default)/collectionGroups/purchase_items/indexes/CICAgJjFqZMK","state":"INITIALIZING"}}
+[info] +  firestore: deployed indexes in firestore.indexes.json successfully for (default) database 
+[debug] [2026-04-04T14:04:35.819Z] [rules] releasing cloud.firestore/(default) with ruleset projects/billarpoolstamta-5d4ac/rulesets/a6dd9588-e798-42b4-990b-5f2d67c79f4a
+[debug] [2026-04-04T14:04:35.820Z] Checked if tokens are valid: true, expires at: 1775314960760
+[debug] [2026-04-04T14:04:35.820Z] Checked if tokens are valid: true, expires at: 1775314960760
+[debug] [2026-04-04T14:04:35.821Z] >>> [apiv2][query] PATCH https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac/releases/cloud.firestore/(default) [none]
+[debug] [2026-04-04T14:04:35.821Z] >>> [apiv2][body] PATCH https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac/releases/cloud.firestore/(default) {"release":{"name":"projects/billarpoolstamta-5d4ac/releases/cloud.firestore/(default)","rulesetName":"projects/billarpoolstamta-5d4ac/rulesets/a6dd9588-e798-42b4-990b-5f2d67c79f4a"}}
+[debug] [2026-04-04T14:04:36.152Z] <<< [apiv2][status] PATCH https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac/releases/cloud.firestore/(default) 200
+[debug] [2026-04-04T14:04:36.152Z] <<< [apiv2][body] PATCH https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac/releases/cloud.firestore/(default) {"name":"projects/billarpoolstamta-5d4ac/releases/cloud.firestore","rulesetName":"projects/billarpoolstamta-5d4ac/rulesets/a6dd9588-e798-42b4-990b-5f2d67c79f4a","createTime":"2026-03-17T16:40:35.582379Z","updateTime":"2026-04-04T14:04:36.192702Z"}
+[debug] [2026-04-04T14:04:36.152Z] [rules] updated release projects/billarpoolstamta-5d4ac/releases/cloud.firestore
+[info] +  firestore: released rules firestore.rules to cloud.firestore 
+[info] 
+[info] +  Deploy complete! 
+[info] 
+[info] Project Console: https://console.firebase.google.com/project/billarpoolstamta-5d4ac/overview

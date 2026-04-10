@@ -8,6 +8,7 @@ import type {
   ServiceOrder,
   StockAlert,
 } from '@/lib/admin/types';
+import { getProductSaleMode, getVariantRealUnitCost } from '@/lib/admin/variant-helpers';
 
 export function roundCurrency(value: number) {
   const normalizedValue = Number(value);
@@ -95,6 +96,14 @@ export function getProductRealUnitCost(purchases: Purchase[], productId: string)
   return getLatestPurchaseForProduct(purchases, productId)?.realUnitCost ?? 0;
 }
 
+export function getVariantOrProductRealUnitCost(
+  purchases: Purchase[],
+  productId: string,
+  variantId?: string
+) {
+  return getVariantRealUnitCost(purchases, productId, variantId);
+}
+
 export function getProductProfitMargin(product: Product, purchases: Purchase[]) {
   return calculateMargin(getProductRealUnitCost(purchases, product.id), product.salePrice);
 }
@@ -120,7 +129,15 @@ export function getDashboardSummary(
   const inventorySummary = products.reduce<DashboardSummary>(
     (summary, product) => {
       const stock = getProductStock(movements, product.id);
-      const realUnitCost = getProductRealUnitCost(purchases, product.id);
+      const realUnitCost =
+        getProductSaleMode(product) === 'varianted'
+          ? Math.max(
+              ...(product.variants ?? []).map((variant) =>
+                getVariantRealUnitCost(purchases, product.id, variant.id)
+              ),
+              0
+            )
+          : getProductRealUnitCost(purchases, product.id);
 
       summary.totalProducts += 1;
       summary.totalStock += stock;

@@ -86,7 +86,7 @@ export function SupplierFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] w-[calc(100vw-1rem)] max-w-2xl overflow-y-auto px-4 sm:w-[calc(100vw-2rem)]">
+      <DialogContent className="max-h-[92vh] w-[calc(100vw-1rem)] max-w-[96vw] overflow-y-auto px-4 sm:w-[calc(100vw-2rem)] sm:px-5 lg:max-w-4xl lg:px-6">
         <DialogHeader>
           <DialogTitle>{initialSupplier ? 'Editar proveedor' : 'Nuevo proveedor'}</DialogTitle>
           <DialogDescription>

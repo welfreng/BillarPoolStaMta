@@ -32,10 +32,10 @@ import type { Product } from '@/lib/admin/types';
 import { db } from '@/lib/firebase';
 import { SITE_LOGO } from '@/lib/branding';
 
-const pageSize = 6;
+const pageSize = 10;
 
 export default function ProductosPage() {
-  const { products, createProduct, updateProduct, deleteProduct } = useAdminData();
+  const { products, purchases, movements, sales, services, createProduct, updateProduct, deleteProduct } = useAdminData();
   const { toast } = useToast();
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('all');
@@ -67,6 +67,35 @@ export default function ProductosPage() {
       return matchesQuery && matchesCategory && matchesStatus;
     });
   }, [category, products, query, status]);
+
+  const productHistoryById = useMemo(() => {
+    return new Map(
+      products.map((product) => {
+        const purchasesCount = purchases.filter((purchase) => purchase.productId === product.id).length;
+        const movementsCount = movements.filter((movement) => movement.productId === product.id).length;
+        const salesCount = sales.filter(
+          (sale) =>
+            sale.productId === product.id ||
+            sale.lineItems.some((item) => item.productId === product.id) ||
+            sale.giftItems.some((item) => item.productId === product.id)
+        ).length;
+        const servicesCount = services.filter((service) =>
+          service.materials.some((material) => material.productId === product.id)
+        ).length;
+
+        return [
+          product.id,
+          {
+            purchasesCount,
+            movementsCount,
+            salesCount,
+            servicesCount,
+            hasActivity: purchasesCount + movementsCount + salesCount + servicesCount > 0,
+          },
+        ];
+      })
+    );
+  }, [movements, products, purchases, sales, services]);
 
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / pageSize));
   const paginatedProducts = filteredProducts.slice((page - 1) * pageSize, page * pageSize);
@@ -132,7 +161,10 @@ export default function ProductosPage() {
       console.error('Error guardando producto en Firestore:', error);
       toast({
         title: 'No se pudo guardar el producto',
-        description: 'Revisa la configuracion y permisos de Firebase para este proyecto.',
+        description:
+          error instanceof Error
+            ? error.message
+            : 'Revisa la configuracion y permisos de Firebase para este proyecto.',
         variant: 'destructive',
       });
       throw error;
@@ -140,21 +172,33 @@ export default function ProductosPage() {
   };
 
   const handleDelete = async (product: Product) => {
-    const relatedCountMessage =
-      'Tambien se eliminaran sus compras, movimientos y ventas relacionadas.';
-    if (!window.confirm(`Deseas eliminar ${product.name}?\n\n${relatedCountMessage}`)) return;
+    const historySummary = productHistoryById.get(product.id);
+    if (historySummary?.hasActivity) {
+      toast({
+        title: 'Producto con historial',
+        description:
+          'Este producto ya tiene compras, inventario o ventas registradas. Primero habra que reorganizarlo con una migracion guiada, no eliminarlo.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!window.confirm(`Deseas eliminar ${product.name}?`)) return;
     try {
       await deleteProduct(product.id);
       setSelectedProduct(undefined);
       toast({
         title: 'Producto eliminado',
-        description: 'El producto y sus registros relacionados fueron removidos del panel.',
+        description: 'El producto fue removido del panel.',
       });
     } catch (error) {
       console.error('Error eliminando producto en Firestore:', error);
       toast({
         title: 'No se pudo eliminar el producto',
-        description: 'Firestore rechazo la operacion o la conexion fallo.',
+        description:
+          error instanceof Error
+            ? error.message
+            : 'Firestore rechazo la operacion o la conexion fallo.',
         variant: 'destructive',
       });
     }
@@ -179,7 +223,7 @@ export default function ProductosPage() {
         }
       />
 
-      <div className="grid gap-6 xl:grid-cols-[1.4fr_0.8fr]">
+      <div className="grid gap-6 xl:grid-cols-[1.75fr_0.75fr]">
         <div className="min-w-0 space-y-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <div className="relative sm:col-span-2 xl:col-span-2">
@@ -235,6 +279,8 @@ export default function ProductosPage() {
           {paginatedProducts.length > 0 ? (
             <>
               <div className="min-w-0">
+                <div className="mb-2 text-xs text-slate-500">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
+                <div className="overflow-x-auto pb-2">
                 <Table className="min-w-[680px]">
                   <TableHeader>
                     <TableRow>
@@ -243,15 +289,28 @@ export default function ProductosPage() {
                       <TableHead>Venta</TableHead>
                       <TableHead>Destacado</TableHead>
                       <TableHead>Estado</TableHead>
-                      <TableHead className="text-right">Acciones</TableHead>
+                      <TableHead className="sticky right-0 z-10 bg-white text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
+                        Acciones
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedProducts.map((product) => (
+                    {paginatedProducts.map((product) => {
+                      const rowHoverSummary = [
+                        product.name,
+                        `Marca: ${product.brand}`,
+                        `Categoria: ${getCategoryLabel(product.category)} / ${product.subcategory}`,
+                        `Precio: ${formatCurrency(product.salePrice)}`,
+                        `Destacado: ${product.featured ? 'Si' : 'No'}`,
+                        `Estado: ${product.status === 'active' ? 'Activo' : 'Inactivo'}`,
+                      ].join('\n');
+
+                      return (
                       <TableRow
                         key={product.id}
                         className="cursor-pointer"
                         onClick={() => setSelectedProduct(product)}
+                        title={rowHoverSummary}
                       >
                         <TableCell>
                           <div>
@@ -272,7 +331,7 @@ export default function ProductosPage() {
                         <TableCell>
                           <ProductStatusBadge status={product.status} />
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="sticky right-0 bg-white text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
                           <div className="flex justify-end gap-2">
                             <Button
                               type="button"
@@ -312,9 +371,10 @@ export default function ProductosPage() {
                           </div>
                         </TableCell>
                       </TableRow>
-                    ))}
+                    )})}
                   </TableBody>
                 </Table>
+                </div>
               </div>
 
               <div className="flex items-center justify-between border-t pt-4 text-sm text-slate-500">
@@ -356,7 +416,7 @@ export default function ProductosPage() {
           )}
         </div>
 
-        <aside className="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <aside className="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 xl:sticky xl:top-24 xl:self-start">
           {selectedProduct ? (
             <div className="space-y-5">
               <div className="overflow-hidden rounded-3xl border border-slate-200 bg-slate-50">
@@ -426,6 +486,7 @@ export default function ProductosPage() {
         open={openDialog}
         onOpenChange={setOpenDialog}
         initialProduct={editingProduct}
+        historySummary={editingProduct ? productHistoryById.get(editingProduct.id) : undefined}
         onSubmit={handleSave}
       />
       <Dialog open={openViewDialog} onOpenChange={setOpenViewDialog}>

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
-import { collection, onSnapshot, query as firestoreQuery, type DocumentData, where } from "firebase/firestore"
+import { collection, getDocs, query as firestoreQuery, type DocumentData, where } from "firebase/firestore"
 import { MessageCircle, Search, ShoppingBag, Tag } from "lucide-react"
 import {
   extractCatalogImageOverrides,
@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { SITE_LOGO } from "@/lib/branding"
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface CatalogProduct {
   id: string
@@ -32,10 +33,19 @@ interface CatalogProduct {
   brand: string
   salePrice: number
   featured: boolean
+  availableForDelivery: boolean
   publicStock: number
   status: "active" | "draft" | "archived"
   tag: string
   details: string[]
+  variantLabel?: string
+  variants: Array<{
+    id: string
+    name: string
+    salePrice: number
+    stock: number
+    colorHex?: string
+  }>
 }
 
 const defaultImage = SITE_LOGO
@@ -45,6 +55,22 @@ const categoryOrder = new Map(publicCatalogCategories.map((category, index) => [
 
 function mapCatalogProduct(documentId: string, data: DocumentData): CatalogProduct {
   const fallbackProduct = publicCatalogProducts.find((product) => product.id === documentId)
+  const variants = Array.isArray(data.variants)
+    ? data.variants
+        .map((variant: DocumentData, index: number) => ({
+          id: String(variant?.id ?? `variant-${index + 1}`),
+          name: String(variant?.displayName ?? variant?.name ?? ""),
+          salePrice: Number(variant?.salePrice ?? data.salePrice ?? 0),
+          stock: Number(variant?.publicStock ?? variant?.stock ?? 0),
+          colorHex: typeof variant?.colorHex === "string" ? String(variant.colorHex) : undefined,
+        }))
+        .filter((variant: { name: string }) => variant.name)
+    : []
+  const variantPrices = variants
+    .map((variant) => variant.salePrice)
+    .filter((price) => price > 0)
+    .sort((left, right) => left - right)
+  const totalVariantStock = variants.reduce((total, variant) => total + Math.max(variant.stock, 0), 0)
 
   return {
     id: documentId,
@@ -54,9 +80,10 @@ function mapCatalogProduct(documentId: string, data: DocumentData): CatalogProdu
     category: String(data.category ?? fallbackProduct?.category ?? "accesorios"),
     subcategory: String(data.subcategory ?? ""),
     brand: String(data.brand ?? ""),
-    salePrice: Number(data.salePrice ?? 0),
+    salePrice: variantPrices[0] ?? Number(data.salePrice ?? 0),
     featured: Boolean(data.featured ?? false),
-    publicStock: Number(data.publicStock ?? 0),
+    availableForDelivery: Boolean(data.availableForDelivery ?? false),
+    publicStock: variants.length > 0 ? totalVariantStock : Number(data.publicStock ?? 0),
     status:
       data.status === "draft" || data.status === "archived" || data.status === "active"
         ? data.status
@@ -67,61 +94,82 @@ function mapCatalogProduct(documentId: string, data: DocumentData): CatalogProdu
       data.category ? `Categoria: ${categoryLabels.get(String(data.category)) ?? String(data.category)}` : "",
       data.subcategory ? `Subcategoria: ${String(data.subcategory)}` : "",
     ].filter(Boolean),
+    variantLabel: typeof data.variantLabel === "string" ? String(data.variantLabel) : undefined,
+    variants,
   }
 }
 
 export default function ProductCatalog({
   featuredOnly = false,
   sectionId = "productos",
+  includeOutOfStock = false,
 }: {
   featuredOnly?: boolean
   sectionId?: string
+  includeOutOfStock?: boolean
 }) {
   const [activeCategory, setActiveCategory] = useState("todos")
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null)
+  const [selectedVariantId, setSelectedVariantId] = useState<string>("")
   const [products, setProducts] = useState<CatalogProduct[]>([])
   const [imageOverrides, setImageOverrides] = useState<CatalogImageOverrideMaps>({
     byProductId: {},
     byProductName: {},
   })
+  const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState("")
   const [previewSides, setPreviewSides] = useState<Record<string, "left" | "right">>({})
   const productCardRefs = useRef<Record<string, HTMLElement | null>>({})
 
   useEffect(() => {
-    const unsubscribeProducts = onSnapshot(
-      firestoreQuery(
-        collection(db, "products"),
-        where("status", "==", "active"),
-        where("publicStock", ">", 0)
-      ),
-      (snapshot) => {
-        const items = snapshot.docs
-          .map((snapshotItem) => mapCatalogProduct(snapshotItem.id, snapshotItem.data()))
-          .sort((left, right) => left.name.localeCompare(right.name))
+    let isMounted = true
 
-        setProducts(items)
-      },
-      (error) => {
+    const sortProducts = (items: CatalogProduct[]) =>
+      items.sort((left, right) => {
+        const leftAvailability = left.publicStock > 0 ? 0 : 1
+        const rightAvailability = right.publicStock > 0 ? 0 : 1
+        if (leftAvailability !== rightAvailability) return leftAvailability - rightAvailability
+        return left.name.localeCompare(right.name)
+      })
+
+    const loadCatalog = async () => {
+      try {
+        const [productsSnapshot, imagesSnapshot] = await Promise.all([
+          getDocs(
+            firestoreQuery(
+              collection(db, "products"),
+              where("status", "==", "active")
+            )
+          ),
+          getDocs(collection(db, "siteAssets")),
+        ])
+
+        if (!isMounted) return
+
+        const nextProducts = sortProducts(
+          productsSnapshot.docs.map((snapshotItem) => mapCatalogProduct(snapshotItem.id, snapshotItem.data()))
+        )
+        const nextImageOverrides = extractCatalogImageOverrides(imagesSnapshot)
+
+        setProducts(nextProducts)
+        setImageOverrides(nextImageOverrides)
+      } catch (error) {
         console.error("Error leyendo productos del catalogo:", error)
-        setProducts([])
+        if (isMounted) {
+          setProducts([])
+          setImageOverrides({ byProductId: {}, byProductName: {} })
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false)
+        }
       }
-    )
+    }
 
-    const unsubscribeImages = onSnapshot(
-      collection(db, "siteAssets"),
-      (snapshot) => {
-        setImageOverrides(extractCatalogImageOverrides(snapshot))
-      },
-      (error) => {
-        console.error("Error leyendo imagenes del catalogo:", error)
-        setImageOverrides({ byProductId: {}, byProductName: {} })
-      }
-    )
+    void loadCatalog()
 
     return () => {
-      unsubscribeProducts()
-      unsubscribeImages()
+      isMounted = false
     }
   }, [])
 
@@ -133,13 +181,13 @@ export default function ProductCatalog({
       })),
     [imageOverrides, products]
   )
-  const availableCatalogProducts = useMemo(
-    () => catalogProducts.filter((product) => product.publicStock > 0),
-    [catalogProducts]
+  const visibleCatalogProducts = useMemo(
+    () => (includeOutOfStock ? catalogProducts : catalogProducts.filter((product) => product.publicStock > 0)),
+    [catalogProducts, includeOutOfStock]
   )
 
   const dynamicCategories = useMemo(() => {
-    const categories = Array.from(new Set(availableCatalogProducts.map((product) => product.category).filter(Boolean)))
+    const categories = Array.from(new Set(visibleCatalogProducts.map((product) => product.category).filter(Boolean)))
 
     return [
       { id: "todos", label: "Todos" },
@@ -155,13 +203,13 @@ export default function ProductCatalog({
           label: categoryLabels.get(category) ?? category,
         })),
     ]
-  }, [availableCatalogProducts])
+  }, [visibleCatalogProducts])
 
   const filteredProducts = useMemo(
     () => {
       const normalizedQuery = query.trim().toLowerCase()
 
-      return availableCatalogProducts.filter((product) => {
+      return visibleCatalogProducts.filter((product) => {
         const matchesCategory = activeCategory === "todos" || product.category === activeCategory
         const matchesQuery =
           normalizedQuery.length === 0 ||
@@ -172,15 +220,16 @@ export default function ProductCatalog({
         return matchesCategory && matchesQuery
       })
     },
-    [activeCategory, availableCatalogProducts, query]
+    [activeCategory, query, visibleCatalogProducts]
   )
 
   const visibleProducts = useMemo(() => {
     if (!featuredOnly) return filteredProducts
 
-    const featuredProducts = availableCatalogProducts.filter((product) => product.featured)
-    return (featuredProducts.length > 0 ? featuredProducts : availableCatalogProducts).slice(0, 5)
-  }, [availableCatalogProducts, featuredOnly, filteredProducts])
+    const featuredProducts = visibleCatalogProducts.filter((product) => product.featured && product.publicStock > 0)
+    const fallbackProducts = visibleCatalogProducts.filter((product) => product.publicStock > 0)
+    return (featuredProducts.length > 0 ? featuredProducts : fallbackProducts).slice(0, 5)
+  }, [featuredOnly, filteredProducts, visibleCatalogProducts])
   const groupedProducts = useMemo(() => {
     const grouped = new Map<string, CatalogProduct[]>()
 
@@ -205,11 +254,30 @@ export default function ProductCatalog({
       }))
   }, [filteredProducts])
 
-  const selectedProduct = availableCatalogProducts.find((product) => product.id === selectedProductId) ?? null
+  const selectedProduct = visibleCatalogProducts.find((product) => product.id === selectedProductId) ?? null
+  const selectedVariant =
+    selectedProduct?.variants.find((variant) => variant.id === selectedVariantId) ??
+    selectedProduct?.variants[0] ??
+    null
+  useEffect(() => {
+    if (!selectedProduct) {
+      setSelectedVariantId("")
+      return
+    }
+    if (selectedProduct.variants.length === 0) {
+      setSelectedVariantId("")
+      return
+    }
+    setSelectedVariantId((current) =>
+      selectedProduct.variants.some((variant) => variant.id === current)
+        ? current
+        : selectedProduct.variants[0]?.id ?? ""
+    )
+  }, [selectedProduct])
   const selectedCategoryLabel =
     selectedProduct ? categoryLabels.get(selectedProduct.category) ?? selectedProduct.category : ""
   const whatsappMessage = selectedProduct
-    ? `Hola, me interesa el producto ${selectedProduct.name} por ${formatCurrency(selectedProduct.salePrice)}. Quiero mas informacion.`
+    ? `Hola, me interesa el producto ${selectedProduct.name}${selectedVariant ? ` - ${selectedVariant.name}` : ""} por ${formatCurrency(selectedVariant?.salePrice ?? selectedProduct.salePrice)}. Quiero mas informacion.`
     : "Hola, quiero informacion sobre sus productos."
 
   const setPreviewSideFromViewport = (productId: string) => {
@@ -243,7 +311,9 @@ export default function ProductCatalog({
           <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground text-pretty">
             {featuredOnly
               ? "Mira una seleccion de referencias destacadas y entra a la tienda virtual para ver el catalogo completo."
-              : "Mira precios, abre el detalle de cada referencia y contacta al negocio directamente para confirmar disponibilidad."}
+              : includeOutOfStock
+                ? "Mira todo el catalogo de referencias, incluyendo productos agotados, y contacta al negocio para confirmar disponibilidad."
+                : "Mira precios, abre el detalle de cada referencia y contacta al negocio directamente para confirmar disponibilidad."}
           </p>
         </div>
 
@@ -276,10 +346,43 @@ export default function ProductCatalog({
                 </button>
               ))}
             </div>
+
           </div>
         ) : null}
 
-        {(featuredOnly ? visibleProducts.length > 0 : groupedProducts.length > 0) ? (
+        {loading ? (
+          <div className="space-y-10">
+            {Array.from({ length: featuredOnly ? 1 : 2 }).map((_, groupIndex) => (
+              <div key={`catalog-skeleton-${groupIndex}`} className="space-y-4">
+                {!featuredOnly ? (
+                  <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-3">
+                    <div className="space-y-2">
+                      <Skeleton className="h-3 w-24 rounded-full" />
+                      <Skeleton className="h-7 w-40 rounded-xl" />
+                    </div>
+                    <Skeleton className="h-7 w-24 rounded-full" />
+                  </div>
+                ) : null}
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                  {Array.from({ length: featuredOnly ? 5 : 10 }).map((_, cardIndex) => (
+                    <div
+                      key={`catalog-card-skeleton-${groupIndex}-${cardIndex}`}
+                      className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+                    >
+                      <Skeleton className="h-32 w-full" />
+                      <div className="space-y-3 p-3">
+                        <Skeleton className="h-4 w-3/4 rounded-lg" />
+                        <Skeleton className="h-3 w-full rounded-lg" />
+                        <Skeleton className="h-10 w-full rounded-2xl" />
+                        <Skeleton className="h-8 w-full rounded-lg" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (featuredOnly ? visibleProducts.length > 0 : groupedProducts.length > 0) ? (
           featuredOnly ? (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               {visibleProducts.map((product) => {
@@ -292,19 +395,26 @@ export default function ProductCatalog({
                       productCardRefs.current[product.id] = element
                     }}
                     onMouseEnter={() => setPreviewSideFromViewport(product.id)}
-                    className="group relative overflow-visible rounded-2xl border border-border bg-card shadow-sm transition-all duration-300 hover:z-20 hover:-translate-y-1 hover:shadow-xl"
+                    className={`group relative overflow-visible rounded-2xl border border-border bg-card shadow-sm transition-all duration-300 hover:z-20 hover:-translate-y-1 hover:shadow-xl ${
+                      product.publicStock <= 0 ? "border-slate-200 bg-slate-50/80 opacity-80" : ""
+                    }`}
                   >
                     <div className="relative h-28 overflow-hidden bg-gradient-to-br from-white via-slate-50 to-slate-100 sm:h-32">
                       <Image
                         src={product.image || defaultImage}
                         alt={product.name}
                         fill
-                        className="object-cover transition-transform duration-500 group-hover:scale-110"
+                        className={`object-cover transition-transform duration-500 group-hover:scale-110 ${
+                          product.publicStock <= 0 ? "grayscale-[0.45] saturate-50" : ""
+                        }`}
                         unoptimized={product.image.startsWith("data:")}
                       />
+                      {product.publicStock <= 0 ? (
+                        <div className="absolute inset-0 bg-white/35" />
+                      ) : null}
                       <div className="absolute inset-0 bg-gradient-to-t from-[#0a1628]/70 via-transparent to-transparent" />
                       <div className="absolute left-2.5 top-2.5 z-10 inline-flex items-center rounded-full bg-[#0a2472] px-2 py-1 text-[10px] font-semibold text-white">
-                        {product.tag}
+                        {product.publicStock > 0 ? product.tag : "Agotado"}
                       </div>
                     </div>
 
@@ -320,9 +430,12 @@ export default function ProductCatalog({
                           src={product.image || defaultImage}
                           alt={`${product.name} vista ampliada`}
                           fill
-                          className="object-contain p-3"
+                          className={`object-contain p-3 ${product.publicStock <= 0 ? "grayscale-[0.45] saturate-50" : ""}`}
                           unoptimized={product.image.startsWith("data:")}
                         />
+                        {product.publicStock <= 0 ? (
+                          <div className="absolute inset-0 bg-white/30" />
+                        ) : null}
                       </div>
                       <div className="mt-3 flex items-center justify-between gap-3">
                         <div className="min-w-0">
@@ -335,14 +448,19 @@ export default function ProductCatalog({
                       </div>
                     </div>
 
-                    <div className="space-y-2.5 p-3">
-                      <div className="space-y-1">
-                        <h3 className="line-clamp-2 font-mono text-sm font-bold leading-snug text-foreground sm:text-base">
-                          {product.name}
-                        </h3>
-                        <p className="hidden line-clamp-2 text-xs leading-5 text-muted-foreground sm:block">
-                          {product.description}
-                        </p>
+                      <div className="space-y-2.5 p-3">
+                        <div className="space-y-1">
+                          <h3 className="line-clamp-2 font-mono text-sm font-bold leading-snug text-foreground sm:text-base">
+                            {product.name}
+                          </h3>
+                          {product.publicStock <= 0 ? (
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-rose-600">
+                              Agotado
+                            </p>
+                          ) : null}
+                          <p className="hidden line-clamp-2 text-xs leading-5 text-muted-foreground sm:block">
+                            {product.description}
+                          </p>
                       </div>
 
                       <div className="flex items-center justify-between rounded-2xl bg-[#0a2472]/5 px-2.5 py-2">
@@ -394,19 +512,26 @@ export default function ProductCatalog({
                             productCardRefs.current[product.id] = element
                           }}
                           onMouseEnter={() => setPreviewSideFromViewport(product.id)}
-                          className="group relative overflow-visible rounded-2xl border border-border bg-card shadow-sm transition-all duration-300 hover:z-20 hover:-translate-y-1 hover:shadow-xl"
+                          className={`group relative overflow-visible rounded-2xl border border-border bg-card shadow-sm transition-all duration-300 hover:z-20 hover:-translate-y-1 hover:shadow-xl ${
+                            product.publicStock <= 0 ? "border-slate-200 bg-slate-50/80 opacity-80" : ""
+                          }`}
                         >
                           <div className="relative h-28 overflow-hidden bg-gradient-to-br from-white via-slate-50 to-slate-100 sm:h-32">
                             <Image
                               src={product.image || defaultImage}
                               alt={product.name}
                               fill
-                              className="object-cover transition-transform duration-500 group-hover:scale-110"
+                              className={`object-cover transition-transform duration-500 group-hover:scale-110 ${
+                                product.publicStock <= 0 ? "grayscale-[0.45] saturate-50" : ""
+                              }`}
                               unoptimized={product.image.startsWith("data:")}
                             />
+                            {product.publicStock <= 0 ? (
+                              <div className="absolute inset-0 bg-white/35" />
+                            ) : null}
                             <div className="absolute inset-0 bg-gradient-to-t from-[#0a1628]/70 via-transparent to-transparent" />
                             <div className="absolute left-2.5 top-2.5 z-10 inline-flex items-center rounded-full bg-[#0a2472] px-2 py-1 text-[10px] font-semibold text-white">
-                              {product.tag}
+                              {product.publicStock > 0 ? product.tag : "Agotado"}
                             </div>
                           </div>
 
@@ -422,9 +547,12 @@ export default function ProductCatalog({
                                 src={product.image || defaultImage}
                                 alt={`${product.name} vista ampliada`}
                                 fill
-                                className="object-contain p-3"
+                                className={`object-contain p-3 ${product.publicStock <= 0 ? "grayscale-[0.45] saturate-50" : ""}`}
                                 unoptimized={product.image.startsWith("data:")}
                               />
+                              {product.publicStock <= 0 ? (
+                                <div className="absolute inset-0 bg-white/30" />
+                              ) : null}
                             </div>
                             <div className="mt-3 flex items-center justify-between gap-3">
                               <div className="min-w-0">
@@ -438,13 +566,18 @@ export default function ProductCatalog({
                           </div>
 
                           <div className="space-y-2.5 p-3">
-                            <div className="space-y-1">
-                              <h3 className="line-clamp-2 font-mono text-sm font-bold leading-snug text-foreground sm:text-base">
-                                {product.name}
-                              </h3>
-                              <p className="hidden line-clamp-2 text-xs leading-5 text-muted-foreground sm:block">
-                                {product.description}
+                          <div className="space-y-1">
+                            <h3 className="line-clamp-2 font-mono text-sm font-bold leading-snug text-foreground sm:text-base">
+                              {product.name}
+                            </h3>
+                            {product.publicStock <= 0 ? (
+                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-rose-600">
+                                Agotado
                               </p>
+                            ) : null}
+                            <p className="hidden line-clamp-2 text-xs leading-5 text-muted-foreground sm:block">
+                              {product.description}
+                            </p>
                             </div>
 
                             <div className="flex items-center justify-between rounded-2xl bg-[#0a2472]/5 px-2.5 py-2">
@@ -519,7 +652,15 @@ export default function ProductCatalog({
         </div>
       </div>
 
-      <Dialog open={Boolean(selectedProduct)} onOpenChange={(open) => !open && setSelectedProductId(null)}>
+      <Dialog
+        open={Boolean(selectedProduct)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedProductId(null)
+            setSelectedVariantId("")
+          }
+        }}
+      >
         {selectedProduct ? (
           <DialogContent className="max-h-[90vh] w-[calc(100vw-1rem)] max-w-5xl overflow-y-auto rounded-3xl px-4 sm:w-[calc(100vw-2rem)] sm:px-6">
             <DialogHeader>
@@ -548,9 +689,13 @@ export default function ProductCatalog({
                       <h3 className="mt-2 font-mono text-2xl font-bold text-slate-950">{selectedProduct.name}</h3>
                     </div>
                     <div className="rounded-2xl bg-[#0a2472]/5 px-4 py-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Precio sugerido</p>
+                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                        Precio sugerido
+                      </p>
                       <p className="mt-1 text-2xl font-bold text-[#0a2472]">
-                        {selectedProduct.salePrice > 0 ? formatCurrency(selectedProduct.salePrice) : "Consultar"}
+                        {(selectedVariant?.salePrice ?? selectedProduct.salePrice) > 0
+                          ? formatCurrency(selectedVariant?.salePrice ?? selectedProduct.salePrice)
+                          : "Consultar"}
                       </p>
                     </div>
                   </div>
@@ -559,6 +704,34 @@ export default function ProductCatalog({
                     <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Descripcion</h3>
                     <p className="mt-3 text-sm leading-7 text-slate-600">{selectedProduct.description}</p>
                   </div>
+
+                  {selectedProduct.variants.length > 0 ? (
+                    <div className="mt-4 rounded-2xl bg-slate-50 p-4">
+                      <p className="text-xs text-slate-500">{selectedProduct.variantLabel || "Variantes"}</p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {selectedProduct.variants.map((variant) => (
+                          <button
+                            key={variant.id}
+                            type="button"
+                            onClick={() => setSelectedVariantId(variant.id)}
+                            className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium transition ${
+                              (selectedVariant?.id ?? selectedProduct.variants[0]?.id) === variant.id
+                                ? "border-[#0a2472] bg-[#0a2472] text-white"
+                                : "border-slate-200 bg-white text-slate-700"
+                            }`}
+                          >
+                            <span>{variant.name}</span>
+                            {variant.colorHex ? (
+                              <span
+                                className="h-4 w-4 rounded-full border border-white/40"
+                                style={{ backgroundColor: variant.colorHex }}
+                              />
+                            ) : null}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="space-y-4">
@@ -611,3 +784,4 @@ export default function ProductCatalog({
     </section>
   )
 }
+

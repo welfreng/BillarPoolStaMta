@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { jsPDF } from 'jspdf';
 import { BarChart3, Download, Printer, ReceiptText, Share2 } from 'lucide-react';
 import {
@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatCurrency, formatDateTime, formatNumber, getProductById } from '@/lib/admin/calculations';
 import { SITE_LOGO } from '@/lib/branding';
-import type { Product, Sale } from '@/lib/admin/types';
+import type { Product, Sale, ServiceOrder } from '@/lib/admin/types';
 
 type InvoiceLine = {
   quantity: number;
@@ -27,6 +27,15 @@ type InvoiceGift = {
   quantity: number;
   name: string;
 };
+
+function normalizeWhatsappPhone(phone: string) {
+  const digits = phone.replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits.startsWith('57')) return digits;
+  if (digits.length === 10) return `57${digits}`;
+  if (digits.startsWith('0') && digits.length > 10) return digits.slice(1);
+  return digits;
+}
 
 function escapeHtml(value: string) {
   return value
@@ -128,6 +137,11 @@ async function buildInvoicePdf({
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
   doc.text(sale.customerName || 'Cliente mostrador', marginX + 4, cursorY + 15);
+  if (sale.customerPhone) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text(`Telefono: ${sale.customerPhone}`, marginX + 4, cursorY + 20);
+  }
   doc.text(responsibleUser, marginX + 110, cursorY + 15);
 
   cursorY += 34;
@@ -241,46 +255,75 @@ export function SaleDetailsDialog({
   onOpenChange,
   sale,
   sales,
+  services,
   products,
-  showAdminView = true,
+  hideFinancialDetails = false,
+  initialTab = 'details',
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   sale: Sale | null;
   sales: Sale[];
+  services: ServiceOrder[];
   products: Product[];
-  showAdminView?: boolean;
+  hideFinancialDetails?: boolean;
+  initialTab?: 'details' | 'invoice';
 }) {
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [activeTab, setActiveTab] = useState<'details' | 'invoice'>(initialTab);
+
+  useEffect(() => {
+    if (!open) return;
+    setActiveTab(initialTab);
+  }, [initialTab, open, sale?.id]);
 
   if (!sale) return null;
 
   const groupedSales = sales.filter((item) => (item.saleBatchId ?? item.id) === (sale.saleBatchId ?? sale.id));
   const baseSale = groupedSales[0] ?? sale;
+  const linkedServices = services.filter(
+    (service) =>
+      service.source === 'sale-addon' &&
+      groupedSales.some((groupedSale) => service.saleId === groupedSale.id)
+  );
   const lineItems = groupedSales.flatMap((item) => item.lineItems);
-  const giftItems = groupedSales.flatMap((item) => item.giftItems);
-  const netRevenue = groupedSales.reduce((sum, item) => sum + item.totalSale - (item.returnedSaleAmount ?? 0), 0);
+  const giftItems = groupedSales.flatMap((item) => item.giftItems).filter((item) => item.kind !== 'auto-material');
+  const automaticMaterialItems = groupedSales.flatMap((item) => item.giftItems).filter((item) => item.kind === 'auto-material');
+  const serviceRevenue = linkedServices.reduce((sum, item) => sum + item.totalRevenue, 0);
+  const serviceCost = linkedServices.reduce(
+    (sum, item) => sum + (item.totalCost ?? item.totalOperationalCost ?? item.totalMaterialCost),
+    0
+  );
+  const netRevenue = groupedSales.reduce((sum, item) => sum + item.totalSale - (item.returnedSaleAmount ?? 0), 0) + serviceRevenue;
   const totalCost = groupedSales.reduce((sum, item) => sum + item.totalCost, 0);
-  const netCost = groupedSales.reduce((sum, item) => sum + item.totalCost - (item.returnedCostAmount ?? 0), 0);
+  const netCost = groupedSales.reduce((sum, item) => sum + item.totalCost - (item.returnedCostAmount ?? 0), 0) + serviceCost;
   const netProfit = groupedSales.reduce(
     (sum, item) => sum + item.grossProfit - ((item.returnedSaleAmount ?? 0) - (item.returnedCostAmount ?? 0)),
     0
-  );
+  ) + (serviceRevenue - serviceCost);
   const netUnits = groupedSales.reduce((sum, item) => sum + item.quantity - (item.returnedQuantity ?? 0), 0);
-  const subtotal = lineItems.reduce((sum, item) => sum + item.totalSale, 0);
+  const subtotal = lineItems.reduce((sum, item) => sum + item.totalSale, 0) + serviceRevenue;
   const returnedUnits = groupedSales.reduce((sum, item) => sum + (item.returnedQuantity ?? 0), 0);
   const returnedAmount = groupedSales.reduce((sum, item) => sum + (item.returnedSaleAmount ?? 0), 0);
   const returnedCost = groupedSales.reduce((sum, item) => sum + (item.returnedCostAmount ?? 0), 0);
   const invoiceLogoUrl = typeof window !== 'undefined' ? `${window.location.origin}${SITE_LOGO}` : SITE_LOGO;
-  const invoiceLines: InvoiceLine[] = lineItems.map((item) => {
-    const product = getProductById(products, item.productId);
-    return {
-      quantity: item.quantity,
-      name: product?.name ?? 'Producto',
-      unitPrice: item.unitPrice,
-      total: item.totalSale,
-    };
-  });
+  const invoiceLines: InvoiceLine[] = groupedSales.flatMap((saleItem) =>
+    saleItem.lineItems.map((item) => {
+      const product = getProductById(products, item.productId);
+      const lineServiceRevenue = linkedServices
+        .filter((service) => service.saleId === saleItem.id)
+        .reduce((sum, service) => sum + service.totalRevenue, 0);
+      const effectiveUnitPrice =
+        item.quantity > 0 ? item.unitPrice + lineServiceRevenue / item.quantity : item.unitPrice;
+
+      return {
+        quantity: item.quantity,
+        name: `${product?.name ?? 'Producto'}${item.variantName ? ` - ${item.variantName}` : ''}`,
+        unitPrice: effectiveUnitPrice,
+        total: item.totalSale + lineServiceRevenue,
+      };
+    })
+  );
   const invoiceGifts: InvoiceGift[] = giftItems.map((item) => {
     const product = getProductById(products, item.productId);
     return {
@@ -367,6 +410,7 @@ export function SaleDetailsDialog({
               <div class="box" style="min-width:280px;">
                 <p class="muted">Cliente</p>
                 <p style="font-weight:700; margin-top:6px;">${escapeHtml(baseSale.customerName)}</p>
+                ${baseSale.customerPhone ? `<p class="muted" style="margin-top:8px;">Telefono: ${escapeHtml(baseSale.customerPhone)}</p>` : ''}
                 <p class="muted" style="margin-top:8px;">Responsable: ${escapeHtml(baseSale.responsibleUser)}</p>
               </div>
             </div>
@@ -462,8 +506,10 @@ export function SaleDetailsDialog({
       const pdfBlob = doc.output('blob');
       const pdfFile = new File([pdfBlob], fileNameFromSale(baseSale), { type: 'application/pdf' });
       const shareMessage = `Factura de ${baseSale.customerName} - ${formatCurrency(netRevenue)}`;
+      const whatsappPhone = normalizeWhatsappPhone(baseSale.customerPhone ?? '');
 
       if (
+        !whatsappPhone &&
         navigator.share &&
         navigator.canShare &&
         navigator.canShare({
@@ -479,7 +525,11 @@ export function SaleDetailsDialog({
       }
 
       doc.save(pdfFile.name);
-      window.open(`https://wa.me/?text=${encodeURIComponent(`${shareMessage}. Adjunto el PDF descargado.`)}`, '_blank');
+      const whatsappMessage = `${shareMessage}. Te envio la factura. Si el PDF no se adjunta automaticamente, ya quedo descargado en este dispositivo.`;
+      const whatsappUrl = whatsappPhone
+        ? `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(whatsappMessage)}`
+        : `https://wa.me/?text=${encodeURIComponent(`${shareMessage}. Adjunto el PDF descargado.`)}`;
+      window.open(whatsappUrl, '_blank');
     } finally {
       setIsExportingPdf(false);
     }
@@ -487,34 +537,34 @@ export function SaleDetailsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] w-[calc(100vw-1rem)] max-w-[96vw] overflow-y-auto px-4 sm:w-[calc(100vw-2rem)] lg:max-w-[900px] lg:px-5 xl:max-w-[980px] xl:px-6">
+      <DialogContent className="max-h-[92vh] w-[calc(100vw-1rem)] max-w-[96vw] overflow-y-auto px-4 sm:w-[calc(100vw-2rem)] sm:px-5 lg:max-w-4xl lg:px-6">
         <DialogHeader>
           <DialogTitle>Detalle de la venta</DialogTitle>
           <DialogDescription>
-            Revisa la utilidad en vista administrativa o cambia a la factura del cliente para imprimir, descargar o compartir el PDF.
+            Revisa el detalle de la venta y cambia a la factura del cliente para imprimir, descargar o compartir el PDF.
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue={showAdminView ? 'admin' : 'invoice'} className="space-y-4">
-          {showAdminView ? (
-            <TabsList className="grid w-full grid-cols-2 rounded-2xl bg-slate-100 p-1">
-              <TabsTrigger value="admin" className="rounded-xl">
-                <BarChart3 className="mr-2 h-4 w-4" />
-                Administracion
-              </TabsTrigger>
-              <TabsTrigger value="invoice" className="rounded-xl">
-                <ReceiptText className="mr-2 h-4 w-4" />
-                Factura cliente
-              </TabsTrigger>
-            </TabsList>
-          ) : null}
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'details' | 'invoice')} className="space-y-4">
+          <TabsList className="grid w-full grid-cols-2 rounded-2xl bg-slate-100 p-1">
+            <TabsTrigger value="details" className="rounded-xl">
+              <BarChart3 className="mr-2 h-4 w-4" />
+              Detalle venta
+            </TabsTrigger>
+            <TabsTrigger value="invoice" className="rounded-xl">
+              <ReceiptText className="mr-2 h-4 w-4" />
+              Factura cliente
+            </TabsTrigger>
+          </TabsList>
 
-          {showAdminView ? (
-            <TabsContent value="admin" className="space-y-4">
+          <TabsContent value="details" className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <p className="text-xs text-slate-500">Cliente</p>
                 <p className="mt-1 font-semibold text-slate-950">{baseSale.customerName}</p>
+                {baseSale.customerPhone ? (
+                  <p className="mt-1 text-sm text-slate-500">Telefono: {baseSale.customerPhone}</p>
+                ) : null}
                 <p className="mt-1 text-sm text-slate-500">{formatDateTime(baseSale.soldAt)}</p>
               </div>
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -524,27 +574,42 @@ export function SaleDetailsDialog({
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className={`grid gap-3 sm:grid-cols-2 ${hideFinancialDetails ? 'xl:grid-cols-3' : 'xl:grid-cols-4'}`}>
               <div className="rounded-2xl border border-cyan-100 bg-cyan-50/70 p-4">
                 <p className="text-xs text-slate-500">Cantidad neta</p>
                 <p className="mt-1 font-semibold text-slate-950">{formatNumber(netUnits)} uds</p>
               </div>
               <div className="rounded-2xl border border-cyan-100 bg-cyan-50/70 p-4">
-                <p className="text-xs text-slate-500">Ingreso neto</p>
+                <p className="text-xs text-slate-500">Total factura</p>
                 <p className="mt-1 font-semibold text-slate-950">{formatCurrency(netRevenue)}</p>
               </div>
-              <div className="rounded-2xl border border-amber-100 bg-amber-50/80 p-4">
-                <p className="text-xs text-slate-500">Costo neto</p>
-                <p className="mt-1 font-semibold text-amber-800">{formatCurrency(netCost)}</p>
-              </div>
-              <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4">
-                <p className="text-xs text-slate-500">Utilidad neta</p>
-                <p className="mt-1 font-semibold text-emerald-800">{formatCurrency(netProfit)}</p>
-              </div>
+              {returnedUnits > 0 || returnedAmount > 0 ? (
+                <div className="rounded-2xl border border-rose-100 bg-rose-50/70 p-4">
+                  <p className="text-xs text-slate-500">Devoluciones</p>
+                  <p className="mt-1 font-semibold text-rose-700">{formatNumber(returnedUnits)} uds</p>
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-xs text-slate-500">Estado</p>
+                  <p className="mt-1 font-semibold text-slate-950">Venta activa</p>
+                </div>
+              )}
+              {!hideFinancialDetails ? (
+                <>
+                  <div className="rounded-2xl border border-amber-100 bg-amber-50/80 p-4">
+                    <p className="text-xs text-slate-500">Costo neto</p>
+                    <p className="mt-1 font-semibold text-amber-800">{formatCurrency(netCost)}</p>
+                  </div>
+                  <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4">
+                    <p className="text-xs text-slate-500">Utilidad neta</p>
+                    <p className="mt-1 font-semibold text-emerald-800">{formatCurrency(netProfit)}</p>
+                  </div>
+                </>
+              ) : null}
             </div>
 
             {(returnedUnits > 0 || returnedAmount > 0) && (
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className={`grid gap-3 ${hideFinancialDetails ? 'sm:grid-cols-2' : 'sm:grid-cols-3'}`}>
                 <div className="rounded-2xl border border-rose-100 bg-rose-50/70 p-4">
                   <p className="text-xs text-slate-500">Unidades devueltas</p>
                   <p className="mt-1 font-semibold text-rose-700">{formatNumber(returnedUnits)} uds</p>
@@ -553,15 +618,19 @@ export function SaleDetailsDialog({
                   <p className="text-xs text-slate-500">Valor devuelto</p>
                   <p className="mt-1 font-semibold text-rose-700">{formatCurrency(returnedAmount)}</p>
                 </div>
-                <div className="rounded-2xl border border-rose-100 bg-rose-50/70 p-4">
-                  <p className="text-xs text-slate-500">Costo devuelto</p>
-                  <p className="mt-1 font-semibold text-rose-700">{formatCurrency(returnedCost)}</p>
-                </div>
+                {!hideFinancialDetails ? (
+                  <div className="rounded-2xl border border-rose-100 bg-rose-50/70 p-4">
+                    <p className="text-xs text-slate-500">Costo devuelto</p>
+                    <p className="mt-1 font-semibold text-rose-700">{formatCurrency(returnedCost)}</p>
+                  </div>
+                ) : null}
               </div>
             )}
 
             <div className="rounded-2xl border border-slate-200 bg-white p-4">
-              <h3 className="text-sm font-semibold text-slate-950">Detalle interno de productos</h3>
+              <h3 className="text-sm font-semibold text-slate-950">
+                {hideFinancialDetails ? 'Detalle de productos' : 'Detalle interno de productos'}
+              </h3>
               <div className="mt-4 space-y-3">
                 {lineItems.map((item, index) => {
                   const product = getProductById(products, item.productId);
@@ -573,21 +642,63 @@ export function SaleDetailsDialog({
                       <div className="flex items-start justify-between gap-4">
                         <div>
                           <p className="font-medium text-slate-900">
-                            {formatNumber(item.quantity)} x {product?.name ?? 'Producto'}
+                            {formatNumber(item.quantity)} x {product?.name ?? 'Producto'}{item.variantName ? ` - ${item.variantName}` : ''}
                           </p>
                           <p className="text-sm text-slate-500">Precio unitario: {formatCurrency(item.unitPrice)}</p>
-                          <p className="text-sm text-slate-500">Costo unitario: {formatCurrency(item.realUnitCost)}</p>
+                          {!hideFinancialDetails ? (
+                            <p className="text-sm text-slate-500">Costo unitario: {formatCurrency(item.realUnitCost)}</p>
+                          ) : null}
                         </div>
                         <div className="text-right">
-                          <p className="text-xs text-slate-500">Venta</p>
+                          <p className="text-xs text-slate-500">Total</p>
                           <p className="font-medium text-slate-900">{formatCurrency(item.totalSale)}</p>
-                          <p className="mt-2 text-xs text-slate-500">Costo</p>
-                          <p className="font-medium text-amber-800">{formatCurrency(item.totalCost)}</p>
+                          {!hideFinancialDetails ? (
+                            <>
+                              <p className="mt-2 text-xs text-slate-500">Costo</p>
+                              <p className="font-medium text-amber-800">{formatCurrency(item.totalCost)}</p>
+                            </>
+                          ) : null}
                         </div>
                       </div>
                     </div>
                   );
                 })}
+                {!hideFinancialDetails && linkedServices.length > 0 ? (
+                  linkedServices.map((service, index) => (
+                    <div
+                      key={`${service.id}-${index}`}
+                      className="rounded-2xl border border-cyan-200 bg-cyan-50/70 p-4"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="font-medium text-slate-900">
+                            Servicio: {service.serviceCategory || 'torno'}
+                          </p>
+                          <p className="text-sm text-slate-500">
+                            {service.cueReference || 'Sin referencia'}
+                          </p>
+                          <p className="text-sm text-slate-500">
+                            Tipo: {service.serviceType === 'tip-installation'
+                              ? 'Instalacion de casquillo'
+                              : service.serviceType === 'tip-ferrule-installation'
+                                ? 'Instalacion de casquillo y virola'
+                                : 'Instalacion de extension'}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-slate-500">Total servicio</p>
+                          <p className="font-medium text-slate-900">{formatCurrency(service.totalRevenue)}</p>
+                          <p className="mt-2 text-xs text-slate-500">Costo servicio</p>
+                          <p className="font-medium text-amber-800">
+                            {formatCurrency(service.totalCost ?? service.totalOperationalCost ?? service.totalMaterialCost)}
+                          </p>
+                          <p className="mt-2 text-xs text-slate-500">Utilidad</p>
+                          <p className="font-medium text-emerald-800">{formatCurrency(service.grossProfit)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : null}
               </div>
             </div>
 
@@ -609,10 +720,12 @@ export function SaleDetailsDialog({
                             </p>
                             <p className="text-sm text-slate-500">Registrado como obsequio</p>
                           </div>
-                          <div className="text-right">
-                            <p className="text-xs text-slate-500">Costo obsequio</p>
-                            <p className="font-medium text-violet-700">{formatCurrency(giftItem.totalCost)}</p>
-                          </div>
+                          {!hideFinancialDetails ? (
+                            <div className="text-right">
+                              <p className="text-xs text-slate-500">Costo obsequio</p>
+                              <p className="font-medium text-violet-700">{formatCurrency(giftItem.totalCost)}</p>
+                            </div>
+                          ) : null}
                         </div>
                       );
                     })}
@@ -620,27 +733,48 @@ export function SaleDetailsDialog({
                 ) : (
                   <p className="mt-4 text-sm text-slate-500">Esta venta no tuvo productos obsequiados.</p>
                 )}
+                {automaticMaterialItems.length > 0 ? (
+                  <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <p className="text-sm font-medium text-slate-900">Descuentos internos automaticos</p>
+                    <div className="mt-2 space-y-2 text-sm text-slate-500">
+                      {automaticMaterialItems.map((item, index) => {
+                        const product = getProductById(products, item.productId);
+                        return (
+                          <p key={`${item.productId}-${index}`}>
+                            {formatNumber(item.quantity)} x {product?.name ?? 'Material interno'}
+                          </p>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <h3 className="text-sm font-semibold text-slate-950">Resumen interno</h3>
+                <h3 className="text-sm font-semibold text-slate-950">
+                  {hideFinancialDetails ? 'Resumen de la venta' : 'Resumen interno'}
+                </h3>
                 <div className="mt-4 space-y-3 text-sm">
                   <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
                     <span className="text-slate-500">Subtotal productos</span>
                     <span className="font-medium text-slate-900">{formatCurrency(subtotal)}</span>
                   </div>
-                  <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
-                    <span className="text-slate-500">Costo total original</span>
-                    <span className="font-medium text-slate-900">{formatCurrency(totalCost)}</span>
-                  </div>
+                  {!hideFinancialDetails ? (
+                    <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
+                      <span className="text-slate-500">Costo total original</span>
+                      <span className="font-medium text-slate-900">{formatCurrency(totalCost)}</span>
+                    </div>
+                  ) : null}
                   <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
                     <span className="text-slate-500">Ingreso neto actual</span>
                     <span className="font-medium text-slate-900">{formatCurrency(netRevenue)}</span>
                   </div>
-                  <div className="flex items-center justify-between rounded-xl bg-emerald-50 px-3 py-2">
-                    <span className="text-emerald-700">Utilidad neta</span>
-                    <span className="font-semibold text-emerald-800">{formatCurrency(netProfit)}</span>
-                  </div>
+                  {!hideFinancialDetails ? (
+                    <div className="flex items-center justify-between rounded-xl bg-emerald-50 px-3 py-2">
+                      <span className="text-emerald-700">Utilidad neta</span>
+                      <span className="font-semibold text-emerald-800">{formatCurrency(netProfit)}</span>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -651,8 +785,7 @@ export function SaleDetailsDialog({
                 {baseSale.notes?.trim() ? baseSale.notes : 'Sin observaciones registradas.'}
               </p>
             </div>
-            </TabsContent>
-          ) : null}
+          </TabsContent>
 
           <TabsContent value="invoice" className="space-y-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
@@ -672,7 +805,11 @@ export function SaleDetailsDialog({
               </Button>
               <Button type="button" className="rounded-xl" onClick={() => void handleSharePdf()} disabled={isExportingPdf}>
                 <Share2 className="mr-2 h-4 w-4" />
-                {isExportingPdf ? 'Preparando...' : 'Compartir PDF por WhatsApp'}
+                {isExportingPdf
+                  ? 'Preparando...'
+                  : baseSale.customerPhone
+                    ? 'Enviar al cliente por WhatsApp'
+                    : 'Compartir por WhatsApp'}
               </Button>
             </div>
 
@@ -693,6 +830,9 @@ export function SaleDetailsDialog({
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
                   <p className="text-slate-500">Cliente</p>
                   <p className="mt-1 font-semibold text-slate-950">{baseSale.customerName}</p>
+                  {baseSale.customerPhone ? (
+                    <p className="mt-2 text-slate-500">Telefono: {baseSale.customerPhone}</p>
+                  ) : null}
                   <p className="mt-2 text-slate-500">Atendido por: {baseSale.responsibleUser}</p>
                 </div>
               </div>
@@ -711,11 +851,10 @@ export function SaleDetailsDialog({
                   <p>Total</p>
                 </div>
                 <div className="divide-y divide-slate-200">
-                  {lineItems.map((item, index) => {
-                    const product = getProductById(products, item.productId);
+                  {invoiceLines.map((item, index) => {
                     return (
                       <div
-                        key={`${item.productId}-${index}`}
+                        key={`${item.name}-${index}`}
                         className="grid gap-3 px-4 py-4 text-sm text-slate-700 md:grid-cols-[0.8fr_2.2fr_1fr_1fr] md:items-center"
                       >
                         <div className="grid grid-cols-2 gap-3 md:contents">
@@ -724,7 +863,7 @@ export function SaleDetailsDialog({
                         </div>
                         <div className="grid grid-cols-2 gap-3 md:contents">
                           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 md:hidden">Producto</p>
-                          <p>{product?.name ?? 'Producto'}</p>
+                          <p>{item.name}</p>
                         </div>
                         <div className="grid grid-cols-2 gap-3 md:contents">
                           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 md:hidden">Valor unitario</p>
@@ -732,7 +871,7 @@ export function SaleDetailsDialog({
                         </div>
                         <div className="grid grid-cols-2 gap-3 md:contents">
                           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 md:hidden">Total</p>
-                          <p className="font-medium text-slate-900">{formatCurrency(item.totalSale)}</p>
+                          <p className="font-medium text-slate-900">{formatCurrency(item.total)}</p>
                         </div>
                       </div>
                     );

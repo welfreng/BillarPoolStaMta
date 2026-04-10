@@ -26,6 +26,7 @@ const pageTitles: Record<string, string> = {
   '/dashboard/web': 'Pagina web',
   '/dashboard/reportes': 'Reportes iniciales',
   '/dashboard/ventas': 'Gestion de ventas',
+  '/dashboard/autorizaciones': 'Autorizaciones de ventas',
   '/dashboard/servicios': 'Servicios de torno',
   '/dashboard/proveedores': 'Gestion de proveedores',
   '/dashboard/usuarios': 'Usuarios y roles',
@@ -84,6 +85,7 @@ export function AdminHeader() {
       { label: 'Productos', helper: 'Gestionar catalogo y stock', href: '/dashboard/productos' },
       { label: 'Proveedores', helper: 'Gestionar proveedores', href: '/dashboard/proveedores' },
       { label: 'Ventas', helper: 'Ir al modulo de ventas', href: '/dashboard/ventas' },
+      { label: 'Autorizaciones', helper: 'Revisar solicitudes de vendedores', href: '/dashboard/autorizaciones' },
       { label: 'Registrar venta', helper: 'Abrir el modulo de ventas', href: '/dashboard/ventas' },
       { label: 'Servicios', helper: 'Registrar trabajos del torno', href: '/dashboard/servicios' },
       { label: 'Registrar servicio', helper: 'Abrir el modulo de servicios', href: '/dashboard/servicios' },
@@ -105,7 +107,11 @@ export function AdminHeader() {
       { label: 'Inventario', helper: 'Consultar stock y precios', href: '/dashboard/inventario' },
     ];
 
-    return role === 'sales' ? salesItems : adminItems;
+    return role === 'sales'
+      ? salesItems
+      : role === 'courier'
+        ? [{ label: 'Dashboard', helper: 'Ir al panel principal', href: '/dashboard' }]
+        : adminItems;
   }, [role]);
   const filteredItems = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -123,18 +129,17 @@ export function AdminHeader() {
   useEffect(() => {
     if (role !== 'admin') {
       setNotifications([]);
-      return;
+    } else {
+      const notificationsQuery = query(
+        collection(db, 'admin-notifications'),
+        orderBy('createdAt', 'desc'),
+        limit(8)
+      );
+
+      return onSnapshot(notificationsQuery, (snapshot) => {
+        setNotifications(snapshot.docs.map((item) => mapNotificationDocument(item.id, item.data())));
+      });
     }
-
-    const notificationsQuery = query(
-      collection(db, 'admin-notifications'),
-      orderBy('createdAt', 'desc'),
-      limit(8)
-    );
-
-    return onSnapshot(notificationsQuery, (snapshot) => {
-      setNotifications(snapshot.docs.map((item) => mapNotificationDocument(item.id, item.data())));
-    });
   }, [role]);
 
   const navigateToItem = (href: string) => {
@@ -223,8 +228,8 @@ export function AdminHeader() {
                 <DropdownMenuLabel className="px-4 py-3">
                   <div>
                     <p className="text-sm font-semibold text-slate-950">Notificaciones</p>
-                    <p className="text-xs font-normal text-slate-500">
-                      Avisos cuando vendedores registran ventas o servicios.
+                      <p className="text-xs font-normal text-slate-500">
+                      Avisos cuando vendedores registran ventas, servicios o solicitudes.
                     </p>
                   </div>
                 </DropdownMenuLabel>
@@ -270,7 +275,7 @@ export function AdminHeader() {
                 {user?.displayName ?? 'Administrador'}
               </p>
               <p className="truncate text-xs text-slate-500">
-                {user?.email} · {role === 'sales' ? 'Rol ventas' : 'Rol administrador'}
+                {user?.email} · {role === 'sales' ? 'Rol ventas' : role === 'courier' ? 'Rol domiciliario' : 'Rol administrador'}
               </p>
             </div>
             <Button variant="outline" size="sm" onClick={logout} className="rounded-xl self-start sm:self-auto">

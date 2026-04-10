@@ -42,7 +42,7 @@ export default function ServiciosPage() {
           if (!service.performedAt.startsWith(currentMonth)) return accumulator;
           accumulator.count += 1;
           accumulator.revenue += service.totalRevenue;
-          accumulator.cost += service.totalMaterialCost;
+          accumulator.cost += service.totalCost ?? service.totalMaterialCost;
           accumulator.profit += service.grossProfit;
           return accumulator;
         },
@@ -50,6 +50,37 @@ export default function ServiciosPage() {
       ),
     [filteredServices]
   );
+
+  const buildMaterialChips = (service: (typeof filteredServices)[number]) =>
+    service.materials.map((item) => {
+      const product = getProductById(products, item.productId);
+      return `${product?.name ?? 'Producto'} x${formatNumber(item.quantity)}`;
+    });
+
+  const buildMaterialMeta = (service: (typeof filteredServices)[number]) => {
+    const materialChips = buildMaterialChips(service);
+    const visibleCount = service.source === 'sale-addon' ? 1 : isSalesUser ? 2 : 3;
+    const visibleChips = materialChips.slice(0, visibleCount);
+    const hiddenCount = Math.max(0, materialChips.length - visibleCount);
+    const detailLabel =
+      service.source === 'sale-addon'
+        ? hiddenCount > 0
+          ? `Asociado a venta · ${formatNumber(materialChips.length)} materiales`
+          : 'Asociado a venta'
+        : materialChips.length > 1
+          ? `${formatNumber(materialChips.length)} materiales`
+          : materialChips.length === 1
+            ? '1 material'
+            : 'Sin materiales';
+
+    return {
+      materialChips,
+      visibleChips,
+      hiddenCount,
+      detailLabel,
+      isSaleAddon: service.source === 'sale-addon',
+    };
+  };
 
   return (
     <div className="space-y-6">
@@ -88,9 +119,9 @@ export default function ServiciosPage() {
               <p className="mt-2 text-sm text-slate-500">Total cobrado en {currentMonth}.</p>
             </div>
             <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4 shadow-sm sm:p-6">
-              <p className="text-sm text-amber-800">Costo de materiales</p>
+              <p className="text-sm text-amber-800">Costo del servicio</p>
               <p className="mt-3 text-3xl font-semibold text-amber-950">{formatCurrency(monthTotals.cost)}</p>
-              <p className="mt-2 text-sm text-amber-900">Consumo real descontado del inventario.</p>
+              <p className="mt-2 text-sm text-amber-900">Incluye materiales y costo operativo cuando aplique.</p>
             </div>
             <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm sm:p-6">
               <p className="text-sm text-emerald-800">Utilidad del torno</p>
@@ -115,16 +146,29 @@ export default function ServiciosPage() {
         {filteredServices.length > 0 ? (
           <>
             <div className="space-y-3 md:hidden">
-              {filteredServices.map((service) => {
-                const materialsSummary = service.materials
-                  .map((item) => {
-                    const product = getProductById(products, item.productId);
-                    return `${product?.name ?? 'Producto'} x ${formatNumber(item.quantity)}`;
-                  })
-                  .join(', ');
+                {filteredServices.map((service) => {
+                  const { materialChips, hiddenCount, isSaleAddon } = buildMaterialMeta(service);
+                  const materialsSummary = materialChips.join(', ');
+                  const rowHoverSummary = [
+                    serviceTypeLabels[service.serviceType],
+                    `Cliente: ${service.customerName}`,
+                    `Referencia: ${service.cueReference}`,
+                    `Categoria: ${service.serviceCategory || 'General'}`,
+                    `Valor: ${formatCurrency(service.totalRevenue)}`,
+                    `Costo: ${formatCurrency(service.totalCost ?? service.totalMaterialCost)}`,
+                    !isSalesUser ? `Utilidad: ${formatCurrency(service.grossProfit)}` : '',
+                    `Materiales: ${materialsSummary}`,
+                    `Fecha: ${formatDateTime(service.performedAt)}`,
+                  ]
+                    .filter(Boolean)
+                    .join('\n');
 
-                return (
-                  <article key={service.id} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                  return (
+                    <article
+                      key={service.id}
+                      className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4"
+                      title={rowHoverSummary}
+                    >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="font-medium text-slate-900">{serviceTypeLabels[service.serviceType]}</p>
@@ -134,7 +178,13 @@ export default function ServiciosPage() {
                     </div>
                     <div className="mt-3 space-y-2 text-sm text-slate-600">
                       <p><span className="font-medium text-slate-800">Cliente:</span> {service.customerName}</p>
-                      <p><span className="font-medium text-slate-800">Materiales:</span> {materialsSummary}</p>
+                      <p>
+                        <span className="font-medium text-slate-800">Materiales:</span>{' '}
+                        {isSaleAddon && hiddenCount > 0
+                          ? `${materialChips[0]} + ${formatNumber(hiddenCount)} mas`
+                          : materialsSummary}
+                      </p>
+                      <p><span className="font-medium text-slate-800">Categoria:</span> {service.serviceCategory || 'General'}</p>
                       <p><span className="font-medium text-slate-800">Fecha:</span> {formatDateTime(service.performedAt)}</p>
                       {service.notes ? <p><span className="font-medium text-slate-800">Nota:</span> {service.notes}</p> : null}
                       {!isSalesUser ? (
@@ -149,56 +199,90 @@ export default function ServiciosPage() {
             </div>
 
             <div className="hidden min-w-0 md:block">
-            <Table className="min-w-[900px]">
+            <div className="mb-2 text-xs text-slate-500">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
+            <div className="overflow-x-auto pb-2">
+            <Table className={isSalesUser ? 'min-w-[1080px]' : 'min-w-[900px]'}>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Servicio</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Materiales</TableHead>
-                  <TableHead>Valor cobrado</TableHead>
+                  <TableHead className={isSalesUser ? 'w-[200px]' : undefined}>Servicio</TableHead>
+                  <TableHead className={isSalesUser ? 'w-[190px]' : undefined}>Cliente</TableHead>
+                  <TableHead className={isSalesUser ? 'w-[360px]' : undefined}>Materiales</TableHead>
+                  <TableHead className={isSalesUser ? 'w-[150px] whitespace-nowrap' : undefined}>Valor cobrado</TableHead>
                   {!isSalesUser ? <TableHead>Costo</TableHead> : null}
                   {!isSalesUser ? <TableHead>Utilidad</TableHead> : null}
-                  <TableHead>Fecha</TableHead>
+                  <TableHead className={isSalesUser ? 'w-[160px] whitespace-nowrap' : undefined}>Fecha</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredServices.map((service) => {
-                  const materialsSummary = service.materials
-                    .map((item) => {
-                      const product = getProductById(products, item.productId);
-                      return `${product?.name ?? 'Producto'} x ${formatNumber(item.quantity)}`;
-                    })
-                    .join(', ');
+                    const { materialChips, visibleChips, hiddenCount, detailLabel, isSaleAddon } = buildMaterialMeta(service);
+                    const materialsSummary = materialChips.join(', ');
+                    const rowHoverSummary = [
+                      serviceTypeLabels[service.serviceType],
+                      `Cliente: ${service.customerName}`,
+                      `Responsable: ${service.responsibleUser}`,
+                      `Referencia: ${service.cueReference}`,
+                      `Categoria: ${service.serviceCategory || 'General'}`,
+                      `Valor: ${formatCurrency(service.totalRevenue)}`,
+                      `Costo: ${formatCurrency(service.totalCost ?? service.totalMaterialCost)}`,
+                      !isSalesUser ? `Utilidad: ${formatCurrency(service.grossProfit)}` : '',
+                      `Materiales: ${materialsSummary}`,
+                      service.notes ? `Nota: ${service.notes}` : '',
+                      `Fecha: ${formatDateTime(service.performedAt)}`,
+                    ]
+                      .filter(Boolean)
+                      .join('\n');
 
-                  return (
-                    <TableRow key={service.id}>
-                      <TableCell>
+                    return (
+                      <TableRow key={service.id} title={rowHoverSummary}>
+                        <TableCell className={isSalesUser ? 'align-top' : undefined}>
                         <div>
                           <p className="font-medium text-slate-900">{serviceTypeLabels[service.serviceType]}</p>
                           <p className="text-xs text-slate-500">{service.cueReference}</p>
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className={isSalesUser ? 'align-top' : undefined}>
                         <div>
                           <p>{service.customerName}</p>
                           <p className="text-xs text-slate-500">{service.responsibleUser}</p>
                         </div>
                       </TableCell>
-                      <TableCell className="max-w-xs">
-                        <p className="text-sm text-slate-700">{materialsSummary}</p>
-                        {service.notes ? <p className="mt-1 text-xs text-slate-500">{service.notes}</p> : null}
+                      <TableCell className={isSalesUser ? 'max-w-[280px] align-top' : 'max-w-[260px] align-top'}>
+                        <div className="flex flex-wrap gap-1.5">
+                          {visibleChips.map((materialLabel) => (
+                            <span
+                              key={`${service.id}-${materialLabel}`}
+                              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
+                                isSaleAddon ? 'bg-cyan-50 text-cyan-700' : 'bg-slate-100 text-slate-700'
+                              }`}
+                            >
+                              {materialLabel}
+                            </span>
+                          ))}
+                          {hiddenCount > 0 ? (
+                            <span className="inline-flex rounded-full bg-cyan-50 px-2.5 py-1 text-xs font-medium text-cyan-700">
+                              +{hiddenCount} mas
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="mt-1 text-[11px] text-slate-500">{detailLabel}</p>
                       </TableCell>
-                      <TableCell>{formatCurrency(service.totalRevenue)}</TableCell>
-                      {!isSalesUser ? <TableCell>{formatCurrency(service.totalMaterialCost)}</TableCell> : null}
+                      <TableCell className={isSalesUser ? 'align-top whitespace-nowrap font-semibold text-slate-900' : undefined}>
+                        {formatCurrency(service.totalRevenue)}
+                      </TableCell>
+                      {!isSalesUser ? <TableCell>{formatCurrency(service.totalCost ?? service.totalMaterialCost)}</TableCell> : null}
                       {!isSalesUser ? (
                         <TableCell className="font-medium text-emerald-700">{formatCurrency(service.grossProfit)}</TableCell>
                       ) : null}
-                      <TableCell>{formatDateTime(service.performedAt)}</TableCell>
+                      <TableCell className={isSalesUser ? 'align-top whitespace-nowrap' : undefined}>
+                        {formatDateTime(service.performedAt)}
+                      </TableCell>
                     </TableRow>
                   );
                 })}
               </TableBody>
             </Table>
+            </div>
             </div>
           </>
         ) : (
@@ -242,6 +326,7 @@ export default function ServiciosPage() {
 
           await registerService({
             serviceType: values.serviceType,
+            serviceCategory: values.serviceCategory,
             performedAt: values.performedAt,
             customerName: values.customerName,
             cueReference: values.cueReference,

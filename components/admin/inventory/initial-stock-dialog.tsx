@@ -33,11 +33,13 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 
 const initialStockSchema = z.object({
   productId: z.string().min(1, 'Selecciona un producto'),
+  variantId: z.string().default(''),
   quantity: z.coerce.number().positive('La cantidad debe ser mayor a cero'),
   estimatedUnitCost: z.coerce.number().min(0, 'El costo estimado no puede ser negativo'),
   suggestedSalePrice: z.coerce.number().min(0, 'El precio de venta no puede ser negativo'),
@@ -49,6 +51,7 @@ export type InitialStockFormValues = z.infer<typeof initialStockSchema>;
 
 const defaultValues: InitialStockFormValues = {
   productId: '',
+  variantId: '',
   quantity: 1,
   estimatedUnitCost: 0,
   suggestedSalePrice: 0,
@@ -148,6 +151,9 @@ export function InitialStockDialog({
   });
 
   const selectedProductId = form.watch('productId');
+  const selectedVariantId = form.watch('variantId');
+  const selectedProduct = products.find((product) => product.id === selectedProductId);
+  const selectedVariant = selectedProduct?.variants?.find((variant) => variant.id === selectedVariantId);
 
   useEffect(() => {
     if (!open) {
@@ -156,18 +162,25 @@ export function InitialStockDialog({
   }, [form, open]);
 
   useEffect(() => {
-    const selectedProduct = products.find((product) => product.id === selectedProductId);
     if (!selectedProduct) return;
 
     form.setValue('suggestedSalePrice', selectedProduct.salePrice, {
       shouldDirty: true,
       shouldValidate: true,
     });
-  }, [form, products, selectedProductId]);
+  }, [form, selectedProduct, selectedProductId]);
+
+  useEffect(() => {
+    if (!selectedVariant || selectedVariant.salePrice === undefined) return;
+    form.setValue('suggestedSalePrice', Number(selectedVariant.salePrice), {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+  }, [form, selectedVariant]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] w-[calc(100vw-1rem)] max-w-2xl overflow-y-auto px-4 sm:w-[calc(100vw-2rem)]">
+      <DialogContent className="max-h-[92vh] w-[calc(100vw-1rem)] max-w-[96vw] overflow-y-auto px-4 sm:w-[calc(100vw-2rem)] sm:px-5 lg:max-w-4xl lg:px-6">
         <DialogHeader>
           <DialogTitle>Cargar inventario inicial</DialogTitle>
           <DialogDescription>
@@ -192,7 +205,10 @@ export function InitialStockDialog({
                   <FormControl>
                     <SearchableSelect
                       value={field.value}
-                      onChange={field.onChange}
+                      onChange={(value) => {
+                        field.onChange(value);
+                        form.setValue('variantId', '', { shouldValidate: true });
+                      }}
                       placeholder="Selecciona producto"
                       searchPlaceholder="Buscar producto..."
                       emptyLabel="No se encontraron productos."
@@ -208,6 +224,33 @@ export function InitialStockDialog({
                 </FormItem>
               )}
             />
+
+            {selectedProduct?.variants?.length ? (
+              <FormField
+                control={form.control}
+                name="variantId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{selectedProduct.variantLabel || 'Variante'}</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Selecciona una variante" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {(selectedProduct.variants ?? []).map((variant) => (
+                          <SelectItem key={variant.id} value={variant.id}>
+                            {variant.name} ({variant.stock})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            ) : null}
 
             <div className="grid gap-4 md:grid-cols-2">
               <FormField

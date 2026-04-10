@@ -1,9 +1,11 @@
 'use client';
 
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import { CircleAlert, PackageCheck, Search, SendHorizonal, ShoppingCart } from 'lucide-react';
+import { CircleAlert, PackageCheck, Search, SendHorizonal, ShieldCheck, ShoppingCart } from 'lucide-react';
 import { useAuth } from '@/components/auth-context';
 import { MetricCard } from '@/components/admin/dashboard/metric-card';
+import { SaleDetailsDialog } from '@/components/admin/sales/sale-details-dialog';
 import { SaleFormDialog, type SaleFormValues } from '@/components/admin/sales/sale-form-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,12 +14,13 @@ import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, formatNumber, getProductStock, getStockAlert } from '@/lib/admin/calculations';
 
 export default function DashboardPage() {
-  const { products, movements, purchases, summary, registerSale } = useAdminData();
+  const { products, movements, purchases, summary, sales, services, registerSale, authorizationRequests } = useAdminData();
   const { role, profile, user } = useAuth();
   const { toast } = useToast();
   const [productQuery, setProductQuery] = useState('');
   const [openSaleDialog, setOpenSaleDialog] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [detailsSaleId, setDetailsSaleId] = useState<string | null>(null);
 
   const availableProducts = products
     .map((product) => ({
@@ -51,6 +54,7 @@ export default function DashboardPage() {
   const selectedProduct = selectedProductId
     ? products.find((product) => product.id === selectedProductId) ?? null
     : null;
+  const detailsSale = detailsSaleId ? sales.find((sale) => sale.id === detailsSaleId) ?? null : null;
 
   const initialSaleValues: SaleFormValues | null = selectedProduct
     ? {
@@ -58,12 +62,15 @@ export default function DashboardPage() {
         items: [
           {
             productId: selectedProduct.id,
+            variantId: '',
             quantity: 1,
             unitPrice: selectedProduct.salePrice,
+            serviceItems: [],
             giftItems: [],
           },
         ],
-        customerName: 'Cliente mostrador',
+        customerPhone: '',
+        customerName: '',
         notes: '',
       }
     : null;
@@ -74,6 +81,7 @@ export default function DashboardPage() {
           .map((product, index) => `${index + 1}. ${product.name}`)
           .join('%0A')}`
       : 'Hola, por ahora no tenemos productos agotados para solicitar.';
+  const pendingAuthorizationRequests = authorizationRequests.filter((request) => request.status === 'pending');
 
   return (
     <div className="space-y-6">
@@ -146,6 +154,29 @@ export default function DashboardPage() {
           helper="Productos que debes reponer o solicitar."
           tone="danger"
         />
+        {role === 'admin' ? (
+          <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm text-amber-800">Autorizaciones pendientes</p>
+                <p className="mt-2 text-3xl font-semibold text-amber-950">
+                  {formatNumber(pendingAuthorizationRequests.length)}
+                </p>
+                <p className="mt-2 text-sm text-amber-900">
+                  Revisa solicitudes de edicion o devolucion enviadas por vendedores.
+                </p>
+              </div>
+              <div className="rounded-2xl bg-white/80 p-3 text-amber-800">
+                <ShieldCheck className="h-5 w-5" />
+              </div>
+            </div>
+            <Link href="/dashboard/autorizaciones" className="mt-4 inline-flex">
+              <Button variant="outline" className="rounded-2xl border-amber-300 bg-white text-amber-900 hover:bg-amber-100">
+                Ver solicitudes
+              </Button>
+            </Link>
+          </div>
+        ) : null}
       </section>
 
       <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -319,10 +350,11 @@ export default function DashboardPage() {
         purchases={purchases}
         movements={movements}
         initialValues={initialSaleValues}
+        mode="create"
         hideFinancialSummary={role === 'sales'}
         onSubmit={async (values) => {
           try {
-            await registerSale({
+            const createdSales = await registerSale({
               ...values,
               soldAt: new Date(values.soldAt).toISOString(),
               actorRole: role ?? 'admin',
@@ -332,6 +364,9 @@ export default function DashboardPage() {
             });
             setOpenSaleDialog(false);
             setSelectedProductId(null);
+            if (createdSales[0]) {
+              setDetailsSaleId(createdSales[0].id);
+            }
             toast({
               title: 'Venta registrada',
               description: 'El producto fue vendido desde el dashboard y el inventario quedo actualizado.',
@@ -345,6 +380,21 @@ export default function DashboardPage() {
             throw error;
           }
         }}
+      />
+
+      <SaleDetailsDialog
+        open={Boolean(detailsSale)}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            setDetailsSaleId(null);
+          }
+        }}
+        sale={detailsSale}
+        sales={sales}
+        services={services}
+        products={products}
+        hideFinancialDetails={role === 'sales'}
+        initialTab="invoice"
       />
     </div>
   );

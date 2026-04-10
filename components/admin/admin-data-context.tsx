@@ -12,6 +12,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDocs,
   onSnapshot,
   orderBy,
   query,
@@ -19,6 +20,7 @@ import {
   setDoc,
   Timestamp,
   updateDoc,
+  where,
   writeBatch,
   type DocumentData,
 } from 'firebase/firestore';
@@ -29,16 +31,36 @@ import {
   getLatestMovements,
   getProductRealUnitCost,
   getProductStock,
+  getVariantOrProductRealUnitCost,
 } from '@/lib/admin/calculations';
 import { initialMovements, initialProducts, initialPurchases, initialSales, initialServices, initialSuppliers } from '@/lib/admin/mock-data';
 import { db } from '@/lib/firebase';
 import { SITE_LOGO } from '@/lib/branding';
+import {
+  buildVariantAttributeValues,
+  getProductSaleMode,
+  getProductVariantStock,
+  normalizeVariantAttributeDefinitions,
+  normalizeProductVariants as normalizeProductVariantRecords,
+  summarizeProductFromVariants,
+} from '@/lib/admin/variant-helpers';
+import {
+  formatSaleGiftCategoryList,
+  getAllowedSaleGiftCategories,
+  getSaleGiftCategoryKey,
+} from '@/lib/admin/sale-gift-rules';
+import type { SaleServiceItem } from '@/lib/admin/types';
 import type {
+  AuthorizationRequest,
+  AuthorizationRequestStatus,
+  AuthorizationRequestType,
   DashboardSummary,
   InventoryMovement,
   MovementReason,
   MovementType,
   Product,
+  ProductVariant,
+  ProductVariantAttributeDefinition,
   Purchase,
   Sale,
   SaleGiftItem,
@@ -50,11 +72,16 @@ import type {
   UserRole,
 } from '@/lib/admin/types';
 
-type NewProductInput = Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'publicStock'>;
+type ProductMutationInput = Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'publicStock'> & {
+  historyVariantName?: string;
+};
+type NewProductInput = ProductMutationInput;
 type NewSupplierInput = Omit<Supplier, 'id' | 'createdAt' | 'updatedAt'>;
 
 interface RegisterMovementInput {
   productId: string;
+  variantId?: string;
+  variantName?: string;
   type: MovementType;
   reason: MovementReason;
   quantity: number;
@@ -70,6 +97,8 @@ interface RegisterPurchaseInput {
   shippingValueTotal: number;
   items: Array<{
     productId: string;
+    variantId?: string;
+    variantName?: string;
     presentationQuantity: number;
     purchaseUnitValue: number;
     suggestedSalePrice: number;
@@ -78,6 +107,8 @@ interface RegisterPurchaseInput {
 
 interface RegisterInitialStockInput {
   productId: string;
+  variantId?: string;
+  variantName?: string;
   quantity: number;
   estimatedUnitCost: number;
   occurredAt: string;
@@ -90,14 +121,18 @@ interface RegisterSaleInput {
   soldAt: string;
   items: Array<{
     productId: string;
+    variantId?: string;
+    variantName?: string;
     quantity: number;
     unitPrice: number;
+    serviceItems?: SaleServiceItem[];
     giftItems?: Array<{
       productId: string;
       quantity: number;
     }>;
   }>;
   customerName: string;
+  customerPhone: string;
   notes: string;
   responsibleUser: string;
   actorRole?: UserRole;
@@ -111,12 +146,24 @@ interface RegisterSaleReturnInput {
   responsibleUser: string;
 }
 
+interface RegisterSaleReturnBatchInput {
+  returnedAt: string;
+  items: Array<{
+    saleId: string;
+    quantity: number;
+  }>;
+  notes: string;
+  responsibleUser: string;
+}
+
 interface RegisterServiceInput {
   serviceType: ServiceType;
+  serviceCategory?: string;
   performedAt: string;
   customerName: string;
   cueReference: string;
   servicePrice: number;
+  serviceCost?: number;
   materials: Array<{
     productId: string;
     quantity: number;
@@ -124,6 +171,31 @@ interface RegisterServiceInput {
   notes: string;
   responsibleUser: string;
   actorRole?: UserRole;
+  source?: 'standalone' | 'sale-addon';
+  saleId?: string;
+  saleBatchId?: string;
+}
+
+interface CreateAuthorizationRequestInput {
+  saleId: string;
+  saleBatchId: string;
+  requestType: AuthorizationRequestType;
+  customerName: string;
+  saleSummary: string;
+  reason: string;
+  requestedBy: string;
+  requestedByRole: UserRole;
+}
+
+interface ReviewAuthorizationRequestInput {
+  status: Extract<AuthorizationRequestStatus, 'approved' | 'rejected'>;
+  reviewNote: string;
+  reviewedBy: string;
+}
+
+interface CompleteAuthorizationRequestInput {
+  requestId: string;
+  completedBy: string;
 }
 
 interface AdminDataContextValue {
@@ -134,11 +206,12 @@ interface AdminDataContextValue {
   purchases: Purchase[];
   sales: Sale[];
   services: ServiceOrder[];
+  authorizationRequests: AuthorizationRequest[];
   summary: DashboardSummary;
   latestMovements: InventoryMovement[];
   syncPublicProductStocks: () => Promise<number>;
-  createProduct: (input: NewProductInput) => Promise<Product>;
-  updateProduct: (productId: string, input: NewProductInput) => Promise<Product>;
+  createProduct: (input: ProductMutationInput) => Promise<Product>;
+  updateProduct: (productId: string, input: ProductMutationInput) => Promise<Product>;
   deleteProduct: (productId: string) => Promise<void>;
   createSupplier: (input: NewSupplierInput) => Promise<Supplier>;
   updateSupplier: (supplierId: string, input: NewSupplierInput) => Promise<Supplier>;
@@ -156,7 +229,14 @@ interface AdminDataContextValue {
   registerSale: (input: RegisterSaleInput) => Promise<Sale[]>;
   updateSaleBatch: (saleBatchId: string, input: RegisterSaleInput) => Promise<Sale[]>;
   registerSaleReturn: (input: RegisterSaleReturnInput) => Promise<Sale>;
+  registerSaleReturns: (input: RegisterSaleReturnBatchInput) => Promise<Sale[]>;
   registerService: (input: RegisterServiceInput) => Promise<ServiceOrder>;
+  createAuthorizationRequest: (input: CreateAuthorizationRequestInput) => Promise<AuthorizationRequest>;
+  reviewAuthorizationRequest: (
+    requestId: string,
+    input: ReviewAuthorizationRequestInput
+  ) => Promise<AuthorizationRequest>;
+  completeAuthorizationRequest: (input: CompleteAuthorizationRequestInput) => Promise<AuthorizationRequest>;
 }
 
 const AdminDataContext = createContext<AdminDataContextValue | undefined>(undefined);
@@ -169,6 +249,76 @@ function targetProductName(products: Product[], productId: string) {
   return products.find((product) => product.id === productId)?.name ?? 'producto';
 }
 
+function buildSaleGiftItems(
+  item: RegisterSaleInput['items'][number],
+  targetProduct: Product,
+  products: Product[],
+  purchases: Purchase[],
+  _baseMovements: InventoryMovement[]
+) {
+  const giftItems: SaleGiftItem[] = [];
+  if ((item.giftItems?.length ?? 0) === 0) {
+    return giftItems;
+  }
+
+  if (targetProduct.category !== 'tacos') {
+    throw new Error(`Solo los tacos de billar pueden llevar obsequio. Revisa ${targetProduct.name}.`);
+  }
+
+  const allowedGiftCategories = getAllowedSaleGiftCategories(targetProduct);
+  if (allowedGiftCategories.length === 0) {
+    throw new Error(`Este producto no admite obsequios. Revisa ${targetProduct.name}.`);
+  }
+
+  const seenGiftCategories = new Set<string>();
+
+  item.giftItems?.forEach((giftItemInput) => {
+    const giftProductId = giftItemInput.productId?.trim();
+    const giftQuantity = Math.max(Number(giftItemInput.quantity ?? 0), 0);
+
+    if (!giftProductId) {
+      throw new Error(`Selecciona el obsequio para ${targetProduct.name}.`);
+    }
+    if (giftQuantity <= 0) {
+      throw new Error(`La cantidad del obsequio debe ser mayor a cero para ${targetProduct.name}.`);
+    }
+
+    const giftedProduct = products.find((product) => product.id === giftProductId);
+    if (!giftedProduct) {
+      throw new Error('No se encontro uno de los productos obsequiados.');
+    }
+    const giftCategoryKey = getSaleGiftCategoryKey(giftedProduct);
+    if (!giftCategoryKey) {
+      throw new Error(
+        `Los obsequios para ${targetProduct.name} solo pueden ser un guante, un estuche, una extension o un parachoque.`
+      );
+    }
+    if (!allowedGiftCategories.includes(giftCategoryKey)) {
+      throw new Error(
+        `Para ${targetProduct.name} solo aplica ${formatSaleGiftCategoryList(allowedGiftCategories)} como obsequio.`
+      );
+    }
+    if (giftQuantity !== 1) {
+      throw new Error(`Cada obsequio para ${targetProduct.name} debe tener cantidad 1.`);
+    }
+    if (seenGiftCategories.has(giftCategoryKey)) {
+      throw new Error(`No repitas el mismo tipo de obsequio para ${targetProduct.name}.`);
+    }
+    seenGiftCategories.add(giftCategoryKey);
+
+    const giftUnitCost = getProductRealUnitCost(purchases, giftProductId);
+    giftItems.push({
+      productId: giftProductId,
+      quantity: giftQuantity,
+      unitCost: giftUnitCost,
+      totalCost: giftQuantity * giftUnitCost,
+      kind: 'gift',
+    });
+  });
+
+  return giftItems;
+}
+
 function normalizeDateValue(value: unknown) {
   if (typeof value === 'string') return value;
   if (value instanceof Timestamp) return value.toDate().toISOString();
@@ -179,7 +329,49 @@ function normalizeDateValue(value: unknown) {
 }
 
 function mapProductDocument(documentId: string, data: DocumentData): Product {
-  return {
+  const variantAttributes = Array.isArray(data.variantAttributes)
+    ? data.variantAttributes
+        .map((attribute, index) => ({
+          id: String(attribute?.id ?? `attr-${index + 1}`),
+          key: String(attribute?.key ?? attribute?.label ?? `atributo-${index + 1}`),
+          label: String(attribute?.label ?? attribute?.key ?? `Atributo ${index + 1}`),
+        }))
+        .filter((attribute) => attribute.label)
+    : [];
+  const normalizedVariants = Array.isArray(data.variants)
+    ? normalizeProductVariantRecords(
+        documentId,
+        variantAttributes,
+        data.variants.map((variant: DocumentData, index: number) => ({
+          id: String(variant?.id ?? `variant-${index + 1}`),
+          name: String(variant?.name ?? ''),
+          salePrice: Number(variant?.salePrice ?? data.salePrice ?? 0),
+          latestUnitCost: Number(variant?.latestUnitCost ?? 0),
+          stock: Number(variant?.stock ?? 0),
+          publicStock: Number(variant?.publicStock ?? variant?.stock ?? 0),
+          status: variant?.status === 'inactive' ? 'inactive' : 'active',
+          sortOrder: Number(variant?.sortOrder ?? index),
+          attributes:
+            variant && typeof variant === 'object' && variant.attributes && typeof variant.attributes === 'object'
+              ? Object.fromEntries(
+                  Object.entries(variant.attributes).map(([key, value]) => [key, String(value ?? '')])
+                )
+              : {},
+          attributeValues: Array.isArray(variant?.attributeValues)
+            ? variant.attributeValues.map((value: unknown) => String(value ?? ''))
+            : buildVariantAttributeValues(
+                variantAttributes,
+                variant && typeof variant === 'object' && variant.attributes && typeof variant.attributes === 'object'
+                  ? Object.fromEntries(
+                      Object.entries(variant.attributes).map(([key, value]) => [key, String(value ?? '')])
+                    )
+                  : {}
+              ),
+          colorHex: typeof variant?.colorHex === 'string' ? String(variant.colorHex) : undefined,
+        }))
+      )
+    : [];
+  const product: Product = {
     id: documentId,
     name: String(data.name ?? ''),
     description: String(data.description ?? ''),
@@ -187,7 +379,12 @@ function mapProductDocument(documentId: string, data: DocumentData): Product {
     subcategory: String(data.subcategory ?? ''),
     brand: String(data.brand ?? ''),
     salePrice: Number(data.salePrice ?? 0),
+    saleMode: data.saleMode === 'varianted' ? 'varianted' : normalizedVariants.length > 0 ? 'varianted' : 'simple',
+    variantLabel: String(data.variantLabel ?? ''),
+    variantAttributes,
+    variants: normalizedVariants,
     featured: Boolean(data.featured ?? false),
+    availableForDelivery: Boolean(data.availableForDelivery ?? false),
     publicStock: Number(data.publicStock ?? 0),
     image: String(data.image ?? SITE_LOGO),
     imageRotation: Number(data.imageRotation ?? 0),
@@ -198,6 +395,26 @@ function mapProductDocument(documentId: string, data: DocumentData): Product {
     createdAt: normalizeDateValue(data.createdAt),
     updatedAt: normalizeDateValue(data.updatedAt),
   };
+  return getProductSaleMode(product) === 'varianted'
+    ? {
+        ...product,
+        ...summarizeProductFromVariants(product),
+      }
+    : product;
+}
+
+function getProductVariantById(product: Product, variantId?: string) {
+  if (!variantId) return null;
+  return product.variants?.find((variant) => variant.id === variantId) ?? null;
+}
+
+function buildVariantStockMap(products: Product[]) {
+  return new Map(
+    products.map((product) => [
+      product.id,
+      new Map((product.variants ?? []).map((variant) => [variant.id, variant.stock])),
+    ])
+  );
 }
 
 function getPublicStockFromMovements(movements: Array<{ productId: string; quantity: number }>, productId: string) {
@@ -227,10 +444,13 @@ function mapMovementDocument(documentId: string, data: DocumentData): InventoryM
   return {
     id: documentId,
     productId: String(data.productId ?? ''),
+    variantId: data.variantId ? String(data.variantId) : undefined,
+    variantName: data.variantName ? String(data.variantName) : undefined,
     purchaseId: data.purchaseId ? String(data.purchaseId) : undefined,
     purchaseBatchId: data.purchaseBatchId ? String(data.purchaseBatchId) : undefined,
     saleId: data.saleId ? String(data.saleId) : undefined,
     serviceOrderId: data.serviceOrderId ? String(data.serviceOrderId) : undefined,
+    deliveryOrderId: data.deliveryOrderId ? String(data.deliveryOrderId) : undefined,
     type:
       data.type === 'entry' || data.type === 'exit' || data.type === 'adjustment' || data.type === 'purchase'
         ? data.type
@@ -258,8 +478,11 @@ function mapMovementDocument(documentId: string, data: DocumentData): InventoryM
 function mapPurchaseDocument(documentId: string, data: DocumentData): Purchase {
   return {
     id: documentId,
+    purchaseId: data.purchaseId ? String(data.purchaseId) : undefined,
     purchaseBatchId: data.purchaseBatchId ? String(data.purchaseBatchId) : undefined,
     productId: String(data.productId ?? ''),
+    variantId: data.variantId ? String(data.variantId) : undefined,
+    variantName: data.variantName ? String(data.variantName) : undefined,
     supplierId: data.supplierId ? String(data.supplierId) : undefined,
     supplier: String(data.supplier ?? ''),
     source: data.source === 'initial-load' ? 'initial-load' : 'purchase',
@@ -287,6 +510,8 @@ function mapSaleDocument(documentId: string, data: DocumentData): Sale {
     ? [
         {
           productId: String(data.productId ?? ''),
+          variantId: data.variantId ? String(data.variantId) : undefined,
+          variantName: data.variantName ? String(data.variantName) : undefined,
           quantity: Number(data.quantity ?? 0),
           unitPrice: Number(data.unitPrice ?? 0),
           realUnitCost: Number(data.realUnitCost ?? 0),
@@ -299,6 +524,8 @@ function mapSaleDocument(documentId: string, data: DocumentData): Sale {
     ? data.lineItems
         .map((item) => ({
           productId: String(item?.productId ?? ''),
+          variantId: item?.variantId ? String(item.variantId) : undefined,
+          variantName: item?.variantName ? String(item.variantName) : undefined,
           quantity: Number(item?.quantity ?? 0),
           unitPrice: Number(item?.unitPrice ?? 0),
           realUnitCost: Number(item?.realUnitCost ?? 0),
@@ -312,11 +539,12 @@ function mapSaleDocument(documentId: string, data: DocumentData): Sale {
   const legacyGiftedUnitCost = Number(data.giftedUnitCost ?? 0);
   const legacyGiftedTotalCost = Number(data.giftedTotalCost ?? 0);
   const giftItems: SaleGiftItem[] = Array.isArray(data.giftItems)
-    ? data.giftItems.map((item) => ({
+    ? data.giftItems.map((item): SaleGiftItem => ({
         productId: String(item?.productId ?? ''),
         quantity: Number(item?.quantity ?? 0),
         unitCost: Number(item?.unitCost ?? 0),
         totalCost: Number(item?.totalCost ?? 0),
+        kind: item?.kind === 'auto-material' ? 'auto-material' : 'gift',
       })).filter((item) => item.productId && item.quantity > 0)
     : legacyGiftedProductId && legacyGiftedQuantity > 0
       ? [
@@ -325,6 +553,7 @@ function mapSaleDocument(documentId: string, data: DocumentData): Sale {
             quantity: legacyGiftedQuantity,
             unitCost: legacyGiftedUnitCost,
             totalCost: legacyGiftedTotalCost,
+            kind: 'gift',
           },
         ]
       : [];
@@ -353,6 +582,7 @@ function mapSaleDocument(documentId: string, data: DocumentData): Sale {
     returnedSaleAmount: Number(data.returnedSaleAmount ?? 0),
     returnedCostAmount: Number(data.returnedCostAmount ?? 0),
     customerName: String(data.customerName ?? ''),
+    customerPhone: String(data.customerPhone ?? ''),
     notes: String(data.notes ?? ''),
     responsibleUser: String(data.responsibleUser ?? 'Administrador'),
   };
@@ -369,6 +599,12 @@ function mapServiceDocument(documentId: string, data: DocumentData): ServiceOrde
         }))
         .filter((item) => item.productId && item.quantity > 0)
     : [];
+  const totalMaterialCost = Number(
+    data.totalMaterialCost ?? materials.reduce((sum, item) => sum + item.totalCost, 0)
+  );
+  const totalOperationalCost = Number(data.totalOperationalCost ?? data.serviceCost ?? 0);
+  const totalCost = Number(data.totalCost ?? totalMaterialCost + totalOperationalCost);
+  const totalRevenue = Number(data.totalRevenue ?? data.servicePrice ?? 0);
 
   return {
     id: documentId,
@@ -378,22 +614,54 @@ function mapServiceDocument(documentId: string, data: DocumentData): ServiceOrde
       data.serviceType === 'extension-installation'
         ? data.serviceType
         : 'tip-installation',
+    serviceCategory: data.serviceCategory ? String(data.serviceCategory) : undefined,
+    source: data.source === 'sale-addon' ? 'sale-addon' : 'standalone',
+    saleId: data.saleId ? String(data.saleId) : undefined,
+    saleBatchId: data.saleBatchId ? String(data.saleBatchId) : undefined,
     performedAt: normalizeDateValue(data.performedAt),
     customerName: String(data.customerName ?? ''),
     cueReference: String(data.cueReference ?? ''),
     servicePrice: Number(data.servicePrice ?? data.totalRevenue ?? 0),
-    totalRevenue: Number(data.totalRevenue ?? data.servicePrice ?? 0),
-    totalMaterialCost: Number(
-      data.totalMaterialCost ?? materials.reduce((sum, item) => sum + item.totalCost, 0)
-    ),
+    totalRevenue,
+    totalMaterialCost,
+    totalOperationalCost,
+    totalCost,
     grossProfit: Number(
       data.grossProfit ??
-        Number(data.totalRevenue ?? data.servicePrice ?? 0) -
-          materials.reduce((sum, item) => sum + item.totalCost, 0)
+        totalRevenue - totalCost
     ),
     materials,
     notes: String(data.notes ?? ''),
     responsibleUser: String(data.responsibleUser ?? 'Administrador'),
+  };
+}
+
+function mapAuthorizationRequestDocument(documentId: string, data: DocumentData): AuthorizationRequest {
+  return {
+    id: documentId,
+    saleId: String(data.saleId ?? ''),
+    saleBatchId: String(data.saleBatchId ?? data.saleId ?? ''),
+    requestType: data.requestType === 'sale-return' ? 'sale-return' : 'sale-edit',
+    status:
+      data.status === 'approved' ||
+      data.status === 'rejected' ||
+      data.status === 'completed'
+        ? data.status
+        : 'pending',
+    customerName: String(data.customerName ?? ''),
+    saleSummary: String(data.saleSummary ?? ''),
+    reason: String(data.reason ?? ''),
+    requestedBy: String(data.requestedBy ?? 'Usuario de ventas'),
+    requestedByRole:
+      data.requestedByRole === 'sales' || data.requestedByRole === 'courier'
+        ? data.requestedByRole
+        : 'admin',
+    reviewedBy: String(data.reviewedBy ?? ''),
+    reviewNote: String(data.reviewNote ?? ''),
+    createdAt: normalizeDateValue(data.createdAt),
+    updatedAt: normalizeDateValue(data.updatedAt),
+    reviewedAt: data.reviewedAt ? normalizeDateValue(data.reviewedAt) : undefined,
+    completedAt: data.completedAt ? normalizeDateValue(data.completedAt) : undefined,
   };
 }
 
@@ -414,14 +682,198 @@ function findGiftMovementForSale(movements: InventoryMovement[], sale: Sale) {
   return movements.filter((movement) => movement.saleId === sale.id && movement.reason === 'gift');
 }
 
+function countProductHistoryRecords(
+  productId: string,
+  input: {
+    purchases: Purchase[];
+    movements: InventoryMovement[];
+    sales: Sale[];
+    services: ServiceOrder[];
+  }
+) {
+  const purchasesCount = input.purchases.filter((purchase) => purchase.productId === productId).length;
+  const movementsCount = input.movements.filter((movement) => movement.productId === productId).length;
+  const salesCount = input.sales.filter(
+    (sale) =>
+      sale.productId === productId ||
+      sale.lineItems.some((item) => item.productId === productId) ||
+      sale.giftItems.some((item) => item.productId === productId)
+  ).length;
+  const servicesCount = input.services.filter((service) =>
+    service.materials.some((material) => material.productId === productId)
+  ).length;
+
+  return {
+    purchasesCount,
+    movementsCount,
+    salesCount,
+    servicesCount,
+    hasActivity: purchasesCount + movementsCount + salesCount + servicesCount > 0,
+  };
+}
+
+function normalizeComparableVariantDefinitions(definitions: ProductVariantAttributeDefinition[] = []) {
+  return normalizeVariantAttributeDefinitions(definitions).map((definition) => ({
+    key: definition.key,
+    label: definition.label,
+  }));
+}
+
+function normalizeComparableVariants(product: Product) {
+  const definitions = normalizeVariantAttributeDefinitions(product.variantAttributes ?? []);
+  const normalizedVariants = normalizeProductVariantRecords(product.id, definitions, product.variants ?? []);
+
+  return normalizedVariants.map((variant) => ({
+    id: variant.id,
+    name: variant.name,
+    attributes: variant.attributes ?? {},
+    salePrice: Number(variant.salePrice ?? 0),
+    stock: Math.max(Number(variant.stock ?? 0), 0),
+    status: variant.status === 'inactive' ? 'inactive' : 'active',
+  }));
+}
+
+function hasStructuralProductChanges(existingProduct: Product, nextProduct: Product) {
+  if (existingProduct.category !== nextProduct.category) return true;
+  if (existingProduct.subcategory !== nextProduct.subcategory) return true;
+  if (getProductSaleMode(existingProduct) !== getProductSaleMode(nextProduct)) return true;
+
+  const currentDefinitions = JSON.stringify(
+    normalizeComparableVariantDefinitions(existingProduct.variantAttributes ?? [])
+  );
+  const nextDefinitions = JSON.stringify(
+    normalizeComparableVariantDefinitions(nextProduct.variantAttributes ?? [])
+  );
+  if (currentDefinitions !== nextDefinitions) return true;
+
+  const currentVariants = normalizeComparableVariants(existingProduct);
+  const nextVariants = normalizeComparableVariants(nextProduct);
+
+  if (currentVariants.length !== nextVariants.length) return true;
+
+  for (let index = 0; index < currentVariants.length; index += 1) {
+    const currentVariant = currentVariants[index];
+    const nextVariant = nextVariants[index];
+
+    if (!nextVariant) return true;
+    if (currentVariant.id !== nextVariant.id) return true;
+    if (currentVariant.name !== nextVariant.name) return true;
+    if (JSON.stringify(currentVariant.attributes) !== JSON.stringify(nextVariant.attributes)) return true;
+    if (currentVariant.stock !== nextVariant.stock) return true;
+    if (currentVariant.status !== nextVariant.status) return true;
+  }
+
+  return false;
+}
+
+function findVariantByPreferredName(variants: ProductVariant[] = [], preferredName?: string) {
+  const normalizedPreferredName = preferredName?.trim().toLowerCase();
+  if (!normalizedPreferredName) return null;
+
+  return (
+    variants.find((variant) => {
+      const values = [
+        variant.name,
+        variant.displayName,
+        variant.attributes?.color,
+        ...(variant.attributeValues ?? []),
+      ]
+        .map((value) => String(value ?? '').trim().toLowerCase())
+        .filter(Boolean);
+
+      return values.includes(normalizedPreferredName);
+    }) ?? null
+  );
+}
+
+function findTransparentVariant(variants: ProductVariant[] = []) {
+  return (
+    variants.find((variant) => {
+      const colorValue = String(variant.attributes?.color ?? variant.attributeValues?.[0] ?? variant.name ?? '')
+        .trim()
+        .toLowerCase();
+      return colorValue === 'transparente';
+    }) ?? null
+  );
+}
+
+function canAutoMigrateLegacyVirolaHistory(
+  existingProduct: Product,
+  nextProduct: Product
+) {
+  if (existingProduct.category !== 'virolas') return false;
+  if (getProductSaleMode(nextProduct) !== 'varianted') return false;
+
+  const nextDefinitions = normalizeVariantAttributeDefinitions(nextProduct.variantAttributes ?? []);
+  if (nextDefinitions.length !== 1 || nextDefinitions[0]?.key !== 'color') return false;
+
+  return (nextProduct.variants?.length ?? 0) > 0;
+}
+
+function buildProductWritePayload(
+  input: NewProductInput,
+  options: {
+    saleMode: Product['saleMode'];
+    salePrice: number;
+    variantLabel: string;
+    variantAttributes: ProductVariantAttributeDefinition[];
+    variants: ProductVariant[];
+    publicStock: number;
+    includeCreatedAt?: boolean;
+  }
+) {
+  const serializedVariants = options.variants.map((variant) => ({
+    id: String(variant.id ?? ''),
+    productId: String(variant.productId ?? ''),
+    name: String(variant.name ?? ''),
+    displayName: String(variant.displayName ?? variant.name ?? ''),
+    sku: variant.sku?.trim() || null,
+    salePrice: Number(variant.salePrice ?? 0),
+    latestUnitCost: Number(variant.latestUnitCost ?? 0),
+    stock: Math.max(Number(variant.stock ?? 0), 0),
+    publicStock: Math.max(Number(variant.publicStock ?? variant.stock ?? 0), 0),
+    status: variant.status === 'inactive' ? 'inactive' : 'active',
+    sortOrder: Number(variant.sortOrder ?? 0),
+    attributes: variant.attributes ?? {},
+    attributeValues: Array.isArray(variant.attributeValues) ? variant.attributeValues : [],
+    colorHex: variant.colorHex?.trim() || null,
+  }));
+
+  return {
+    name: String(input.name ?? '').trim(),
+    description: String(input.description ?? '').trim(),
+    category: String(input.category ?? '').trim(),
+    subcategory: String(input.subcategory ?? '').trim(),
+    brand: String(input.brand ?? '').trim(),
+    salePrice: Number(options.salePrice ?? 0),
+    saleMode: options.saleMode === 'varianted' ? 'varianted' : 'simple',
+    variantLabel: String(options.variantLabel ?? '').trim(),
+    variantAttributes: options.variantAttributes,
+    variants: serializedVariants,
+    featured: Boolean(input.featured ?? false),
+    availableForDelivery: Boolean(input.availableForDelivery ?? false),
+    image: String(input.image ?? SITE_LOGO),
+    imageRotation: Number(input.imageRotation ?? 0),
+    status:
+      input.status === 'draft' || input.status === 'archived' || input.status === 'active'
+        ? input.status
+        : 'active',
+    publicStock: Math.max(Number(options.publicStock ?? 0), 0),
+    ...(options.includeCreatedAt ? { createdAt: serverTimestamp() } : {}),
+    updatedAt: serverTimestamp(),
+  };
+}
+
 export function AdminDataProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState<Product[]>(initialProducts);
+  const [productVariants, setProductVariants] = useState<ProductVariant[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>(initialSuppliers);
   const [movements, setMovements] = useState<InventoryMovement[]>(initialMovements);
   const [purchases, setPurchases] = useState<Purchase[]>(initialPurchases);
   const [sales, setSales] = useState<Sale[]>(initialSales);
   const [services, setServices] = useState<ServiceOrder[]>(initialServices);
+  const [authorizationRequests, setAuthorizationRequests] = useState<AuthorizationRequest[]>([]);
 
   const queueAdminNotification = (
     batch: ReturnType<typeof writeBatch>,
@@ -447,7 +899,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     const readyCollections = new Set<string>();
     const markReady = (collectionName: string) => {
       readyCollections.add(collectionName);
-      if (readyCollections.size === 6) {
+      if (readyCollections.size === 8) {
         setLoading(false);
       }
     };
@@ -473,6 +925,45 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       (error) => {
         console.error('Error leyendo proveedores desde Firestore:', error);
         markReady('suppliers');
+      }
+    );
+
+    const unsubProductVariants = onSnapshot(
+      query(collection(db, 'product_variants'), orderBy('productId', 'asc')),
+      (snapshot) => {
+        setProductVariants(
+          snapshot.docs.map((item) => {
+            const data = item.data();
+            return {
+              id: item.id,
+              productId: String(data.productId ?? ''),
+              name: String(data.name ?? data.displayName ?? ''),
+              displayName: String(data.displayName ?? data.name ?? ''),
+              sku: data.sku ? String(data.sku) : undefined,
+              salePrice: Number(data.salePrice ?? 0),
+              latestUnitCost: Number(data.latestUnitCost ?? 0),
+              stock: Number(data.stock ?? data.stockOnHand ?? 0),
+              publicStock: Number(data.publicStock ?? data.stock ?? data.stockOnHand ?? 0),
+              status: data.status === 'inactive' ? 'inactive' : 'active',
+              sortOrder: Number(data.sortOrder ?? 0),
+              attributes:
+                data.attributes && typeof data.attributes === 'object'
+                  ? Object.fromEntries(
+                      Object.entries(data.attributes).map(([key, value]) => [key, String(value ?? '')])
+                    )
+                  : {},
+              attributeValues: Array.isArray(data.attributeValues)
+                ? data.attributeValues.map((value: unknown) => String(value ?? ''))
+                : [],
+              colorHex: typeof data.colorHex === 'string' ? String(data.colorHex) : undefined,
+            } satisfies ProductVariant;
+          })
+        );
+        markReady('product_variants');
+      },
+      (error) => {
+        console.error('Error leyendo variantes desde Firestore:', error);
+        markReady('product_variants');
       }
     );
 
@@ -524,13 +1015,29 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       }
     );
 
+    const unsubAuthorizationRequests = onSnapshot(
+      query(collection(db, 'authorization-requests'), orderBy('createdAt', 'desc')),
+      (snapshot) => {
+        setAuthorizationRequests(
+          snapshot.docs.map((item) => mapAuthorizationRequestDocument(item.id, item.data()))
+        );
+        markReady('authorization-requests');
+      },
+      (error) => {
+        console.error('Error leyendo autorizaciones desde Firestore:', error);
+        markReady('authorization-requests');
+      }
+    );
+
     return () => {
       unsubProducts();
+      unsubProductVariants();
       unsubSuppliers();
       unsubMovements();
       unsubPurchases();
       unsubSales();
       unsubServices();
+      unsubAuthorizationRequests();
     };
   }, []);
 
@@ -569,10 +1076,110 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const applyVariantStockMapToBatch = (
+    batch: ReturnType<typeof writeBatch>,
+    variantStockMap: Map<string, Map<string, number>>,
+    sourceProducts: Product[]
+  ) => {
+    variantStockMap.forEach((variantMap, productId) => {
+      const product = sourceProducts.find((item) => item.id === productId);
+      if (!product) return;
+
+      const nextVariants = (product.variants ?? []).map((variant) => ({
+        ...variant,
+        stock: Math.max(Number(variantMap.get(variant.id) ?? variant.stock ?? 0), 0),
+      }));
+      const productVariantPayload = nextVariants.map((variant, index) => ({
+        id: variant.id,
+        productId,
+        name: variant.name,
+        displayName: variant.displayName ?? variant.name,
+        sku: variant.sku ?? null,
+        salePrice: Number(variant.salePrice ?? product.salePrice ?? 0),
+        latestUnitCost: Number(variant.latestUnitCost ?? 0),
+        stock: Math.max(Number(variant.stock ?? 0), 0),
+        publicStock: Math.max(Number(variant.stock ?? 0), 0),
+        status: variant.status === 'inactive' ? 'inactive' : 'active',
+        sortOrder: Number(variant.sortOrder ?? index),
+        attributes: variant.attributes ?? {},
+        attributeValues: variant.attributeValues ?? [],
+        colorHex: variant.colorHex ?? null,
+      }));
+
+      batch.set(
+        doc(db, 'products', productId),
+        {
+          variants: productVariantPayload,
+          publicStock: productVariantPayload.reduce<number>(
+            (total, variant) => total + Math.max(Number(variant.stock ?? 0), 0),
+            0
+          ),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      productVariantPayload.forEach((variant) => {
+        batch.set(
+          doc(db, 'product_variants', variant.id),
+          {
+            id: variant.id,
+            productId,
+            name: variant.name,
+            displayName: variant.displayName ?? variant.name,
+            salePrice: Number(variant.salePrice ?? product.salePrice ?? 0),
+            latestUnitCost: Number(variant.latestUnitCost ?? 0),
+            stock: Math.max(Number(variant.stock ?? 0), 0),
+            publicStock: Math.max(Number(variant.stock ?? 0), 0),
+            status: variant.status === 'inactive' ? 'inactive' : 'active',
+            sortOrder: Number(variant.sortOrder ?? 0),
+            attributes: variant.attributes ?? {},
+            attributeValues: variant.attributeValues ?? [],
+            colorHex: variant.colorHex ?? null,
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
+      });
+    });
+  };
+
+  const syncVariantDocumentsToBatch = (
+    batch: ReturnType<typeof writeBatch>,
+    product: Product
+  ) => {
+    (product.variants ?? []).forEach((variant, index) => {
+      batch.set(
+        doc(db, 'product_variants', variant.id),
+        {
+          id: variant.id,
+          productId: product.id,
+          name: variant.name,
+          displayName: variant.displayName ?? variant.name,
+          salePrice: Number(variant.salePrice ?? product.salePrice ?? 0),
+          latestUnitCost: Number(variant.latestUnitCost ?? 0),
+          stock: Math.max(Number(variant.stock ?? 0), 0),
+          publicStock: Math.max(Number(variant.publicStock ?? variant.stock ?? 0), 0),
+          status: variant.status === 'inactive' ? 'inactive' : 'active',
+          sortOrder: Number(variant.sortOrder ?? index),
+          attributes: variant.attributes ?? {},
+          attributeValues: variant.attributeValues ?? [],
+          colorHex: variant.colorHex ?? null,
+          updatedAt: serverTimestamp(),
+          createdAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+    });
+  };
+
   const syncPublicProductStocks = async () => {
     const batch = writeBatch(db);
     products.forEach((product) => {
-      const publicStock = getProductStock(movements, product.id);
+      const publicStock =
+        getProductSaleMode(product) === 'varianted'
+          ? (product.variants ?? []).reduce((total, variant) => total + Math.max(Number(variant.stock ?? 0), 0), 0)
+          : getProductStock(movements, product.id);
       batch.set(
         doc(db, 'products', product.id),
         {
@@ -589,20 +1196,57 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   const createProduct = async (input: NewProductInput) => {
     const createdAt = new Date().toISOString();
     const productRef = doc(collection(db, 'products'));
+    const normalizedVariantAttributes = normalizeVariantAttributeDefinitions(input.variantAttributes);
+    const normalizedVariants = normalizeProductVariantRecords(
+      productRef.id,
+      normalizedVariantAttributes,
+      input.variants
+    );
+    const nextSaleMode = input.saleMode === 'varianted' || normalizedVariants.length > 0 ? 'varianted' : 'simple';
+    const productSummary =
+      nextSaleMode === 'varianted'
+        ? {
+            publicStock: normalizedVariants.reduce((total, variant) => total + Math.max(Number(variant.stock ?? 0), 0), 0),
+            salePrice:
+              normalizedVariants
+                .map((variant) => Number(variant.salePrice ?? 0))
+                .filter((value) => value > 0)
+                .sort((left, right) => left - right)[0] ?? Number(input.salePrice ?? 0),
+          }
+        : {
+            publicStock: 0,
+            salePrice: Number(input.salePrice ?? 0),
+          };
     const newProduct: Product = {
       ...input,
+      saleMode: nextSaleMode,
+      salePrice: productSummary.salePrice,
+      variantLabel:
+        input.variantLabel?.trim() ||
+        normalizedVariantAttributes.map((attribute) => attribute.label).join(' / '),
+      variantAttributes: normalizedVariantAttributes,
+      variants: normalizedVariants,
       id: productRef.id,
-      publicStock: 0,
+      publicStock: productSummary.publicStock,
       createdAt,
       updatedAt: createdAt,
     };
 
-    await setDoc(productRef, {
-      ...input,
-      publicStock: 0,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
+    const batch = writeBatch(db);
+    batch.set(
+      productRef,
+      buildProductWritePayload(input, {
+        saleMode: nextSaleMode,
+        salePrice: productSummary.salePrice,
+        variantLabel: newProduct.variantLabel ?? '',
+        variantAttributes: normalizedVariantAttributes,
+        variants: normalizedVariants,
+        publicStock: productSummary.publicStock,
+        includeCreatedAt: true,
+      })
+    );
+    syncVariantDocumentsToBatch(batch, newProduct);
+    await batch.commit();
 
     return newProduct;
   };
@@ -613,22 +1257,281 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       throw new Error('No se encontro el producto a actualizar.');
     }
 
-    await updateDoc(doc(db, 'products', productId), {
-      ...input,
-      updatedAt: serverTimestamp(),
-    });
-
-    return {
+    const normalizedVariantAttributes = normalizeVariantAttributeDefinitions(input.variantAttributes);
+    const normalizedVariants = normalizeProductVariantRecords(
+      productId,
+      normalizedVariantAttributes,
+      input.variants
+    );
+    const nextSaleMode = input.saleMode === 'varianted' || normalizedVariants.length > 0 ? 'varianted' : 'simple';
+    const nextProduct: Product = {
       ...existingProduct,
       ...input,
-      publicStock: existingProduct.publicStock,
+      saleMode: nextSaleMode,
+      salePrice:
+        nextSaleMode === 'varianted'
+          ? normalizedVariants
+              .map((variant) => Number(variant.salePrice ?? 0))
+              .filter((value) => value > 0)
+              .sort((left, right) => left - right)[0] ?? Number(input.salePrice ?? existingProduct.salePrice ?? 0)
+          : Number(input.salePrice ?? existingProduct.salePrice ?? 0),
+      variantLabel:
+        input.variantLabel?.trim() ||
+        normalizedVariantAttributes.map((attribute) => attribute.label).join(' / '),
+      variantAttributes: normalizedVariantAttributes,
+      variants: normalizedVariants,
+      publicStock:
+        nextSaleMode === 'varianted'
+          ? normalizedVariants.reduce((total, variant) => total + Math.max(Number(variant.stock ?? 0), 0), 0)
+          : existingProduct.publicStock,
       updatedAt: new Date().toISOString(),
     };
+
+    const historySummary = countProductHistoryRecords(productId, {
+      purchases,
+      movements,
+      sales,
+      services,
+    });
+
+    const canAutoMigrateHistory =
+      historySummary.hasActivity &&
+      canAutoMigrateLegacyVirolaHistory(existingProduct, nextProduct);
+
+    if (
+      historySummary.hasActivity &&
+      hasStructuralProductChanges(existingProduct, nextProduct) &&
+      !canAutoMigrateHistory
+    ) {
+      throw new Error(
+        'Este producto ya tiene compras, movimientos o ventas. Para no afectar inventario e historial, por ahora solo puedes editar datos comerciales y visuales; la reorganizacion de variantes debe hacerse con una migracion guiada.'
+      );
+    }
+
+    let migratedProduct = nextProduct;
+    let historyVariant =
+      findVariantByPreferredName(normalizedVariants, input.historyVariantName) ??
+      findTransparentVariant(normalizedVariants) ??
+      normalizedVariants[0] ??
+      null;
+    let variantAdjustmentDeltas: Array<{
+      variantId: string;
+      variantName: string;
+      quantity: number;
+    }> = [];
+
+    if (canAutoMigrateHistory && historyVariant) {
+      const currentLegacyStock = Math.max(getProductStock(movements, productId), 0);
+      const desiredTotalStock = normalizedVariants.reduce(
+        (total, variant) => total + Math.max(Number(variant.stock ?? 0), 0),
+        0
+      );
+
+      if (desiredTotalStock !== currentLegacyStock) {
+        throw new Error(
+          `El stock repartido entre variantes debe sumar ${currentLegacyStock}. Ajusta las cantidades antes de guardar.`
+        );
+      }
+
+      const baseMigratedVariants = normalizedVariants.map((variant) =>
+        variant.id === historyVariant?.id
+          ? {
+              ...variant,
+              stock: currentLegacyStock,
+              publicStock: currentLegacyStock,
+            }
+          : {
+              ...variant,
+              stock: 0,
+              publicStock: 0,
+            }
+      );
+
+      variantAdjustmentDeltas = normalizedVariants
+        .map((variant) => {
+          const baseVariant = baseMigratedVariants.find((item) => item.id === variant.id);
+          const baseStock = Math.max(Number(baseVariant?.stock ?? 0), 0);
+          const desiredStock = Math.max(Number(variant.stock ?? 0), 0);
+          const quantity = desiredStock - baseStock;
+
+          if (quantity === 0) return null;
+
+          return {
+            variantId: variant.id,
+            variantName: variant.displayName ?? variant.name,
+            quantity,
+          };
+        })
+        .filter((item): item is { variantId: string; variantName: string; quantity: number } => Boolean(item));
+
+      historyVariant =
+        findVariantByPreferredName(normalizedVariants, input.historyVariantName) ??
+        findTransparentVariant(normalizedVariants) ??
+        normalizedVariants[0] ??
+        null;
+      migratedProduct = {
+        ...nextProduct,
+        variants: normalizedVariants,
+        publicStock: normalizedVariants.reduce((total, variant) => total + Math.max(Number(variant.stock ?? 0), 0), 0),
+      };
+    }
+
+    const batch = writeBatch(db);
+    batch.set(
+      doc(db, 'products', productId),
+      buildProductWritePayload(input, {
+        saleMode: migratedProduct.saleMode,
+        salePrice: migratedProduct.salePrice,
+        variantLabel: migratedProduct.variantLabel ?? '',
+        variantAttributes: normalizedVariantAttributes,
+        variants: migratedProduct.variants ?? [],
+        publicStock: migratedProduct.publicStock,
+      }),
+      { merge: true }
+    );
+
+    if (canAutoMigrateHistory && historyVariant) {
+      const historyVariantId = historyVariant.id;
+      const historyVariantName = historyVariant.displayName ?? historyVariant.name;
+
+      movements
+        .filter((movement) => movement.productId === productId && !movement.variantId)
+        .forEach((movement) => {
+          batch.set(
+            doc(db, 'movements', movement.id),
+            {
+              variantId: historyVariantId,
+              variantName: historyVariantName,
+            },
+            { merge: true }
+          );
+        });
+
+      purchases
+        .filter((purchase) => purchase.productId === productId && !purchase.variantId)
+        .forEach((purchase) => {
+          batch.set(
+            doc(db, 'purchases', purchase.id),
+            {
+              variantId: historyVariantId,
+              variantName: historyVariantName,
+            },
+            { merge: true }
+          );
+        });
+
+      sales
+        .filter(
+          (sale) =>
+            sale.productId === productId ||
+            sale.lineItems.some((item) => item.productId === productId && !item.variantId)
+        )
+        .forEach((sale) => {
+          const nextLineItems = sale.lineItems.map((item) =>
+            item.productId === productId && !item.variantId
+              ? {
+                  ...item,
+                  variantId: historyVariantId,
+                  variantName: historyVariantName,
+                }
+              : item
+          );
+
+          batch.set(
+            doc(db, 'sales', sale.id),
+            {
+              variantId: sale.productId === productId ? historyVariantId : sale.lineItems[0]?.variantId ?? null,
+              variantName: sale.productId === productId ? historyVariantName : sale.lineItems[0]?.variantName ?? null,
+              lineItems: nextLineItems,
+            },
+            { merge: true }
+          );
+        });
+
+      const [inventoryMovementSnapshot, purchaseItemsSnapshot] = await Promise.all([
+        getDocs(query(collection(db, 'inventory_movements'), where('productId', '==', productId))),
+        getDocs(query(collection(db, 'purchase_items'), where('productId', '==', productId))),
+      ]);
+
+      inventoryMovementSnapshot.docs.forEach((snapshotItem) => {
+        const data = snapshotItem.data();
+        if (data.variantId) return;
+        batch.set(
+          doc(db, 'inventory_movements', snapshotItem.id),
+          {
+            variantId: historyVariantId,
+            variantName: historyVariantName,
+          },
+          { merge: true }
+        );
+      });
+
+      purchaseItemsSnapshot.docs.forEach((snapshotItem) => {
+        const data = snapshotItem.data();
+        if (data.variantId) return;
+        batch.set(
+          doc(db, 'purchase_items', snapshotItem.id),
+          {
+            variantId: historyVariantId,
+            variantName: historyVariantName,
+          },
+          { merge: true }
+        );
+      });
+
+      if (variantAdjustmentDeltas.length > 0) {
+        const occurredAt = Timestamp.fromDate(new Date());
+
+        variantAdjustmentDeltas.forEach((item) => {
+          const movementRef = doc(collection(db, 'movements'));
+          const movementPayload = {
+            id: movementRef.id,
+            productId,
+            variantId: item.variantId,
+            variantName: item.variantName,
+            type: 'adjustment',
+            reason: 'manual-adjustment',
+            quantity: item.quantity,
+            notes: `Redistribucion inicial de stock entre variantes. Historial base: ${historyVariantName}.`,
+            occurredAt,
+            responsibleUser: 'Migracion de variantes',
+            relatedUnitCost: getVariantOrProductRealUnitCost(purchases, productId, item.variantId),
+          };
+
+          batch.set(doc(db, 'movements', movementRef.id), movementPayload);
+          batch.set(doc(db, 'inventory_movements', movementRef.id), {
+            ...movementPayload,
+            sourceType: 'manual-adjustment',
+            sourceId: movementRef.id,
+          });
+        });
+      }
+    }
+
+    syncVariantDocumentsToBatch(batch, migratedProduct);
+    await batch.commit();
+
+    return migratedProduct;
   };
 
   const deleteProduct = async (productId: string) => {
+    const historySummary = countProductHistoryRecords(productId, {
+      purchases,
+      movements,
+      sales,
+      services,
+    });
+    if (historySummary.hasActivity) {
+      throw new Error(
+        'Este producto ya tiene historial. No se puede eliminar sin una migracion controlada porque afectaria compras, inventario o ventas registradas.'
+      );
+    }
+
     const batch = writeBatch(db);
     batch.delete(doc(db, 'products', productId));
+    (products.find((product) => product.id === productId)?.variants ?? []).forEach((variant) => {
+      batch.delete(doc(db, 'product_variants', variant.id));
+    });
     movements
       .filter((movement) => movement.productId === productId)
       .forEach((movement) => batch.delete(doc(db, 'movements', movement.id)));
@@ -699,6 +1602,10 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     if (!targetProduct) {
       throw new Error('No se encontro el producto para registrar el movimiento.');
     }
+    const selectedVariant = input.variantId ? getProductVariantById(targetProduct, input.variantId) : null;
+    if (getProductSaleMode(targetProduct) === 'varianted' && !selectedVariant) {
+      throw new Error(`Selecciona una variante valida para ${targetProduct.name}.`);
+    }
 
     const normalizedQuantity =
       input.type === 'exit' ? -Math.abs(input.quantity) : input.quantity;
@@ -706,6 +1613,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     const movement: InventoryMovement = {
       id: movementRef.id,
       productId: input.productId,
+      variantId: selectedVariant?.id,
+      variantName: selectedVariant?.name ?? input.variantName,
       type: input.type,
       reason: input.reason,
       quantity: normalizedQuantity,
@@ -713,7 +1622,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       occurredAt: new Date().toISOString(),
       responsibleUser: input.responsibleUser,
       relatedUnitCost:
-        input.relatedUnitCost ?? getProductRealUnitCost(purchases, input.productId),
+        input.relatedUnitCost ?? getVariantOrProductRealUnitCost(purchases, input.productId, selectedVariant?.id),
     };
 
     const batch = writeBatch(db);
@@ -721,12 +1630,25 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       ...movement,
       occurredAt: serverTimestamp(),
     });
+    batch.set(doc(db, 'inventory_movements', movement.id), {
+      ...movement,
+      occurredAt: serverTimestamp(),
+      sourceType: 'manual-adjustment',
+      sourceId: movement.id,
+    });
     applyPublicStockMapToBatch(
       batch,
       buildPublicStockMap(movements, [input.productId], [
         { productId: input.productId, quantity: normalizedQuantity },
       ])
     );
+    if (selectedVariant) {
+      const variantStockMap = buildVariantStockMap(products);
+      const productVariantMap = variantStockMap.get(input.productId);
+      const currentVariantStock = productVariantMap?.get(selectedVariant.id) ?? selectedVariant.stock ?? 0;
+      productVariantMap?.set(selectedVariant.id, Math.max(currentVariantStock + normalizedQuantity, 0));
+      applyVariantStockMapToBatch(batch, variantStockMap, products);
+    }
     await batch.commit();
 
     return movement;
@@ -756,7 +1678,10 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     const purchaseValueTotal = Number((quantity * estimatedUnitCost).toFixed(2));
     const purchase: Purchase = {
       id: purchaseRef.id,
+      purchaseId: purchaseRef.id,
       productId: input.productId,
+      variantId: input.variantId,
+      variantName: input.variantName,
       supplier: 'Inventario inicial sin proveedor',
       source: 'initial-load',
       purchasedAt: input.occurredAt,
@@ -776,6 +1701,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     const movement: InventoryMovement = {
       id: movementRef.id,
       productId: input.productId,
+      variantId: input.variantId,
+      variantName: input.variantName,
       purchaseId: purchase.id,
       type: 'entry',
       reason: 'initial-load',
@@ -789,10 +1716,24 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     const batch = writeBatch(db);
     batch.set(doc(db, 'purchases', purchase.id), {
       ...purchase,
+      docType: 'legacy-line',
+      purchasedAt: Timestamp.fromDate(new Date(input.occurredAt)),
+    });
+    batch.set(doc(db, 'purchase_items', purchase.id), {
+      ...purchase,
+      purchaseId: purchase.id,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
       purchasedAt: Timestamp.fromDate(new Date(input.occurredAt)),
     });
     batch.set(doc(db, 'movements', movement.id), {
       ...movement,
+      occurredAt: Timestamp.fromDate(new Date(input.occurredAt)),
+    });
+    batch.set(doc(db, 'inventory_movements', movement.id), {
+      ...movement,
+      sourceType: 'initial-load',
+      sourceId: purchase.id,
       occurredAt: Timestamp.fromDate(new Date(input.occurredAt)),
     });
 
@@ -813,6 +1754,13 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         { productId: input.productId, quantity },
       ])
     );
+    if (input.variantId) {
+      const variantStockMap = buildVariantStockMap(products);
+      const productVariantMap = variantStockMap.get(input.productId);
+      const currentVariantStock = productVariantMap?.get(input.variantId) ?? 0;
+      productVariantMap?.set(input.variantId, currentVariantStock + quantity);
+      applyVariantStockMapToBatch(batch, variantStockMap, products);
+    }
 
     await batch.commit();
 
@@ -881,8 +1829,11 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       );
       const purchase: Purchase = {
         id: doc(collection(db, 'purchases')).id,
+        purchaseId: batchId,
         purchaseBatchId: batchId,
         productId: item.productId,
+        variantId: item.variantId,
+        variantName: item.variantName,
         supplier: input.supplier,
         supplierId: input.supplierId,
         purchasedAt: input.purchasedAt,
@@ -904,11 +1855,21 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       const movementRef = doc(collection(db, 'movements'));
       batch.set(doc(db, 'purchases', purchase.id), {
         ...purchase,
+        docType: 'legacy-line',
+        purchasedAt: Timestamp.fromDate(new Date(input.purchasedAt)),
+      });
+      batch.set(doc(db, 'purchase_items', purchase.id), {
+        ...purchase,
+        purchaseId: batchId,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
         purchasedAt: Timestamp.fromDate(new Date(input.purchasedAt)),
       });
       batch.set(movementRef, {
         id: movementRef.id,
         productId: item.productId,
+        variantId: item.variantId ?? null,
+        variantName: item.variantName ?? null,
         purchaseId: purchase.id,
         purchaseBatchId: batchId,
         type: 'purchase',
@@ -919,9 +1880,29 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         responsibleUser: 'Administrador',
         relatedUnitCost: totals.realUnitCost,
       });
+      batch.set(doc(db, 'inventory_movements', movementRef.id), {
+        id: movementRef.id,
+        productId: item.productId,
+        variantId: item.variantId ?? null,
+        variantName: item.variantName ?? null,
+        purchaseId: purchase.id,
+        purchaseBatchId: batchId,
+        sourceType: 'purchase',
+        sourceId: batchId,
+        type: 'purchase',
+        reason: 'purchase',
+        quantity: quantityPurchased,
+        notes: `Compra grupal registrada a proveedor ${input.supplier}`,
+        occurredAt: Timestamp.fromDate(new Date(input.purchasedAt)),
+        responsibleUser: 'Administrador',
+        relatedUnitCost: totals.realUnitCost,
+      });
       stockDeltas.push({ productId: item.productId, quantity: quantityPurchased });
       batch.update(doc(db, 'products', item.productId), {
-        salePrice: item.suggestedSalePrice,
+        salePrice:
+          item.variantId && getProductSaleMode(products.find((product) => product.id === item.productId)) === 'varianted'
+            ? products.find((product) => product.id === item.productId)?.salePrice ?? item.suggestedSalePrice
+            : item.suggestedSalePrice,
         updatedAt: serverTimestamp(),
       });
     });
@@ -934,6 +1915,21 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         stockDeltas
       )
     );
+    const variantStockMap = buildVariantStockMap(products);
+    normalizedItems.forEach((item) => {
+      if (!item.variantId) return;
+      const targetProduct = products.find((product) => product.id === item.productId);
+      const targetVariant = targetProduct ? getProductVariantById(targetProduct, item.variantId) : null;
+      if (!targetVariant) return;
+      const currentStock = variantStockMap.get(item.productId)?.get(item.variantId) ?? targetVariant.stock ?? 0;
+      variantStockMap.get(item.productId)?.set(item.variantId, currentStock + item.presentationQuantity);
+      const variantRecord = (targetProduct?.variants ?? []).find((variant) => variant.id === item.variantId);
+      if (variantRecord) {
+        variantRecord.salePrice = Number(item.suggestedSalePrice ?? variantRecord.salePrice ?? targetProduct?.salePrice ?? 0);
+        variantRecord.latestUnitCost = getVariantOrProductRealUnitCost(purchases, item.productId, item.variantId);
+      }
+    });
+    applyVariantStockMapToBatch(batch, variantStockMap, products);
 
     await batch.commit();
 
@@ -1018,13 +2014,24 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     await batch.commit();
   };
 
-  const registerSaleInternal = async (input: RegisterSaleInput, baseMovements: InventoryMovement[] = movements) => {
+  const registerSaleInternal = async (
+    input: RegisterSaleInput,
+    baseMovements: InventoryMovement[] = movements,
+    baseProducts: Product[] = products,
+    options?: { saleBatchId?: string }
+  ) => {
     if (input.items.length === 0) {
       throw new Error('Agrega al menos un producto a la venta.');
     }
 
+    const normalizedCustomerPhone = input.customerPhone.trim();
+    if (normalizedCustomerPhone && normalizedCustomerPhone.length < 7) {
+      throw new Error('Ingresa un telefono valido o dejalo vacio.');
+    }
+
+    const variantStockMap = buildVariantStockMap(baseProducts);
     const lineRecords = input.items.map((item) => {
-      const targetProduct = products.find((product) => product.id === item.productId);
+      const targetProduct = baseProducts.find((product) => product.id === item.productId);
       if (!targetProduct) {
         throw new Error('No se encontro uno de los productos para registrar la venta.');
       }
@@ -1039,9 +2046,27 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         throw new Error(`La cantidad vendida supera el stock disponible de ${targetProduct.name}.`);
       }
 
-      const realUnitCost = getProductRealUnitCost(purchases, item.productId);
+      let variantId: string | undefined;
+      let variantName: string | undefined;
+      if ((targetProduct.variants?.length ?? 0) > 0) {
+        const selectedVariant = getProductVariantById(targetProduct, item.variantId);
+        if (!selectedVariant) {
+          throw new Error(`Selecciona la opcion disponible de ${targetProduct.name}.`);
+        }
+        const currentVariantStock = variantStockMap.get(targetProduct.id)?.get(selectedVariant.id) ?? selectedVariant.stock;
+        if (quantity > currentVariantStock) {
+          throw new Error(`La variante ${selectedVariant.name} de ${targetProduct.name} no tiene stock suficiente.`);
+        }
+        variantStockMap.get(targetProduct.id)?.set(selectedVariant.id, currentVariantStock - quantity);
+        variantId = selectedVariant.id;
+        variantName = selectedVariant.name;
+      }
+
+      const realUnitCost = getVariantOrProductRealUnitCost(purchases, item.productId, variantId);
       const lineItem: SaleLineItem = {
         productId: item.productId,
+        variantId,
+        variantName,
         quantity,
         unitPrice: Number(item.unitPrice ?? 0),
         realUnitCost,
@@ -1049,49 +2074,17 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         totalCost: quantity * realUnitCost,
       };
 
-      const giftItems: SaleGiftItem[] = [];
-      if ((item.giftItems?.length ?? 0) > 0) {
-        if (targetProduct.category !== 'tacos') {
-          throw new Error(`Solo los tacos de billar pueden llevar obsequio. Revisa ${targetProduct.name}.`);
-        }
-        const seenGiftCategories = new Set<string>();
-        item.giftItems?.forEach((giftItemInput) => {
-          const giftProductId = giftItemInput.productId?.trim();
-          const giftQuantity = Math.max(Number(giftItemInput.quantity ?? 0), 0);
+      const giftItems = buildSaleGiftItems(item, targetProduct, baseProducts, purchases, baseMovements);
+      const serviceItems = (item.serviceItems ?? []).map((serviceItem) => ({
+        serviceType: serviceItem.serviceType,
+        serviceCategory: serviceItem.serviceCategory?.trim() || undefined,
+        price: Math.max(Number(serviceItem.price ?? 0), 0),
+        cost: Math.max(Number(serviceItem.cost ?? 0), 0),
+        cueReference: serviceItem.cueReference?.trim() || targetProduct.name,
+        notes: serviceItem.notes?.trim() || '',
+      })).filter((serviceItem) => serviceItem.price > 0 || serviceItem.cost > 0 || serviceItem.cueReference);
 
-          if (!giftProductId) {
-            throw new Error(`Selecciona el obsequio para ${targetProduct.name}.`);
-          }
-          if (giftQuantity <= 0) {
-            throw new Error(`La cantidad del obsequio debe ser mayor a cero para ${targetProduct.name}.`);
-          }
-
-          const giftedProduct = products.find((product) => product.id === giftProductId);
-          if (!giftedProduct) {
-            throw new Error('No se encontro uno de los productos obsequiados.');
-          }
-          if (!['guantes', 'estuches'].includes(giftedProduct.category)) {
-            throw new Error(`Los obsequios para ${targetProduct.name} solo pueden ser un guante y un estuche.`);
-          }
-          if (giftQuantity !== 1) {
-            throw new Error(`Cada obsequio para ${targetProduct.name} debe tener cantidad 1.`);
-          }
-          if (seenGiftCategories.has(giftedProduct.category)) {
-            throw new Error(`No repitas el mismo tipo de obsequio para ${targetProduct.name}.`);
-          }
-          seenGiftCategories.add(giftedProduct.category);
-
-          const giftUnitCost = getProductRealUnitCost(purchases, giftProductId);
-          giftItems.push({
-            productId: giftProductId,
-            quantity: giftQuantity,
-            unitCost: giftUnitCost,
-            totalCost: giftQuantity * giftUnitCost,
-          });
-        });
-      }
-
-      return { lineItem, giftItems };
+      return { lineItem, giftItems, serviceItems, targetProduct };
     });
 
     const requestedGiftTotals = new Map<string, number>();
@@ -1115,7 +2108,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    const saleBatchId = doc(collection(db, 'sale-batches')).id;
+    const saleBatchId = options?.saleBatchId ?? doc(collection(db, 'sale-batches')).id;
 
     const batch = writeBatch(db);
     const stockDeltas: Array<{ productId: string; quantity: number }> = [];
@@ -1144,11 +2137,23 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         returnedSaleAmount: 0,
         returnedCostAmount: 0,
         customerName: input.customerName,
+        customerPhone: normalizedCustomerPhone,
         notes: input.notes,
         responsibleUser: input.responsibleUser,
       };
       batch.set(doc(db, 'sales', sale.id), {
         ...sale,
+        lineItems: sale.lineItems.map((item) => ({
+          ...item,
+          variantId: item.variantId ?? null,
+          variantName: item.variantName ?? null,
+        })),
+        giftItems: sale.giftItems.map((item) => ({
+          ...item,
+          kind: item.kind ?? 'gift',
+        })),
+        variantId: lineItem.variantId ?? null,
+        variantName: lineItem.variantName ?? null,
         giftedProductId: sale.giftedProductId ?? null,
         soldAt: Timestamp.fromDate(new Date(input.soldAt)),
       });
@@ -1157,6 +2162,24 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         id: movementRef.id,
         saleId: sale.id,
         productId: lineItem.productId,
+        variantId: lineItem.variantId ?? null,
+        variantName: lineItem.variantName ?? null,
+        type: 'exit',
+        reason: 'sale',
+        quantity: -Math.abs(lineItem.quantity),
+        notes: input.notes || `Venta registrada${input.customerName ? ` para ${input.customerName}` : ''}`,
+        occurredAt: Timestamp.fromDate(new Date(input.soldAt)),
+        responsibleUser: input.responsibleUser,
+        relatedUnitCost: lineItem.realUnitCost,
+      });
+      batch.set(doc(db, 'inventory_movements', movementRef.id), {
+        id: movementRef.id,
+        saleId: sale.id,
+        productId: lineItem.productId,
+        variantId: lineItem.variantId ?? null,
+        variantName: lineItem.variantName ?? null,
+        sourceType: 'sale',
+        sourceId: saleBatchId,
         type: 'exit',
         reason: 'sale',
         quantity: -Math.abs(lineItem.quantity),
@@ -1178,7 +2201,23 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
           quantity: -Math.abs(giftItem.quantity),
           notes:
             input.notes ||
-            `Obsequio asociado a ${targetProductName(products, lineItem.productId)}${input.customerName ? ` para ${input.customerName}` : ''}`,
+            `Obsequio asociado a ${targetProductName(baseProducts, lineItem.productId)}${input.customerName ? ` para ${input.customerName}` : ''}`,
+          occurredAt: Timestamp.fromDate(new Date(input.soldAt)),
+          responsibleUser: input.responsibleUser,
+          relatedUnitCost: giftItem.unitCost,
+        });
+        batch.set(doc(db, 'inventory_movements', giftMovementRef.id), {
+          id: giftMovementRef.id,
+          saleId: sale.id,
+          productId: giftItem.productId,
+          sourceType: 'sale-gift',
+          sourceId: sale.id,
+          type: 'exit',
+          reason: 'gift',
+          quantity: -Math.abs(giftItem.quantity),
+          notes:
+            input.notes ||
+            `Obsequio asociado a ${targetProductName(baseProducts, lineItem.productId)}${input.customerName ? ` para ${input.customerName}` : ''}`,
           occurredAt: Timestamp.fromDate(new Date(input.soldAt)),
           responsibleUser: input.responsibleUser,
           relatedUnitCost: giftItem.unitCost,
@@ -1189,6 +2228,46 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       return sale;
     });
 
+    lineRecords.forEach(({ lineItem, serviceItems, targetProduct }, index) => {
+      if (serviceItems.length === 0) return;
+
+      const linkedSale = createdSales[index];
+      serviceItems.forEach((serviceItem) => {
+        const serviceRef = doc(collection(db, 'services'));
+        const service: ServiceOrder = {
+          id: serviceRef.id,
+          serviceType: serviceItem.serviceType,
+          serviceCategory: serviceItem.serviceCategory,
+          source: 'sale-addon',
+          saleId: linkedSale.id,
+          saleBatchId,
+          performedAt: input.soldAt,
+          customerName: input.customerName,
+          cueReference: serviceItem.cueReference,
+          servicePrice: serviceItem.price,
+          totalRevenue: serviceItem.price,
+          totalMaterialCost: 0,
+          totalOperationalCost: serviceItem.cost,
+          totalCost: serviceItem.cost,
+          grossProfit: serviceItem.price - serviceItem.cost,
+          materials: [],
+          notes:
+            serviceItem.notes ||
+            `Servicio asociado a la venta de ${targetProduct.name}${input.customerName ? ` para ${input.customerName}` : ''}`,
+          responsibleUser: input.responsibleUser,
+        };
+
+        batch.set(doc(db, 'services', service.id), {
+          ...service,
+          serviceCategory: service.serviceCategory ?? null,
+          source: service.source ?? 'sale-addon',
+          saleId: service.saleId ?? null,
+          saleBatchId: service.saleBatchId ?? null,
+          performedAt: Timestamp.fromDate(new Date(input.soldAt)),
+        });
+      });
+    });
+
     applyPublicStockMapToBatch(
       batch,
       buildPublicStockMap(
@@ -1197,6 +2276,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         stockDeltas
       )
     );
+    applyVariantStockMapToBatch(batch, variantStockMap, baseProducts);
 
     if (input.actorRole === 'sales') {
       const soldUnits = createdSales.reduce((sum, sale) => sum + sale.quantity, 0);
@@ -1223,9 +2303,37 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       throw new Error('No se encontro la venta a editar.');
     }
     const giftMovementsToUpdate = existingSales.flatMap((sale) => findGiftMovementForSale(movements, sale));
+    const linkedServiceOrders = services.filter(
+      (service) => service.source === 'sale-addon' && service.saleBatchId === saleBatchId
+    );
+    const restoredProducts = products.map((product) => {
+      const variantRestorations = new Map<string, number>();
+      existingSales.forEach((sale) => {
+        sale.lineItems
+          .filter((item) => item.productId === product.id && item.variantId)
+          .forEach((item) => {
+            variantRestorations.set(
+              item.variantId!,
+              (variantRestorations.get(item.variantId!) ?? 0) + item.quantity
+            );
+          });
+      });
+
+      if (variantRestorations.size === 0) {
+        return product;
+      }
+
+      return {
+        ...product,
+        variants: (product.variants ?? []).map((variant) => ({
+          ...variant,
+          stock: variant.stock + (variantRestorations.get(variant.id) ?? 0),
+        })),
+      };
+    });
     const requestedGiftTotals = new Map<string, number>();
     const nextLineRecords = input.items.map((item) => {
-      const targetProduct = products.find((product) => product.id === item.productId);
+      const targetProduct = restoredProducts.find((product) => product.id === item.productId);
       if (!targetProduct) {
         throw new Error('No se encontro uno de los productos para actualizar la venta.');
       }
@@ -1234,8 +2342,14 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         throw new Error('La cantidad vendida debe ser mayor a cero.');
       }
       const realUnitCost = getProductRealUnitCost(purchases, item.productId);
+      const selectedVariant = getProductVariantById(targetProduct, item.variantId);
+      if ((targetProduct.variants?.length ?? 0) > 0 && !selectedVariant) {
+        throw new Error(`Selecciona la opcion disponible de ${targetProduct.name}.`);
+      }
       const lineItem: SaleLineItem = {
         productId: item.productId,
+        variantId: selectedVariant?.id,
+        variantName: selectedVariant?.name,
         quantity,
         unitPrice: Number(item.unitPrice ?? 0),
         realUnitCost,
@@ -1243,45 +2357,10 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         totalCost: quantity * realUnitCost,
       };
 
-      const giftItems: SaleGiftItem[] = [];
-      if ((item.giftItems?.length ?? 0) > 0) {
-        if (targetProduct.category !== 'tacos') {
-          throw new Error(`Solo los tacos de billar pueden llevar obsequio. Revisa ${targetProduct.name}.`);
-        }
-        const seenGiftCategories = new Set<string>();
-        item.giftItems?.forEach((giftItemInput) => {
-          const productId = giftItemInput.productId?.trim();
-          const quantity = Math.max(Number(giftItemInput.quantity ?? 0), 0);
-          if (!productId) {
-            throw new Error(`Selecciona el obsequio para ${targetProduct.name}.`);
-          }
-          if (quantity <= 0) {
-            throw new Error(`La cantidad del obsequio debe ser mayor a cero para ${targetProduct.name}.`);
-          }
-          const giftedProduct = products.find((product) => product.id === productId);
-          if (!giftedProduct) {
-            throw new Error('No se encontro uno de los productos obsequiados.');
-          }
-          if (!['guantes', 'estuches'].includes(giftedProduct.category)) {
-            throw new Error(`Los obsequios para ${targetProduct.name} solo pueden ser un guante y un estuche.`);
-          }
-          if (quantity !== 1) {
-            throw new Error(`Cada obsequio para ${targetProduct.name} debe tener cantidad 1.`);
-          }
-          if (seenGiftCategories.has(giftedProduct.category)) {
-            throw new Error(`No repitas el mismo tipo de obsequio para ${targetProduct.name}.`);
-          }
-          seenGiftCategories.add(giftedProduct.category);
-          requestedGiftTotals.set(productId, (requestedGiftTotals.get(productId) ?? 0) + quantity);
-          const unitCost = getProductRealUnitCost(purchases, productId);
-          giftItems.push({
-            productId,
-            quantity,
-            unitCost,
-            totalCost: quantity * unitCost,
-          });
-        });
-      }
+      const giftItems = buildSaleGiftItems(item, targetProduct, restoredProducts, purchases, movements);
+      giftItems.forEach((giftItem) => {
+        requestedGiftTotals.set(giftItem.productId, (requestedGiftTotals.get(giftItem.productId) ?? 0) + giftItem.quantity);
+      });
 
       return { lineItem, giftItems };
     });
@@ -1321,6 +2400,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
 
     const batch = writeBatch(db);
     existingSales.forEach((sale) => batch.delete(doc(db, 'sales', sale.id)));
+    linkedServiceOrders.forEach((service) => batch.delete(doc(db, 'services', service.id)));
     movements
       .filter((movement) => existingSales.some((sale) => sale.id === movement.saleId))
       .forEach((movement) => batch.delete(doc(db, 'movements', movement.id)));
@@ -1333,16 +2413,19 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
 
     return registerSaleInternal({
       ...input,
-      items: nextLineRecords.map((record) => ({
+      items: nextLineRecords.map((record, index) => ({
         productId: record.lineItem.productId,
+        variantId: record.lineItem.variantId,
+        variantName: record.lineItem.variantName,
         quantity: record.lineItem.quantity,
         unitPrice: record.lineItem.unitPrice,
+        serviceItems: input.items[index]?.serviceItems ?? [],
         giftItems: record.giftItems.map((giftItem) => ({
           productId: giftItem.productId,
           quantity: giftItem.quantity,
         })),
       })),
-    }, remainingMovements);
+    }, remainingMovements, restoredProducts, { saleBatchId });
   };
 
   const registerSaleReturn = async (input: RegisterSaleReturnInput) => {
@@ -1376,6 +2459,24 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       id: movementRef.id,
       saleId: sale.id,
       productId: sale.productId,
+      variantId: sale.lineItems[0]?.variantId ?? null,
+      variantName: sale.lineItems[0]?.variantName ?? null,
+      type: 'entry',
+      reason: 'return',
+      quantity: Math.abs(input.quantity),
+      notes: input.notes || `Devolucion registrada de ${sale.customerName || 'cliente'}`,
+      occurredAt: Timestamp.fromDate(new Date(input.returnedAt)),
+      responsibleUser: input.responsibleUser,
+      relatedUnitCost: sale.realUnitCost,
+    });
+    batch.set(doc(db, 'inventory_movements', movementRef.id), {
+      id: movementRef.id,
+      saleId: sale.id,
+      productId: sale.productId,
+      variantId: sale.lineItems[0]?.variantId ?? null,
+      variantName: sale.lineItems[0]?.variantName ?? null,
+      sourceType: 'sale-return',
+      sourceId: sale.id,
       type: 'entry',
       reason: 'return',
       quantity: Math.abs(input.quantity),
@@ -1390,6 +2491,13 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         { productId: sale.productId, quantity: Math.abs(input.quantity) },
       ])
     );
+    if (sale.lineItems[0]?.variantId) {
+      const variantStockMap = buildVariantStockMap(products);
+      const productVariantMap = variantStockMap.get(sale.productId);
+      const currentVariantStock = productVariantMap?.get(sale.lineItems[0].variantId!) ?? 0;
+      productVariantMap?.set(sale.lineItems[0].variantId!, currentVariantStock + Math.abs(input.quantity));
+      applyVariantStockMapToBatch(batch, variantStockMap, products);
+    }
 
     await batch.commit();
 
@@ -1401,13 +2509,132 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     };
   };
 
+  const registerSaleReturns = async (input: RegisterSaleReturnBatchInput) => {
+    if (input.items.length === 0) {
+      throw new Error('Agrega al menos un producto para devolver.');
+    }
+
+    const requestedReturns = input.items
+      .map((item) => ({
+        saleId: item.saleId,
+        quantity: Math.max(Number(item.quantity ?? 0), 0),
+      }))
+      .filter((item) => item.quantity > 0);
+
+    if (requestedReturns.length === 0) {
+      throw new Error('Ingresa al menos una cantidad valida para devolver.');
+    }
+
+    const saleMap = new Map<string, Sale>();
+    requestedReturns.forEach((item) => {
+      if (saleMap.has(item.saleId)) {
+        throw new Error('No repitas el mismo producto en la devolucion.');
+      }
+      const sale = sales.find((current) => current.id === item.saleId);
+      if (!sale) {
+        throw new Error('No se encontro una de las ventas para registrar la devolucion.');
+      }
+      const remainingQuantity = sale.quantity - (sale.returnedQuantity ?? 0);
+      if (item.quantity > remainingQuantity) {
+        throw new Error('La cantidad a devolver supera lo pendiente de uno de los productos.');
+      }
+      saleMap.set(item.saleId, sale);
+    });
+
+    const batch = writeBatch(db);
+    const stockDeltas: Array<{ productId: string; quantity: number }> = [];
+    const updatedSales: Sale[] = [];
+
+    requestedReturns.forEach((item) => {
+      const sale = saleMap.get(item.saleId);
+      if (!sale) return;
+
+      const returnedSaleAmount = item.quantity * sale.unitPrice;
+      const returnedCostAmount = item.quantity * sale.realUnitCost;
+      const nextReturnedQuantity = (sale.returnedQuantity ?? 0) + item.quantity;
+      const nextReturnedSaleAmount = (sale.returnedSaleAmount ?? 0) + returnedSaleAmount;
+      const nextReturnedCostAmount = (sale.returnedCostAmount ?? 0) + returnedCostAmount;
+
+      batch.update(doc(db, 'sales', sale.id), {
+        returnedQuantity: nextReturnedQuantity,
+        returnedSaleAmount: nextReturnedSaleAmount,
+        returnedCostAmount: nextReturnedCostAmount,
+      });
+
+      const movementRef = doc(collection(db, 'movements'));
+      batch.set(movementRef, {
+        id: movementRef.id,
+        saleId: sale.id,
+        productId: sale.productId,
+        variantId: sale.lineItems[0]?.variantId ?? null,
+        variantName: sale.lineItems[0]?.variantName ?? null,
+        type: 'entry',
+        reason: 'return',
+        quantity: Math.abs(item.quantity),
+        notes: input.notes || `Devolucion registrada de ${sale.customerName || 'cliente'}`,
+        occurredAt: Timestamp.fromDate(new Date(input.returnedAt)),
+        responsibleUser: input.responsibleUser,
+        relatedUnitCost: sale.realUnitCost,
+      });
+      batch.set(doc(db, 'inventory_movements', movementRef.id), {
+        id: movementRef.id,
+        saleId: sale.id,
+        productId: sale.productId,
+        variantId: sale.lineItems[0]?.variantId ?? null,
+        variantName: sale.lineItems[0]?.variantName ?? null,
+        sourceType: 'sale-return',
+        sourceId: sale.id,
+        type: 'entry',
+        reason: 'return',
+        quantity: Math.abs(item.quantity),
+        notes: input.notes || `Devolucion registrada de ${sale.customerName || 'cliente'}`,
+        occurredAt: Timestamp.fromDate(new Date(input.returnedAt)),
+        responsibleUser: input.responsibleUser,
+        relatedUnitCost: sale.realUnitCost,
+      });
+
+      stockDeltas.push({ productId: sale.productId, quantity: Math.abs(item.quantity) });
+      updatedSales.push({
+        ...sale,
+        returnedQuantity: nextReturnedQuantity,
+        returnedSaleAmount: nextReturnedSaleAmount,
+        returnedCostAmount: nextReturnedCostAmount,
+      });
+    });
+
+    applyPublicStockMapToBatch(
+      batch,
+      buildPublicStockMap(
+        movements,
+        stockDeltas.map((item) => item.productId),
+        stockDeltas
+      )
+    );
+    const variantStockMap = buildVariantStockMap(products);
+    updatedSales.forEach((sale) => {
+      const variantId = sale.lineItems[0]?.variantId;
+      if (!variantId) return;
+      const productVariantMap = variantStockMap.get(sale.productId);
+      const currentVariantStock = productVariantMap?.get(variantId) ?? 0;
+      const restoredQuantity =
+        requestedReturns.find((item) => item.saleId === sale.id)?.quantity ?? 0;
+      productVariantMap?.set(variantId, currentVariantStock + Math.abs(restoredQuantity));
+    });
+    applyVariantStockMapToBatch(batch, variantStockMap, products);
+
+    await batch.commit();
+
+    return updatedSales;
+  };
+
   const registerService = async (input: RegisterServiceInput) => {
     if ((Number(input.servicePrice) || 0) <= 0) {
       throw new Error('El valor del servicio debe ser mayor a cero.');
     }
 
-    if (input.materials.length === 0) {
-      throw new Error('Agrega al menos un producto consumido por el servicio.');
+    const directServiceCost = Math.max(Number(input.serviceCost ?? 0), 0);
+    if (input.materials.length === 0 && directServiceCost <= 0) {
+      throw new Error('Agrega materiales o un costo para registrar el servicio.');
     }
 
     const materialMap = new Map<string, number>();
@@ -1446,16 +2673,23 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     const serviceRef = doc(collection(db, 'services'));
     const totalMaterialCost = materials.reduce((sum, item) => sum + item.totalCost, 0);
     const totalRevenue = Number(input.servicePrice) || 0;
-    const grossProfit = totalRevenue - totalMaterialCost;
+    const totalCost = totalMaterialCost + directServiceCost;
+    const grossProfit = totalRevenue - totalCost;
     const service: ServiceOrder = {
       id: serviceRef.id,
       serviceType: input.serviceType,
+      serviceCategory: input.serviceCategory?.trim() || undefined,
+      source: input.source === 'sale-addon' ? 'sale-addon' : 'standalone',
+      saleId: input.saleId?.trim() || undefined,
+      saleBatchId: input.saleBatchId?.trim() || undefined,
       performedAt: input.performedAt,
       customerName: input.customerName,
       cueReference: input.cueReference,
       servicePrice: totalRevenue,
       totalRevenue,
       totalMaterialCost,
+      totalOperationalCost: directServiceCost,
+      totalCost,
       grossProfit,
       materials,
       notes: input.notes,
@@ -1465,6 +2699,10 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     const batch = writeBatch(db);
     batch.set(doc(db, 'services', service.id), {
       ...service,
+      serviceCategory: service.serviceCategory ?? null,
+      source: service.source ?? 'standalone',
+      saleId: service.saleId ?? null,
+      saleBatchId: service.saleBatchId ?? null,
       performedAt: Timestamp.fromDate(new Date(input.performedAt)),
     });
 
@@ -1510,6 +2748,126 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     return service;
   };
 
+  const createAuthorizationRequest = async (input: CreateAuthorizationRequestInput) => {
+    const trimmedReason = input.reason.trim();
+    if (!trimmedReason) {
+      throw new Error('Escribe el motivo de la solicitud para que el administrador pueda revisarla.');
+    }
+
+    const duplicateRequest = authorizationRequests.find(
+      (request) =>
+        request.saleBatchId === input.saleBatchId &&
+        request.requestType === input.requestType &&
+        (request.status === 'pending' || request.status === 'approved')
+    );
+
+    if (duplicateRequest) {
+      throw new Error(
+        duplicateRequest.status === 'approved'
+          ? 'Ya existe una autorizacion aprobada para esta accion.'
+          : 'Ya existe una solicitud pendiente para esta accion.'
+      );
+    }
+
+    const createdAt = new Date().toISOString();
+    const requestRef = doc(collection(db, 'authorization-requests'));
+    const request: AuthorizationRequest = {
+      id: requestRef.id,
+      saleId: input.saleId,
+      saleBatchId: input.saleBatchId,
+      requestType: input.requestType,
+      status: 'pending',
+      customerName: input.customerName,
+      saleSummary: input.saleSummary,
+      reason: trimmedReason,
+      requestedBy: input.requestedBy,
+      requestedByRole: input.requestedByRole,
+      reviewedBy: '',
+      reviewNote: '',
+      createdAt,
+      updatedAt: createdAt,
+    };
+
+    const batch = writeBatch(db);
+    batch.set(requestRef, {
+      ...request,
+      createdAt: Timestamp.fromDate(new Date(createdAt)),
+      updatedAt: Timestamp.fromDate(new Date(createdAt)),
+    });
+
+    queueAdminNotification(batch, {
+      title:
+        input.requestType === 'sale-return'
+          ? 'Solicitud de devolucion'
+          : 'Solicitud de edicion de venta',
+      message: `${input.requestedBy} solicito autorizacion para ${input.customerName || 'cliente'}.`,
+      href: '/dashboard/autorizaciones',
+      createdAt,
+    });
+
+    await batch.commit();
+    return request;
+  };
+
+  const reviewAuthorizationRequest = async (
+    requestId: string,
+    input: ReviewAuthorizationRequestInput
+  ) => {
+    const request = authorizationRequests.find((item) => item.id === requestId);
+    if (!request) {
+      throw new Error('No se encontro la solicitud a revisar.');
+    }
+    if (request.status !== 'pending') {
+      throw new Error('Solo se pueden revisar solicitudes pendientes.');
+    }
+
+    const updatedAt = new Date().toISOString();
+    await updateDoc(doc(db, 'authorization-requests', requestId), {
+      status: input.status,
+      reviewNote: input.reviewNote.trim(),
+      reviewedBy: input.reviewedBy,
+      reviewedAt: Timestamp.fromDate(new Date(updatedAt)),
+      updatedAt: Timestamp.fromDate(new Date(updatedAt)),
+    });
+
+    return {
+      ...request,
+      status: input.status,
+      reviewNote: input.reviewNote.trim(),
+      reviewedBy: input.reviewedBy,
+      reviewedAt: updatedAt,
+      updatedAt,
+    };
+  };
+
+  const completeAuthorizationRequest = async (
+    input: CompleteAuthorizationRequestInput
+  ): Promise<AuthorizationRequest> => {
+    const request = authorizationRequests.find((item) => item.id === input.requestId);
+    if (!request) {
+      throw new Error('No se encontro la autorizacion usada para esta accion.');
+    }
+    if (request.status !== 'approved') {
+      throw new Error('La autorizacion ya no esta disponible para usarse.');
+    }
+
+    const completedAt = new Date().toISOString();
+    await updateDoc(doc(db, 'authorization-requests', input.requestId), {
+      status: 'completed',
+      reviewedBy: request.reviewedBy || input.completedBy,
+      completedAt: Timestamp.fromDate(new Date(completedAt)),
+      updatedAt: Timestamp.fromDate(new Date(completedAt)),
+    });
+
+    return {
+      ...request,
+      status: 'completed' as AuthorizationRequestStatus,
+      reviewedBy: request.reviewedBy || input.completedBy,
+      completedAt,
+      updatedAt: completedAt,
+    };
+  };
+
   const summary = useMemo(
     () => getDashboardSummary(products, movements, purchases, sales, services),
     [movements, products, purchases, sales, services]
@@ -1526,6 +2884,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         purchases,
         sales,
         services,
+        authorizationRequests,
         summary,
         latestMovements,
         syncPublicProductStocks,
@@ -1545,7 +2904,11 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         registerSale,
         updateSaleBatch,
         registerSaleReturn,
+        registerSaleReturns,
         registerService,
+        createAuthorizationRequest,
+        reviewAuthorizationRequest,
+        completeAuthorizationRequest,
       }}
     >
       {children}

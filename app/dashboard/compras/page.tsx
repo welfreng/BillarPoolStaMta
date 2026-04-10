@@ -99,6 +99,7 @@ export default function ComprasPage() {
       const product = getProductById(products, item.productId);
       return {
         productId: item.productId,
+        variantId: item.variantId ?? '',
         presentationQuantity: item.presentationQuantity,
         purchaseUnitValue: item.purchaseUnitValue,
         suggestedSalePrice: product?.salePrice ?? item.suggestedSalePrice,
@@ -265,6 +266,7 @@ export default function ComprasPage() {
                   </div>
                 </div>
 
+                <div className="px-4 pt-3 text-xs text-slate-500">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
                 <div className="relative z-0 w-full overflow-x-auto rounded-b-3xl">
                   <Table className="min-w-[980px]">
                     <TableHeader>
@@ -277,22 +279,34 @@ export default function ComprasPage() {
                         <TableHead>Costo unitario real</TableHead>
                         <TableHead>Precio sugerido</TableHead>
                         <TableHead>Utilidad</TableHead>
-                        <TableHead className="text-right">Acciones</TableHead>
+                        <TableHead className="sticky right-0 z-10 bg-white text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
+                          Acciones
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {group.items.map((purchase) => {
-                        const product = getProductById(products, purchase.productId);
-                        const currentSuggestedSalePrice = product?.salePrice ?? purchase.suggestedSalePrice;
-                        const unitProfit = calculateUnitProfit(
-                          purchase.realUnitCost,
-                          currentSuggestedSalePrice
-                        );
-                        return (
-                          <TableRow key={purchase.id}>
-                            <TableCell>
-                              <div>
-                                <p className="font-medium text-slate-900">{product?.name}</p>
+                        {group.items.map((purchase) => {
+                          const product = getProductById(products, purchase.productId);
+                          const currentSuggestedSalePrice = product?.salePrice ?? purchase.suggestedSalePrice;
+                          const unitProfit = calculateUnitProfit(
+                            purchase.realUnitCost,
+                            currentSuggestedSalePrice
+                          );
+                          const rowHoverSummary = [
+                            product?.name ?? 'Producto',
+                            `Cantidad: ${formatNumber(purchase.quantityPurchased)} uds`,
+                            `Compra: ${formatCurrency(purchase.purchaseValueTotal)}`,
+                            `Envio: ${formatCurrency(purchase.shippingValueTotal)}`,
+                            `Inversion: ${formatCurrency(purchase.totalInvestment)}`,
+                            `Costo unitario real: ${formatCurrency(purchase.realUnitCost)}`,
+                            `Precio sugerido: ${formatCurrency(currentSuggestedSalePrice)}`,
+                            `Utilidad unitaria: ${formatCurrency(unitProfit)}`,
+                          ].join('\n');
+                          return (
+                            <TableRow key={purchase.id} title={rowHoverSummary}>
+                              <TableCell>
+                                <div>
+                                  <p className="font-medium text-slate-900">{product?.name}</p>
                                 <p className="text-xs text-slate-500">{product?.brand}</p>
                               </div>
                             </TableCell>
@@ -303,7 +317,7 @@ export default function ComprasPage() {
                             <TableCell>{formatCurrency(purchase.realUnitCost)}</TableCell>
                             <TableCell>{formatCurrency(currentSuggestedSalePrice)}</TableCell>
                             <TableCell>{formatCurrency(unitProfit)}</TableCell>
-                            <TableCell className="text-right">
+                            <TableCell className="sticky right-0 bg-white text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
                               <div className="flex justify-end gap-2">
                                 <Button
                                   type="button"

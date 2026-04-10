@@ -8,7 +8,7 @@ export default function TiendaVirtualPage() {
     <>
       <Navbar />
       <main className="pt-20">
-        <ProductCatalog sectionId="tienda-virtual" />
+        <ProductCatalog sectionId="tienda-virtual" includeOutOfStock />
       </main>
       <Footer />
       <WhatsAppButton />

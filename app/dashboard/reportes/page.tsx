@@ -271,41 +271,53 @@ export default function ReportesPage() {
           </div>
 
           {saleGroups.length > 0 ? (
-            <Table className="min-w-[760px]">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Factura</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Ingreso neto</TableHead>
-                  <TableHead>Utilidad</TableHead>
-                  <TableHead>Fecha</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {saleGroups.map((group) => {
-                  const productsSummary = group.lineItems
-                    .map((item) => `${getProductById(products, item.productId)?.name ?? 'Producto'} x ${formatNumber(item.quantity)}`)
-                    .join(', ');
-
-                  return (
-                    <TableRow key={group.key}>
-                      <TableCell>
-                        <div>
-                          <p className="font-medium text-slate-900">{productsSummary}</p>
-                          <p className="text-xs text-slate-500">
-                            {formatNumber(group.totalUnits - group.returnedUnits)} unidades netas
-                          </p>
-                        </div>
-                      </TableCell>
-                      <TableCell>{group.sale.customerName}</TableCell>
-                      <TableCell>{formatCurrency(group.netRevenue)}</TableCell>
-                      <TableCell className="font-medium text-emerald-700">{formatCurrency(group.netProfit)}</TableCell>
-                      <TableCell>{formatDateTime(group.sale.soldAt)}</TableCell>
+            <>
+              <div className="mb-2 text-xs text-slate-500">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
+              <div className="overflow-x-auto pb-2">
+                <Table className="min-w-[760px]">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Factura</TableHead>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead>Ingreso neto</TableHead>
+                      <TableHead>Utilidad</TableHead>
+                      <TableHead>Fecha</TableHead>
                     </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                  </TableHeader>
+                  <TableBody>
+                      {saleGroups.map((group) => {
+                        const productsSummary = group.lineItems
+                          .map((item) => `${getProductById(products, item.productId)?.name ?? 'Producto'} x ${formatNumber(item.quantity)}`)
+                          .join(', ');
+                        const rowHoverSummary = [
+                          productsSummary || 'Venta registrada',
+                          `Cliente: ${group.sale.customerName}`,
+                          `Ingreso neto: ${formatCurrency(group.netRevenue)}`,
+                          `Utilidad: ${formatCurrency(group.netProfit)}`,
+                          `Fecha: ${formatDateTime(group.sale.soldAt)}`,
+                        ].join('\n');
+
+                        return (
+                          <TableRow key={group.key} title={rowHoverSummary}>
+                            <TableCell>
+                              <div>
+                                <p className="font-medium text-slate-900">{productsSummary}</p>
+                              <p className="text-xs text-slate-500">
+                                {formatNumber(group.totalUnits - group.returnedUnits)} unidades netas
+                              </p>
+                            </div>
+                          </TableCell>
+                          <TableCell>{group.sale.customerName}</TableCell>
+                          <TableCell>{formatCurrency(group.netRevenue)}</TableCell>
+                          <TableCell className="font-medium text-emerald-700">{formatCurrency(group.netProfit)}</TableCell>
+                          <TableCell>{formatDateTime(group.sale.soldAt)}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           ) : (
             <Empty className="rounded-3xl border border-dashed border-slate-200 bg-slate-50/60 py-10">
               <EmptyHeader>
@@ -377,24 +389,35 @@ export default function ReportesPage() {
         <p className="mt-1 text-sm text-slate-500">Te ayuda a ver que insumos del torno se estan consumiendo con mayor frecuencia.</p>
         <div className="mt-4">
           {topServiceMaterials.length > 0 ? (
-            <Table className="min-w-[540px]">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Material</TableHead>
-                  <TableHead>Cantidad usada</TableHead>
-                  <TableHead>Costo acumulado</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {topServiceMaterials.map((material) => (
-                  <TableRow key={material.productId}>
-                    <TableCell>{material.name}</TableCell>
-                    <TableCell>{formatNumber(material.quantity)}</TableCell>
-                    <TableCell>{formatCurrency(material.cost)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <>
+              <div className="mb-2 text-xs text-slate-500">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
+              <div className="overflow-x-auto pb-2">
+                <Table className="min-w-[540px]">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Material</TableHead>
+                      <TableHead>Cantidad usada</TableHead>
+                      <TableHead>Costo acumulado</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                      {topServiceMaterials.map((material) => {
+                        const rowHoverSummary = [
+                          material.name,
+                          `Cantidad usada: ${formatNumber(material.quantity)}`,
+                          `Costo acumulado: ${formatCurrency(material.cost)}`,
+                        ].join('\n');
+                        return (
+                        <TableRow key={material.productId} title={rowHoverSummary}>
+                          <TableCell>{material.name}</TableCell>
+                          <TableCell>{formatNumber(material.quantity)}</TableCell>
+                          <TableCell>{formatCurrency(material.cost)}</TableCell>
+                        </TableRow>
+                      )})}
+                    </TableBody>
+                </Table>
+              </div>
+            </>
           ) : (
             <p className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-500">Aun no hay consumo de materiales en servicios para este mes.</p>
           )}

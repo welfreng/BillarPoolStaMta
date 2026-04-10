@@ -115,6 +115,7 @@ function SearchableSelect({
 
 const movementSchema = z.object({
   productId: z.string().min(1, 'Selecciona un producto'),
+  variantId: z.string().default(''),
   type: z.enum(['entry', 'exit', 'adjustment']),
   reason: z.enum(['purchase', 'sale', 'gift', 'manual-adjustment', 'damage', 'initial-load', 'transfer']),
   quantity: z.coerce.number().positive('La cantidad debe ser mayor a cero'),
@@ -126,6 +127,7 @@ export type MovementFormValues = z.infer<typeof movementSchema>;
 
 const defaultValues: MovementFormValues = {
   productId: '',
+  variantId: '',
   type: 'entry',
   reason: 'purchase',
   quantity: 1,
@@ -149,6 +151,9 @@ export function MovementFormDialog({
     defaultValues,
   });
   const selectedType = form.watch('type');
+  const selectedProductId = form.watch('productId');
+  const selectedProduct = products.find((product) => product.id === selectedProductId);
+  const selectedVariantOptions = selectedProduct?.variants ?? [];
   const availableReasons = useMemo(
     () => [...(movementReasonsByType[selectedType] ?? movementReasonsByType.entry)] as MovementFormValues['reason'][],
     [selectedType]
@@ -163,7 +168,7 @@ export function MovementFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] w-[calc(100vw-1rem)] max-w-2xl overflow-y-auto px-4 sm:w-[calc(100vw-2rem)]">
+      <DialogContent className="max-h-[92vh] w-[calc(100vw-1rem)] max-w-[96vw] overflow-y-auto px-4 sm:w-[calc(100vw-2rem)] sm:px-5 lg:max-w-4xl lg:px-6">
         <DialogHeader>
           <DialogTitle>Registrar movimiento de inventario</DialogTitle>
           <DialogDescription>
@@ -188,8 +193,11 @@ export function MovementFormDialog({
                     <FormLabel>Producto</FormLabel>
                     <FormControl>
                       <SearchableSelect
-                        value={field.value}
-                        onChange={field.onChange}
+                              value={field.value}
+                              onChange={(value) => {
+                                field.onChange(value);
+                                form.setValue('variantId', '', { shouldValidate: true });
+                              }}
                         placeholder="Selecciona producto"
                         searchPlaceholder="Buscar producto..."
                         emptyLabel="No se encontraron productos."
@@ -203,6 +211,32 @@ export function MovementFormDialog({
                   </FormItem>
                 )}
               />
+              {selectedVariantOptions.length > 0 ? (
+                <FormField
+                  control={form.control}
+                  name="variantId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{selectedProduct?.variantLabel || 'Variante'}</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Selecciona una variante" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {selectedVariantOptions.map((variant) => (
+                            <SelectItem key={variant.id} value={variant.id}>
+                              {variant.name} ({variant.stock})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              ) : null}
               <FormField
                 control={form.control}
                 name="type"

@@ -127,6 +127,8 @@ export default function ProveedoresPage() {
 
         {filteredSuppliers.length > 0 ? (
           <div className="min-w-0">
+            <div className="mb-2 text-xs text-slate-500">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
+            <div className="overflow-x-auto pb-2">
             <Table className="min-w-[720px]">
               <TableHeader>
                 <TableRow>
@@ -135,12 +137,25 @@ export default function ProveedoresPage() {
                   <TableHead>Telefono</TableHead>
                   <TableHead>Ciudad</TableHead>
                   <TableHead>Estado</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
+                  <TableHead className="sticky right-0 z-10 bg-white text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
+                    Acciones
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredSuppliers.map((supplier) => (
-                  <TableRow key={supplier.id}>
+                {filteredSuppliers.map((supplier) => {
+                  const rowHoverSummary = [
+                    supplier.name,
+                    `Contacto: ${supplier.contactName}`,
+                    `Telefono: ${supplier.phone}`,
+                    `Ciudad: ${supplier.city}`,
+                    `Estado: ${supplier.status === 'active' ? 'Activo' : 'Inactivo'}`,
+                    supplier.notes ? `Notas: ${supplier.notes}` : '',
+                  ]
+                    .filter(Boolean)
+                    .join('\n');
+                  return (
+                  <TableRow key={supplier.id} title={rowHoverSummary}>
                     <TableCell>
                       <div>
                         <p className="font-medium text-slate-900">{supplier.name}</p>
@@ -151,7 +166,7 @@ export default function ProveedoresPage() {
                     <TableCell>{supplier.phone}</TableCell>
                     <TableCell>{supplier.city}</TableCell>
                     <TableCell>{supplier.status === 'active' ? 'Activo' : 'Inactivo'}</TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="sticky right-0 bg-white text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
                       <div className="flex justify-end gap-2">
                         <Button
                           type="button"
@@ -175,9 +190,10 @@ export default function ProveedoresPage() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                )})}
               </TableBody>
             </Table>
+            </div>
           </div>
         ) : (
           <Empty className="border border-dashed border-slate-200 bg-slate-50/70">

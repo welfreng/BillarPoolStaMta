@@ -61,7 +61,10 @@ export default function UsuariosPage() {
               nombre: String(data.nombre ?? ''),
               email: String(data.email ?? ''),
               telefono: String(data.telefono ?? ''),
-              role: data.role === 'sales' ? 'sales' : 'admin',
+              role:
+                data.role === 'sales' || data.role === 'courier'
+                  ? data.role
+                  : 'admin',
               status: data.status === 'inactive' ? 'inactive' : 'active',
               createdAt: normalizeDateValue(data.createdAt),
               updatedAt: normalizeDateValue(data.updatedAt),
@@ -196,6 +199,12 @@ export default function UsuariosPage() {
             {users.filter((user) => user.role === 'sales').length}
           </p>
         </div>
+        <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+          <p className="text-sm text-slate-500">Domiciliarios</p>
+          <p className="mt-2 text-3xl font-semibold text-slate-950">
+            {users.filter((user) => user.role === 'courier').length}
+          </p>
+        </div>
         <div className="rounded-3xl border border-cyan-200 bg-cyan-50 p-4 shadow-sm sm:p-6">
           <p className="text-sm text-cyan-800">Regla aplicada</p>
           <p className="mt-2 text-lg font-semibold text-cyan-950">
@@ -217,6 +226,8 @@ export default function UsuariosPage() {
 
         {filteredUsers.length > 0 ? (
           <div className="min-w-0">
+            <div className="mb-2 text-xs text-slate-500">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
+            <div className="overflow-x-auto pb-2">
             <Table className="min-w-[760px]">
               <TableHeader>
                 <TableRow>
@@ -225,12 +236,25 @@ export default function UsuariosPage() {
                   <TableHead>Rol</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Creado</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
+                  <TableHead className="sticky right-0 z-10 bg-white text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
+                    Acciones
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredUsers.map((item) => (
-                  <TableRow key={item.id}>
+                {filteredUsers.map((item) => {
+                  const roleLabel =
+                    item.role === 'sales' ? 'Ventas' : item.role === 'courier' ? 'Domiciliario' : 'Administrador';
+                  const rowHoverSummary = [
+                    item.nombre,
+                    `Correo: ${item.email}`,
+                    `Telefono: ${item.telefono}`,
+                    `Rol: ${roleLabel}`,
+                    `Estado: ${item.status === 'active' ? 'Activo' : 'Inactivo'}`,
+                    `Creado: ${new Date(item.createdAt).toLocaleDateString('es-CO')}`,
+                  ].join('\n');
+                  return (
+                  <TableRow key={item.id} title={rowHoverSummary}>
                     <TableCell>
                       <div>
                         <p className="font-medium text-slate-900">{item.nombre}</p>
@@ -238,10 +262,12 @@ export default function UsuariosPage() {
                       </div>
                     </TableCell>
                     <TableCell>{item.telefono}</TableCell>
-                    <TableCell>{item.role === 'sales' ? 'Ventas' : 'Administrador'}</TableCell>
+                    <TableCell>
+                      {roleLabel}
+                    </TableCell>
                     <TableCell>{item.status === 'active' ? 'Activo' : 'Inactivo'}</TableCell>
                     <TableCell>{new Date(item.createdAt).toLocaleDateString('es-CO')}</TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="sticky right-0 bg-white text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
                       <Button
                         type="button"
                         variant="outline"
@@ -252,12 +278,13 @@ export default function UsuariosPage() {
                         }}
                       >
                         <Pencil className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  )})}
+                </TableBody>
             </Table>
+            </div>
           </div>
         ) : (
           <Empty className="border border-dashed border-slate-200 bg-slate-50/70">

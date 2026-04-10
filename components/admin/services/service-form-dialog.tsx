@@ -37,6 +37,7 @@ import type { InventoryMovement, Product, Purchase, ServiceType } from '@/lib/ad
 
 const serviceSchema = z.object({
   serviceType: z.enum(['tip-installation', 'tip-ferrule-installation', 'extension-installation']),
+  serviceCategory: z.string().default('torno'),
   performedAt: z.string().min(1, 'Selecciona la fecha'),
   customerName: z.string().min(2, 'Ingresa el cliente'),
   cueReference: z.string().min(2, 'Describe el taco o referencia'),
@@ -70,6 +71,7 @@ export type ServiceFormValues = z.infer<typeof serviceSchema>;
 
 const defaultValues: ServiceFormValues = {
   serviceType: 'tip-installation',
+  serviceCategory: 'torno',
   performedAt: new Date().toISOString().slice(0, 10),
   customerName: '',
   cueReference: '',
@@ -143,7 +145,7 @@ export function ServiceFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] w-[calc(100vw-1rem)] max-w-[96vw] overflow-y-auto px-4 sm:w-[calc(100vw-2rem)] lg:max-w-4xl">
+      <DialogContent className="max-h-[92vh] w-[calc(100vw-1rem)] max-w-[96vw] overflow-y-auto px-4 sm:w-[calc(100vw-2rem)] sm:px-5 lg:max-w-4xl lg:px-6">
         <DialogHeader>
           <DialogTitle>Registrar servicio de torno</DialogTitle>
           <DialogDescription>
@@ -193,6 +195,20 @@ export function ServiceFormDialog({
                     <FormLabel>Fecha del servicio</FormLabel>
                     <FormControl>
                       <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="serviceCategory"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Categoria del servicio</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ej: torno" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

@@ -1,8 +1,10 @@
 export type ProductStatus = 'active' | 'draft' | 'archived';
 export type StockAlert = 'healthy' | 'out';
 export type PresentationKind = 'unit' | 'dozen' | 'box-12';
-export type UserRole = 'admin' | 'sales';
+export type UserRole = 'admin' | 'sales' | 'courier';
 export type MovementType = 'entry' | 'exit' | 'adjustment' | 'purchase';
+export type ProductSaleMode = 'simple' | 'varianted';
+export type VariantStatus = 'active' | 'inactive';
 export type MovementReason =
   | 'purchase'
   | 'sale'
@@ -20,6 +22,12 @@ export interface CategoryOption {
   subcategories: string[];
 }
 
+export interface ProductVariantAttributeDefinition {
+  id: string;
+  key: string;
+  label: string;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -28,13 +36,35 @@ export interface Product {
   subcategory: string;
   brand: string;
   salePrice: number;
+  saleMode?: ProductSaleMode;
+  variantLabel?: string;
+  variantAttributes?: ProductVariantAttributeDefinition[];
+  variants?: ProductVariant[];
   featured: boolean;
+  availableForDelivery?: boolean;
   publicStock: number;
   image: string;
   imageRotation: number;
   status: ProductStatus;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ProductVariant {
+  id: string;
+  productId?: string;
+  name: string;
+  displayName?: string;
+  sku?: string;
+  salePrice?: number;
+  latestUnitCost?: number;
+  stock: number;
+  publicStock?: number;
+  status?: VariantStatus;
+  sortOrder?: number;
+  attributes?: Record<string, string>;
+  attributeValues?: string[];
+  colorHex?: string;
 }
 
 export interface Supplier {
@@ -64,10 +94,13 @@ export interface AppUserAccount {
 export interface InventoryMovement {
   id: string;
   productId: string;
+  variantId?: string;
+  variantName?: string;
   purchaseId?: string;
   purchaseBatchId?: string;
   saleId?: string;
   serviceOrderId?: string;
+  deliveryOrderId?: string;
   type: MovementType;
   reason: MovementReason;
   quantity: number;
@@ -79,8 +112,11 @@ export interface InventoryMovement {
 
 export interface Purchase {
   id: string;
+  purchaseId?: string;
   purchaseBatchId?: string;
   productId: string;
+  variantId?: string;
+  variantName?: string;
   supplierId?: string;
   supplier: string;
   source?: 'purchase' | 'initial-load';
@@ -99,20 +135,42 @@ export interface Purchase {
   notes?: string;
 }
 
+export interface PurchaseOrder {
+  id: string;
+  supplierId?: string;
+  supplier: string;
+  purchasedAt: string;
+  shippingValueTotal: number;
+  notes?: string;
+  source?: 'purchase' | 'initial-load';
+}
+
 export interface SaleGiftItem {
   productId: string;
   quantity: number;
   unitCost: number;
   totalCost: number;
+  kind?: 'gift' | 'auto-material';
 }
 
 export interface SaleLineItem {
   productId: string;
+  variantId?: string;
+  variantName?: string;
   quantity: number;
   unitPrice: number;
   realUnitCost: number;
   totalSale: number;
   totalCost: number;
+}
+
+export interface SaleServiceItem {
+  serviceType: ServiceType;
+  serviceCategory: string;
+  price: number;
+  cost: number;
+  cueReference: string;
+  notes: string;
 }
 
 export interface Sale {
@@ -136,8 +194,31 @@ export interface Sale {
   returnedSaleAmount: number;
   returnedCostAmount: number;
   customerName: string;
+  customerPhone: string;
   notes: string;
   responsibleUser: string;
+}
+
+export type AuthorizationRequestType = 'sale-edit' | 'sale-return';
+export type AuthorizationRequestStatus = 'pending' | 'approved' | 'rejected' | 'completed';
+
+export interface AuthorizationRequest {
+  id: string;
+  saleId: string;
+  saleBatchId: string;
+  requestType: AuthorizationRequestType;
+  status: AuthorizationRequestStatus;
+  customerName: string;
+  saleSummary: string;
+  reason: string;
+  requestedBy: string;
+  requestedByRole: UserRole;
+  reviewedBy: string;
+  reviewNote: string;
+  createdAt: string;
+  updatedAt: string;
+  reviewedAt?: string;
+  completedAt?: string;
 }
 
 export type ServiceType =
@@ -155,16 +236,65 @@ export interface ServiceMaterialItem {
 export interface ServiceOrder {
   id: string;
   serviceType: ServiceType;
+  serviceCategory?: string;
+  source?: 'standalone' | 'sale-addon';
+  saleId?: string;
+  saleBatchId?: string;
   performedAt: string;
   customerName: string;
   cueReference: string;
   servicePrice: number;
   totalRevenue: number;
   totalMaterialCost: number;
+  totalOperationalCost?: number;
+  totalCost?: number;
   grossProfit: number;
   materials: ServiceMaterialItem[];
   notes: string;
   responsibleUser: string;
+}
+
+export type DeliveryOrderStatus =
+  | 'pending'
+  | 'assigned'
+  | 'en-route'
+  | 'delivered'
+  | 'closed'
+  | 'cancelled';
+
+export type DeliveryPaymentMethod = 'cash' | 'transfer' | 'pending';
+
+export interface DeliveryOrderItem {
+  productId: string;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+}
+
+export interface DeliveryOrder {
+  id: string;
+  establishmentName: string;
+  customerName: string;
+  customerPhone: string;
+  city: string;
+  customerAddress: string;
+  neighborhood: string;
+  deliveryZoneId: string;
+  deliveryZoneLabel: string;
+  addressReference: string;
+  paymentMethod: DeliveryPaymentMethod;
+  paymentSupportNote: string;
+  items: DeliveryOrderItem[];
+  productsTotal: number;
+  deliveryFee: number;
+  totalToCharge: number;
+  status: DeliveryOrderStatus;
+  courierId?: string;
+  courierName?: string;
+  stockDiscounted?: boolean;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface DashboardMetric {

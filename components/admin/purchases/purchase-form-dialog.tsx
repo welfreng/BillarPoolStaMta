@@ -39,10 +39,12 @@ import {
   CommandList,
 } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 
 const purchaseLineSchema = z.object({
   productId: z.string().min(1, 'Selecciona un producto'),
+  variantId: z.string().default(''),
   presentationQuantity: z.coerce.number().positive('Cantidad invalida'),
   purchaseUnitValue: z.coerce.number().min(0),
   suggestedSalePrice: z.coerce.number().min(0),
@@ -60,6 +62,7 @@ export type PurchaseFormValues = z.infer<typeof purchaseSchema>;
 type PurchaseLineFormValue = PurchaseFormValues['items'][number];
 type DraftPurchaseLine = {
   productId: string;
+  variantId: string;
   presentationQuantity: string;
   purchaseUnitValue: string;
   suggestedSalePrice: string;
@@ -67,6 +70,7 @@ type DraftPurchaseLine = {
 
 const defaultLine: PurchaseFormValues['items'][number] = {
   productId: '',
+  variantId: '',
   presentationQuantity: 1,
   purchaseUnitValue: 0,
   suggestedSalePrice: 0,
@@ -83,6 +87,7 @@ const defaultValues: PurchaseFormValues = {
 function createDefaultPurchaseLine(): DraftPurchaseLine {
   return {
     productId: '',
+    variantId: '',
     presentationQuantity: '',
     purchaseUnitValue: '',
     suggestedSalePrice: '',
@@ -93,6 +98,7 @@ function createDraftPurchaseLineFromValue(line?: PurchaseLineFormValue): DraftPu
   if (!line) return createDefaultPurchaseLine();
   return {
     productId: line.productId ?? '',
+    variantId: line.variantId ?? '',
     presentationQuantity: String(line.presentationQuantity ?? ''),
     purchaseUnitValue: String(line.purchaseUnitValue ?? ''),
     suggestedSalePrice: String(line.suggestedSalePrice ?? ''),
@@ -115,6 +121,13 @@ function isPackOf12Product(product?: Product) {
   return /x\s*12/i.test(product.subcategory) || /x\s*12/i.test(product.name);
 }
 
+function isSamePurchaseLine(
+  left: Pick<PurchaseLineFormValue, 'productId' | 'variantId'>,
+  right: Pick<PurchaseLineFormValue, 'productId' | 'variantId'>
+) {
+  return left.productId === right.productId && (left.variantId || '') === (right.variantId || '');
+}
+
 function SearchableSelect({
   value,
   onChange,
@@ -122,6 +135,7 @@ function SearchableSelect({
   searchPlaceholder,
   emptyLabel,
   options,
+  disabled,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -129,6 +143,7 @@ function SearchableSelect({
   searchPlaceholder: string;
   emptyLabel: string;
   options: Array<{ value: string; label: string }>;
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -146,6 +161,7 @@ function SearchableSelect({
           type="button"
           variant="outline"
           role="combobox"
+          disabled={disabled}
           className="w-full min-w-0 justify-between overflow-hidden px-3 font-normal"
         >
           <span className="truncate text-left">
@@ -220,7 +236,7 @@ export function PurchaseFormDialog({
     resolver: zodResolver(purchaseSchema),
     defaultValues: initialValues ?? defaultValues,
   });
-  const { fields, append, remove, update } = useFieldArray({
+  const { fields, remove, replace } = useFieldArray({
     control: form.control,
     name: 'items',
   });
@@ -228,6 +244,7 @@ export function PurchaseFormDialog({
   const [lineDialogOpen, setLineDialogOpen] = useState(false);
   const [editingLineIndex, setEditingLineIndex] = useState<number | null>(null);
   const [draftLine, setDraftLine] = useState<DraftPurchaseLine>(createDefaultPurchaseLine());
+  const [lockedDraftProductId, setLockedDraftProductId] = useState<string | null>(null);
   const [lineError, setLineError] = useState('');
 
   useEffect(() => {
@@ -242,6 +259,7 @@ export function PurchaseFormDialog({
     setLineDialogOpen(false);
     setEditingLineIndex(null);
     setDraftLine(createDefaultPurchaseLine());
+    setLockedDraftProductId(null);
     setLineError('');
   }, [form, initialValues, open]);
 
@@ -321,16 +339,80 @@ export function PurchaseFormDialog({
   const shippingPerUnit = totalPurchasedUnits > 0 ? (Number(values.shippingValueTotal) || 0) / totalPurchasedUnits : 0;
   const firstItem = values.items[0] ?? createDefaultPurchaseLine();
   const firstItemProduct = products.find((product) => product.id === firstItem.productId);
+  const firstItemVariantOptions = firstItemProduct?.variants ?? [];
   const firstPreview = previewItems[0] ?? null;
   const firstItemIsPack12 = isPackOf12Product(firstItemProduct);
   const draftProduct = products.find((product) => product.id === draftLine.productId);
+  const draftVariantOptions = draftProduct?.variants ?? [];
   const isDraftPack12 = isPackOf12Product(draftProduct);
   const draftQuantity = Number(draftLine.presentationQuantity) || 0;
   const draftPurchaseValueTotal = (Number(draftLine.purchaseUnitValue) || 0) * draftQuantity;
+  const getAvailableVariantOptions = (productId: string, excludeIndex?: number) => {
+    const product = products.find((candidate) => candidate.id === productId);
+    const productVariants = product?.variants ?? [];
+    if (productVariants.length === 0) return [];
 
-  const openNewLineDialog = () => {
+    const usedVariantIds = new Set(
+      values.items
+        .filter((item, index) => index !== excludeIndex && item.productId === productId && Boolean(item.variantId))
+        .map((item) => item.variantId)
+    );
+
+    return productVariants.filter((variant) => !usedVariantIds.has(variant.id));
+  };
+  const getDuplicateLineIndex = (
+    line: Pick<PurchaseLineFormValue, 'productId' | 'variantId'>,
+    excludeIndex?: number | null
+  ) =>
+    values.items.findIndex((item, index) => index !== (excludeIndex ?? null) && isSamePurchaseLine(item, line));
+  const firstAvailableSiblingVariants = firstItemProduct ? getAvailableVariantOptions(firstItemProduct.id) : [];
+  const draftAvailableVariantOptions = draftProduct
+    ? getAvailableVariantOptions(draftProduct.id, editingLineIndex ?? undefined)
+    : [];
+  const currentEditingItem = editingLineIndex !== null ? values.items[editingLineIndex] : null;
+  const draftSelectableVariantOptions =
+    draftProduct && currentEditingItem?.productId === draftProduct.id && currentEditingItem.variantId
+      ? draftVariantOptions.filter(
+          (variant) => variant.id === currentEditingItem.variantId || draftAvailableVariantOptions.some((item) => item.id === variant.id)
+        )
+      : draftAvailableVariantOptions;
+  const buildDraftLineForProduct = (productId: string, excludeIndex?: number) => {
+    const product = products.find((candidate) => candidate.id === productId);
+    const firstAvailableVariant = product ? getAvailableVariantOptions(product.id, excludeIndex)[0] : undefined;
+    return {
+      productId,
+      variantId: firstAvailableVariant?.id ?? '',
+      presentationQuantity: '',
+      purchaseUnitValue: '',
+      suggestedSalePrice: String(firstAvailableVariant?.salePrice ?? product?.salePrice ?? ''),
+    };
+  };
+
+  const isLockedVariantFlow = Boolean(lockedDraftProductId) && editingLineIndex === null;
+
+  const openNewLineDialog = (
+    preferredProductId?: string,
+    lockProduct = false,
+    priceSeed?: { purchaseUnitValue?: number; suggestedSalePrice?: number }
+  ) => {
+    const preferredProduct = preferredProductId
+      ? products.find((product) => product.id === preferredProductId)
+      : undefined;
     setEditingLineIndex(null);
-    setDraftLine(createDefaultPurchaseLine());
+    setDraftLine(
+      preferredProduct
+        ? {
+            ...buildDraftLineForProduct(preferredProduct.id),
+            purchaseUnitValue:
+              priceSeed?.purchaseUnitValue !== undefined ? String(priceSeed.purchaseUnitValue) : '',
+            suggestedSalePrice:
+              priceSeed?.suggestedSalePrice !== undefined
+                ? String(priceSeed.suggestedSalePrice)
+                : buildDraftLineForProduct(preferredProduct.id).suggestedSalePrice,
+          }
+        : createDefaultPurchaseLine()
+    );
+    setLockedDraftProductId(lockProduct && preferredProduct ? preferredProduct.id : null);
     setLineError('');
     setLineDialogOpen(true);
   };
@@ -338,11 +420,12 @@ export function PurchaseFormDialog({
   const openEditLineDialog = (index: number) => {
     setEditingLineIndex(index);
     setDraftLine(createDraftPurchaseLineFromValue(values.items[index]));
+    setLockedDraftProductId(null);
     setLineError('');
     setLineDialogOpen(true);
   };
 
-  const saveDraftLine = () => {
+  const saveDraftLine = (continueWithSameProduct = false) => {
     if (!draftLine.productId) {
       setLineError('Selecciona un producto.');
       return;
@@ -351,31 +434,76 @@ export function PurchaseFormDialog({
       setLineError('La cantidad debe ser mayor a cero.');
       return;
     }
-    if ((Number(draftLine.purchaseUnitValue) || 0) < 0) {
-      setLineError('El valor de compra no puede ser negativo.');
+    if ((Number(draftLine.purchaseUnitValue) || 0) <= 0) {
+      setLineError('Debes ingresar un valor unitario de compra mayor a cero.');
       return;
     }
-    if ((Number(draftLine.suggestedSalePrice) || 0) < 0) {
-      setLineError('El precio sugerido no puede ser negativo.');
+    if ((Number(draftLine.suggestedSalePrice) || 0) <= 0) {
+      setLineError('Debes ingresar un precio sugerido mayor a cero.');
       return;
     }
 
     const normalizedDraftLine = {
       productId: draftLine.productId,
+      variantId: draftLine.variantId,
       presentationQuantity: Number(draftLine.presentationQuantity) || 0,
       purchaseUnitValue: Number(draftLine.purchaseUnitValue) || 0,
       suggestedSalePrice: Number(draftLine.suggestedSalePrice) || 0,
     };
+    const selectedProduct = products.find((product) => product.id === draftLine.productId);
+    if ((selectedProduct?.variants?.length ?? 0) > 0 && !draftLine.variantId) {
+      setLineError(`Selecciona ${selectedProduct?.variantLabel?.toLowerCase() || 'la variante'} del producto.`);
+      return;
+    }
+    const duplicateLineIndex = getDuplicateLineIndex(normalizedDraftLine, editingLineIndex);
+    if (duplicateLineIndex !== -1) {
+      const selectedVariant = selectedProduct?.variants?.find((variant) => variant.id === normalizedDraftLine.variantId);
+      setLineError(
+        selectedVariant
+          ? `La variante "${selectedVariant.name}" ya fue agregada en esta compra. Selecciona otra diferente.`
+          : 'Ese producto ya fue agregado en esta compra. Edita la linea existente o selecciona otro.'
+      );
+      return;
+    }
 
-    if (editingLineIndex === null) {
-      append(normalizedDraftLine);
-    } else {
-      update(editingLineIndex, normalizedDraftLine);
+    const nextItems =
+      editingLineIndex === null
+        ? [...values.items, normalizedDraftLine]
+        : values.items.map((item, index) => (index === editingLineIndex ? normalizedDraftLine : item));
+    replace(
+      nextItems.map((item) =>
+        item.productId === normalizedDraftLine.productId
+          ? {
+              ...item,
+              purchaseUnitValue: normalizedDraftLine.purchaseUnitValue,
+              suggestedSalePrice: normalizedDraftLine.suggestedSalePrice,
+            }
+          : item
+      )
+    );
+
+    if (continueWithSameProduct && editingLineIndex === null) {
+      const nextAvailableVariants = getAvailableVariantOptions(draftLine.productId).filter(
+        (variant) => variant.id !== normalizedDraftLine.variantId
+      );
+        if (nextAvailableVariants.length > 0) {
+          setDraftLine({
+            productId: draftLine.productId,
+            variantId: nextAvailableVariants[0]?.id ?? '',
+            presentationQuantity: '',
+            purchaseUnitValue: String(normalizedDraftLine.purchaseUnitValue),
+            suggestedSalePrice: String(normalizedDraftLine.suggestedSalePrice),
+          });
+          setLockedDraftProductId(draftLine.productId);
+          setLineError('');
+          return;
+      }
     }
 
     setLineDialogOpen(false);
     setEditingLineIndex(null);
     setDraftLine(createDefaultPurchaseLine());
+    setLockedDraftProductId(null);
     setLineError('');
   };
 
@@ -413,6 +541,19 @@ export function PurchaseFormDialog({
     }));
   };
 
+  const syncProductPricesInForm = (productId: string, purchaseUnitValue: number, suggestedSalePrice: number) => {
+    const nextItems = form.getValues('items').map((item) =>
+      item.productId === productId
+        ? {
+            ...item,
+            purchaseUnitValue,
+            suggestedSalePrice,
+          }
+        : item
+    );
+    replace(nextItems);
+  };
+
   const normalizePack12Line = (index: number, fieldId: string) => {
     if (pack12NormalizedByField[fieldId]) return;
 
@@ -439,10 +580,13 @@ export function PurchaseFormDialog({
     }));
   };
 
+  const firstLineCanSeedVariants =
+    (Number(firstItem.purchaseUnitValue) || 0) > 0 && (Number(firstItem.suggestedSalePrice) || 0) > 0;
+
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[94vh] w-[calc(100vw-1rem)] max-w-6xl overflow-y-auto px-3 sm:w-[calc(100vw-2rem)] sm:px-6">
+      <DialogContent className="max-h-[92vh] w-[calc(100vw-1rem)] max-w-[96vw] overflow-y-auto px-4 sm:w-[calc(100vw-2rem)] sm:px-5 lg:max-w-4xl lg:px-6">
         <DialogHeader>
           <DialogTitle>{initialValues ? 'Editar compra' : 'Registrar compra'}</DialogTitle>
           <DialogDescription>
@@ -574,6 +718,9 @@ export function PurchaseFormDialog({
                                 field.onChange(value);
                                 resetPack12Normalization(fields[0]?.id ?? 'primary-line');
                                 const product = products.find((item) => item.id === value);
+                                form.setValue('items.0.variantId', '', {
+                                  shouldValidate: true,
+                                });
                                 if (product) {
                                   form.setValue('items.0.suggestedSalePrice', product.salePrice, {
                                     shouldValidate: true,
@@ -593,6 +740,44 @@ export function PurchaseFormDialog({
                         </FormItem>
                       )}
                     />
+
+                    {firstItemVariantOptions.length > 0 ? (
+                      <FormField
+                        control={form.control}
+                        name="items.0.variantId"
+                        render={({ field }) => (
+                          <FormItem className="min-w-0">
+                            <FormLabel>{firstItemProduct?.variantLabel || 'Variante'}</FormLabel>
+                            <Select
+                              value={field.value}
+                              onValueChange={(value) => {
+                                field.onChange(value);
+                                const variant = firstItemVariantOptions.find((item) => item.id === value);
+                                if (variant?.salePrice !== undefined) {
+                                  form.setValue('items.0.suggestedSalePrice', Number(variant.salePrice), {
+                                    shouldValidate: true,
+                                  });
+                                }
+                              }}
+                            >
+                                <FormControl>
+                                  <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Selecciona una variante" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                {firstItemVariantOptions.map((variant) => (
+                                  <SelectItem key={variant.id} value={variant.id}>
+                                    {variant.name} ({formatNumber(variant.stock)})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    ) : null}
 
                     <div className="grid gap-4 sm:grid-cols-[minmax(124px,0.72fr)_minmax(160px,0.92fr)] lg:grid-cols-3 sm:items-end">
                       <FormField
@@ -636,6 +821,13 @@ export function PurchaseFormDialog({
                                 onChange={(event) => {
                                   field.onChange(event);
                                   resetPack12Normalization(fields[0]?.id ?? 'primary-line');
+                                  if (firstItem.productId) {
+                                    syncProductPricesInForm(
+                                      firstItem.productId,
+                                      Number(event.target.value) || 0,
+                                      Number(form.getValues('items.0.suggestedSalePrice')) || 0
+                                    );
+                                  }
                                 }}
                                 onBlur={() => {
                                   field.onBlur();
@@ -655,7 +847,22 @@ export function PurchaseFormDialog({
                           <FormItem>
                             <FormLabel>Precio sugerido de venta</FormLabel>
                             <FormControl>
-                              <Input type="number" min="0" step="0.01" {...field} />
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                {...field}
+                                onChange={(event) => {
+                                  field.onChange(event);
+                                  if (firstItem.productId) {
+                                    syncProductPricesInForm(
+                                      firstItem.productId,
+                                      Number(form.getValues('items.0.purchaseUnitValue')) || 0,
+                                      Number(event.target.value) || 0
+                                    );
+                                  }
+                                }}
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -687,9 +894,43 @@ export function PurchaseFormDialog({
                     </div>
 
                     {firstItemProduct ? (
-                      <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-slate-50 px-3 py-2.5 text-sm text-slate-600">
-                        <span className="truncate">{firstItemProduct.name} - {firstItemProduct.brand || 'Sin marca'}</span>
-                        <span className="font-medium text-slate-900">Total linea: {formatCurrency(firstPreview?.purchaseValueTotal ?? 0)}</span>
+                      <div className="mt-4 space-y-3 rounded-2xl bg-slate-50 px-3 py-2.5 text-sm text-slate-600">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="truncate">{firstItemProduct.name} - {firstItemProduct.brand || 'Sin marca'}</span>
+                          <span className="font-medium text-slate-900">Total linea: {formatCurrency(firstPreview?.purchaseValueTotal ?? 0)}</span>
+                        </div>
+                        {firstItemVariantOptions.length > 0 ? (
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-3">
+                            <p className="text-xs text-slate-500">
+                              {firstAvailableSiblingVariants.length > 0
+                                ? `Quedan ${formatNumber(firstAvailableSiblingVariants.length)} variantes disponibles para este producto.`
+                                : 'Todas las variantes de este producto ya fueron agregadas.'}
+                            </p>
+                            {firstAvailableSiblingVariants.length > 0 ? (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="rounded-xl bg-white"
+                                disabled={!firstLineCanSeedVariants}
+                                onClick={() =>
+                                  openNewLineDialog(firstItemProduct.id, true, {
+                                    purchaseUnitValue: Number(firstItem.purchaseUnitValue) || 0,
+                                    suggestedSalePrice: Number(firstItem.suggestedSalePrice) || 0,
+                                  })
+                                }
+                              >
+                                <PlusCircle className="mr-2 h-4 w-4" />
+                                Agregar otra variante
+                              </Button>
+                            ) : null}
+                            {!firstLineCanSeedVariants ? (
+                              <p className="w-full text-xs text-amber-700">
+                                Define primero el valor unitario y el precio sugerido para habilitar las otras variantes.
+                              </p>
+                            ) : null}
+                          </div>
+                        ) : null}
                       </div>
                     ) : null}
                   </div>
@@ -701,7 +942,14 @@ export function PurchaseFormDialog({
                   {fields.map((field, index) => {
                     const preview = previewItems[index];
                     const selectedProduct = products.find((item) => item.id === values.items[index]?.productId);
+                    const selectedVariant = selectedProduct?.variants?.find(
+                      (variant) => variant.id === values.items[index]?.variantId
+                    );
                     const isPack12 = isPackOf12Product(selectedProduct);
+                    const availableSiblingVariants = selectedProduct ? getAvailableVariantOptions(selectedProduct.id, index) : [];
+                    const canSeedSiblingVariants =
+                      (Number(values.items[index]?.purchaseUnitValue) || 0) > 0 &&
+                      (Number(values.items[index]?.suggestedSalePrice) || 0) > 0;
                     return (
                       <div key={field.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -709,6 +957,9 @@ export function PurchaseFormDialog({
                             <p className="font-medium text-slate-900">
                               {selectedProduct?.name ?? 'Producto'} x {formatNumber(preview?.quantityPurchased ?? 0)}
                             </p>
+                            {selectedVariant ? (
+                              <p className="text-sm text-cyan-700">{selectedVariant.name}</p>
+                            ) : null}
                             <p className="text-sm text-slate-500">
                               Valor unitario: {formatCurrency(values.items[index]?.purchaseUnitValue ?? 0)}
                             </p>
@@ -724,6 +975,24 @@ export function PurchaseFormDialog({
                           </div>
 
                           <div className="flex gap-2 sm:shrink-0">
+                            {selectedProduct && availableSiblingVariants.length > 0 ? (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="rounded-xl"
+                                disabled={!canSeedSiblingVariants}
+                                onClick={() =>
+                                  openNewLineDialog(selectedProduct.id, true, {
+                                    purchaseUnitValue: Number(values.items[index]?.purchaseUnitValue) || 0,
+                                    suggestedSalePrice: Number(values.items[index]?.suggestedSalePrice) || 0,
+                                  })
+                                }
+                              >
+                                <PlusCircle className="mr-2 h-4 w-4" />
+                                Otra variante
+                              </Button>
+                            ) : null}
                             <Button type="button" variant="ghost" size="sm" className="rounded-xl" onClick={() => openEditLineDialog(index)}>
                               <Pencil className="mr-2 h-4 w-4" />
                               Editar
@@ -755,7 +1024,7 @@ export function PurchaseFormDialog({
                   type="button"
                   variant="outline"
                   className="w-full rounded-xl bg-white"
-                  onClick={openNewLineDialog}
+                  onClick={() => openNewLineDialog()}
                 >
                   <PlusCircle className="mr-2 h-4 w-4" />
                   Agregar producto
@@ -786,39 +1055,84 @@ export function PurchaseFormDialog({
 
     <Dialog open={lineDialogOpen} onOpenChange={setLineDialogOpen}>
       <DialogContent className="w-[calc(100vw-1rem)] max-w-xl px-4 sm:w-[calc(100vw-2rem)] sm:px-5">
-        <DialogHeader>
-          <DialogTitle>{editingLineIndex === null ? 'Agregar producto a la compra' : 'Editar producto de la compra'}</DialogTitle>
-          <DialogDescription>
-            Selecciona el producto y define cantidad, valor de compra y precio sugerido.
-          </DialogDescription>
-        </DialogHeader>
+          <DialogHeader>
+            <DialogTitle>{editingLineIndex === null ? 'Agregar producto a la compra' : 'Editar producto de la compra'}</DialogTitle>
+            <DialogDescription>
+              {isLockedVariantFlow
+                ? 'Agrega otra variante del mismo producto usando los mismos valores de compra.'
+                : 'Selecciona el producto y define cantidad, valor de compra y precio sugerido.'}
+            </DialogDescription>
+          </DialogHeader>
 
         <div className="space-y-4">
-          <div className="space-y-2">
-            <Label>Producto</Label>
-            <SearchableSelect
-              value={draftLine.productId}
-              onChange={(value) => {
-                const product = products.find((item) => item.id === value);
-                setDraftLine((current) => ({
-                  ...current,
-                  productId: value,
-                  suggestedSalePrice:
-                    product?.salePrice !== undefined ? String(product.salePrice) : current.suggestedSalePrice,
-                }));
-                setLineError('');
-              }}
-              placeholder="Selecciona producto"
-              searchPlaceholder="Buscar producto..."
-              emptyLabel="No se encontraron productos."
-              options={products.map((product) => ({
-                value: product.id,
-                label: `${product.name} - ${product.brand}`,
-              }))}
-            />
-          </div>
+          {isLockedVariantFlow && draftProduct ? (
+            <div className="rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-cyan-800">Producto fijo</p>
+              <p className="mt-1 text-sm font-semibold text-cyan-950">
+                {draftProduct.name} {draftProduct.brand ? `- ${draftProduct.brand}` : ''}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Label>Producto</Label>
+              <SearchableSelect
+                value={draftLine.productId}
+                onChange={(value) => {
+                  const product = products.find((item) => item.id === value);
+                  const nextDraftLine = product
+                    ? buildDraftLineForProduct(product.id, editingLineIndex ?? undefined)
+                    : createDefaultPurchaseLine();
+                  setDraftLine(nextDraftLine);
+                  setLineError('');
+                }}
+                placeholder="Selecciona producto"
+                searchPlaceholder="Buscar producto..."
+                emptyLabel="No se encontraron productos."
+                disabled={Boolean(lockedDraftProductId)}
+                options={products.map((product) => ({
+                  value: product.id,
+                  label: `${product.name} - ${product.brand}`,
+                }))}
+              />
+            </div>
+          )}
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          {draftVariantOptions.length > 0 ? (
+            <div className="space-y-2">
+              <Label>{draftProduct?.variantLabel || 'Variante'}</Label>
+              <Select
+                value={draftLine.variantId}
+                onValueChange={(value) => {
+                  const variant = draftVariantOptions.find((item) => item.id === value);
+                  setDraftLine((current) => ({
+                    ...current,
+                    variantId: value,
+                    suggestedSalePrice:
+                      variant?.salePrice !== undefined ? String(variant.salePrice) : current.suggestedSalePrice,
+                  }));
+                  setLineError('');
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Selecciona una variante" />
+                </SelectTrigger>
+                <SelectContent>
+                  {draftSelectableVariantOptions.map((variant) => (
+                    <SelectItem key={variant.id} value={variant.id}>
+                      {variant.name} ({formatNumber(variant.stock)})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-slate-500">
+                {draftSelectableVariantOptions.length > 0
+                  ? 'Solo se muestran variantes que aun no han sido agregadas a esta compra.'
+                  : 'Todas las variantes de este producto ya fueron agregadas a la compra.'}
+              </p>
+            </div>
+          ) : null}
+
+          <div className={isLockedVariantFlow ? 'grid gap-4' : 'grid gap-4 sm:grid-cols-2'}>
             <div className="space-y-2">
               <Label>{isDraftPack12 ? 'Cantidad en unidades' : 'Cantidad comprada'}</Label>
               <Input
@@ -847,52 +1161,56 @@ export function PurchaseFormDialog({
               />
             </div>
 
+            {!isLockedVariantFlow ? (
+              <div className="space-y-2">
+                <Label>{isDraftPack12 ? 'Valor unitario por pieza' : 'Valor unitario de compra'}</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={draftLine.purchaseUnitValue}
+                    onChange={(event) => {
+                      setDraftLine((current) => ({
+                        ...current,
+                        purchaseUnitValue: event.target.value,
+                      }));
+                      setLineError('');
+                    }}
+                    onBlur={() => {
+                      const product = products.find((item) => item.id === draftLine.productId);
+                      if (!isPackOf12Product(product)) return;
+                      const quantityEntered = Number(draftLine.presentationQuantity) || 0;
+                      const unitValueEntered = Number(draftLine.purchaseUnitValue) || 0;
+                      if (quantityEntered < 12 || unitValueEntered <= 0) return;
+                      setDraftLine((current) => ({
+                        ...current,
+                        presentationQuantity: String(Number((quantityEntered / 12).toFixed(2))),
+                        purchaseUnitValue: String(Number((unitValueEntered * 12).toFixed(2))),
+                      }));
+                    }}
+                  />
+              </div>
+            ) : null}
+          </div>
+
+          {!isLockedVariantFlow ? (
             <div className="space-y-2">
-              <Label>{isDraftPack12 ? 'Valor unitario por pieza' : 'Valor unitario de compra'}</Label>
+              <Label>Precio sugerido de venta</Label>
               <Input
                 type="number"
                 min="0"
                 step="0.01"
-                value={draftLine.purchaseUnitValue}
+                value={draftLine.suggestedSalePrice}
                 onChange={(event) => {
                   setDraftLine((current) => ({
                     ...current,
-                    purchaseUnitValue: event.target.value,
+                    suggestedSalePrice: event.target.value,
                   }));
                   setLineError('');
                 }}
-                onBlur={() => {
-                  const product = products.find((item) => item.id === draftLine.productId);
-                  if (!isPackOf12Product(product)) return;
-                  const quantityEntered = Number(draftLine.presentationQuantity) || 0;
-                  const unitValueEntered = Number(draftLine.purchaseUnitValue) || 0;
-                  if (quantityEntered < 12 || unitValueEntered <= 0) return;
-                  setDraftLine((current) => ({
-                    ...current,
-                    presentationQuantity: String(Number((quantityEntered / 12).toFixed(2))),
-                    purchaseUnitValue: String(Number((unitValueEntered * 12).toFixed(2))),
-                  }));
-                }}
               />
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Precio sugerido de venta</Label>
-            <Input
-              type="number"
-              min="0"
-              step="0.01"
-              value={draftLine.suggestedSalePrice}
-              onChange={(event) => {
-                setDraftLine((current) => ({
-                  ...current,
-                  suggestedSalePrice: event.target.value,
-                }));
-                setLineError('');
-              }}
-            />
-          </div>
+          ) : null}
 
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="rounded-2xl bg-slate-50 p-4">
@@ -916,13 +1234,30 @@ export function PurchaseFormDialog({
               {lineError}
             </p>
           ) : null}
+          {isLockedVariantFlow ? (
+            <p className="rounded-xl border border-cyan-200 bg-cyan-50 px-3 py-2 text-sm text-cyan-800">
+              Esta variante usa automaticamente el mismo valor unitario y el mismo precio sugerido del producto base.
+            </p>
+          ) : null}
         </div>
 
         <DialogFooter className="gap-3">
-          <Button type="button" variant="outline" onClick={() => setLineDialogOpen(false)}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              setLineDialogOpen(false);
+              setLockedDraftProductId(null);
+            }}
+          >
             Cancelar
           </Button>
-          <Button type="button" onClick={saveDraftLine}>
+          {editingLineIndex === null && lockedDraftProductId && draftSelectableVariantOptions.length > 1 ? (
+            <Button type="button" variant="outline" onClick={() => saveDraftLine(true)}>
+              Agregar y seguir
+            </Button>
+          ) : null}
+          <Button type="button" onClick={() => saveDraftLine(false)}>
             {editingLineIndex === null ? 'Agregar producto' : 'Guardar cambios'}
           </Button>
         </DialogFooter>
