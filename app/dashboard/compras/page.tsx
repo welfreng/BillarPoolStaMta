@@ -11,6 +11,7 @@ import { PurchaseFormDialog, type PurchaseFormValues } from '@/components/admin/
 import { ResponsiveRowActions } from '@/components/admin/shared/responsive-row-actions';
 import { useAdminData } from '@/components/admin/admin-data-context';
 import { calculateUnitProfit, formatCurrency, formatNumber, getProductById } from '@/lib/admin/calculations';
+import { getFriendlyFirestoreWriteErrorMessage } from '@/lib/firestore-write-retry';
 import { useToast } from '@/hooks/use-toast';
 
 export default function ComprasPage() {
@@ -148,7 +149,10 @@ export default function ComprasPage() {
       console.error('Error eliminando compra agrupada:', error);
       toast({
         title: 'No se pudo eliminar la compra',
-        description: 'Revisa la configuracion y permisos de Firebase.',
+        description: getFriendlyFirestoreWriteErrorMessage(
+          error,
+          'Revisa la configuracion y permisos de Firebase.'
+        ),
         variant: 'destructive',
       });
     }
@@ -167,7 +171,10 @@ export default function ComprasPage() {
       console.error('Error eliminando producto de compra:', error);
       toast({
         title: 'No se pudo eliminar el producto',
-        description: 'Revisa la configuracion y permisos de Firebase.',
+        description: getFriendlyFirestoreWriteErrorMessage(
+          error,
+          'Revisa la configuracion y permisos de Firebase.'
+        ),
         variant: 'destructive',
       });
     }
@@ -433,7 +440,10 @@ export default function ComprasPage() {
             console.error('Error registrando compra en Firestore:', error);
             toast({
               title: 'No se pudo registrar la compra',
-              description: 'Revisa la configuracion y permisos de Firebase.',
+              description: getFriendlyFirestoreWriteErrorMessage(
+                error,
+                'Revisa la configuracion y permisos de Firebase.'
+              ),
               variant: 'destructive',
             });
             throw error;

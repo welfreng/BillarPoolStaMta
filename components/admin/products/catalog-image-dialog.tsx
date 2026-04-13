@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import Image from 'next/image';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
@@ -22,7 +22,6 @@ import {
   type CatalogImageOverrideMaps,
 } from '@/lib/catalog-image-overrides';
 import {
-  getFriendlyFirestoreWriteErrorMessage,
   runFirestoreWriteWithBackoff,
 } from '@/lib/firestore-write-retry';
 import { db } from '@/lib/firebase';
@@ -246,13 +245,13 @@ export function CatalogImageDialog({
 
       toast({
         title: 'Imagen actualizada',
-        description: `${productName} ya quedó actualizada en la web.`,
+        description: `${productName} ya quedo actualizada en la web.`,
       });
     } catch (error) {
       console.error('Error guardando imagen del catalogo:', error);
       toast({
         title: 'No se pudo guardar la imagen',
-        description: 'Intenta de nuevo. La foto no se alcanzó a publicar en la web.',
+        description: 'Intenta de nuevo. La foto no se alcanzo a publicar en la web.',
         variant: 'destructive',
       });
     } finally {
@@ -632,3 +631,4 @@ export function CatalogImageDialog({
     </Dialog>
   );
 }
+

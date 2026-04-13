@@ -27,6 +27,7 @@ import {
   resolveCatalogImageOverride,
   type CatalogImageOverrideMaps,
 } from '@/lib/catalog-image-overrides';
+import { getFriendlyFirestoreWriteErrorMessage } from '@/lib/firestore-write-retry';
 import { formatCurrency } from '@/lib/admin/calculations';
 import { getCategoryLabel, toCategoryOptions } from '@/lib/admin/category-utils';
 import type { Product } from '@/lib/admin/types';
@@ -188,10 +189,12 @@ export default function ProductosPage() {
       console.error('Error guardando producto en Firestore:', error);
       toast({
         title: 'No se pudo guardar el producto',
-        description:
+        description: getFriendlyFirestoreWriteErrorMessage(
+          error,
           error instanceof Error
             ? error.message
-            : 'Revisa la configuracion y permisos de Firebase para este proyecto.',
+            : 'Revisa la configuracion y permisos de Firebase para este proyecto.'
+        ),
         variant: 'destructive',
       });
       throw error;
@@ -222,10 +225,12 @@ export default function ProductosPage() {
       console.error('Error eliminando producto en Firestore:', error);
       toast({
         title: 'No se pudo eliminar el producto',
-        description:
+        description: getFriendlyFirestoreWriteErrorMessage(
+          error,
           error instanceof Error
             ? error.message
-            : 'Firestore rechazo la operacion o la conexion fallo.',
+            : 'Firestore rechazo la operacion o la conexion fallo.'
+        ),
         variant: 'destructive',
       });
     }

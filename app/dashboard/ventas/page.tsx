@@ -31,6 +31,7 @@ import { useAdminData } from '@/components/admin/admin-data-context';
 import { useAuth } from '@/components/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, formatDateTime, formatNumber, getProductById, getProductStock } from '@/lib/admin/calculations';
+import { getFriendlyFirestoreWriteErrorMessage } from '@/lib/firestore-write-retry';
 import { getSaleLineDisplayName } from '@/lib/admin/sale-line-display';
 import type { AuthorizationRequest, AuthorizationRequestType } from '@/lib/admin/types';
 
@@ -840,7 +841,10 @@ export default function VentasPage() {
           } catch (error) {
             toast({
               title: editingSaleBatchId ? 'No se pudo actualizar la venta' : 'No se pudo registrar la venta',
-              description: error instanceof Error ? error.message : 'Verifica el stock disponible.',
+              description: getFriendlyFirestoreWriteErrorMessage(
+                error,
+                error instanceof Error ? error.message : 'Verifica el stock disponible.'
+              ),
               variant: 'destructive',
             });
             throw error;
@@ -905,7 +909,10 @@ export default function VentasPage() {
           } catch (error) {
             toast({
               title: 'No se pudo registrar la devolucion',
-              description: error instanceof Error ? error.message : 'Verifica la cantidad a devolver.',
+              description: getFriendlyFirestoreWriteErrorMessage(
+                error,
+                error instanceof Error ? error.message : 'Verifica la cantidad a devolver.'
+              ),
               variant: 'destructive',
             });
             throw error;
@@ -990,7 +997,10 @@ export default function VentasPage() {
                 } catch (error) {
                   toast({
                     title: 'No se pudo enviar la solicitud',
-                    description: error instanceof Error ? error.message : 'Intenta nuevamente.',
+                    description: getFriendlyFirestoreWriteErrorMessage(
+                      error,
+                      error instanceof Error ? error.message : 'Intenta nuevamente.'
+                    ),
                     variant: 'destructive',
                   });
                 }

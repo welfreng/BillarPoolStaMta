@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { useAdminData } from '@/components/admin/admin-data-context';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, formatNumber, getProductStock, getStockAlert } from '@/lib/admin/calculations';
+import { getFriendlyFirestoreWriteErrorMessage } from '@/lib/firestore-write-retry';
 import type { Product } from '@/lib/admin/types';
 
 function getProductSalePriceSummary(product: Product) {
@@ -533,7 +534,10 @@ export default function DashboardPage() {
           } catch (error) {
             toast({
               title: 'No se pudo registrar la venta',
-              description: error instanceof Error ? error.message : 'Verifica el stock disponible.',
+              description: getFriendlyFirestoreWriteErrorMessage(
+                error,
+                error instanceof Error ? error.message : 'Verifica el stock disponible.'
+              ),
               variant: 'destructive',
             });
             throw error;
