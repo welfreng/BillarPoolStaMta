@@ -19,6 +19,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { SectionHeader } from '@/components/admin/shared/section-header';
 import { ProductFormDialog, type ProductFormValues } from '@/components/admin/products/product-form-dialog';
 import { ProductStatusBadge } from '@/components/admin/shared/status-badges';
+import { ResponsiveRowActions } from '@/components/admin/shared/responsive-row-actions';
 import { useAdminData } from '@/components/admin/admin-data-context';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -27,15 +28,39 @@ import {
   type CatalogImageOverrideMaps,
 } from '@/lib/catalog-image-overrides';
 import { formatCurrency } from '@/lib/admin/calculations';
-import { getCategoryLabel, inventoryCategories } from '@/lib/admin/catalogs';
+import { getCategoryLabel, toCategoryOptions } from '@/lib/admin/category-utils';
 import type { Product } from '@/lib/admin/types';
 import { db } from '@/lib/firebase';
 import { SITE_LOGO } from '@/lib/branding';
 
 const pageSize = 10;
 
+function getVariantPriceSummary(product: Product) {
+  const prices = (product.variants ?? [])
+    .map((variant) => Number(variant.salePrice ?? 0))
+    .filter((price) => price > 0);
+
+  if (prices.length === 0) return formatCurrency(product.salePrice);
+
+  const minPrice = Math.min(...prices);
+  const maxPrice = Math.max(...prices);
+  return minPrice === maxPrice
+    ? formatCurrency(minPrice)
+    : `${formatCurrency(minPrice)} - ${formatCurrency(maxPrice)}`;
+}
+
+function getVariantSummary(product: Product) {
+  const variants = product.variants ?? [];
+  if (variants.length === 0) return 'Sin variantes';
+
+  const outOfStock = variants.filter((variant) => Number(variant.stock ?? 0) <= 0).length;
+  return outOfStock > 0
+    ? `${variants.length} variantes · ${outOfStock} agotadas`
+    : `${variants.length} variantes`;
+}
+
 export default function ProductosPage() {
-  const { products, purchases, movements, sales, services, createProduct, updateProduct, deleteProduct } = useAdminData();
+  const { categories, products, purchases, movements, sales, services, createProduct, updateProduct, deleteProduct } = useAdminData();
   const { toast } = useToast();
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('all');
@@ -52,7 +77,9 @@ export default function ProductosPage() {
   const [catalogImageOverrides, setCatalogImageOverrides] = useState<CatalogImageOverrideMaps>({
     byProductId: {},
     byProductName: {},
+    byVariantKey: {},
   });
+  const categoryOptions = useMemo(() => toCategoryOptions(categories), [categories]);
 
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
@@ -127,7 +154,7 @@ export default function ProductosPage() {
       },
       (error) => {
         console.error('Error leyendo imagenes del catalogo web:', error);
-        setCatalogImageOverrides({ byProductId: {}, byProductName: {} });
+        setCatalogImageOverrides({ byProductId: {}, byProductName: {}, byVariantKey: {} });
       }
     );
 
@@ -250,7 +277,7 @@ export default function ProductosPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas las categorias</SelectItem>
-                {inventoryCategories.map((item) => (
+                {categoryOptions.map((item) => (
                   <SelectItem key={item.id} value={item.id}>
                     {item.label}
                   </SelectItem>
@@ -279,13 +306,70 @@ export default function ProductosPage() {
           {paginatedProducts.length > 0 ? (
             <>
               <div className="min-w-0">
-                <div className="mb-2 text-xs text-slate-500">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
-                <div className="overflow-x-auto pb-2">
+                <div className="space-y-3 md:hidden">
+                  {paginatedProducts.map((product) => (
+                    <div
+                      key={product.id}
+                      className="rounded-2xl border border-slate-200 bg-white p-4"
+                      onClick={() => setSelectedProduct(product)}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-medium text-slate-900">{product.name}</p>
+                          <p className="mt-1 text-sm text-slate-500">{product.brand}</p>
+                          <p className="mt-1 text-sm text-slate-500">
+                            {getCategoryLabel(categories, product.category)} · {product.subcategory}
+                          </p>
+                          <p className="mt-2 text-sm text-slate-600">{getVariantSummary(product)}</p>
+                          <p className="text-sm font-medium text-slate-900">{getVariantPriceSummary(product)}</p>
+                          <div className="mt-2 flex items-center gap-2">
+                            <ProductStatusBadge status={product.status} />
+                            <span className={product.featured ? 'text-xs font-medium text-emerald-700' : 'text-xs text-slate-400'}>
+                              {product.featured ? 'Destacado' : 'No destacado'}
+                            </span>
+                          </div>
+                        </div>
+                        <ResponsiveRowActions
+                          actions={[
+                            {
+                              label: 'Ver',
+                              icon: <Eye className="h-4 w-4" />,
+                              onClick: () => {
+                                setSelectedProduct(product);
+                                setOpenViewDialog(true);
+                              },
+                            },
+                            {
+                              label: 'Editar',
+                              icon: <Pencil className="h-4 w-4" />,
+                              onClick: () => {
+                                setEditingProduct(product);
+                                setOpenDialog(true);
+                              },
+                            },
+                            {
+                              label: 'Eliminar',
+                              icon: <Trash2 className="h-4 w-4" />,
+                              onClick: () => {
+                                handleDelete(product);
+                              },
+                              destructive: true,
+                            },
+                          ]}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mb-2 hidden text-xs text-slate-500 md:block">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
+                <div className="hidden overflow-x-auto pb-2 md:block">
                 <Table className="min-w-[680px]">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Producto</TableHead>
                       <TableHead>Categoria</TableHead>
+                      <TableHead>Variantes</TableHead>
                       <TableHead>Venta</TableHead>
                       <TableHead>Destacado</TableHead>
                       <TableHead>Estado</TableHead>
@@ -299,8 +383,9 @@ export default function ProductosPage() {
                       const rowHoverSummary = [
                         product.name,
                         `Marca: ${product.brand}`,
-                        `Categoria: ${getCategoryLabel(product.category)} / ${product.subcategory}`,
-                        `Precio: ${formatCurrency(product.salePrice)}`,
+                        `Categoria: ${getCategoryLabel(categories, product.category)} / ${product.subcategory}`,
+                        `Variantes: ${getVariantSummary(product)}`,
+                        `Precio: ${getVariantPriceSummary(product)}`,
                         `Destacado: ${product.featured ? 'Si' : 'No'}`,
                         `Estado: ${product.status === 'active' ? 'Activo' : 'Inactivo'}`,
                       ].join('\n');
@@ -319,10 +404,11 @@ export default function ProductosPage() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <p className="text-sm text-slate-700">{getCategoryLabel(product.category)}</p>
+                          <p className="text-sm text-slate-700">{getCategoryLabel(categories, product.category)}</p>
                           <p className="text-xs text-slate-500">{product.subcategory}</p>
                         </TableCell>
-                        <TableCell>{formatCurrency(product.salePrice)}</TableCell>
+                        <TableCell>{getVariantSummary(product)}</TableCell>
+                        <TableCell>{getVariantPriceSummary(product)}</TableCell>
                         <TableCell>
                           <span className={product.featured ? 'font-medium text-emerald-700' : 'text-slate-400'}>
                             {product.featured ? 'Si' : 'No'}
@@ -332,43 +418,34 @@ export default function ProductosPage() {
                           <ProductStatusBadge status={product.status} />
                         </TableCell>
                         <TableCell className="sticky right-0 bg-white text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                setSelectedProduct(product);
-                                setOpenViewDialog(true);
-                              }}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                setEditingProduct(product);
-                                setOpenDialog(true);
-                              }}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                handleDelete(product);
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
+                          <ResponsiveRowActions
+                            actions={[
+                              {
+                                label: 'Ver',
+                                icon: <Eye className="h-4 w-4" />,
+                                onClick: () => {
+                                  setSelectedProduct(product);
+                                  setOpenViewDialog(true);
+                                },
+                              },
+                              {
+                                label: 'Editar',
+                                icon: <Pencil className="h-4 w-4" />,
+                                onClick: () => {
+                                  setEditingProduct(product);
+                                  setOpenDialog(true);
+                                },
+                              },
+                              {
+                                label: 'Eliminar',
+                                icon: <Trash2 className="h-4 w-4" />,
+                                onClick: () => {
+                                  handleDelete(product);
+                                },
+                                destructive: true,
+                              },
+                            ]}
+                          />
                         </TableCell>
                       </TableRow>
                     )})}
@@ -443,7 +520,7 @@ export default function ProductosPage() {
                   <div className="rounded-2xl bg-slate-50 p-4">
                     <p className="text-xs text-slate-500">Categoria</p>
                     <p className="mt-1 font-semibold text-slate-900">
-                      {getCategoryLabel(selectedProduct.category)}
+                      {getCategoryLabel(categories, selectedProduct.category)}
                     </p>
                     <p className="text-xs text-slate-500">{selectedProduct.subcategory}</p>
                   </div>
@@ -455,15 +532,57 @@ export default function ProductosPage() {
                 <div className="rounded-2xl bg-slate-50 p-4">
                   <p className="text-xs text-slate-500">Precio de venta</p>
                   <p className="mt-1 font-semibold text-slate-900">
-                    {formatCurrency(selectedProduct.salePrice)}
+                    {getVariantPriceSummary(selectedProduct)}
                   </p>
                 </div>
+                {(selectedProduct.variants?.length ?? 0) > 0 ? (
+                  <div className="rounded-2xl bg-slate-50 p-4">
+                    <p className="text-xs text-slate-500">Resumen de variantes</p>
+                    <p className="mt-1 font-semibold text-slate-900">{getVariantSummary(selectedProduct)}</p>
+                  </div>
+                ) : null}
                 <div className="rounded-2xl bg-slate-50 p-4">
                   <p className="text-xs text-slate-500">Producto destacado</p>
                   <p className={`mt-1 font-semibold ${selectedProduct.featured ? 'text-emerald-700' : 'text-slate-600'}`}>
                     {selectedProduct.featured ? 'Si, visible en portada' : 'No'}
                   </p>
                 </div>
+                {(selectedProduct.variants?.length ?? 0) > 0 ? (
+                  <div className="rounded-2xl bg-slate-50 p-4">
+                    <p className="text-xs text-slate-500">Detalle por variante</p>
+                    <div className="mt-3 space-y-2">
+                      {(selectedProduct.variants ?? []).map((variant) => {
+                        const stock = Math.max(Number(variant.stock ?? 0), 0);
+                        return (
+                          <div
+                            key={variant.id}
+                            className="rounded-2xl border border-slate-200 bg-white px-3 py-3"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="font-medium text-slate-900">
+                                  {variant.displayName ?? variant.name}
+                                </p>
+                                <p className="text-xs text-slate-500">
+                                  {formatCurrency(Number(variant.salePrice ?? selectedProduct.salePrice ?? 0))}
+                                </p>
+                              </div>
+                              <span
+                                className={
+                                  stock <= 0
+                                    ? 'rounded-full bg-rose-100 px-2.5 py-1 text-xs font-medium text-rose-700'
+                                    : 'rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700'
+                                }
+                              >
+                                {stock <= 0 ? 'Agotada' : `${stock} uds`}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </div>
           ) : (
@@ -537,7 +656,7 @@ export default function ProductosPage() {
                 <DialogHeader>
                   <DialogTitle className="text-white">{selectedProduct.name}</DialogTitle>
                   <DialogDescription className="text-slate-400">
-                    {getCategoryLabel(selectedProduct.category)} · {selectedProduct.subcategory}
+                    {getCategoryLabel(categories, selectedProduct.category)} · {selectedProduct.subcategory}
                   </DialogDescription>
                 </DialogHeader>
                 <div className="mt-4 space-y-4">

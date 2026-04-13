@@ -29,7 +29,7 @@ const userBaseSchema = z.object({
   nombre: z.string().min(2, 'Ingresa el nombre'),
   email: z.string().email('Email invalido'),
   telefono: z.string().min(7, 'Ingresa un telefono valido'),
-  role: z.enum(['admin', 'sales', 'courier']),
+  role: z.enum(['admin', 'sales']),
   status: z.enum(['active', 'inactive']),
 });
 
@@ -202,7 +202,6 @@ export function UserFormDialog({
                       <SelectContent>
                         <SelectItem value="admin">Administrador</SelectItem>
                         <SelectItem value="sales">Ventas</SelectItem>
-                        <SelectItem value="courier">Domiciliario</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />

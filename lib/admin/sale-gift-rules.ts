@@ -1,4 +1,5 @@
 import type { Product } from '@/lib/admin/types';
+import { matchesProductCategoryFamily } from '@/lib/admin/category-rules';
 
 export type SaleGiftCategory = 'guantes' | 'estuches' | 'extensiones' | 'parachoques';
 
@@ -11,11 +12,11 @@ function normalizeProductGiftRuleSource(product: Pick<Product, 'name' | 'brand' 
 }
 
 export function getSaleGiftCategoryKey(product: Pick<Product, 'category' | 'subcategory'>) {
-  if (product.category === 'guantes') return 'guantes';
-  if (product.category === 'estuches') return 'estuches';
-  if (product.category === 'extensiones') return 'extensiones';
+  if (matchesProductCategoryFamily(product, 'guantes')) return 'guantes';
+  if (matchesProductCategoryFamily(product, 'estuches')) return 'estuches';
+  if (matchesProductCategoryFamily(product, 'extensiones')) return 'extensiones';
   if (
-    product.category === 'cauchos-para-tacos' &&
+    matchesProductCategoryFamily(product, 'parachoques') &&
     product.subcategory.trim().toLowerCase() === 'parachoques'
   ) {
     return 'parachoques';
@@ -27,7 +28,7 @@ export function getSaleGiftCategoryKey(product: Pick<Product, 'category' | 'subc
 export function getAllowedSaleGiftCategories(
   product: Pick<Product, 'category' | 'name' | 'brand' | 'subcategory'>
 ): SaleGiftCategory[] {
-  if (product.category !== 'tacos') return [];
+  if (!matchesProductCategoryFamily(product, 'tacos')) return [];
 
   const normalized = normalizeProductGiftRuleSource(product);
   const isRestrictedSimpleCue =

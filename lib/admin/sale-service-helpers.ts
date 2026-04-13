@@ -1,7 +1,8 @@
 import type { Product, SaleServiceItem } from '@/lib/admin/types';
+import { matchesProductCategoryFamily } from '@/lib/admin/category-rules';
 
 export function supportsInstallationService(product: Pick<Product, 'category'> | null | undefined) {
-  return product?.category === 'casquillos-o-suelas';
+  return matchesProductCategoryFamily(product, 'casquillos');
 }
 
 export function createDefaultInstallationServiceItem(): SaleServiceItem {

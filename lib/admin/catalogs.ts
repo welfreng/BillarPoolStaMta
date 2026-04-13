@@ -1,4 +1,10 @@
-import type { CategoryOption, PresentationKind } from '@/lib/admin/types';
+import type { PresentationKind } from '@/lib/admin/types';
+import {
+  isChalkProduct,
+  isPackOf12Presentation,
+  matchesCategoryFamily,
+  usesClearTypeDimension,
+} from '@/lib/admin/category-rules';
 
 export type ProductVariantTemplateMode =
   | 'single-axis-list'
@@ -35,6 +41,7 @@ export interface ProductVariantTemplate {
   mode: ProductVariantTemplateMode;
   attributes: ProductVariantTemplateAttribute[];
   editor?: ProductVariantTemplateEditorConfig;
+  allowAttributeEditing?: boolean;
 }
 
 function createCompactSelectionEditor(config: Partial<ProductVariantTemplateEditorConfig> = {}): ProductVariantTemplateEditorConfig {
@@ -106,76 +113,6 @@ export const serviceTypeLabels = {
   'extension-installation': 'Instalacion de extension',
 } as const;
 
-export const inventoryCategories: CategoryOption[] = [
-  {
-    id: 'tacos',
-    label: 'Tacos',
-    subcategories: ['Grafito', 'Madera', 'Fibra de carbono', 'Break cue'],
-  },
-  {
-    id: 'tizas',
-    label: 'Tizas',
-    subcategories: ['Por unidad', 'Caja x 12', 'Caja x 81','Caja x 144' ],
-  },
-  {
-    id: 'guantes',
-    label: 'Guantes',
-    subcategories: ['Dedos completos', '3 Dedos', 'Paquete x 12'],
-  },
-  {
-    id: 'estuches',
-    label: 'Estuches',
-    subcategories: ['Tubular', 'Cajon', 'Lona', 'Mochila'],
-  },
-  {
-    id: 'panos-de-billar',
-    label: 'Panos de billar',
-    subcategories: ['Pool', 'Carambola', 'Mesa 9 pies'],
-  },
-  {
-    id: 'casquillos-o-suelas',
-    label: 'Casquillos o suelas',
-    subcategories: ['Importados', 'Caja x 50', 'Casquillos Perilla'],
-  },
-  {
-    id: 'virolas',
-    label: 'Virolas',
-    subcategories: ['ABS Fibra', 'ABS Teflon', 'Transparente', 'Acrilica Confite', 'Teflon Confite'],
-  },
-  {
-    id: 'supresores',
-    label: 'Supresores',
-    subcategories: [],
-  },
-  {
-    id: 'cauchos-para-tacos',
-    label: 'Cauchos para tacos',
-    subcategories: ['Parachoques', 'Cauchos Sencillos'],
-  },
-  {
-    id: 'extensiones',
-    label: 'Extensiones',
-    subcategories: ['Sencilla', 'Expandible'],
-  },
-  {
-    id: 'empunadura',
-    label: 'Empunadura',
-    subcategories: ['Grip'],
-  },
-  {
-    id: 'accesorios',
-    label: 'Accesorios',
-    subcategories: [
-      'Triangulos',
-      'Cepillos',
-      'Porta Tizas',
-      'Cera brilladora',
-      'Brilladoras de Flechas',
-      'Pica Casquillos',
-    ],
-  },
-];
-
 export const availableBrands = [
   'Predator',
   'Cuetec',
@@ -207,10 +144,6 @@ export const presentationKindUnits: Record<PresentationKind, number> = {
   'box-12': 12,
 };
 
-export function getCategoryLabel(categoryId: string) {
-  return inventoryCategories.find((category) => category.id === categoryId)?.label ?? categoryId;
-}
-
 export function getProductVariantTemplate(input: {
   name: string;
   category: string;
@@ -222,8 +155,16 @@ export function getProductVariantTemplate(input: {
   const category = input.category.trim().toLowerCase();
   const subcategory = input.subcategory.trim().toLowerCase();
   const colorSignals = ['color', 'colores', 'rojo', 'roja', 'azul', 'verde', 'amarillo', 'negro', 'blanco'];
+  const combinedSignals = `${name} ${brand} ${category}`.trim();
+  const isCasquilloCategory = matchesCategoryFamily(category, 'casquillos');
+  const looksLikeChalkBox =
+    isPackOf12Presentation({ name: input.name, subcategory: input.subcategory }) &&
+    (isChalkProduct({ ...input, saleMode: 'simple', variants: [] }) ||
+      combinedSignals.includes('royal') ||
+      combinedSignals.includes('master') ||
+      combinedSignals.includes('silver cup'));
 
-  if (category === 'guantes' && subcategory !== 'paquete x 12') {
+  if (matchesCategoryFamily(category, 'guantes') && subcategory !== 'paquete x 12') {
     const isShortFingerProduct =
       name.includes('dedos cortos') ||
       name.includes('dedo corto') ||
@@ -260,48 +201,47 @@ export function getProductVariantTemplate(input: {
     };
   }
 
-  if (category === 'casquillos-o-suelas') {
+  if (isCasquilloCategory) {
     const isExplicitColorTip =
       colorSignals.some((signal) => name.includes(signal) || subcategory.includes(signal)) &&
       !name.includes('ok healing');
     const isPerillaTip = subcategory.includes('perilla');
-
-    if (isExplicitColorTip) {
-      return {
-        id: 'casquillos-clear',
-        label: 'Casquillos clear',
-        helper: 'Carga una fila por color para manejar stock y precio por separado.',
-        mode: 'single-axis-list',
-        attributes: [{ label: 'Color', key: 'color', options: ['Rojo', 'Azul', 'Transparente', 'Amarillo'] }],
-      };
-    }
-
-    if (isPerillaTip) {
-      return {
-        id: 'casquillos-perilla-tamano',
-        label: 'Casquillos perilla por tamano',
-        helper: 'Usa una fila por tamano para manejar inventario y precio por medida.',
-        mode: 'single-axis-list',
-        attributes: [{ label: 'Tamano', key: 'tamano', options: ['11 mm', '11.5 mm', '12 mm', '12.5 mm', '13 mm'] }],
-      };
-    }
+    const hasClearTypeDimension = !isPerillaTip || usesClearTypeDimension(input);
 
     return {
-      id: 'casquillos-dureza',
-      label: 'Casquillos importados',
-      helper: 'Usa una fila por dureza para registrar precio y stock como en una tabla comercial.',
-      mode: 'single-axis-list',
-      attributes: [{ label: 'Dureza', key: 'dureza', options: ['SS', 'S', 'M', 'H'] }],
+      id: hasClearTypeDimension ? 'casquillos-tipo-dureza' : 'casquillos-escalable',
+      label: hasClearTypeDimension ? 'Casquillos por tipo y dureza' : 'Casquillos escalables',
+      helper:
+        'Empieza con los atributos que aplican hoy y agrega otros despues si la familia crece, sin cambiar la arquitectura.',
+      mode: 'manual-combinations',
+      editor: createCompactManualEditor({
+        priceMode: hasClearTypeDimension ? 'per-variant' : 'global',
+        searchableAttributes: ['tipo', 'dureza', 'tamano', 'color', 'medida', 'presentacion'],
+        allowCustomValuesFor: ['tipo', 'dureza', 'tamano', 'color', 'medida', 'presentacion'],
+        hiddenColumns: ['sku', 'status'],
+      }),
+      allowAttributeEditing: true,
+      attributes: hasClearTypeDimension
+        ? [
+            { label: 'Tipo', key: 'tipo', options: ['Clear', 'Sin clear'] },
+            { label: 'Dureza', key: 'dureza', options: ['SS', 'S', 'M', 'H'] },
+          ]
+        : isPerillaTip
+          ? [{ label: 'Tamano', key: 'tamano', options: ['11 mm', '11.5 mm', '12 mm', '12.5 mm', '13 mm'] }]
+          : isExplicitColorTip
+            ? [{ label: 'Color', key: 'color', options: ['Rojo', 'Azul', 'Transparente', 'Amarillo'] }]
+            : [{ label: 'Dureza', key: 'dureza', options: ['SS', 'S', 'M', 'H'] }],
     };
   }
 
-  if (category === 'virolas') {
+  if (matchesCategoryFamily(category, 'virolas')) {
     if (name.includes('g10') || subcategory.includes('g10')) {
       return {
         id: 'virolas-g10',
         label: 'Virolas G10',
         helper: 'Gestiona las virolas por tipo de perforacion.',
         mode: 'single-axis-list',
+        allowAttributeEditing: true,
         editor: createCompactSelectionEditor({
           priceMode: 'global',
         }),
@@ -323,6 +263,7 @@ export function getProductVariantTemplate(input: {
         label: 'Jumas y virolas de color',
         helper: 'Agrega solo los colores reales de esta virola para no mezclar acabados ni inventario.',
         mode: 'single-axis-list',
+        allowAttributeEditing: true,
         attributes: [
           {
             label: 'Color',
@@ -334,12 +275,13 @@ export function getProductVariantTemplate(input: {
     }
   }
 
-  if (category === 'supresores') {
+  if (matchesCategoryFamily(category, 'supresores')) {
     return {
       id: 'supresores-color',
       label: 'Supresores por color',
       helper: 'Registra una fila por color o acabado, por ejemplo transparente o negro.',
       mode: 'single-axis-list',
+      allowAttributeEditing: true,
       attributes: [
         {
           label: 'Color',
@@ -350,12 +292,13 @@ export function getProductVariantTemplate(input: {
     };
   }
 
-  if (category === 'empunadura' && subcategory === 'grip') {
+  if (matchesCategoryFamily(category, 'empunadura') && subcategory === 'grip') {
     return {
       id: 'grips-color',
       label: 'Grips por color',
       helper: 'Agrega solo los colores reales del grip, igual que en el flujo de guantes.',
       mode: 'single-axis-list',
+      allowAttributeEditing: true,
       attributes: [
         {
           label: 'Color',
@@ -366,12 +309,13 @@ export function getProductVariantTemplate(input: {
     };
   }
 
-  if (category === 'accesorios' && subcategory === 'porta tizas') {
+  if (matchesCategoryFamily(category, 'accesorios') && subcategory === 'porta tizas') {
     return {
       id: 'porta-tizas-color',
       label: 'Porta tizas por color',
       helper: 'Registra una fila por color para mostrar disponibilidad real.',
       mode: 'single-axis-list',
+      allowAttributeEditing: true,
       attributes: [
         {
           label: 'Color',
@@ -382,7 +326,24 @@ export function getProductVariantTemplate(input: {
     };
   }
 
-  if (category === 'tacos' && (brand.includes('yfen') || name.includes('yfen'))) {
+  if (looksLikeChalkBox) {
+    return {
+      id: 'tizas-caja-color',
+      label: 'Tizas por color',
+      helper: 'Agrega solo los colores reales que manejas para esta caja de 12.',
+      mode: 'single-axis-list',
+      allowAttributeEditing: true,
+      attributes: [
+        {
+          label: 'Color',
+          key: 'color',
+          options: [],
+        },
+      ],
+    };
+  }
+
+  if (matchesCategoryFamily(category, 'tacos') && (brand.includes('yfen') || name.includes('yfen'))) {
     return {
       id: 'tacos-yfen',
       label: 'Tacos Yfen',

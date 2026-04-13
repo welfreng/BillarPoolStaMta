@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { SectionHeader } from '@/components/admin/shared/section-header';
 import { SupplierFormDialog, type SupplierFormValues } from '@/components/admin/suppliers/supplier-form-dialog';
+import { ResponsiveRowActions } from '@/components/admin/shared/responsive-row-actions';
 import { useAdminData } from '@/components/admin/admin-data-context';
 import { useToast } from '@/hooks/use-toast';
 import type { Supplier } from '@/lib/admin/types';
@@ -127,8 +128,46 @@ export default function ProveedoresPage() {
 
         {filteredSuppliers.length > 0 ? (
           <div className="min-w-0">
-            <div className="mb-2 text-xs text-slate-500">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
-            <div className="overflow-x-auto pb-2">
+            <div className="space-y-3 md:hidden">
+              {filteredSuppliers.map((supplier) => (
+                <div key={supplier.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-medium text-slate-900">{supplier.name}</p>
+                      <p className="mt-1 text-sm text-slate-500">{supplier.contactName}</p>
+                      <p className="mt-1 text-sm text-slate-500">
+                        {supplier.city} · {supplier.phone}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {supplier.status === 'active' ? 'Activo' : 'Inactivo'}
+                      </p>
+                      <p className="mt-2 text-xs text-slate-400">{supplier.notes || 'Sin notas'}</p>
+                    </div>
+                    <ResponsiveRowActions
+                      actions={[
+                        {
+                          label: 'Editar',
+                          icon: <Pencil className="h-4 w-4" />,
+                          onClick: () => {
+                            setEditingSupplier(supplier);
+                            setOpenDialog(true);
+                          },
+                        },
+                        {
+                          label: 'Eliminar',
+                          icon: <Trash2 className="h-4 w-4" />,
+                          onClick: () => handleDelete(supplier),
+                          destructive: true,
+                        },
+                      ]}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mb-2 hidden text-xs text-slate-500 md:block">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
+            <div className="hidden overflow-x-auto pb-2 md:block">
             <Table className="min-w-[720px]">
               <TableHeader>
                 <TableRow>
@@ -167,27 +206,24 @@ export default function ProveedoresPage() {
                     <TableCell>{supplier.city}</TableCell>
                     <TableCell>{supplier.status === 'active' ? 'Activo' : 'Inactivo'}</TableCell>
                     <TableCell className="sticky right-0 bg-white text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          onClick={() => {
-                            setEditingSupplier(supplier);
-                            setOpenDialog(true);
-                          }}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          onClick={() => handleDelete(supplier)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      <ResponsiveRowActions
+                        actions={[
+                          {
+                            label: 'Editar',
+                            icon: <Pencil className="h-4 w-4" />,
+                            onClick: () => {
+                              setEditingSupplier(supplier);
+                              setOpenDialog(true);
+                            },
+                          },
+                          {
+                            label: 'Eliminar',
+                            icon: <Trash2 className="h-4 w-4" />,
+                            onClick: () => handleDelete(supplier),
+                            destructive: true,
+                          },
+                        ]}
+                      />
                     </TableCell>
                   </TableRow>
                 )})}

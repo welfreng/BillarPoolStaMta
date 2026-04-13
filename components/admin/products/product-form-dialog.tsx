@@ -5,8 +5,9 @@ import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Boxes, CheckCircle2, Package2, Trash2 } from 'lucide-react';
-import { availableBrands, getProductVariantTemplate, inventoryCategories } from '@/lib/admin/catalogs';
+import { Boxes, CheckCircle2, Package2, Plus, Trash2 } from 'lucide-react';
+import { availableBrands, getProductVariantTemplate } from '@/lib/admin/catalogs';
+import { isPackOf12Presentation, matchesCategoryFamily } from '@/lib/admin/category-rules';
 import type { Product } from '@/lib/admin/types';
 import {
   buildVariantAttributeValues,
@@ -46,6 +47,13 @@ import { useToast } from '@/hooks/use-toast';
 import { optimizeImageFile } from '@/lib/image-upload';
 import { SITE_LOGO } from '@/lib/branding';
 import { VariantCompactEditor } from '@/components/admin/products/variant-compact-editor';
+import { useAdminData } from '@/components/admin/admin-data-context';
+import { toCategoryOptions } from '@/lib/admin/category-utils';
+import { CategoryFormDialog, type CategoryFormValues } from '@/components/admin/categories/category-form-dialog';
+import {
+  SubcategoryFormDialog,
+  type SubcategoryFormValues,
+} from '@/components/admin/categories/subcategory-form-dialog';
 
 function slugifyVariantKey(value: string) {
   return value
@@ -100,20 +108,19 @@ function inferColorHex(value: string) {
 }
 
 function shouldDisableVariantsForSelection(category: string, subcategory: string) {
-  const normalizedCategory = category.trim().toLowerCase();
   const normalizedSubcategory = subcategory.trim().toLowerCase();
 
-  if (!normalizedCategory || !normalizedSubcategory) return false;
+  if (!category.trim() || !normalizedSubcategory) return false;
 
-  if (normalizedCategory === 'guantes' && normalizedSubcategory === 'paquete x 12') {
+  if (getProductVariantTemplate({ name: '', brand: '', category, subcategory })) {
+    return false;
+  }
+
+  if (matchesCategoryFamily(category, 'guantes') && normalizedSubcategory === 'paquete x 12') {
     return true;
   }
 
-  return (
-    normalizedSubcategory.startsWith('paquete x ') ||
-    normalizedSubcategory.startsWith('caja x ') ||
-    normalizedSubcategory === 'docena'
-  );
+  return isPackOf12Presentation({ name: '', subcategory }) || normalizedSubcategory.startsWith('paquete x ');
 }
 
 function rankSubcategoryForVariants(category: string, subcategory: string) {
@@ -234,21 +241,11 @@ const productSchema = z
       })
     ).default([]),
     featured: z.boolean().default(false),
-    availableForDelivery: z.boolean().default(false),
     image: z.string().min(1, 'Carga una imagen del producto'),
     imageRotation: z.coerce.number(),
     status: z.enum(['active', 'draft', 'archived']),
   })
   .superRefine((values, ctx) => {
-    const selectedCategory = inventoryCategories.find((category) => category.id === values.category);
-    if (selectedCategory && selectedCategory.subcategories.length > 0 && !values.subcategory) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Selecciona una subcategoria',
-        path: ['subcategory'],
-      });
-    }
-
     if (values.saleMode === 'varianted' && values.variantAttributes.length === 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -322,8 +319,8 @@ interface ProductHistorySummary {
 const defaultValues: ProductFormValues = {
   name: '',
   description: '',
-  category: 'tacos',
-  subcategory: 'Grafito',
+  category: '',
+  subcategory: '',
   brand: availableBrands[0],
   salePrice: 0,
   saleMode: 'simple',
@@ -332,7 +329,6 @@ const defaultValues: ProductFormValues = {
   variantAttributes: [],
   variants: [],
   featured: false,
-  availableForDelivery: false,
   image: SITE_LOGO,
   imageRotation: 0,
   status: 'active',
@@ -356,14 +352,20 @@ export function ProductFormDialog({
     defaultValues,
   });
   const { toast } = useToast();
+  const { categories, createCategory, createSubcategory } = useAdminData();
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const [customSingleAxisValue, setCustomSingleAxisValue] = useState('');
+  const [openCategoryDialog, setOpenCategoryDialog] = useState(false);
+  const [openSubcategoryDialog, setOpenSubcategoryDialog] = useState(false);
+  const [templateHydratedForProductId, setTemplateHydratedForProductId] = useState<string | null>(null);
   const { fields: variantFields, append: appendVariant, remove: removeVariant, replace: replaceVariants } = useFieldArray({
     control: form.control,
     name: 'variants',
   });
   const {
     fields: attributeFields,
+    append: appendAttribute,
+    remove: removeAttribute,
     replace: replaceAttributes,
   } = useFieldArray({
     control: form.control,
@@ -373,6 +375,7 @@ export function ProductFormDialog({
   useEffect(() => {
     if (!initialProduct) {
       form.reset(defaultValues);
+      setTemplateHydratedForProductId(null);
       return;
     }
 
@@ -406,11 +409,11 @@ export function ProductFormDialog({
         colorHex: variant.colorHex ?? '',
       })),
       featured: initialProduct.featured,
-      availableForDelivery: false,
       image: initialProduct.image,
       imageRotation: initialProduct.imageRotation,
       status: initialProduct.status,
     });
+    setTemplateHydratedForProductId(null);
   }, [form, initialProduct]);
 
   const selectedCategoryId = form.watch('category');
@@ -424,9 +427,17 @@ export function ProductFormDialog({
   const selectedVariantAttributes = form.watch('variantAttributes');
   const selectedHistoryVariantName = form.watch('historyVariantName');
   const watchedVariants = form.watch('variants');
+  const categoryOptions = useMemo(
+    () =>
+      toCategoryOptions(categories, {
+        selectedCategoryId,
+        selectedSubcategoryLabel: selectedSubcategory,
+      }),
+    [categories, selectedCategoryId, selectedSubcategory]
+  );
   const selectedCategory = useMemo(
-    () => inventoryCategories.find((category) => category.id === selectedCategoryId),
-    [selectedCategoryId]
+    () => categoryOptions.find((category) => category.id === selectedCategoryId),
+    [categoryOptions, selectedCategoryId]
   );
   const selectedSubcategoryOptions = useMemo(() => {
     const options = selectedCategory?.subcategories ?? [];
@@ -438,6 +449,14 @@ export function ProductFormDialog({
       return left.localeCompare(right, 'es', { sensitivity: 'base' });
     });
   }, [selectedCategory, selectedCategoryId]);
+  useEffect(() => {
+    if (initialProduct) return;
+    const currentCategory = form.getValues('category');
+    if (currentCategory || categoryOptions.length === 0) return;
+    const firstCategory = categoryOptions[0];
+    form.setValue('category', firstCategory.id, { shouldValidate: true });
+    form.setValue('subcategory', firstCategory.subcategories[0] ?? '', { shouldValidate: true });
+  }, [categoryOptions, form, initialProduct]);
   const variantsDisabledForSelection = shouldDisableVariantsForSelection(
     selectedCategoryId,
     selectedSubcategory
@@ -498,10 +517,7 @@ export function ProductFormDialog({
     () => normalizedAttributeDefinitions.some((attribute) => attribute.key === 'color' || attribute.label.toLowerCase() === 'color'),
     [normalizedAttributeDefinitions]
   );
-  const usesSingleAxisTemplate =
-    saleMode === 'varianted' &&
-    variantTemplate?.mode === 'single-axis-list' &&
-    normalizedAttributeDefinitions.length === 1;
+  const usesSingleAxisTemplate = false;
   const usesAutoCombinationTemplate =
     saleMode === 'varianted' && variantTemplate?.mode === 'auto-combinations';
   const compactEditorConfig =
@@ -510,26 +526,29 @@ export function ProductFormDialog({
       : null;
   const usesCompactVariantEditor = Boolean(compactEditorConfig);
   const usesCompactManualRows = compactEditorConfig?.creationMode === 'manual-rows';
-  const singleAxisTemplate = usesSingleAxisTemplate ? variantTemplate?.attributes[0] ?? null : null;
+  const singleAxisTemplate = variantTemplate?.mode === 'single-axis-list' ? variantTemplate.attributes[0] ?? null : null;
+  const templateAllowsAttributeEditing = !variantTemplate || variantTemplate.allowAttributeEditing === true;
+  const suggestedManualAttributes = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...(variantTemplate?.attributes ?? []).map((attribute) => attribute.label),
+          'Color',
+          'Tamano',
+          'Medida',
+          'Presentacion',
+        ])
+      ),
+    [variantTemplate]
+  );
   const canReconfigureVirolaHistory =
     Boolean(initialProduct && historySummary?.hasActivity) &&
-    initialProduct?.category === 'virolas' &&
+    matchesCategoryFamily(initialProduct?.category ?? '', 'virolas') &&
     variantTemplate?.id === 'virolas-color';
   const structureLocked = Boolean(initialProduct && historySummary?.hasActivity && !canReconfigureVirolaHistory);
-  const existingSingleAxisValues = useMemo(() => {
-    if (!usesSingleAxisTemplate) return [];
-    return watchedVariants
-      .map((variant) => String(variant.attributeValues?.[0] ?? variant.name ?? '').trim())
-      .filter(Boolean);
-  }, [usesSingleAxisTemplate, watchedVariants]);
-  const normalizedExistingSingleAxisValues = useMemo(
-    () => new Set(existingSingleAxisValues.map((value) => value.toLowerCase())),
-    [existingSingleAxisValues]
-  );
-  const availableSingleAxisOptions = useMemo(() => {
-    if (!singleAxisTemplate) return [];
-    return singleAxisTemplate.options.filter((option) => !normalizedExistingSingleAxisValues.has(option.toLowerCase()));
-  }, [normalizedExistingSingleAxisValues, singleAxisTemplate]);
+  const existingSingleAxisValues: string[] = [];
+  const normalizedExistingSingleAxisValues = new Set<string>();
+  const availableSingleAxisOptions: string[] = [];
   const fixedCompactAttributeKeys = useMemo(
     () => new Set(compactEditorConfig?.fixedAttributes ?? []),
     [compactEditorConfig]
@@ -593,6 +612,33 @@ export function ProductFormDialog({
       templateCompactAttributeOptions,
     ]
   );
+  const handleQuickCategoryCreate = async (values: CategoryFormValues) => {
+    const created = await createCategory({ label: values.label });
+    form.setValue('category', created.id, { shouldValidate: true, shouldDirty: true });
+    form.setValue('subcategory', '', { shouldValidate: true, shouldDirty: true });
+    setOpenCategoryDialog(false);
+    toast({
+      title: 'Categoria creada',
+      description: 'Ya puedes usarla en este producto.',
+    });
+  };
+  const handleQuickSubcategoryCreate = async (values: SubcategoryFormValues) => {
+    if (!selectedCategoryId) {
+      throw new Error('Selecciona primero una categoria.');
+    }
+
+    const updatedCategory = await createSubcategory(selectedCategoryId, { label: values.label });
+    const createdSubcategory = updatedCategory.subcategories[updatedCategory.subcategories.length - 1];
+    form.setValue('subcategory', createdSubcategory?.label ?? values.label, {
+      shouldValidate: true,
+      shouldDirty: true,
+    });
+    setOpenSubcategoryDialog(false);
+    toast({
+      title: 'Subcategoria creada',
+      description: 'Ya puedes usarla en este producto.',
+    });
+  };
   useEffect(() => {
     if (!usesCompactVariantEditor) return;
 
@@ -670,7 +716,9 @@ export function ProductFormDialog({
   }, [form, saleMode, variantSummary]);
 
   useEffect(() => {
-    if ((!usesSingleAxisTemplate && !usesAutoCombinationTemplate) || structureLocked) return;
+    if ((!usesSingleAxisTemplate && !usesAutoCombinationTemplate) || structureLocked) {
+      return;
+    }
 
     const nextPrice = Number(selectedSalePrice ?? 0);
     const currentVariants = form.getValues('variants');
@@ -685,7 +733,14 @@ export function ProductFormDialog({
         salePrice: nextPrice,
       }))
     );
-  }, [form, replaceVariants, selectedSalePrice, structureLocked, usesAutoCombinationTemplate, usesSingleAxisTemplate]);
+  }, [
+    form,
+    replaceVariants,
+    selectedSalePrice,
+    structureLocked,
+    usesAutoCombinationTemplate,
+    usesSingleAxisTemplate,
+  ]);
 
   const applyVariantTemplate = () => {
     if (!variantTemplate) return;
@@ -709,23 +764,6 @@ export function ProductFormDialog({
         form.getValues('variants').map((variant) => ({
           ...variant,
           attributeValues: nextAttributes.map((_, index) => variant.attributeValues?.[index] ?? ''),
-        }))
-      );
-      return;
-    }
-
-    if (variantTemplate.mode === 'single-axis-list' && variantTemplate.attributes.length === 1) {
-      const [axis] = variantTemplate.attributes;
-      replaceVariants(
-        axis.options.map((option) => ({
-          id: '',
-          name: '',
-          sku: '',
-          salePrice: Number(form.getValues('salePrice') ?? 0),
-          stock: 0,
-          status: 'active',
-          attributeValues: [option],
-          colorHex: axis.key === 'color' ? inferColorHex(option) : '',
         }))
       );
       return;
@@ -755,6 +793,62 @@ export function ProductFormDialog({
       }))
     );
   };
+
+  useEffect(() => {
+    if (!initialProduct || !variantTemplate || saleMode !== 'varianted') return;
+    if (templateHydratedForProductId === initialProduct.id) return;
+    if (normalizedAttributeDefinitions.length > 0) return;
+
+    const nextAttributes = variantTemplate.attributes.map((attribute, index) => ({
+      id: `attr-${index + 1}`,
+      key: attribute.key || slugifyVariantKey(attribute.label),
+      label: attribute.label,
+    }));
+
+    replaceAttributes(nextAttributes);
+
+    const currentVariants = form.getValues('variants');
+    if (currentVariants.length > 0) {
+      replaceVariants(
+        currentVariants.map((variant) => {
+          const fallbackFirstValue =
+            variant.attributeValues?.find((value) => value?.trim()) ??
+            variant.name?.trim() ??
+            '';
+
+          return {
+            ...variant,
+            attributeValues: nextAttributes.map((attribute, index) => {
+              if (variant.attributeValues?.[index]?.trim()) {
+                return variant.attributeValues[index] ?? '';
+              }
+
+              if (index === 0 && nextAttributes.length === 1) {
+                return fallbackFirstValue;
+              }
+
+              return '';
+            }),
+            colorHex:
+              nextAttributes.length === 1 && nextAttributes[0]?.key === 'color'
+                ? inferColorHex(fallbackFirstValue)
+                : variant.colorHex,
+          };
+        })
+      );
+    }
+
+    setTemplateHydratedForProductId(initialProduct.id);
+  }, [
+    form,
+    initialProduct,
+    normalizedAttributeDefinitions.length,
+    replaceAttributes,
+    replaceVariants,
+    saleMode,
+    templateHydratedForProductId,
+    variantTemplate,
+  ]);
   const appendSingleAxisVariant = (rawValue: string) => {
     const value = rawValue.trim();
     if (!value || normalizedExistingSingleAxisValues.has(value.toLowerCase())) return;
@@ -823,6 +917,72 @@ export function ProductFormDialog({
       [attributeKey]: Array.from(new Set([...(current[attributeKey] ?? []), value])),
     }));
   };
+  const addManualVariantAttribute = () => {
+    appendAttribute({
+      id: '',
+      key: '',
+      label: '',
+    });
+
+    replaceVariants(
+      form.getValues('variants').map((variant) => ({
+        ...variant,
+        attributeValues: [...(variant.attributeValues ?? []), ''],
+      }))
+    );
+  };
+  const appendSuggestedManualAttribute = (label: string) => {
+    const normalizedLabel = label.trim();
+    if (!normalizedLabel) return;
+
+    const alreadyExists = form
+      .getValues('variantAttributes')
+      .some((attribute) => attribute.label.trim().toLowerCase() === normalizedLabel.toLowerCase());
+    if (alreadyExists) return;
+
+    appendAttribute({
+      id: '',
+      key: slugifyVariantKey(normalizedLabel),
+      label: normalizedLabel,
+    });
+
+    replaceVariants(
+      form.getValues('variants').map((variant) => ({
+        ...variant,
+        attributeValues: [...(variant.attributeValues ?? []), ''],
+      }))
+    );
+  };
+  const updateManualVariantAttribute = (attributeIndex: number, label: string) => {
+    const nextLabel = label;
+    form.setValue(`variantAttributes.${attributeIndex}.label`, nextLabel, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+    form.setValue(`variantAttributes.${attributeIndex}.key`, slugifyVariantKey(nextLabel), {
+      shouldDirty: true,
+      shouldValidate: false,
+    });
+  };
+  const removeManualVariantAttribute = (attributeIndex: number) => {
+    removeAttribute(attributeIndex);
+
+    replaceVariants(
+      form.getValues('variants').map((variant) => ({
+        ...variant,
+        attributeValues: (variant.attributeValues ?? []).filter((_, index) => index !== attributeIndex),
+      }))
+    );
+  };
+  const hasIncompleteManualAttributes =
+    saleMode === 'varianted' &&
+    templateAllowsAttributeEditing &&
+    form.getValues('variantAttributes').some((attribute) => !attribute.label.trim());
+  const canAddManualVariants =
+    saleMode === 'varianted' &&
+    templateAllowsAttributeEditing &&
+    normalizedAttributeDefinitions.length > 0 &&
+    !hasIncompleteManualAttributes;
   const toggleCompactAttributeValue = (attributeKey: string, value: string) => {
     const currentSelectedValues = compactSelectedAttributeValues[attributeKey] ?? [];
     const nextSelectedValues = currentSelectedValues.some((item) => item.toLowerCase() === value.toLowerCase())
@@ -876,7 +1036,115 @@ export function ProductFormDialog({
       });
     }
   };
+  const getCompactRowAttributeOptions = (
+    rowIndex: number,
+    attributeKey: string,
+    fallbackOptions: string[]
+  ) => {
+    if (!usesCompactManualRows) return fallbackOptions;
+
+    const attributeIndex = normalizedAttributeDefinitions.findIndex((attribute) => attribute.key === attributeKey);
+    if (attributeIndex < 0) return fallbackOptions;
+
+    const currentVariants = form.getValues('variants');
+    const currentRow = currentVariants[rowIndex];
+    if (!currentRow) return fallbackOptions;
+
+    return fallbackOptions.filter((option) => {
+      const isDuplicateWithinContext = currentVariants.some((variant, index) => {
+        if (index === rowIndex) return false;
+
+        return normalizedAttributeDefinitions.every((attribute, comparisonIndex) => {
+          const currentValue =
+            comparisonIndex === attributeIndex
+              ? option.trim().toLowerCase()
+              : (currentRow.attributeValues?.[comparisonIndex] ?? '').trim().toLowerCase();
+          const otherValue = (variant.attributeValues?.[comparisonIndex] ?? '').trim().toLowerCase();
+
+          if (!currentValue) return true;
+          return currentValue === otherValue;
+        });
+      });
+
+      const currentValue = (currentRow.attributeValues?.[attributeIndex] ?? '').trim().toLowerCase();
+      return !isDuplicateWithinContext || currentValue === option.trim().toLowerCase();
+    });
+  };
+  const buildSuggestedCompactAttributeValues = () => {
+    if (!usesCompactManualRows || compactAttributeControls.length === 0) return normalizedAttributeDefinitions.map(() => '');
+
+    const currentVariants = form.getValues('variants');
+    const existingSignatures = new Set(
+      currentVariants
+        .map((variant) =>
+          normalizedAttributeDefinitions
+            .map((_, index) => variant.attributeValues?.[index]?.trim().toLowerCase() ?? '')
+            .join('||')
+        )
+    );
+
+    const search = (
+      attributeIndex: number,
+      currentValues: string[]
+    ): string[] | null => {
+      if (attributeIndex >= normalizedAttributeDefinitions.length) {
+        const signature = currentValues.map((value) => value.trim().toLowerCase()).join('||');
+        return existingSignatures.has(signature) ? null : currentValues;
+      }
+
+      const attribute = normalizedAttributeDefinitions[attributeIndex];
+      const baseOptions =
+        compactAttributeControls.find((control) => control.key === attribute.key)?.options ?? [];
+      const virtualRowIndex = currentVariants.length;
+      const virtualVariants = [
+        ...currentVariants,
+        {
+          attributeValues: currentValues,
+        },
+      ] as Array<{ attributeValues?: string[] }>;
+
+      const filteredOptions = baseOptions.filter((option) => {
+        const optionSignature = virtualVariants.some((variant, index) => {
+          if (index === virtualRowIndex) return false;
+
+          return normalizedAttributeDefinitions.every((comparisonAttribute, comparisonIndex) => {
+            const currentValue =
+              comparisonIndex === attributeIndex
+                ? option.trim().toLowerCase()
+                : (currentValues[comparisonIndex] ?? '').trim().toLowerCase();
+            const otherValue = (variant.attributeValues?.[comparisonIndex] ?? '').trim().toLowerCase();
+
+            if (!currentValue) return true;
+            return comparisonAttribute.key ? currentValue === otherValue : false;
+          });
+        });
+
+        return !optionSignature;
+      });
+
+      for (const option of filteredOptions) {
+        const nextValues = [...currentValues];
+        nextValues[attributeIndex] = option;
+        const found = search(attributeIndex + 1, nextValues);
+        if (found) return found;
+      }
+
+      return null;
+    };
+
+    return search(0, normalizedAttributeDefinitions.map(() => '')) ?? normalizedAttributeDefinitions.map(() => '');
+  };
   const addCompactManualVariantRow = () => {
+    const suggestedAttributeValues = buildSuggestedCompactAttributeValues();
+    const hasSuggestedValues = suggestedAttributeValues.some((value) => value.trim());
+    if (!hasSuggestedValues && normalizedAttributeDefinitions.length > 0 && form.getValues('variants').length > 0) {
+      toast({
+        title: 'Sin combinaciones disponibles',
+        description: 'Ya cargaste todas las combinaciones sugeridas para estos atributos.',
+      });
+      return;
+    }
+
     appendVariant({
       id: '',
       name: '',
@@ -884,8 +1152,11 @@ export function ProductFormDialog({
       salePrice: Number(form.getValues('salePrice') ?? 0),
       stock: 0,
       status: 'active',
-      attributeValues: normalizedAttributeDefinitions.map(() => ''),
-      colorHex: '',
+      attributeValues: suggestedAttributeValues,
+      colorHex: (() => {
+        const colorIndex = normalizedAttributeDefinitions.findIndex((attribute) => attribute.key === 'color');
+        return colorIndex >= 0 ? inferColorHex(suggestedAttributeValues[colorIndex] ?? '') : '';
+      })(),
     });
   };
   const removeCompactManualVariantRow = (rowIndex: number) => {
@@ -907,6 +1178,12 @@ export function ProductFormDialog({
     form.setValue(`variants.${rowIndex}.status`, value, {
       shouldDirty: true,
       shouldValidate: false,
+    });
+  };
+  const setCompactRowSalePrice = (rowIndex: number, value: number) => {
+    form.setValue(`variants.${rowIndex}.salePrice`, Math.max(Number(value || 0), 0), {
+      shouldDirty: true,
+      shouldValidate: true,
     });
   };
   const loadImageFile = (file: File) =>
@@ -944,26 +1221,20 @@ export function ProductFormDialog({
 
     try {
       const imageData = await optimizeImageFile(file, {
-        maxWidth: 1200,
-        maxHeight: 1200,
-        quality: 0.84,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        quality: 0.78,
+        minQuality: 0.58,
+        fit: 'cover',
+        maxBytes: 240 * 1024,
       });
-      if (imageData.originalWidth !== imageData.originalHeight) {
-        form.clearErrors('image');
-        onChange(defaultValues.image);
-        form.setValue('imageRotation', 0, { shouldValidate: true });
-        toast({
-          title: 'Imagen no recomendada',
-          description: `La imagen seleccionada mide ${imageData.originalWidth} x ${imageData.originalHeight} px y no es cuadrada. Se dejara la imagen predeterminada para mantener una vista consistente.`,
-          variant: 'destructive',
-        });
-        event.target.value = '';
-        return;
-      }
-
       form.clearErrors('image');
       onChange(imageData.dataUrl);
       form.setValue('imageRotation', 0, { shouldValidate: true });
+      toast({
+        title: 'Imagen ajustada automaticamente',
+        description: `La foto se preparo en ${imageData.width} x ${imageData.height} px para cuidar espacio en la base de datos.`,
+      });
     } catch (error) {
       form.setError('image', {
         type: 'manual',
@@ -987,32 +1258,50 @@ export function ProductFormDialog({
 
         <Form {...form}>
           <form
-            onSubmit={form.handleSubmit(async (values) => {
-              const colorAttributeIndex = values.variantAttributes.findIndex(
-                (attribute) => attribute.key === 'color' || attribute.label.trim().toLowerCase() === 'color'
-              );
-              const nextValues: ProductFormValues = {
-                ...values,
-                variantLabel:
-                  values.saleMode === 'varianted'
-                    ? values.variantAttributes.map((attribute) => attribute.label.trim()).filter(Boolean).join(' / ')
-                    : '',
-                variants: values.variants.map((variant) => {
-                  const inferredHex =
-                    colorAttributeIndex >= 0
-                      ? inferColorHex(variant.attributeValues[colorAttributeIndex] ?? '')
-                      : '';
+            onSubmit={form.handleSubmit(
+              async (values) => {
+                const selectedCategoryRecord = categoryOptions.find((category) => category.id === values.category);
+                if (selectedCategoryRecord && selectedCategoryRecord.subcategories.length > 0 && !values.subcategory) {
+                  form.setError('subcategory', {
+                    type: 'manual',
+                    message: 'Selecciona una subcategoria',
+                  });
+                  return;
+                }
 
-                  return {
-                    ...variant,
-                    colorHex: inferredHex || variant.colorHex || '',
-                  };
-                }),
-              };
+                const colorAttributeIndex = values.variantAttributes.findIndex(
+                  (attribute) => attribute.key === 'color' || attribute.label.trim().toLowerCase() === 'color'
+                );
+                const nextValues: ProductFormValues = {
+                  ...values,
+                  variantLabel:
+                    values.saleMode === 'varianted'
+                      ? values.variantAttributes.map((attribute) => attribute.label.trim()).filter(Boolean).join(' / ')
+                      : '',
+                  variants: values.variants.map((variant) => {
+                    const inferredHex =
+                      colorAttributeIndex >= 0
+                        ? inferColorHex(variant.attributeValues[colorAttributeIndex] ?? '')
+                        : '';
 
-              await onSubmit(nextValues);
-              form.reset(defaultValues);
-            })}
+                    return {
+                      ...variant,
+                      colorHex: inferredHex || variant.colorHex || '',
+                    };
+                  }),
+                };
+
+                await onSubmit(nextValues);
+                form.reset(defaultValues);
+              },
+              () => {
+                toast({
+                  title: 'Faltan datos por completar',
+                  description: 'Revisa los campos marcados antes de guardar.',
+                  variant: 'destructive',
+                });
+              }
+            )}
             className="space-y-5"
           >
             <div className="space-y-5">
@@ -1057,14 +1346,25 @@ export function ProductFormDialog({
                         name="category"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Categoria</FormLabel>
+                            <div className="flex items-center justify-between gap-2">
+                              <FormLabel>Categoria</FormLabel>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-auto px-0 text-xs"
+                                onClick={() => setOpenCategoryDialog(true)}
+                              >
+                                <Plus className="mr-1 h-3.5 w-3.5" /> Nueva
+                              </Button>
+                            </div>
                             <FormControl>
                               <SearchableSelect
                                 value={field.value}
                                 onChange={(value) => {
                                   if (structureLocked) return;
                                   field.onChange(value);
-                                  const nextCategory = inventoryCategories.find((category) => category.id === value);
+                                  const nextCategory = categoryOptions.find((category) => category.id === value);
                                   const nextSubcategory =
                                     [...(nextCategory?.subcategories ?? [])].sort((left, right) => {
                                       const rankDiff =
@@ -1080,7 +1380,7 @@ export function ProductFormDialog({
                                 placeholder="Selecciona categoria"
                                 searchPlaceholder="Buscar categoria..."
                                 emptyLabel="No se encontraron categorias."
-                                options={inventoryCategories.map((category) => ({
+                                options={categoryOptions.map((category) => ({
                                   value: category.id,
                                   label: category.label,
                                 }))}
@@ -1095,7 +1395,19 @@ export function ProductFormDialog({
                         name="subcategory"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Subcategoria</FormLabel>
+                            <div className="flex items-center justify-between gap-2">
+                              <FormLabel>Subcategoria</FormLabel>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-auto px-0 text-xs"
+                                disabled={!selectedCategoryId}
+                                onClick={() => setOpenSubcategoryDialog(true)}
+                              >
+                                <Plus className="mr-1 h-3.5 w-3.5" /> Nueva
+                              </Button>
+                            </div>
                             {selectedCategory && selectedSubcategoryOptions.length > 0 ? (
                               <Select
                                 value={field.value}
@@ -1119,7 +1431,10 @@ export function ProductFormDialog({
                               </Select>
                             ) : (
                               <FormControl>
-                                <Input value="Sin subcategoria" disabled />
+                                <Input
+                                  value={selectedCategoryId ? 'Sin subcategoria' : 'Selecciona una categoria primero'}
+                                  disabled
+                                />
                               </FormControl>
                             )}
                             <FormMessage />
@@ -1211,51 +1526,145 @@ export function ProductFormDialog({
                           </div>
                         ) : null}
 
-                        {variantTemplate ? (
-                          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
-                            <span className="font-semibold text-slate-900">{variantTemplate.label}</span>
-                          </div>
-                        ) : (
-                          <div className="grid gap-3">
-                            <FormField
-                              control={form.control}
-                              name="saleMode"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Tipo de venta</FormLabel>
-                                  <Select value={field.value} onValueChange={field.onChange}>
-                                    <FormControl>
-                                      <SelectTrigger className="w-full" disabled={structureLocked}>
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      <SelectItem value="simple">Producto simple</SelectItem>
-                                      <SelectItem value="varianted">Producto con variantes</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </div>
-                        )}
+                        <div className="grid gap-3">
+                          <FormField
+                            control={form.control}
+                            name="saleMode"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Tipo de venta</FormLabel>
+                                <Select value={field.value} onValueChange={field.onChange}>
+                                  <FormControl>
+                                    <SelectTrigger className="w-full" disabled={structureLocked}>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="simple">Producto simple</SelectItem>
+                                    <SelectItem value="varianted">Producto con variantes</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          {variantTemplate ? (
+                            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                              <span className="font-semibold text-slate-900">{variantTemplate.label}</span>{' '}
+                              {variantTemplate.helper}
+                            </div>
+                          ) : null}
+                        </div>
 
                         {saleMode === 'varianted' ? (
                           <div className="space-y-2 rounded-2xl border border-slate-200 bg-white p-4">
-                            <div>
-                              <p className="text-sm font-semibold text-slate-900">Atributos de la variante</p>
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-semibold text-slate-900">Atributos de la variante</p>
+                                {!variantTemplate ? (
+                                  <p className="mt-1 text-xs text-slate-500">
+                                    Paso 1: define primero los atributos. Paso 2: agrega las variantes reales.
+                                  </p>
+                                ) : null}
+                              </div>
+                              {templateAllowsAttributeEditing ? (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="rounded-xl bg-white"
+                                  disabled={structureLocked}
+                                  onClick={addManualVariantAttribute}
+                                >
+                                  <Plus className="mr-2 h-4 w-4" />
+                                  {attributeFields.length > 0 ? 'Agregar otro atributo' : 'Agregar atributo'}
+                                </Button>
+                              ) : null}
                             </div>
+
+                            {templateAllowsAttributeEditing ? (
+                              <div className="flex flex-wrap gap-2">
+                                {suggestedManualAttributes.map((label) => (
+                                  <Button
+                                    key={label}
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="rounded-full bg-slate-50"
+                                    disabled={
+                                      structureLocked ||
+                                      form
+                                        .getValues('variantAttributes')
+                                        .some(
+                                          (attribute) =>
+                                            attribute.label.trim().toLowerCase() === label.toLowerCase()
+                                        )
+                                    }
+                                    onClick={() => appendSuggestedManualAttribute(label)}
+                                  >
+                                    + {label}
+                                  </Button>
+                                ))}
+                              </div>
+                            ) : null}
 
                             {attributeFields.length > 0 ? (
                               attributeFields.map((field, index) => (
                                 <div key={field.id} className="rounded-2xl border border-slate-200 p-3">
-                                  <p className="text-sm font-semibold text-slate-900">
-                                    {form.getValues(`variantAttributes.${index}.label`) || `Atributo ${index + 1}`}
-                                  </p>
+                                  {!templateAllowsAttributeEditing ? (
+                                    <p className="text-sm font-semibold text-slate-900">
+                                      {form.getValues(`variantAttributes.${index}.label`) || `Atributo ${index + 1}`}
+                                    </p>
+                                  ) : (
+                                    <div className="flex items-start gap-2">
+                                      <FormField
+                                        control={form.control}
+                                        name={`variantAttributes.${index}.label`}
+                                        render={({ field }) => (
+                                          <FormItem className="flex-1">
+                                            <FormControl>
+                                              <Input
+                                                {...field}
+                                                value={field.value ?? ''}
+                                                placeholder={`Ej: ${index === 0 ? 'Color' : `Atributo ${index + 1}`}`}
+                                                disabled={structureLocked}
+                                                onChange={(event) => {
+                                                  field.onChange(event);
+                                                  updateManualVariantAttribute(index, event.target.value);
+                                                }}
+                                              />
+                                            </FormControl>
+                                            <FormMessage />
+                                          </FormItem>
+                                        )}
+                                      />
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="mt-0.5 shrink-0 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-rose-600"
+                                        disabled={structureLocked}
+                                        onClick={() => removeManualVariantAttribute(index)}
+                                        aria-label="Eliminar atributo"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  )}
                                 </div>
                               ))
+                            ) : templateAllowsAttributeEditing ? (
+                              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                                Empieza por definir al menos un atributo, por ejemplo `Color`, `Tamano` o `Presentacion`.
+                              </div>
                             ) : null}
+                          </div>
+                        ) : null}
+
+                        {saleMode === 'varianted' && form.formState.errors.variantAttributes?.message ? (
+                          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                            {form.formState.errors.variantAttributes.message}
                           </div>
                         ) : null}
 
@@ -1352,6 +1761,7 @@ export function ProductFormDialog({
                                   variant.attributeValues?.[attributeIndex] ?? '',
                                 ])
                               ),
+                              salePrice: Number(variant.salePrice ?? form.getValues('salePrice') ?? 0),
                               stock: Number(variant.stock ?? 0),
                               sku: variant.sku ?? '',
                               status: variant.status === 'inactive' ? 'inactive' : 'active',
@@ -1370,12 +1780,14 @@ export function ProductFormDialog({
                             }
                             onToggleAttributeValue={toggleCompactAttributeValue}
                             onAddAttributeValue={addCompactAttributeValue}
+                            onRowSalePriceChange={setCompactRowSalePrice}
                             onRowStockChange={setCompactRowStock}
                             onRowSkuChange={setCompactRowSku}
                             onRowStatusChange={setCompactRowStatus}
                             onAddRow={addCompactManualVariantRow}
                             onRemoveRow={removeCompactManualVariantRow}
                             onRowAttributeChange={setCompactRowAttribute}
+                            getRowAttributeOptions={getCompactRowAttributeOptions}
                             hiddenColumns={compactEditorConfig?.hiddenColumns}
                             manualRows={usesCompactManualRows}
                           />
@@ -1386,6 +1798,12 @@ export function ProductFormDialog({
                           name="variantLabel"
                           render={() => <FormMessage />}
                         />
+
+                        {saleMode === 'varianted' && form.formState.errors.variants?.message ? (
+                          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                            {form.formState.errors.variants.message}
+                          </div>
+                        ) : null}
 
                         <div className="space-y-3">
                           {saleMode === 'varianted' && variantFields.length > 0 ? (
@@ -1398,11 +1816,13 @@ export function ProductFormDialog({
                               }
                             >
                               {usesSingleAxisTemplate ? (
-                                <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
                                   <Table>
                                     <TableHeader>
                                       <TableRow className="bg-slate-50 hover:bg-slate-50">
-                                        <TableHead className="h-9 px-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Color</TableHead>
+                                        <TableHead className="h-9 px-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                          {singleAxisTemplate?.label ?? 'Variante'}
+                                        </TableHead>
                                         <TableHead className="h-9 w-[112px] px-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Cantidad</TableHead>
                                         <TableHead className="h-9 w-[56px] px-2 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">Eliminar</TableHead>
                                       </TableRow>
@@ -1492,26 +1912,6 @@ export function ProductFormDialog({
                                       : 'grid gap-3 rounded-2xl border border-slate-200 bg-white p-3'
                                   }
                                 >
-                                {!usesSingleAxisTemplate ? (
-                                  <FormField
-                                    control={form.control}
-                                    name={`variants.${index}.name`}
-                                    render={({ field }) => (
-                                      <FormItem>
-                                        <FormLabel>Nombre corto de la variante</FormLabel>
-                                        <FormControl>
-                                          <Input
-                                            placeholder="Opcional; si lo dejas vacio se genera desde los atributos"
-                                            {...field}
-                                            disabled={structureLocked}
-                                          />
-                                        </FormControl>
-                                        <FormMessage />
-                                      </FormItem>
-                                    )}
-                                  />
-                                ) : null}
-
                                 {normalizedAttributeDefinitions.length > 0 ? (
                                   <div
                                     className={
@@ -1638,14 +2038,14 @@ export function ProductFormDialog({
 
                                 {!usesSingleAxisTemplate ? (
                                   <div className="rounded-2xl bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                                    Vista: {buildVariantDisplayName({
-                                      name: form.getValues(`variants.${index}.name`),
+                                    Nombre generado: {buildVariantDisplayName({
+                                      name: '',
                                       attributes: normalizedAttributeDefinitions.reduce<Record<string, string>>((accumulator, attribute, attributeIndex) => {
                                         const value = form.getValues(`variants.${index}.attributeValues.${attributeIndex}`)?.trim();
                                         if (value) accumulator[attribute.key] = value;
                                         return accumulator;
                                       }, {}),
-                                    }, normalizedAttributeDefinitions) || 'Pendiente'}
+                                    }, normalizedAttributeDefinitions) || 'Completa los atributos para generar el nombre'}
                                   </div>
                                 ) : null}
                               </div>
@@ -1671,7 +2071,7 @@ export function ProductFormDialog({
                               type="button"
                               variant="outline"
                               className="rounded-xl bg-white"
-                              disabled={structureLocked}
+                              disabled={structureLocked || (templateAllowsAttributeEditing && !canAddManualVariants)}
                               onClick={() =>
                                 appendVariant({
                                   id: '',
@@ -1685,8 +2085,14 @@ export function ProductFormDialog({
                                 })
                               }
                             >
-                              Agregar variante
+                              Agregar combinacion
                             </Button>
+                          ) : null}
+
+                          {saleMode === 'varianted' && templateAllowsAttributeEditing && !canAddManualVariants ? (
+                            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                              Define primero los atributos para habilitar la carga de combinaciones.
+                            </div>
                           ) : null}
                         </div>
                       </div>
@@ -1828,6 +2234,17 @@ export function ProductFormDialog({
             </DialogFooter>
           </form>
         </Form>
+        <CategoryFormDialog
+          open={openCategoryDialog}
+          onOpenChange={setOpenCategoryDialog}
+          onSubmit={handleQuickCategoryCreate}
+        />
+        <SubcategoryFormDialog
+          open={openSubcategoryDialog}
+          onOpenChange={setOpenSubcategoryDialog}
+          category={categories.find((category) => category.id === selectedCategoryId)}
+          onSubmit={handleQuickSubcategoryCreate}
+        />
       </DialogContent>
     </Dialog>
   );

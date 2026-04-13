@@ -129,10 +129,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             nombre: String(data?.nombre ?? currentUser.displayName ?? ''),
             email: String(data?.email ?? currentUser.email ?? ''),
             telefono: String(data?.telefono ?? ''),
-            role:
-              data?.role === 'sales' || data?.role === 'courier'
-                ? data.role
-                : 'admin',
+            role: data?.role === 'sales' ? 'sales' : 'admin',
             status: data?.status === 'inactive' ? 'inactive' : 'active',
             createdAt: typeof data?.createdAt?.toDate === 'function'
               ? data.createdAt.toDate().toISOString()

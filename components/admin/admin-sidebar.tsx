@@ -14,6 +14,7 @@ import {
   ReceiptText,
   ShoppingCart,
   Tags,
+  FolderTree,
   Users,
   Wrench,
 } from 'lucide-react';
@@ -37,6 +38,7 @@ import { SITE_LOGO } from '@/lib/branding';
 const navigation = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, helper: 'Resumen ejecutivo' },
   { href: '/dashboard/productos', label: 'Productos', icon: Boxes, helper: 'Catalogo y stock' },
+  { href: '/dashboard/categorias', label: 'Categorias', icon: FolderTree, helper: 'Estructura del catalogo' },
   { href: '/dashboard/proveedores', label: 'Proveedores', icon: Building2, helper: 'Contactos de compra' },
   { href: '/dashboard/ventas', label: 'Ventas', icon: ShoppingCart, helper: 'Salidas comerciales' },
   { href: '/dashboard/autorizaciones', label: 'Autorizaciones', icon: ShieldCheck, helper: 'Aprobaciones pendientes' },
@@ -66,9 +68,7 @@ export function AdminSidebar() {
             item.href === '/dashboard/servicios' ||
             item.href === '/dashboard/inventario'
         )
-      : role === 'courier'
-        ? navigation.filter((item) => item.href === '/dashboard')
-        : navigation;
+      : navigation;
 
   useEffect(() => {
     if (isMobile) {

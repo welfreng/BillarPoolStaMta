@@ -1,7 +1,7 @@
 export type ProductStatus = 'active' | 'draft' | 'archived';
 export type StockAlert = 'healthy' | 'out';
 export type PresentationKind = 'unit' | 'dozen' | 'box-12';
-export type UserRole = 'admin' | 'sales' | 'courier';
+export type UserRole = 'admin' | 'sales';
 export type MovementType = 'entry' | 'exit' | 'adjustment' | 'purchase';
 export type ProductSaleMode = 'simple' | 'varianted';
 export type VariantStatus = 'active' | 'inactive';
@@ -20,6 +20,27 @@ export interface CategoryOption {
   id: string;
   label: string;
   subcategories: string[];
+}
+
+export type ProductCategoryStatus = 'active' | 'inactive';
+
+export interface ProductSubcategory {
+  id: string;
+  label: string;
+  status: ProductCategoryStatus;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProductCategoryRecord {
+  id: string;
+  label: string;
+  status: ProductCategoryStatus;
+  sortOrder: number;
+  subcategories: ProductSubcategory[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ProductVariantAttributeDefinition {
@@ -41,7 +62,6 @@ export interface Product {
   variantAttributes?: ProductVariantAttributeDefinition[];
   variants?: ProductVariant[];
   featured: boolean;
-  availableForDelivery?: boolean;
   publicStock: number;
   image: string;
   imageRotation: number;
@@ -100,7 +120,6 @@ export interface InventoryMovement {
   purchaseBatchId?: string;
   saleId?: string;
   serviceOrderId?: string;
-  deliveryOrderId?: string;
   type: MovementType;
   reason: MovementReason;
   quantity: number;
@@ -252,49 +271,6 @@ export interface ServiceOrder {
   materials: ServiceMaterialItem[];
   notes: string;
   responsibleUser: string;
-}
-
-export type DeliveryOrderStatus =
-  | 'pending'
-  | 'assigned'
-  | 'en-route'
-  | 'delivered'
-  | 'closed'
-  | 'cancelled';
-
-export type DeliveryPaymentMethod = 'cash' | 'transfer' | 'pending';
-
-export interface DeliveryOrderItem {
-  productId: string;
-  quantity: number;
-  unitPrice: number;
-  totalPrice: number;
-}
-
-export interface DeliveryOrder {
-  id: string;
-  establishmentName: string;
-  customerName: string;
-  customerPhone: string;
-  city: string;
-  customerAddress: string;
-  neighborhood: string;
-  deliveryZoneId: string;
-  deliveryZoneLabel: string;
-  addressReference: string;
-  paymentMethod: DeliveryPaymentMethod;
-  paymentSupportNote: string;
-  items: DeliveryOrderItem[];
-  productsTotal: number;
-  deliveryFee: number;
-  totalToCharge: number;
-  status: DeliveryOrderStatus;
-  courierId?: string;
-  courierName?: string;
-  stockDiscounted?: boolean;
-  notes: string;
-  createdAt: string;
-  updatedAt: string;
 }
 
 export interface DashboardMetric {

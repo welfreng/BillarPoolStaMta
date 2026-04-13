@@ -9,6 +9,10 @@ import { CatalogImageDialog } from '@/components/admin/products/catalog-image-di
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useAdminData } from '@/components/admin/admin-data-context';
+import {
+  getFriendlyFirestoreWriteErrorMessage,
+  runFirestoreWriteWithBackoff,
+} from '@/lib/firestore-write-retry';
 import { db } from '@/lib/firebase';
 import { optimizeImageFile } from '@/lib/image-upload';
 
@@ -20,9 +24,11 @@ async function loadFileAsDataUrl(
   if (!file) return;
 
   const optimizedImage = await optimizeImageFile(file, {
-    maxWidth: 1400,
-    maxHeight: 1400,
-    quality: 0.82,
+    maxWidth: 960,
+    maxHeight: 960,
+    quality: 0.74,
+    minQuality: 0.52,
+    maxBytes: 170 * 1024,
   });
   onLoaded(optimizedImage.dataUrl);
   event.target.value = '';
@@ -64,13 +70,15 @@ export default function WebPageManagementPage() {
   const handleSaveServiceImages = async () => {
     setSavingServices(true);
     try {
-      await setDoc(
-        doc(db, 'siteAssets', 'services-gallery'),
-        {
-          images: draftServiceImages.filter(Boolean).slice(0, 3),
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true }
+      await runFirestoreWriteWithBackoff(() =>
+        setDoc(
+          doc(db, 'siteAssets', 'services-gallery'),
+          {
+            images: draftServiceImages.filter(Boolean).slice(0, 3),
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        )
       );
       toast({
         title: 'Galeria de servicios actualizada',
@@ -80,8 +88,10 @@ export default function WebPageManagementPage() {
       console.error('Error guardando galeria de servicios:', error);
       toast({
         title: 'No se pudo guardar la galeria',
-        description:
-          'Revisa el tamano de las fotos o intenta subirlas otra vez. Ahora la carga se optimiza para movil.',
+        description: getFriendlyFirestoreWriteErrorMessage(
+          error,
+          'Revisa el tamano de las fotos o intenta subirlas otra vez. Ahora la carga se optimiza para movil.'
+        ),
         variant: 'destructive',
       });
     } finally {
@@ -95,7 +105,20 @@ export default function WebPageManagementPage() {
       const updatedProducts = await syncPublicProductStocks();
       toast({
         title: 'Stock web sincronizado',
-        description: `La tienda virtual ya quedo actualizada. Productos sincronizados: ${updatedProducts}.`,
+        description:
+          updatedProducts > 0
+            ? `La tienda virtual ya quedo actualizada. Productos sincronizados: ${updatedProducts}.`
+            : 'No habia cambios pendientes por sincronizar en el stock publico.',
+      });
+    } catch (error) {
+      console.error('Error sincronizando stock publico:', error);
+      toast({
+        title: 'No se pudo sincronizar el stock web',
+        description: getFriendlyFirestoreWriteErrorMessage(
+          error,
+          'Intenta nuevamente en unos segundos. Si acabas de hacer muchos cambios, espera un momento antes de reintentar.'
+        ),
+        variant: 'destructive',
       });
     } finally {
       setSyncingPublicStock(false);

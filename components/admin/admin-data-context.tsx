@@ -36,6 +36,8 @@ import {
 import { initialMovements, initialProducts, initialPurchases, initialSales, initialServices, initialSuppliers } from '@/lib/admin/mock-data';
 import { db } from '@/lib/firebase';
 import { SITE_LOGO } from '@/lib/branding';
+import { matchesProductCategoryFamily } from '@/lib/admin/category-rules';
+import { slugifyCategoryKey } from '@/lib/admin/category-utils';
 import {
   buildVariantAttributeValues,
   getProductSaleMode,
@@ -49,6 +51,7 @@ import {
   getAllowedSaleGiftCategories,
   getSaleGiftCategoryKey,
 } from '@/lib/admin/sale-gift-rules';
+import { runFirestoreWriteWithBackoff } from '@/lib/firestore-write-retry';
 import type { SaleServiceItem } from '@/lib/admin/types';
 import type {
   AuthorizationRequest,
@@ -59,8 +62,11 @@ import type {
   MovementReason,
   MovementType,
   Product,
+  ProductCategoryRecord,
+  ProductCategoryStatus,
   ProductVariant,
   ProductVariantAttributeDefinition,
+  ProductSubcategory,
   Purchase,
   Sale,
   SaleGiftItem,
@@ -77,6 +83,20 @@ type ProductMutationInput = Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'pu
 };
 type NewProductInput = ProductMutationInput;
 type NewSupplierInput = Omit<Supplier, 'id' | 'createdAt' | 'updatedAt'>;
+type NewCategoryInput = {
+  label: string;
+};
+type UpdateCategoryInput = {
+  label: string;
+  status: ProductCategoryStatus;
+};
+type NewSubcategoryInput = {
+  label: string;
+};
+type UpdateSubcategoryInput = {
+  label: string;
+  status: ProductCategoryStatus;
+};
 
 interface RegisterMovementInput {
   productId: string;
@@ -198,8 +218,59 @@ interface CompleteAuthorizationRequestInput {
   completedBy: string;
 }
 
+type OperationalResetCollectionKey =
+  | 'products'
+  | 'product_variants'
+  | 'suppliers'
+  | 'movements'
+  | 'inventory_movements'
+  | 'purchases'
+  | 'purchase_items'
+  | 'sales'
+  | 'services'
+  | 'authorization-requests'
+  | 'admin-notifications';
+
+interface OperationalResetOptions {
+  deleteProducts: boolean;
+  deleteSuppliers: boolean;
+  deleteAuthorizationRequests: boolean;
+  deleteAdminNotifications: boolean;
+}
+
+interface OperationalResetSummary {
+  generatedAt: string;
+  counts: Record<OperationalResetCollectionKey, number>;
+  collectionsToDelete: Array<{
+    key: OperationalResetCollectionKey;
+    label: string;
+    count: number;
+    classification: 'delete' | 'archive' | 'preserve';
+  }>;
+  collectionsToPreserve: Array<{
+    key: string;
+    label: string;
+    reason: string;
+  }>;
+  backupRecommendations: string[];
+  warnings: string[];
+}
+
+interface OperationalResetSnapshot {
+  exportedAt: string;
+  summary: OperationalResetSummary;
+  options: OperationalResetOptions;
+  data: Partial<Record<OperationalResetCollectionKey, unknown[]>>;
+}
+
+interface OperationalResetResult {
+  executedAt: string;
+  deletedCounts: Partial<Record<OperationalResetCollectionKey, number>>;
+}
+
 interface AdminDataContextValue {
   loading: boolean;
+  categories: ProductCategoryRecord[];
   products: Product[];
   suppliers: Supplier[];
   movements: InventoryMovement[];
@@ -209,7 +280,22 @@ interface AdminDataContextValue {
   authorizationRequests: AuthorizationRequest[];
   summary: DashboardSummary;
   latestMovements: InventoryMovement[];
+  getOperationalResetSummary: (options?: Partial<OperationalResetOptions>) => OperationalResetSummary;
+  exportOperationalResetSnapshot: (
+    options?: Partial<OperationalResetOptions>
+  ) => Promise<OperationalResetSnapshot>;
+  runOperationalReset: (options?: Partial<OperationalResetOptions>) => Promise<OperationalResetResult>;
   syncPublicProductStocks: () => Promise<number>;
+  createCategory: (input: NewCategoryInput) => Promise<ProductCategoryRecord>;
+  updateCategory: (categoryId: string, input: UpdateCategoryInput) => Promise<ProductCategoryRecord>;
+  deleteCategory: (categoryId: string) => Promise<void>;
+  createSubcategory: (categoryId: string, input: NewSubcategoryInput) => Promise<ProductCategoryRecord>;
+  updateSubcategory: (
+    categoryId: string,
+    subcategoryId: string,
+    input: UpdateSubcategoryInput
+  ) => Promise<ProductCategoryRecord>;
+  deleteSubcategory: (categoryId: string, subcategoryId: string) => Promise<void>;
   createProduct: (input: ProductMutationInput) => Promise<Product>;
   updateProduct: (productId: string, input: ProductMutationInput) => Promise<Product>;
   deleteProduct: (productId: string) => Promise<void>;
@@ -245,6 +331,36 @@ function generateId(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+const defaultOperationalResetOptions: OperationalResetOptions = {
+  deleteProducts: true,
+  deleteSuppliers: false,
+  deleteAuthorizationRequests: true,
+  deleteAdminNotifications: true,
+};
+
+const operationalResetCollectionLabels: Record<OperationalResetCollectionKey, string> = {
+  products: 'Productos',
+  product_variants: 'Variantes de producto',
+  suppliers: 'Proveedores',
+  movements: 'Movimientos de inventario',
+  inventory_movements: 'Movimientos espejo de inventario',
+  purchases: 'Compras',
+  purchase_items: 'Items espejo de compras',
+  sales: 'Ventas',
+  services: 'Servicios',
+  'authorization-requests': 'Solicitudes de autorizacion',
+  'admin-notifications': 'Notificaciones administrativas',
+};
+
+function resolveOperationalResetOptions(
+  options?: Partial<OperationalResetOptions>
+): OperationalResetOptions {
+  return {
+    ...defaultOperationalResetOptions,
+    ...options,
+  };
+}
+
 function targetProductName(products: Product[], productId: string) {
   return products.find((product) => product.id === productId)?.name ?? 'producto';
 }
@@ -261,7 +377,7 @@ function buildSaleGiftItems(
     return giftItems;
   }
 
-  if (targetProduct.category !== 'tacos') {
+  if (!matchesProductCategoryFamily(targetProduct, 'tacos')) {
     throw new Error(`Solo los tacos de billar pueden llevar obsequio. Revisa ${targetProduct.name}.`);
   }
 
@@ -384,7 +500,6 @@ function mapProductDocument(documentId: string, data: DocumentData): Product {
     variantAttributes,
     variants: normalizedVariants,
     featured: Boolean(data.featured ?? false),
-    availableForDelivery: Boolean(data.availableForDelivery ?? false),
     publicStock: Number(data.publicStock ?? 0),
     image: String(data.image ?? SITE_LOGO),
     imageRotation: Number(data.imageRotation ?? 0),
@@ -450,7 +565,6 @@ function mapMovementDocument(documentId: string, data: DocumentData): InventoryM
     purchaseBatchId: data.purchaseBatchId ? String(data.purchaseBatchId) : undefined,
     saleId: data.saleId ? String(data.saleId) : undefined,
     serviceOrderId: data.serviceOrderId ? String(data.serviceOrderId) : undefined,
-    deliveryOrderId: data.deliveryOrderId ? String(data.deliveryOrderId) : undefined,
     type:
       data.type === 'entry' || data.type === 'exit' || data.type === 'adjustment' || data.type === 'purchase'
         ? data.type
@@ -652,16 +766,38 @@ function mapAuthorizationRequestDocument(documentId: string, data: DocumentData)
     saleSummary: String(data.saleSummary ?? ''),
     reason: String(data.reason ?? ''),
     requestedBy: String(data.requestedBy ?? 'Usuario de ventas'),
-    requestedByRole:
-      data.requestedByRole === 'sales' || data.requestedByRole === 'courier'
-        ? data.requestedByRole
-        : 'admin',
+    requestedByRole: data.requestedByRole === 'sales' ? 'sales' : 'admin',
     reviewedBy: String(data.reviewedBy ?? ''),
     reviewNote: String(data.reviewNote ?? ''),
     createdAt: normalizeDateValue(data.createdAt),
     updatedAt: normalizeDateValue(data.updatedAt),
     reviewedAt: data.reviewedAt ? normalizeDateValue(data.reviewedAt) : undefined,
     completedAt: data.completedAt ? normalizeDateValue(data.completedAt) : undefined,
+  };
+}
+
+function mapProductCategoryDocument(documentId: string, data: DocumentData): ProductCategoryRecord {
+  const subcategories: ProductSubcategory[] = Array.isArray(data.subcategories)
+    ? data.subcategories
+        .map((item, index) => ({
+          id: String(item?.id ?? `subcategory-${index + 1}`),
+          label: String(item?.label ?? ''),
+          status: (item?.status === 'inactive' ? 'inactive' : 'active') as ProductCategoryStatus,
+          sortOrder: Number(item?.sortOrder ?? index),
+          createdAt: normalizeDateValue(item?.createdAt),
+          updatedAt: normalizeDateValue(item?.updatedAt),
+        }))
+        .filter((item) => item.label)
+    : [];
+
+  return {
+    id: documentId,
+    label: String(data.label ?? documentId),
+    status: (data.status === 'inactive' ? 'inactive' : 'active') as ProductCategoryStatus,
+    sortOrder: Number(data.sortOrder ?? 0),
+    subcategories,
+    createdAt: normalizeDateValue(data.createdAt),
+    updatedAt: normalizeDateValue(data.updatedAt),
   };
 }
 
@@ -710,6 +846,24 @@ function countProductHistoryRecords(
     servicesCount,
     hasActivity: purchasesCount + movementsCount + salesCount + servicesCount > 0,
   };
+}
+
+async function deleteDocumentIdsInChunks(collectionName: string, documentIds: string[], chunkSize = 400) {
+  const normalizedIds = Array.from(new Set(documentIds.filter(Boolean)));
+  if (normalizedIds.length === 0) return 0;
+
+  let deletedCount = 0;
+  for (let index = 0; index < normalizedIds.length; index += chunkSize) {
+    const batch = writeBatch(db);
+    const chunk = normalizedIds.slice(index, index + chunkSize);
+    chunk.forEach((documentId) => {
+      batch.delete(doc(db, collectionName, documentId));
+    });
+    await batch.commit();
+    deletedCount += chunk.length;
+  }
+
+  return deletedCount;
 }
 
 function normalizeComparableVariantDefinitions(definitions: ProductVariantAttributeDefinition[] = []) {
@@ -801,7 +955,7 @@ function canAutoMigrateLegacyVirolaHistory(
   existingProduct: Product,
   nextProduct: Product
 ) {
-  if (existingProduct.category !== 'virolas') return false;
+  if (!matchesProductCategoryFamily(existingProduct, 'virolas')) return false;
   if (getProductSaleMode(nextProduct) !== 'varianted') return false;
 
   const nextDefinitions = normalizeVariantAttributeDefinitions(nextProduct.variantAttributes ?? []);
@@ -851,7 +1005,6 @@ function buildProductWritePayload(
     variantAttributes: options.variantAttributes,
     variants: serializedVariants,
     featured: Boolean(input.featured ?? false),
-    availableForDelivery: Boolean(input.availableForDelivery ?? false),
     image: String(input.image ?? SITE_LOGO),
     imageRotation: Number(input.imageRotation ?? 0),
     status:
@@ -866,6 +1019,7 @@ function buildProductWritePayload(
 
 export function AdminDataProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
+  const [categories, setCategories] = useState<ProductCategoryRecord[]>([]);
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [productVariants, setProductVariants] = useState<ProductVariant[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>(initialSuppliers);
@@ -899,10 +1053,26 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     const readyCollections = new Set<string>();
     const markReady = (collectionName: string) => {
       readyCollections.add(collectionName);
-      if (readyCollections.size === 8) {
+      if (readyCollections.size === 9) {
         setLoading(false);
       }
     };
+
+    const unsubCategories = onSnapshot(
+      collection(db, 'product_categories'),
+      (snapshot) => {
+        setCategories(
+          snapshot.docs
+            .map((item) => mapProductCategoryDocument(item.id, item.data()))
+            .sort((left, right) => left.sortOrder - right.sortOrder || left.label.localeCompare(right.label, 'es'))
+        );
+        markReady('product_categories');
+      },
+      (error) => {
+        console.error('Error leyendo categorias desde Firestore:', error);
+        markReady('product_categories');
+      }
+    );
 
     const unsubProducts = onSnapshot(
       query(collection(db, 'products'), orderBy('createdAt', 'desc')),
@@ -1030,6 +1200,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     );
 
     return () => {
+      unsubCategories();
       unsubProducts();
       unsubProductVariants();
       unsubSuppliers();
@@ -1173,13 +1344,423 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const getOperationalResetSummary = (
+    options?: Partial<OperationalResetOptions>
+  ): OperationalResetSummary => {
+    const resolvedOptions = resolveOperationalResetOptions(options);
+    const counts: Record<OperationalResetCollectionKey, number> = {
+      products: resolvedOptions.deleteProducts ? products.length : 0,
+      product_variants: resolvedOptions.deleteProducts ? productVariants.length : 0,
+      suppliers: resolvedOptions.deleteSuppliers ? suppliers.length : 0,
+      movements: movements.length,
+      inventory_movements: movements.length,
+      purchases: purchases.length,
+      purchase_items: purchases.length,
+      sales: sales.length,
+      services: services.length,
+      'authorization-requests': resolvedOptions.deleteAuthorizationRequests ? authorizationRequests.length : 0,
+      'admin-notifications': 0,
+    };
+
+    return {
+      generatedAt: new Date().toISOString(),
+      counts,
+      collectionsToDelete: [
+        {
+          key: 'products',
+          label: operationalResetCollectionLabels.products,
+          count: counts.products,
+          classification: resolvedOptions.deleteProducts ? 'delete' : 'preserve',
+        },
+        {
+          key: 'product_variants',
+          label: operationalResetCollectionLabels.product_variants,
+          count: counts.product_variants,
+          classification: resolvedOptions.deleteProducts ? 'delete' : 'preserve',
+        },
+        {
+          key: 'purchases',
+          label: operationalResetCollectionLabels.purchases,
+          count: counts.purchases,
+          classification: 'delete',
+        },
+        {
+          key: 'purchase_items',
+          label: operationalResetCollectionLabels.purchase_items,
+          count: counts.purchase_items,
+          classification: 'delete',
+        },
+        {
+          key: 'movements',
+          label: operationalResetCollectionLabels.movements,
+          count: counts.movements,
+          classification: 'delete',
+        },
+        {
+          key: 'inventory_movements',
+          label: operationalResetCollectionLabels.inventory_movements,
+          count: counts.inventory_movements,
+          classification: 'delete',
+        },
+        {
+          key: 'sales',
+          label: operationalResetCollectionLabels.sales,
+          count: counts.sales,
+          classification: 'delete',
+        },
+        {
+          key: 'services',
+          label: operationalResetCollectionLabels.services,
+          count: counts.services,
+          classification: 'delete',
+        },
+        {
+          key: 'suppliers',
+          label: operationalResetCollectionLabels.suppliers,
+          count: counts.suppliers,
+          classification: resolvedOptions.deleteSuppliers ? 'archive' : 'preserve',
+        },
+        {
+          key: 'authorization-requests',
+          label: operationalResetCollectionLabels['authorization-requests'],
+          count: counts['authorization-requests'],
+          classification: resolvedOptions.deleteAuthorizationRequests ? 'archive' : 'preserve',
+        },
+        {
+          key: 'admin-notifications',
+          label: operationalResetCollectionLabels['admin-notifications'],
+          count: counts['admin-notifications'],
+          classification: resolvedOptions.deleteAdminNotifications ? 'archive' : 'preserve',
+        },
+      ],
+      collectionsToPreserve: [
+        {
+          key: 'usuarios',
+          label: 'Usuarios y roles',
+          reason: 'Controlan acceso, permisos y reglas de Firestore.',
+        },
+        {
+          key: 'siteAssets',
+          label: 'Assets y configuracion web',
+          reason: 'Mantienen imagenes del catalogo y contenido publico del sitio.',
+        },
+      ],
+      backupRecommendations: [
+        'Descargar un snapshot JSON antes del reset para conservar el estado previo.',
+        'Si quieres auditoria historica adicional, exportar tambien la base desde Firebase antes de limpiar.',
+        'Si vas a limpiar proveedores, respalda sus contactos porque no se reconstruyen desde otras colecciones.',
+      ],
+      warnings: [
+        'Las categorias y subcategorias no tienen coleccion propia: el ajuste real se hace sobre productos y variantes.',
+        'Compras, ventas, servicios y movimientos comparten referencias por productId, saleId, purchaseId y serviceOrderId.',
+        'purchase_items e inventory_movements son colecciones espejo y deben limpiarse junto con su coleccion principal.',
+      ],
+    };
+  };
+
+  const exportOperationalResetSnapshot = async (
+    options?: Partial<OperationalResetOptions>
+  ): Promise<OperationalResetSnapshot> => {
+    const resolvedOptions = resolveOperationalResetOptions(options);
+    const adminNotificationsSnapshot = resolvedOptions.deleteAdminNotifications
+      ? await getDocs(collection(db, 'admin-notifications'))
+      : null;
+
+    return {
+      exportedAt: new Date().toISOString(),
+      summary: getOperationalResetSummary(resolvedOptions),
+      options: resolvedOptions,
+      data: {
+        ...(resolvedOptions.deleteProducts ? { products, product_variants: productVariants } : {}),
+        ...(resolvedOptions.deleteSuppliers ? { suppliers } : {}),
+        movements,
+        inventory_movements: movements,
+        purchases,
+        purchase_items: purchases,
+        sales,
+        services,
+        ...(resolvedOptions.deleteAuthorizationRequests
+          ? { 'authorization-requests': authorizationRequests }
+          : {}),
+        ...(resolvedOptions.deleteAdminNotifications && adminNotificationsSnapshot
+          ? {
+              'admin-notifications': adminNotificationsSnapshot.docs.map((item) => ({
+                id: item.id,
+                ...item.data(),
+              })),
+            }
+          : {}),
+      },
+    };
+  };
+
+  const runOperationalReset = async (
+    options?: Partial<OperationalResetOptions>
+  ): Promise<OperationalResetResult> => {
+    const resolvedOptions = resolveOperationalResetOptions(options);
+    const deletedCounts: Partial<Record<OperationalResetCollectionKey, number>> = {};
+
+    const purchaseItemsSnapshot = await getDocs(collection(db, 'purchase_items'));
+    const inventoryMovementsSnapshot = await getDocs(collection(db, 'inventory_movements'));
+    const adminNotificationsSnapshot = resolvedOptions.deleteAdminNotifications
+      ? await getDocs(collection(db, 'admin-notifications'))
+      : null;
+
+    deletedCounts.purchases = await deleteDocumentIdsInChunks('purchases', purchases.map((item) => item.id));
+    deletedCounts.purchase_items = await deleteDocumentIdsInChunks(
+      'purchase_items',
+      purchaseItemsSnapshot.docs.map((item) => item.id)
+    );
+    deletedCounts.sales = await deleteDocumentIdsInChunks('sales', sales.map((item) => item.id));
+    deletedCounts.services = await deleteDocumentIdsInChunks('services', services.map((item) => item.id));
+    deletedCounts.movements = await deleteDocumentIdsInChunks('movements', movements.map((item) => item.id));
+    deletedCounts.inventory_movements = await deleteDocumentIdsInChunks(
+      'inventory_movements',
+      inventoryMovementsSnapshot.docs.map((item) => item.id)
+    );
+
+    if (resolvedOptions.deleteProducts) {
+      deletedCounts.product_variants = await deleteDocumentIdsInChunks(
+        'product_variants',
+        productVariants.map((item) => item.id)
+      );
+      deletedCounts.products = await deleteDocumentIdsInChunks('products', products.map((item) => item.id));
+    }
+
+    if (resolvedOptions.deleteSuppliers) {
+      deletedCounts.suppliers = await deleteDocumentIdsInChunks('suppliers', suppliers.map((item) => item.id));
+    }
+
+    if (resolvedOptions.deleteAuthorizationRequests) {
+      deletedCounts['authorization-requests'] = await deleteDocumentIdsInChunks(
+        'authorization-requests',
+        authorizationRequests.map((item) => item.id)
+      );
+    }
+
+    if (resolvedOptions.deleteAdminNotifications && adminNotificationsSnapshot) {
+      deletedCounts['admin-notifications'] = await deleteDocumentIdsInChunks(
+        'admin-notifications',
+        adminNotificationsSnapshot.docs.map((item) => item.id)
+      );
+    }
+
+    return {
+      executedAt: new Date().toISOString(),
+      deletedCounts,
+    };
+  };
+
+  const createCategory = async (input: NewCategoryInput) => {
+    const label = input.label.trim();
+    if (!label) {
+      throw new Error('Ingresa el nombre de la categoria.');
+    }
+
+    const categoryId = slugifyCategoryKey(label);
+    if (!categoryId) {
+      throw new Error('No se pudo generar un identificador valido para la categoria.');
+    }
+    if (categories.some((category) => category.id === categoryId)) {
+      throw new Error('Esa categoria ya existe. Puedes usar la que ya esta creada o escribir otro nombre.');
+    }
+
+    const sortOrder = categories.length;
+    const categoryRef = doc(db, 'product_categories', categoryId);
+    await setDoc(categoryRef, {
+      label,
+      status: 'active',
+      sortOrder,
+      subcategories: [],
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    return {
+      id: categoryId,
+      label,
+      status: 'active' as ProductCategoryStatus,
+      sortOrder,
+      subcategories: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+  };
+
+  const updateCategory = async (categoryId: string, input: UpdateCategoryInput) => {
+    const existingCategory = categories.find((category) => category.id === categoryId);
+    if (!existingCategory) {
+      throw new Error('No se encontro la categoria a actualizar.');
+    }
+
+    const label = input.label.trim();
+    if (!label) {
+      throw new Error('Ingresa el nombre de la categoria.');
+    }
+
+    await updateDoc(doc(db, 'product_categories', categoryId), {
+      label,
+      status: input.status === 'inactive' ? 'inactive' : 'active',
+      updatedAt: serverTimestamp(),
+    });
+
+    return {
+      ...existingCategory,
+      label,
+      status: (input.status === 'inactive' ? 'inactive' : 'active') as ProductCategoryStatus,
+      updatedAt: new Date().toISOString(),
+    };
+  };
+
+  const deleteCategory = async (categoryId: string) => {
+    if (products.some((product) => product.category === categoryId)) {
+      throw new Error('No puedes eliminar una categoria que ya esta en uso por productos.');
+    }
+
+    await deleteDoc(doc(db, 'product_categories', categoryId));
+  };
+
+  const createSubcategory = async (categoryId: string, input: NewSubcategoryInput) => {
+    const existingCategory = categories.find((category) => category.id === categoryId);
+    if (!existingCategory) {
+      throw new Error('Selecciona primero una categoria valida.');
+    }
+
+    const label = input.label.trim();
+    if (!label) {
+      throw new Error('Ingresa el nombre de la subcategoria.');
+    }
+    const subcategoryId = slugifyCategoryKey(label);
+    if (!subcategoryId) {
+      throw new Error('No se pudo generar un identificador valido para la subcategoria.');
+    }
+    if (existingCategory.subcategories.some((subcategory) => subcategory.id === subcategoryId)) {
+      throw new Error('Ya existe una subcategoria con ese nombre dentro de esta categoria.');
+    }
+
+    const nextSubcategories = [
+      ...existingCategory.subcategories,
+      {
+        id: subcategoryId,
+        label,
+        status: 'active' as ProductCategoryStatus,
+        sortOrder: existingCategory.subcategories.length,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ];
+
+    await updateDoc(doc(db, 'product_categories', categoryId), {
+      subcategories: nextSubcategories,
+      updatedAt: serverTimestamp(),
+    });
+
+    return {
+      ...existingCategory,
+      subcategories: nextSubcategories,
+      updatedAt: new Date().toISOString(),
+    };
+  };
+
+  const updateSubcategory = async (
+    categoryId: string,
+    subcategoryId: string,
+    input: UpdateSubcategoryInput
+  ) => {
+    const existingCategory = categories.find((category) => category.id === categoryId);
+    if (!existingCategory) {
+      throw new Error('No se encontro la categoria de la subcategoria.');
+    }
+
+    const existingSubcategory = existingCategory.subcategories.find((subcategory) => subcategory.id === subcategoryId);
+    if (!existingSubcategory) {
+      throw new Error('No se encontro la subcategoria a actualizar.');
+    }
+
+    const label = input.label.trim();
+    if (!label) {
+      throw new Error('Ingresa el nombre de la subcategoria.');
+    }
+
+    const nextSubcategories = existingCategory.subcategories.map((subcategory) =>
+      subcategory.id === subcategoryId
+        ? {
+            ...subcategory,
+            label,
+            status: (input.status === 'inactive' ? 'inactive' : 'active') as ProductCategoryStatus,
+            updatedAt: new Date().toISOString(),
+          }
+        : subcategory
+    );
+
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'product_categories', categoryId), {
+      subcategories: nextSubcategories,
+      updatedAt: serverTimestamp(),
+    });
+
+    if (existingSubcategory.label !== label) {
+      products
+        .filter((product) => product.category === categoryId && product.subcategory === existingSubcategory.label)
+        .forEach((product) => {
+          batch.set(
+            doc(db, 'products', product.id),
+            {
+              subcategory: label,
+              updatedAt: serverTimestamp(),
+            },
+            { merge: true }
+          );
+        });
+    }
+
+    await batch.commit();
+
+    return {
+      ...existingCategory,
+      subcategories: nextSubcategories,
+      updatedAt: new Date().toISOString(),
+    };
+  };
+
+  const deleteSubcategory = async (categoryId: string, subcategoryId: string) => {
+    const existingCategory = categories.find((category) => category.id === categoryId);
+    if (!existingCategory) {
+      throw new Error('No se encontro la categoria de la subcategoria.');
+    }
+
+    const existingSubcategory = existingCategory.subcategories.find((subcategory) => subcategory.id === subcategoryId);
+    if (!existingSubcategory) {
+      throw new Error('No se encontro la subcategoria a eliminar.');
+    }
+
+    if (
+      products.some(
+        (product) => product.category === categoryId && product.subcategory === existingSubcategory.label
+      )
+    ) {
+      throw new Error('No puedes eliminar una subcategoria que ya esta en uso por productos.');
+    }
+
+    await updateDoc(doc(db, 'product_categories', categoryId), {
+      subcategories: existingCategory.subcategories.filter((subcategory) => subcategory.id !== subcategoryId),
+      updatedAt: serverTimestamp(),
+    });
+  };
+
   const syncPublicProductStocks = async () => {
     const batch = writeBatch(db);
+    let changedCount = 0;
     products.forEach((product) => {
       const publicStock =
         getProductSaleMode(product) === 'varianted'
           ? (product.variants ?? []).reduce((total, variant) => total + Math.max(Number(variant.stock ?? 0), 0), 0)
           : getProductStock(movements, product.id);
+      const currentPublicStock = Math.max(Number(product.publicStock ?? 0), 0);
+      if (publicStock === currentPublicStock) {
+        return;
+      }
+
       batch.set(
         doc(db, 'products', product.id),
         {
@@ -1188,9 +1769,18 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         },
         { merge: true }
       );
+      changedCount += 1;
     });
-    await batch.commit();
-    return products.length;
+
+    if (changedCount === 0) {
+      return 0;
+    }
+
+    await runFirestoreWriteWithBackoff(() => batch.commit(), {
+      retries: 5,
+      initialDelayMs: 700,
+    });
+    return changedCount;
   };
 
   const createProduct = async (input: NewProductInput) => {
@@ -2878,6 +3468,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     <AdminDataContext.Provider
       value={{
         loading,
+        categories,
         products,
         suppliers,
         movements,
@@ -2887,7 +3478,16 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         authorizationRequests,
         summary,
         latestMovements,
+        getOperationalResetSummary,
+        exportOperationalResetSnapshot,
+        runOperationalReset,
         syncPublicProductStocks,
+        createCategory,
+        updateCategory,
+        deleteCategory,
+        createSubcategory,
+        updateSubcategory,
+        deleteSubcategory,
         createProduct,
         updateProduct,
         deleteProduct,

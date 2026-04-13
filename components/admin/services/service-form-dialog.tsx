@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { formatCurrency, formatNumber, getProductRealUnitCost, getProductStock } from '@/lib/admin/calculations';
+import { filterProductsByCategoryFamily } from '@/lib/admin/category-rules';
 import { serviceTypeLabels } from '@/lib/admin/catalogs';
 import type { InventoryMovement, Product, Purchase, ServiceType } from '@/lib/admin/types';
 
@@ -114,11 +115,11 @@ export function ServiceFormDialog({
   }, [form, open]);
 
   const values = form.watch();
-  const tipOptions = useMemo(() => products.filter((item) => item.status === 'active' && item.category === 'casquillos-o-suelas'), [products]);
-  const ferruleOptions = useMemo(() => products.filter((item) => item.status === 'active' && item.category === 'virolas'), [products]);
-  const suppressorOptions = useMemo(() => products.filter((item) => item.status === 'active' && item.category === 'supresores'), [products]);
-  const extensionOptions = useMemo(() => products.filter((item) => item.status === 'active' && item.category === 'extensiones'), [products]);
-  const bumperOptions = useMemo(() => products.filter((item) => item.status === 'active' && item.category === 'cauchos-para-tacos'), [products]);
+  const tipOptions = useMemo(() => filterProductsByCategoryFamily(products, 'casquillos'), [products]);
+  const ferruleOptions = useMemo(() => filterProductsByCategoryFamily(products, 'virolas'), [products]);
+  const suppressorOptions = useMemo(() => filterProductsByCategoryFamily(products, 'supresores'), [products]);
+  const extensionOptions = useMemo(() => filterProductsByCategoryFamily(products, 'extensiones'), [products]);
+  const bumperOptions = useMemo(() => filterProductsByCategoryFamily(products, 'parachoques'), [products]);
 
   const selectedMaterials = [
     values.tipProductId,

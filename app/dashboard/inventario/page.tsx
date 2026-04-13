@@ -16,7 +16,8 @@ import { SaleFormDialog, type SaleFormValues } from '@/components/admin/sales/sa
 import { SaleDetailsDialog } from '@/components/admin/sales/sale-details-dialog';
 import { useAdminData } from '@/components/admin/admin-data-context';
 import { useAuth } from '@/components/auth-context';
-import { inventoryCategories, movementReasonLabels, movementTypeLabels } from '@/lib/admin/catalogs';
+import { movementReasonLabels, movementTypeLabels } from '@/lib/admin/catalogs';
+import { toCategoryOptions } from '@/lib/admin/category-utils';
 import {
   formatCurrency,
   formatDateTime,
@@ -26,11 +27,13 @@ import {
   getProductStock,
   getStockAlert,
   getStockAlertLabel,
+  getVariantOrProductRealUnitCost,
 } from '@/lib/admin/calculations';
 import { useToast } from '@/hooks/use-toast';
+import type { StockAlert } from '@/lib/admin/types';
 
 export default function InventarioPage() {
-  const { movements, products, purchases, sales, services, registerMovement, registerInitialStock, registerSale } = useAdminData();
+  const { categories, movements, products, purchases, sales, services, registerMovement, registerInitialStock, registerSale } = useAdminData();
   const { role, profile, user } = useAuth();
   const { toast } = useToast();
   const [openDialog, setOpenDialog] = useState(false);
@@ -43,6 +46,7 @@ export default function InventarioPage() {
   const [productId, setProductId] = useState('all');
   const [category, setCategory] = useState('all');
   const [adminTab, setAdminTab] = useState<'movements' | 'stock'>('movements');
+  const categoryOptions = useMemo(() => toCategoryOptions(categories), [categories]);
   const isSalesUser = role === 'sales';
   const selectedSale = selectedSaleId ? sales.find((sale) => sale.id === selectedSaleId) ?? null : null;
   const selectedProductForSale = selectedProductForSaleId
@@ -87,10 +91,29 @@ export default function InventarioPage() {
       };
     });
   }, [filteredProducts, movements, purchases]);
+  const variantInventorySummary = useMemo(() => {
+    return filteredProducts.flatMap((product) =>
+      (product.variants ?? []).map((variant) => {
+        const stock = Math.max(Number(variant.stock ?? 0), 0);
+        const unitCost = getVariantOrProductRealUnitCost(purchases, product.id, variant.id);
+        return {
+          product,
+          variant,
+          stock,
+          unitCost,
+          inventoryValue: stock * unitCost,
+          alert: (stock <= 0 ? 'out' : 'healthy') as StockAlert,
+        };
+      })
+    );
+  }, [filteredProducts, purchases]);
 
   const totalInventoryUnits = inventorySummary.reduce((sum, item) => sum + item.stock, 0);
   const totalInventoryValue = inventorySummary.reduce((sum, item) => sum + item.inventoryValue, 0);
   const outOfStockCount = inventorySummary.filter((item) => item.alert === 'out').length;
+  const totalVariantUnits = variantInventorySummary.reduce((sum, item) => sum + item.stock, 0);
+  const totalVariantValue = variantInventorySummary.reduce((sum, item) => sum + item.inventoryValue, 0);
+  const outOfStockVariantCount = variantInventorySummary.filter((item) => item.alert === 'out').length;
   const initialSaleValues: SaleFormValues | null = selectedProductForSale
     ? {
         soldAt: new Date().toISOString().slice(0, 10),
@@ -305,7 +328,7 @@ export default function InventarioPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas las categorias</SelectItem>
-                    {inventoryCategories.map((item) => (
+                    {categoryOptions.map((item) => (
                       <SelectItem key={item.id} value={item.id}>
                         {item.label}
                       </SelectItem>
@@ -475,16 +498,28 @@ export default function InventarioPage() {
             <TabsContent value="stock" className="space-y-4">
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-sm text-slate-500">Unidades en inventario</p>
+                  <p className="text-sm text-slate-500">Unidades por producto</p>
                   <p className="mt-2 text-2xl font-semibold text-slate-950">{formatNumber(totalInventoryUnits)}</p>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-sm text-slate-500">Valor estimado del stock</p>
+                  <p className="text-sm text-slate-500">Valor por producto</p>
                   <p className="mt-2 text-2xl font-semibold text-slate-950">{formatCurrency(totalInventoryValue)}</p>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <p className="text-sm text-slate-500">Productos agotados</p>
                   <p className="mt-2 text-2xl font-semibold text-slate-950">{formatNumber(outOfStockCount)}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">Unidades por variante</p>
+                  <p className="mt-2 text-2xl font-semibold text-slate-950">{formatNumber(totalVariantUnits)}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">Valor por variante</p>
+                  <p className="mt-2 text-2xl font-semibold text-slate-950">{formatCurrency(totalVariantValue)}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">Variantes agotadas</p>
+                  <p className="mt-2 text-2xl font-semibold text-slate-950">{formatNumber(outOfStockVariantCount)}</p>
                 </div>
               </div>
 
@@ -496,7 +531,7 @@ export default function InventarioPage() {
               </div>
 
               {inventorySummary.length > 0 ? (
-                <div className="min-w-0">
+                <div className="min-w-0 space-y-6">
                   <div className="mb-2 text-xs text-slate-500">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
                   <div className="overflow-x-auto pb-2">
                   <Table className="min-w-[920px]">
@@ -552,6 +587,61 @@ export default function InventarioPage() {
                     </TableBody>
                   </Table>
                   </div>
+
+                  {variantInventorySummary.length > 0 ? (
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-950">Stock actual por variante</p>
+                        <p className="text-sm text-slate-500">
+                          Aqui si puedes ver precios, stock y agotados por cada combinacion real.
+                        </p>
+                      </div>
+                      <div className="overflow-x-auto pb-2">
+                        <Table className="min-w-[1080px]">
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Producto</TableHead>
+                              <TableHead>Variante</TableHead>
+                              <TableHead>Categoria</TableHead>
+                              <TableHead>Stock</TableHead>
+                              <TableHead>Costo real</TableHead>
+                              <TableHead>Valor inventario</TableHead>
+                              <TableHead>Precio venta</TableHead>
+                              <TableHead>Estado</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {variantInventorySummary.map(({ product, variant, stock, unitCost, inventoryValue, alert }) => (
+                              <TableRow key={variant.id}>
+                                <TableCell>
+                                  <div>
+                                    <p className="font-medium text-slate-900">{product.name}</p>
+                                    <p className="text-xs text-slate-500">{product.brand}</p>
+                                  </div>
+                                </TableCell>
+                                <TableCell>{variant.displayName ?? variant.name}</TableCell>
+                                <TableCell>
+                                  <div>
+                                    <p>{product.category}</p>
+                                    <p className="text-xs text-slate-500">{product.subcategory}</p>
+                                  </div>
+                                </TableCell>
+                                <TableCell>{formatNumber(stock)}</TableCell>
+                                <TableCell>{formatCurrency(unitCost)}</TableCell>
+                                <TableCell>{formatCurrency(inventoryValue)}</TableCell>
+                                <TableCell>{formatCurrency(Number(variant.salePrice ?? product.salePrice ?? 0))}</TableCell>
+                                <TableCell>
+                                  <span className={alert === 'out' ? 'font-medium text-rose-700' : 'font-medium text-emerald-700'}>
+                                    {getStockAlertLabel(alert)}
+                                  </span>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               ) : (
                 <Empty className="border border-dashed border-slate-200 bg-slate-50/70">

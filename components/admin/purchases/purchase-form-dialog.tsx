@@ -10,6 +10,7 @@ import {
   formatCurrency,
   formatNumber,
 } from '@/lib/admin/calculations';
+import { shouldNormalizePackPurchaseToBundle } from '@/lib/admin/category-rules';
 import type { Product, Supplier } from '@/lib/admin/types';
 import { Button } from '@/components/ui/button';
 import {
@@ -105,20 +106,9 @@ function createDraftPurchaseLineFromValue(line?: PurchaseLineFormValue): DraftPu
   };
 }
 
-function isRoyalPremiumChalk(product?: Product) {
-  if (!product) return false;
-  return product.category === 'tizas' && /royal\s*premium/i.test(`${product.name} ${product.brand}`);
-}
-
-function isZ1Chalk(product?: Product) {
-  if (!product) return false;
-  return product.category === 'tizas' && /\bz1\b/i.test(`${product.name} ${product.brand}`);
-}
-
 function isPackOf12Product(product?: Product) {
   if (!product) return false;
-  if (isRoyalPremiumChalk(product) || isZ1Chalk(product)) return false;
-  return /x\s*12/i.test(product.subcategory) || /x\s*12/i.test(product.name);
+  return shouldNormalizePackPurchaseToBundle(product);
 }
 
 function isSamePurchaseLine(

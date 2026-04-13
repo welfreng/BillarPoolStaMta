@@ -6,13 +6,17 @@ export interface OptimizedImageResult {
   height: number;
   originalWidth: number;
   originalHeight: number;
+  estimatedBytes: number;
 }
 
 export interface OptimizeImageOptions {
   maxWidth: number;
   maxHeight: number;
   quality?: number;
+  minQuality?: number;
   outputType?: 'image/jpeg' | 'image/png' | 'image/webp';
+  fit?: 'contain' | 'cover';
+  maxBytes?: number;
 }
 
 function readFileAsDataUrl(file: File) {
@@ -71,7 +75,16 @@ function renderImageToDataUrl(
     throw new Error('No se pudo preparar la imagen para guardarla.');
   }
 
-  context.drawImage(image, 0, 0, width, height);
+  context.clearRect(0, 0, width, height);
+
+  if (options.fit === 'cover') {
+    const sourceSize = Math.min(image.width, image.height);
+    const sourceX = Math.round((image.width - sourceSize) / 2);
+    const sourceY = Math.round((image.height - sourceSize) / 2);
+    context.drawImage(image, sourceX, sourceY, sourceSize, sourceSize, 0, 0, width, height);
+  } else {
+    context.drawImage(image, 0, 0, width, height);
+  }
 
   const dataUrl = canvas.toDataURL(options.outputType ?? 'image/jpeg', options.quality ?? 0.84);
   if (!dataUrl || dataUrl === 'data:,') {
@@ -98,26 +111,54 @@ export async function optimizeImageFile(
   }
 
   const scale = Math.min(1, options.maxWidth / loadedImage.width, options.maxHeight / loadedImage.height);
-  const targetWidth = Math.max(1, Math.round(loadedImage.width * scale));
-  const targetHeight = Math.max(1, Math.round(loadedImage.height * scale));
+  const targetWidth =
+    options.fit === 'cover'
+      ? Math.max(1, Math.round(options.maxWidth))
+      : Math.max(1, Math.round(loadedImage.width * scale));
+  const targetHeight =
+    options.fit === 'cover'
+      ? Math.max(1, Math.round(options.maxHeight))
+      : Math.max(1, Math.round(loadedImage.height * scale));
 
   let width = targetWidth;
   let height = targetHeight;
   let dataUrl = '';
+  let quality = options.quality ?? 0.84;
+  const minQuality = options.minQuality ?? 0.58;
 
-  for (let attempt = 0; attempt < 4; attempt += 1) {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
     try {
-      dataUrl = renderImageToDataUrl(loadedImage, width, height, options);
-      break;
+      dataUrl = renderImageToDataUrl(loadedImage, width, height, {
+        ...options,
+        quality,
+      });
+
+      const estimatedBytes = Math.ceil((dataUrl.length * 3) / 4);
+      if (!options.maxBytes || estimatedBytes <= options.maxBytes) {
+        cleanup();
+        return {
+          dataUrl,
+          width,
+          height,
+          originalWidth: loadedImage.width,
+          originalHeight: loadedImage.height,
+          estimatedBytes,
+        };
+      }
     } catch (error) {
-      if (attempt === 3) {
+      if (attempt === 7) {
         cleanup();
         throw error;
       }
-
-      width = Math.max(1, Math.round(width * 0.72));
-      height = Math.max(1, Math.round(height * 0.72));
     }
+
+    if (quality > minQuality) {
+      quality = Math.max(minQuality, Number((quality - 0.07).toFixed(2)));
+      continue;
+    }
+
+    width = Math.max(1, Math.round(width * 0.88));
+    height = Math.max(1, Math.round(height * 0.88));
   }
 
   cleanup();
@@ -128,5 +169,6 @@ export async function optimizeImageFile(
     height,
     originalWidth: loadedImage.width,
     originalHeight: loadedImage.height,
+    estimatedBytes: Math.ceil((dataUrl.length * 3) / 4),
   };
 }

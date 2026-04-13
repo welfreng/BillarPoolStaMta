@@ -7,6 +7,7 @@ import { MessageCircle, Search, ShoppingBag, Tag } from "lucide-react"
 import {
   extractCatalogImageOverrides,
   resolveCatalogImageOverride,
+  resolveCatalogVariantImageOverride,
   type CatalogImageOverrideMaps,
 } from "@/lib/catalog-image-overrides"
 import { db } from "@/lib/firebase"
@@ -33,7 +34,6 @@ interface CatalogProduct {
   brand: string
   salePrice: number
   featured: boolean
-  availableForDelivery: boolean
   publicStock: number
   status: "active" | "draft" | "archived"
   tag: string
@@ -45,6 +45,7 @@ interface CatalogProduct {
     salePrice: number
     stock: number
     colorHex?: string
+    image?: string
   }>
 }
 
@@ -82,7 +83,6 @@ function mapCatalogProduct(documentId: string, data: DocumentData): CatalogProdu
     brand: String(data.brand ?? ""),
     salePrice: variantPrices[0] ?? Number(data.salePrice ?? 0),
     featured: Boolean(data.featured ?? false),
-    availableForDelivery: Boolean(data.availableForDelivery ?? false),
     publicStock: variants.length > 0 ? totalVariantStock : Number(data.publicStock ?? 0),
     status:
       data.status === "draft" || data.status === "archived" || data.status === "active"
@@ -115,10 +115,12 @@ export default function ProductCatalog({
   const [imageOverrides, setImageOverrides] = useState<CatalogImageOverrideMaps>({
     byProductId: {},
     byProductName: {},
+    byVariantKey: {},
   })
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState("")
   const [previewSides, setPreviewSides] = useState<Record<string, "left" | "right">>({})
+  const [cardPreviewVariantByProduct, setCardPreviewVariantByProduct] = useState<Record<string, string>>({})
   const productCardRefs = useRef<Record<string, HTMLElement | null>>({})
 
   useEffect(() => {
@@ -157,7 +159,7 @@ export default function ProductCatalog({
         console.error("Error leyendo productos del catalogo:", error)
         if (isMounted) {
           setProducts([])
-          setImageOverrides({ byProductId: {}, byProductName: {} })
+          setImageOverrides({ byProductId: {}, byProductName: {}, byVariantKey: {} })
         }
       } finally {
         if (isMounted) {
@@ -178,6 +180,15 @@ export default function ProductCatalog({
       products.map((product) => ({
         ...product,
         image: resolveCatalogImageOverride(product.id, product.name, product.image || defaultImage, imageOverrides),
+        variants: product.variants.map((variant) => ({
+          ...variant,
+          image: resolveCatalogVariantImageOverride(
+            product.id,
+            variant.id,
+            resolveCatalogImageOverride(product.id, product.name, product.image || defaultImage, imageOverrides),
+            imageOverrides
+          ),
+        })),
       })),
     [imageOverrides, products]
   )
@@ -259,6 +270,7 @@ export default function ProductCatalog({
     selectedProduct?.variants.find((variant) => variant.id === selectedVariantId) ??
     selectedProduct?.variants[0] ??
     null
+  const selectedProductImage = selectedVariant?.image || selectedProduct?.image || defaultImage
   useEffect(() => {
     if (!selectedProduct) {
       setSelectedVariantId("")
@@ -296,6 +308,12 @@ export default function ProductCatalog({
     setPreviewSides((current) =>
       current[productId] === nextSide ? current : { ...current, [productId]: nextSide }
     )
+  }
+
+  const getCardPreviewImage = (product: CatalogProduct) => {
+    const previewVariantId = cardPreviewVariantByProduct[product.id]
+    const previewVariant = product.variants.find((variant) => variant.id === previewVariantId)
+    return previewVariant?.image || product.image || defaultImage
   }
 
   return (
@@ -387,6 +405,7 @@ export default function ProductCatalog({
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               {visibleProducts.map((product) => {
                 const previewSide = previewSides[product.id] ?? "right"
+                const currentCardImage = getCardPreviewImage(product)
 
                 return (
                   <article
@@ -401,13 +420,13 @@ export default function ProductCatalog({
                   >
                     <div className="relative h-28 overflow-hidden bg-gradient-to-br from-white via-slate-50 to-slate-100 sm:h-32">
                       <Image
-                        src={product.image || defaultImage}
+                        src={currentCardImage}
                         alt={product.name}
                         fill
                         className={`object-cover transition-transform duration-500 group-hover:scale-110 ${
                           product.publicStock <= 0 ? "grayscale-[0.45] saturate-50" : ""
                         }`}
-                        unoptimized={product.image.startsWith("data:")}
+                        unoptimized={currentCardImage.startsWith("data:")}
                       />
                       {product.publicStock <= 0 ? (
                         <div className="absolute inset-0 bg-white/35" />
@@ -427,11 +446,11 @@ export default function ProductCatalog({
                     >
                       <div className="relative aspect-[4/5] overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-100">
                         <Image
-                          src={product.image || defaultImage}
+                          src={currentCardImage}
                           alt={`${product.name} vista ampliada`}
                           fill
                           className={`object-contain p-3 ${product.publicStock <= 0 ? "grayscale-[0.45] saturate-50" : ""}`}
-                          unoptimized={product.image.startsWith("data:")}
+                          unoptimized={currentCardImage.startsWith("data:")}
                         />
                         {product.publicStock <= 0 ? (
                           <div className="absolute inset-0 bg-white/30" />
@@ -461,6 +480,42 @@ export default function ProductCatalog({
                           <p className="hidden line-clamp-2 text-xs leading-5 text-muted-foreground sm:block">
                             {product.description}
                           </p>
+                          {product.variants.length > 1 ? (
+                            <div className="flex flex-wrap gap-1.5 pt-1">
+                              {product.variants.slice(0, 6).map((variant) => (
+                                <button
+                                  key={variant.id}
+                                  type="button"
+                                  aria-label={`${product.name} ${variant.name}`}
+                                  className={`h-4 w-4 rounded-full border ${
+                                    cardPreviewVariantByProduct[product.id] === variant.id
+                                      ? "border-[#0a2472] ring-2 ring-[#0a2472]/20"
+                                      : "border-slate-300"
+                                  }`}
+                                  style={{ backgroundColor: variant.colorHex || "#cbd5e1" }}
+                                  onMouseEnter={() =>
+                                    setCardPreviewVariantByProduct((current) => ({
+                                      ...current,
+                                      [product.id]: variant.id,
+                                    }))
+                                  }
+                                  onFocus={() =>
+                                    setCardPreviewVariantByProduct((current) => ({
+                                      ...current,
+                                      [product.id]: variant.id,
+                                    }))
+                                  }
+                                  onClick={(event) => {
+                                    event.stopPropagation()
+                                    setCardPreviewVariantByProduct((current) => ({
+                                      ...current,
+                                      [product.id]: current[product.id] === variant.id ? "" : variant.id,
+                                    }))
+                                  }}
+                                />
+                              ))}
+                            </div>
+                          ) : null}
                       </div>
 
                       <div className="flex items-center justify-between rounded-2xl bg-[#0a2472]/5 px-2.5 py-2">
@@ -504,6 +559,7 @@ export default function ProductCatalog({
                   <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                     {group.items.map((product) => {
                       const previewSide = previewSides[product.id] ?? "right"
+                      const currentCardImage = getCardPreviewImage(product)
 
                       return (
                         <article
@@ -518,13 +574,13 @@ export default function ProductCatalog({
                         >
                           <div className="relative h-28 overflow-hidden bg-gradient-to-br from-white via-slate-50 to-slate-100 sm:h-32">
                             <Image
-                              src={product.image || defaultImage}
+                              src={currentCardImage}
                               alt={product.name}
                               fill
                               className={`object-cover transition-transform duration-500 group-hover:scale-110 ${
                                 product.publicStock <= 0 ? "grayscale-[0.45] saturate-50" : ""
                               }`}
-                              unoptimized={product.image.startsWith("data:")}
+                              unoptimized={currentCardImage.startsWith("data:")}
                             />
                             {product.publicStock <= 0 ? (
                               <div className="absolute inset-0 bg-white/35" />
@@ -544,11 +600,11 @@ export default function ProductCatalog({
                           >
                             <div className="relative aspect-[4/5] overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-100">
                               <Image
-                                src={product.image || defaultImage}
+                                src={currentCardImage}
                                 alt={`${product.name} vista ampliada`}
                                 fill
                                 className={`object-contain p-3 ${product.publicStock <= 0 ? "grayscale-[0.45] saturate-50" : ""}`}
-                                unoptimized={product.image.startsWith("data:")}
+                                unoptimized={currentCardImage.startsWith("data:")}
                               />
                               {product.publicStock <= 0 ? (
                                 <div className="absolute inset-0 bg-white/30" />
@@ -578,6 +634,42 @@ export default function ProductCatalog({
                             <p className="hidden line-clamp-2 text-xs leading-5 text-muted-foreground sm:block">
                               {product.description}
                             </p>
+                            {product.variants.length > 1 ? (
+                              <div className="flex flex-wrap gap-1.5 pt-1">
+                                {product.variants.slice(0, 6).map((variant) => (
+                                  <button
+                                    key={variant.id}
+                                    type="button"
+                                    aria-label={`${product.name} ${variant.name}`}
+                                    className={`h-4 w-4 rounded-full border ${
+                                      cardPreviewVariantByProduct[product.id] === variant.id
+                                        ? "border-[#0a2472] ring-2 ring-[#0a2472]/20"
+                                        : "border-slate-300"
+                                    }`}
+                                    style={{ backgroundColor: variant.colorHex || "#cbd5e1" }}
+                                    onMouseEnter={() =>
+                                      setCardPreviewVariantByProduct((current) => ({
+                                        ...current,
+                                        [product.id]: variant.id,
+                                      }))
+                                    }
+                                    onFocus={() =>
+                                      setCardPreviewVariantByProduct((current) => ({
+                                        ...current,
+                                        [product.id]: variant.id,
+                                      }))
+                                    }
+                                    onClick={(event) => {
+                                      event.stopPropagation()
+                                      setCardPreviewVariantByProduct((current) => ({
+                                        ...current,
+                                        [product.id]: current[product.id] === variant.id ? "" : variant.id,
+                                      }))
+                                    }}
+                                  />
+                                ))}
+                              </div>
+                            ) : null}
                             </div>
 
                             <div className="flex items-center justify-between rounded-2xl bg-[#0a2472]/5 px-2.5 py-2">
@@ -673,11 +765,11 @@ export default function ProductCatalog({
             <div className="space-y-6">
               <div className="relative min-h-[360px] overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-100 sm:min-h-[460px]">
                 <Image
-                  src={selectedProduct.image || defaultImage}
-                  alt={selectedProduct.name}
+                  src={selectedProductImage}
+                  alt={selectedVariant ? `${selectedProduct.name} ${selectedVariant.name}` : selectedProduct.name}
                   fill
                   className="object-cover"
-                  unoptimized={selectedProduct.image.startsWith("data:")}
+                  unoptimized={selectedProductImage.startsWith("data:")}
                 />
               </div>
 

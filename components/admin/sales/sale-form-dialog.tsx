@@ -44,6 +44,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { formatCurrency, formatNumber, getProductStock, getVariantOrProductRealUnitCost } from '@/lib/admin/calculations';
+import { matchesProductCategoryFamily } from '@/lib/admin/category-rules';
 import {
   formatSaleGiftCategoryList,
   getAllowedSaleGiftCategories,
@@ -56,6 +57,7 @@ import { createDefaultInstallationServiceItem, supportsInstallationService } fro
 import { getProductVariantStock, getVariantSalePrice } from '@/lib/admin/variant-helpers';
 import { cn } from '@/lib/utils';
 import { SITE_LOGO } from '@/lib/branding';
+import { ResponsiveRowActions } from '@/components/admin/shared/responsive-row-actions';
 
 const saleGiftItemSchema = z.object({
   productId: z.string().default(''),
@@ -323,6 +325,25 @@ function createDraftLineFromValue(line?: SaleLineFormValue): DraftSaleLine {
     serviceItems: line.serviceItems ?? [],
     giftItems: line.giftItems ?? [],
   };
+}
+
+function getSelectableSaleVariants(
+  product: Product | null | undefined,
+  movements: InventoryMovement[]
+) {
+  if (!product) return [];
+
+  return (product.variants ?? []).filter(
+    (variant) => variant.status !== 'inactive' && getProductVariantStock(product, variant.id, movements) > 0
+  );
+}
+
+function getSuggestedSaleVariant(
+  product: Product | null | undefined,
+  movements: InventoryMovement[]
+) {
+  const variants = getSelectableSaleVariants(product, movements);
+  return variants.length === 1 ? variants[0] : null;
 }
 
 function normalizeGiftItems(
@@ -727,7 +748,7 @@ export function SaleFormDialog({
   }, [saleSummaries]);
   const firstLineSummary = saleSummaries[0] ?? null;
   const firstItemProduct = products.find((product) => product.id === firstItem.productId) ?? null;
-  const firstItemVariantOptions = firstItemProduct?.variants ?? [];
+  const firstItemVariantOptions = getSelectableSaleVariants(firstItemProduct, movements);
   const firstItemSelectedVariant =
     firstItemVariantOptions.find((variant) => variant.id === firstItem.variantId) ?? null;
   const firstItemDisplayStock = firstItemSelectedVariant
@@ -737,7 +758,7 @@ export function SaleFormDialog({
   const firstItemCanHaveGift = firstItemAllowedGiftCategories.length > 0;
   const firstItemHasGiftSelection = hasSelectedGiftItems(firstItem.giftItems, products);
   const draftProduct = products.find((product) => product.id === draftLine.productId) ?? null;
-  const draftVariantOptions = draftProduct?.variants ?? [];
+  const draftVariantOptions = getSelectableSaleVariants(draftProduct, movements);
   const draftAllowedGiftCategories = draftProduct ? getAllowedSaleGiftCategories(draftProduct) : [];
   const draftCanHaveGift = draftAllowedGiftCategories.length > 0;
   const draftHasGiftSelection = hasSelectedGiftItems(draftLine.giftItems, products);
@@ -745,12 +766,12 @@ export function SaleFormDialog({
   const availableGiftOptionsByCategory = useMemo(() => {
     const baseOptions = products.filter((product) => product.status === 'active');
     return {
-      guantes: baseOptions.filter((product) => product.category === 'guantes'),
-      estuches: baseOptions.filter((product) => product.category === 'estuches'),
-      extensiones: baseOptions.filter((product) => product.category === 'extensiones'),
+      guantes: baseOptions.filter((product) => matchesProductCategoryFamily(product, 'guantes')),
+      estuches: baseOptions.filter((product) => matchesProductCategoryFamily(product, 'estuches')),
+      extensiones: baseOptions.filter((product) => matchesProductCategoryFamily(product, 'extensiones')),
       parachoques: baseOptions.filter(
         (product) =>
-          product.category === 'cauchos-para-tacos' &&
+          matchesProductCategoryFamily(product, 'parachoques') &&
           product.subcategory.trim().toLowerCase() === 'parachoques'
       ),
     } satisfies Record<SaleGiftCategory, Product[]>;
@@ -977,10 +998,21 @@ export function SaleFormDialog({
                               onChange={(value) => {
                                 field.onChange(value);
                                 const product = products.find((item) => item.id === value);
+                                const suggestedVariant = getSuggestedSaleVariant(product, movements);
                                 if (product) {
-                                  form.setValue('items.0.unitPrice', getVariantSalePrice(product), { shouldValidate: true });
+                                  form.setValue(
+                                    'items.0.unitPrice',
+                                    suggestedVariant
+                                      ? Number(suggestedVariant.salePrice ?? getVariantSalePrice(product))
+                                      : (product.variants?.length ?? 0) > 0
+                                        ? 0
+                                        : getVariantSalePrice(product),
+                                    { shouldValidate: true }
+                                  );
                                 }
-                                form.setValue('items.0.variantId', '', { shouldValidate: true });
+                                form.setValue('items.0.variantId', suggestedVariant?.id ?? '', {
+                                  shouldValidate: true,
+                                });
                                 form.setValue(
                                   'items.0.serviceItems',
                                   supportsInstallationService(product) ? [createDefaultInstallationServiceItem()] : [],
@@ -1041,6 +1073,11 @@ export function SaleFormDialog({
                             <p className="text-sm text-slate-500">
                               Selecciona la opcion que le queda al cliente y revisa cuantas unidades hay.
                             </p>
+                            {firstItemVariantOptions.length > 1 ? (
+                              <p className="text-xs text-amber-700">
+                                El precio se define cuando eliges la variante.
+                              </p>
+                            ) : null}
                           </div>
                           <div className="flex flex-wrap gap-2">
                             {firstItemVariantOptions.map((variant) => (
@@ -1282,15 +1319,22 @@ export function SaleFormDialog({
                               )}
                             </div>
 
-                            <div className="flex gap-2 sm:shrink-0">
-                              <Button type="button" variant="ghost" size="sm" className="rounded-xl" onClick={() => openEditLineDialog(index)}>
-                                <Pencil className="mr-2 h-4 w-4" />
-                                Editar
-                              </Button>
-                              <Button type="button" variant="ghost" size="sm" className="rounded-xl" onClick={() => remove(index)}>
-                                <MinusCircle className="mr-2 h-4 w-4" />
-                                Quitar
-                              </Button>
+                            <div className="sm:shrink-0">
+                              <ResponsiveRowActions
+                                actions={[
+                                  {
+                                    label: 'Editar',
+                                    icon: <Pencil className="h-4 w-4" />,
+                                    onClick: () => openEditLineDialog(index),
+                                  },
+                                  {
+                                    label: 'Quitar',
+                                    icon: <MinusCircle className="h-4 w-4" />,
+                                    onClick: () => remove(index),
+                                    destructive: true,
+                                  },
+                                ]}
+                              />
                             </div>
                           </div>
                         </div>
@@ -1312,7 +1356,7 @@ export function SaleFormDialog({
                   <Button
                     type="button"
                     variant="outline"
-                    className="w-full rounded-xl bg-white"
+                    className="hidden w-full rounded-xl bg-white sm:inline-flex"
                     onClick={openNewLineDialog}
                   >
                     <PlusCircle className="mr-2 h-4 w-4" />
@@ -1382,7 +1426,11 @@ export function SaleFormDialog({
               </div>
 
               <div className="fixed inset-x-3 bottom-2 z-20 rounded-2xl border border-slate-200 bg-white/95 p-2.5 shadow-xl backdrop-blur supports-[padding:max(0px)]:pb-[max(0.625rem,env(safe-area-inset-bottom))] sm:inset-x-6 lg:hidden">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-2">
+                  <Button type="button" variant="outline" className="h-11 rounded-xl px-2" onClick={openNewLineDialog}>
+                    <PlusCircle className="mr-1 h-4 w-4" />
+                    <span className="text-xs">Agregar</span>
+                  </Button>
                   <Button type="button" variant="outline" className="h-11 rounded-xl" onClick={() => onOpenChange(false)}>
                     Cancelar
                   </Button>
@@ -1421,12 +1469,22 @@ export function SaleFormDialog({
                 value={draftLine.productId}
                 onChange={(value) => {
                   const product = products.find((item) => item.id === value);
+                  const suggestedVariant = getSuggestedSaleVariant(product, movements);
                     setDraftLine((current) => ({
                       ...current,
                       productId: value,
-                      variantId: '',
+                      variantId: suggestedVariant?.id ?? '',
                       quantity: current.quantity || '1',
-                      unitPrice: product?.salePrice !== undefined ? String(getVariantSalePrice(product)) : current.unitPrice,
+                      unitPrice:
+                        product?.salePrice !== undefined
+                          ? String(
+                              suggestedVariant
+                                ? Number(suggestedVariant.salePrice ?? getVariantSalePrice(product))
+                                : (product.variants?.length ?? 0) > 0
+                                  ? 0
+                                  : getVariantSalePrice(product)
+                            )
+                          : current.unitPrice,
                       serviceItems: supportsInstallationService(product) ? [createDefaultInstallationServiceItem()] : [],
                       giftItems:
                         product && getAllowedSaleGiftCategories(product).length > 0

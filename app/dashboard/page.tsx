@@ -12,6 +12,42 @@ import { Input } from '@/components/ui/input';
 import { useAdminData } from '@/components/admin/admin-data-context';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, formatNumber, getProductStock, getStockAlert } from '@/lib/admin/calculations';
+import type { Product } from '@/lib/admin/types';
+
+function getProductSalePriceSummary(product: Product) {
+  const prices = (product.variants ?? [])
+    .map((variant) => Number(variant.salePrice ?? 0))
+    .filter((price) => price > 0);
+
+  if (prices.length === 0) return formatCurrency(product.salePrice);
+
+  const minPrice = Math.min(...prices);
+  const maxPrice = Math.max(...prices);
+  return minPrice === maxPrice
+    ? formatCurrency(minPrice)
+    : `${formatCurrency(minPrice)} - ${formatCurrency(maxPrice)}`;
+}
+
+function getVariantAvailabilitySummary(product: Product) {
+  const variants = product.variants ?? [];
+  if (variants.length === 0) return null;
+
+  const inStockCount = variants.filter((variant) => Number(variant.stock ?? 0) > 0).length;
+  const outOfStockCount = variants.length - inStockCount;
+
+  if (outOfStockCount > 0) {
+    return `${inStockCount}/${variants.length} variantes con stock · ${outOfStockCount} agotadas`;
+  }
+
+  return `${variants.length} variantes con stock`;
+}
+
+function getSellableVariants(product: Product | null | undefined) {
+  if (!product) return [];
+  return (product.variants ?? []).filter(
+    (variant) => variant.status !== 'inactive' && Number(variant.stock ?? 0) > 0
+  );
+}
 
 export default function DashboardPage() {
   const { products, movements, purchases, summary, sales, services, registerSale, authorizationRequests } = useAdminData();
@@ -38,6 +74,28 @@ export default function DashboardPage() {
     .filter((product) => product.status === 'active' && getStockAlert(product, movements) === 'out')
     .sort((left, right) => left.name.localeCompare(right.name));
 
+  const outVariants = useMemo(() => {
+    return products
+      .filter((product) => product.status === 'active')
+      .flatMap((product) =>
+        (product.variants ?? [])
+          .filter((variant) => Number(variant.stock ?? 0) <= 0)
+          .map((variant) => ({
+            product,
+            variant,
+            stock: Math.max(Number(variant.stock ?? 0), 0),
+            salePrice: Number(variant.salePrice ?? product.salePrice ?? 0),
+          }))
+      )
+      .sort((left, right) => {
+        const productCompare = left.product.name.localeCompare(right.product.name);
+        if (productCompare !== 0) return productCompare;
+        return (left.variant.displayName ?? left.variant.name).localeCompare(
+          right.variant.displayName ?? right.variant.name
+        );
+      });
+  }, [products]);
+
   const quickResults = useMemo(() => {
     const normalizedQuery = productQuery.trim().toLowerCase();
     if (!normalizedQuery) return availableProducts.slice(0, 8);
@@ -54,6 +112,10 @@ export default function DashboardPage() {
   const selectedProduct = selectedProductId
     ? products.find((product) => product.id === selectedProductId) ?? null
     : null;
+  const selectedProductHasVariants = (selectedProduct?.variants?.length ?? 0) > 0;
+  const selectedProductSellableVariants = getSellableVariants(selectedProduct);
+  const suggestedSelectedVariant =
+    selectedProductSellableVariants.length === 1 ? selectedProductSellableVariants[0] : null;
   const detailsSale = detailsSaleId ? sales.find((sale) => sale.id === detailsSaleId) ?? null : null;
 
   const initialSaleValues: SaleFormValues | null = selectedProduct
@@ -62,9 +124,14 @@ export default function DashboardPage() {
         items: [
           {
             productId: selectedProduct.id,
-            variantId: '',
+            variantId: suggestedSelectedVariant?.id ?? '',
             quantity: 1,
-            unitPrice: selectedProduct.salePrice,
+            unitPrice:
+              suggestedSelectedVariant
+                ? Number(suggestedSelectedVariant.salePrice ?? selectedProduct.salePrice)
+                : selectedProductHasVariants
+                  ? 0
+                : selectedProduct.salePrice,
             serviceItems: [],
             giftItems: [],
           },
@@ -81,6 +148,15 @@ export default function DashboardPage() {
           .map((product, index) => `${index + 1}. ${product.name}`)
           .join('%0A')}`
       : 'Hola, por ahora no tenemos productos agotados para solicitar.';
+  const outVariantMessage =
+    outVariants.length > 0
+      ? `Hola, necesito solicitar estas variantes agotadas:%0A%0A${outVariants
+          .map(
+            (item, index) =>
+              `${index + 1}. ${item.product.name} - ${item.variant.displayName ?? item.variant.name}`
+          )
+          .join('%0A')}`
+      : 'Hola, por ahora no tenemos variantes agotadas para solicitar.';
   const pendingAuthorizationRequests = authorizationRequests.filter((request) => request.status === 'pending');
 
   return (
@@ -120,6 +196,15 @@ export default function DashboardPage() {
                 <p className="text-2xl font-semibold">{formatNumber(outProducts.length)}</p>
               </div>
             </div>
+            <div className="flex items-center gap-3">
+              <div className="rounded-2xl bg-rose-400/10 p-3">
+                <CircleAlert className="h-5 w-5 text-rose-300" />
+              </div>
+              <div>
+                <p className="text-sm text-slate-300">Variantes agotadas</p>
+                <p className="text-2xl font-semibold">{formatNumber(outVariants.length)}</p>
+              </div>
+            </div>
             <div className="pt-2">
               <a
                 href={`https://wa.me/573006775284?text=${outProductsMessage}`}
@@ -152,6 +237,12 @@ export default function DashboardPage() {
           title="Productos agotados"
           value={formatNumber(outProducts.length)}
           helper="Productos que debes reponer o solicitar."
+          tone="danger"
+        />
+        <MetricCard
+          title="Variantes agotadas"
+          value={formatNumber(outVariants.length)}
+          helper="Combinaciones sin stock para reponer con mas precision."
           tone="danger"
         />
         {role === 'admin' ? (
@@ -189,6 +280,9 @@ export default function DashboardPage() {
             <p className="text-sm text-slate-500">
               Escribe el producto, revisa el precio y abre la venta desde este panel.
             </p>
+            <p className="text-xs text-slate-500">
+              Cuando un producto tenga variantes, el valor mostrado es referencia y el precio final sale de la combinacion elegida.
+            </p>
           </div>
         </div>
 
@@ -217,6 +311,11 @@ export default function DashboardPage() {
             >
               <div className="min-w-0">
                 <p className="truncate font-medium text-slate-900">{product.name}</p>
+                {getVariantAvailabilitySummary(product) ? (
+                  <p className="mt-1 text-xs font-medium text-cyan-700">
+                    {getVariantAvailabilitySummary(product)}
+                  </p>
+                ) : null}
                 <p className="text-sm text-slate-500">
                   {product.brand} · {product.category}
                 </p>
@@ -224,8 +323,13 @@ export default function DashboardPage() {
                   Stock: <span className="font-medium text-slate-900">{formatNumber(product.stock)}</span>
                 </p>
                 <p className="text-sm text-slate-600">
-                  Precio de venta: <span className="font-semibold text-emerald-700">{formatCurrency(product.salePrice)}</span>
+                  Precio de venta: <span className="font-semibold text-emerald-700">{getProductSalePriceSummary(product)}</span>
                 </p>
+                {(product.variants?.length ?? 0) > 0 ? (
+                  <p className="text-xs text-slate-500">
+                    El precio final se define segun la variante elegida en la venta.
+                  </p>
+                ) : null}
               </div>
               <Button
                 className="rounded-xl"
@@ -268,7 +372,7 @@ export default function DashboardPage() {
                   <p className="truncate font-medium text-slate-900">{product.name}</p>
                   <p className="text-sm text-slate-500">{product.brand}</p>
                   <p className="mt-1 text-sm font-medium text-emerald-800">
-                    {formatCurrency(product.salePrice)}
+                    {getProductSalePriceSummary(product)}
                   </p>
                 </div>
                 <div className="text-right">
@@ -320,7 +424,7 @@ export default function DashboardPage() {
                   <p className="truncate font-medium text-slate-900">{product.name}</p>
                   <p className="text-sm text-slate-500">{product.brand}</p>
                   <p className="mt-1 text-sm font-medium text-rose-800">
-                    {formatCurrency(product.salePrice)}
+                    {getProductSalePriceSummary(product)}
                   </p>
                 </div>
                 <div className="text-right">
@@ -335,6 +439,61 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
+        </div>
+      </section>
+
+      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="mb-6 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="rounded-2xl bg-rose-50 p-3">
+              <CircleAlert className="h-5 w-5 text-rose-700" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-slate-950">Variantes agotadas</h2>
+              <p className="text-sm text-slate-500">
+                Combinaciones reales agotadas con su precio actual para reponer con mas precision.
+              </p>
+            </div>
+          </div>
+          {outVariants.length > 0 && (
+            <a
+              href={`https://wa.me/573006775284?text=${outVariantMessage}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Button variant="outline" className="rounded-2xl">
+                <SendHorizonal className="mr-2 h-4 w-4" />
+                Reporte
+              </Button>
+            </a>
+          )}
+        </div>
+
+        <div className="space-y-3">
+          {outVariants.map(({ product, variant, stock, salePrice }) => (
+            <div
+              key={variant.id}
+              className="flex items-center justify-between rounded-2xl border border-rose-100 bg-rose-50 p-4"
+            >
+              <div className="min-w-0">
+                <p className="truncate font-medium text-slate-900">{product.name}</p>
+                <p className="text-sm text-slate-500">{variant.displayName ?? variant.name}</p>
+                <p className="text-xs text-slate-500">
+                  {product.brand} · {product.category}
+                </p>
+                <p className="mt-1 text-sm font-medium text-rose-800">{formatCurrency(salePrice)}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-slate-500">Stock</p>
+                <p className="text-lg font-semibold text-rose-950">{formatNumber(stock)}</p>
+              </div>
+            </div>
+          ))}
+          {outVariants.length === 0 && (
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm text-emerald-900">
+              No hay variantes agotadas. Las combinaciones activas tienen stock disponible.
+            </div>
+          )}
         </div>
       </section>
 

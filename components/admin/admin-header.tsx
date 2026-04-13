@@ -21,6 +21,7 @@ import { db } from '@/lib/firebase';
 const pageTitles: Record<string, string> = {
   '/dashboard': 'Dashboard ejecutivo',
   '/dashboard/productos': 'Gestion de productos',
+  '/dashboard/categorias': 'Gestion de categorias',
   '/dashboard/inventario': 'Control de inventario',
   '/dashboard/compras': 'Compras e inversion',
   '/dashboard/web': 'Pagina web',
@@ -83,6 +84,7 @@ export function AdminHeader() {
     const adminItems = [
       { label: 'Dashboard', helper: 'Ir al panel principal', href: '/dashboard' },
       { label: 'Productos', helper: 'Gestionar catalogo y stock', href: '/dashboard/productos' },
+      { label: 'Categorias', helper: 'Gestionar categorias y subcategorias', href: '/dashboard/categorias' },
       { label: 'Proveedores', helper: 'Gestionar proveedores', href: '/dashboard/proveedores' },
       { label: 'Ventas', helper: 'Ir al modulo de ventas', href: '/dashboard/ventas' },
       { label: 'Autorizaciones', helper: 'Revisar solicitudes de vendedores', href: '/dashboard/autorizaciones' },
@@ -107,11 +109,7 @@ export function AdminHeader() {
       { label: 'Inventario', helper: 'Consultar stock y precios', href: '/dashboard/inventario' },
     ];
 
-    return role === 'sales'
-      ? salesItems
-      : role === 'courier'
-        ? [{ label: 'Dashboard', helper: 'Ir al panel principal', href: '/dashboard' }]
-        : adminItems;
+    return role === 'sales' ? salesItems : adminItems;
   }, [role]);
   const filteredItems = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -275,7 +273,7 @@ export function AdminHeader() {
                 {user?.displayName ?? 'Administrador'}
               </p>
               <p className="truncate text-xs text-slate-500">
-                {user?.email} · {role === 'sales' ? 'Rol ventas' : role === 'courier' ? 'Rol domiciliario' : 'Rol administrador'}
+                {user?.email} · {role === 'sales' ? 'Rol ventas' : 'Rol administrador'}
               </p>
             </div>
             <Button variant="outline" size="sm" onClick={logout} className="rounded-xl self-start sm:self-auto">

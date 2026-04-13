@@ -38,6 +38,7 @@ interface CompactAttributeControl {
 export interface CompactVariantRow {
   id: string;
   values: Record<string, string>;
+  salePrice?: number;
   stock: number;
   sku: string;
   status: 'active' | 'inactive';
@@ -50,12 +51,14 @@ export function VariantCompactEditor({
   globalPrice,
   onToggleAttributeValue,
   onAddAttributeValue,
+  onRowSalePriceChange,
   onRowStockChange,
   onRowSkuChange,
   onRowStatusChange,
   onAddRow,
   onRemoveRow,
   onRowAttributeChange,
+  getRowAttributeOptions,
   hiddenColumns,
   manualRows,
 }: {
@@ -70,12 +73,14 @@ export function VariantCompactEditor({
   };
   onToggleAttributeValue: (attributeKey: string, value: string) => void;
   onAddAttributeValue: (attributeKey: string, value: string) => void;
+  onRowSalePriceChange?: (rowIndex: number, value: number) => void;
   onRowStockChange: (rowIndex: number, value: number) => void;
   onRowSkuChange: (rowIndex: number, value: string) => void;
   onRowStatusChange: (rowIndex: number, value: 'active' | 'inactive') => void;
   onAddRow?: () => void;
   onRemoveRow?: (rowIndex: number) => void;
   onRowAttributeChange?: (rowIndex: number, attributeKey: string, value: string) => void;
+  getRowAttributeOptions?: (rowIndex: number, attributeKey: string, fallbackOptions: string[]) => string[];
   hiddenColumns?: Array<'sku' | 'status'>;
   manualRows?: boolean;
 }) {
@@ -253,6 +258,7 @@ export function VariantCompactEditor({
               {attributes.map((attribute) => (
                 <TableHead key={attribute.key}>{attribute.label}</TableHead>
               ))}
+              {!globalPrice ? <TableHead>Precio</TableHead> : null}
               <TableHead>Stock</TableHead>
               {!hiddenColumnSet.has('sku') ? <TableHead>SKU</TableHead> : null}
               {!hiddenColumnSet.has('status') ? <TableHead>Activa</TableHead> : null}
@@ -265,53 +271,75 @@ export function VariantCompactEditor({
                 <TableRow key={row.id || `${index}-${Object.values(row.values).join('-')}`}>
                   {attributes.map((attribute) => (
                     <TableCell key={`${row.id}-${attribute.key}`}>
-                      {manualRows ? (
-                        attribute.searchable ? (
+                      {(() => {
+                        const rowOptions = getRowAttributeOptions?.(index, attribute.key, attribute.options) ?? attribute.options;
+
+                        return manualRows ? (
+                          attribute.searchable ? (
+                            <SearchableSelect
+                              value={row.values[attribute.key] ?? ''}
+                              onChange={(value) => onRowAttributeChange?.(index, attribute.key, value)}
+                              placeholder={`Selecciona ${attribute.label.toLowerCase()}`}
+                              searchPlaceholder={`Buscar ${attribute.label.toLowerCase()}...`}
+                              emptyLabel={`No se encontro ${attribute.label.toLowerCase()}.`}
+                              options={rowOptions.map((option) => ({ value: option, label: option }))}
+                              disabled={structureLocked}
+                              allowCreate={attribute.allowCustom}
+                              createLabel={`Crear "${attribute.label.toLowerCase()}"`}
+                              onCreate={(value) => onAddAttributeValue(attribute.key, value)}
+                            />
+                          ) : (
+                            <Select
+                              value={row.values[attribute.key] || undefined}
+                              onValueChange={(value) => onRowAttributeChange?.(index, attribute.key, value)}
+                              disabled={structureLocked}
+                            >
+                              <SelectTrigger className="w-[150px]">
+                                <SelectValue placeholder={`Selecciona ${attribute.label.toLowerCase()}`} />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {rowOptions.map((option) => (
+                                  <SelectItem key={option} value={option}>
+                                    {option}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )
+                        ) : attribute.searchable && !attribute.fixed ? (
                           <SearchableSelect
                             value={row.values[attribute.key] ?? ''}
-                            onChange={(value) => onRowAttributeChange?.(index, attribute.key, value)}
+                            onChange={(value) => onToggleAttributeValue(attribute.key, value)}
                             placeholder={`Selecciona ${attribute.label.toLowerCase()}`}
                             searchPlaceholder={`Buscar ${attribute.label.toLowerCase()}...`}
                             emptyLabel={`No se encontro ${attribute.label.toLowerCase()}.`}
-                            options={attribute.options.map((option) => ({ value: option, label: option }))}
-                            disabled={structureLocked}
-                            allowCreate={attribute.allowCustom}
-                            createLabel={`Crear "${attribute.label.toLowerCase()}"`}
-                            onCreate={(value) => onAddAttributeValue(attribute.key, value)}
+                            options={rowOptions.map((option) => ({ value: option, label: option }))}
+                            disabled
                           />
                         ) : (
-                          <Select
-                            value={row.values[attribute.key] || undefined}
-                            onValueChange={(value) => onRowAttributeChange?.(index, attribute.key, value)}
-                            disabled={structureLocked}
-                          >
-                            <SelectTrigger className="w-[150px]">
-                              <SelectValue placeholder={`Selecciona ${attribute.label.toLowerCase()}`} />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {attribute.options.map((option) => (
-                                <SelectItem key={option} value={option}>
-                                  {option}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        )
-                      ) : attribute.searchable && !attribute.fixed ? (
-                        <SearchableSelect
-                          value={row.values[attribute.key] ?? ''}
-                          onChange={(value) => onToggleAttributeValue(attribute.key, value)}
-                          placeholder={`Selecciona ${attribute.label.toLowerCase()}`}
-                          searchPlaceholder={`Buscar ${attribute.label.toLowerCase()}...`}
-                          emptyLabel={`No se encontro ${attribute.label.toLowerCase()}.`}
-                          options={attribute.options.map((option) => ({ value: option, label: option }))}
-                          disabled
-                        />
-                      ) : (
-                        <span className="text-sm text-slate-700">{row.values[attribute.key] ?? attribute.label}</span>
-                      )}
+                          <span className="text-sm text-slate-700">{row.values[attribute.key] ?? attribute.label}</span>
+                        );
+                      })()}
                     </TableCell>
                   ))}
+                  {!globalPrice ? (
+                    <TableCell>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={Number(row.salePrice ?? 0)}
+                        disabled={structureLocked}
+                        onChange={(event) => onRowSalePriceChange?.(index, Number(event.target.value || 0))}
+                        onFocus={(event) => {
+                          if (event.target.value === '0') {
+                            event.target.select();
+                          }
+                        }}
+                        className="w-[120px]"
+                      />
+                    </TableCell>
+                  ) : null}
                   <TableCell>
                     <Input
                       type="number"
@@ -373,6 +401,7 @@ export function VariantCompactEditor({
                 <TableCell
                   colSpan={
                     attributes.length +
+                    (globalPrice ? 0 : 1) +
                     1 +
                     (hiddenColumnSet.has('sku') ? 0 : 1) +
                     (hiddenColumnSet.has('status') ? 0 : 1) +

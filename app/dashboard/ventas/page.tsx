@@ -31,6 +31,7 @@ import { useAdminData } from '@/components/admin/admin-data-context';
 import { useAuth } from '@/components/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, formatDateTime, formatNumber, getProductById, getProductStock } from '@/lib/admin/calculations';
+import { getSaleLineDisplayName } from '@/lib/admin/sale-line-display';
 import type { AuthorizationRequest, AuthorizationRequestType } from '@/lib/admin/types';
 
 function getAuthorizationTypeLabel(requestType: AuthorizationRequestType) {
@@ -350,7 +351,7 @@ export default function VentasPage() {
                     .flatMap((sale) =>
                       sale.lineItems.map((item) => {
                         const product = getProductById(products, item.productId);
-                        return product ? `${product.name} x ${formatNumber(item.quantity)}` : null;
+                        return `${getSaleLineDisplayName(product, item)} x ${formatNumber(item.quantity)}`;
                     })
                   )
                   .filter(Boolean);
@@ -491,7 +492,7 @@ export default function VentasPage() {
                       .flatMap((sale) =>
                         sale.lineItems.map((item) => {
                           const product = getProductById(products, item.productId);
-                          return product ? product.name : null;
+                          return getSaleLineDisplayName(product, item);
                         })
                       )
                       .filter(Boolean);

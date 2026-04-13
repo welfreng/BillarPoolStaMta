@@ -17,12 +17,6 @@ service cloud.firestore {
         get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.role == 'sales';
     }
 
-    function isCourier() {
-      return signedIn() &&
-        exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.role == 'courier';
-    }
-
     function isPublicStockSyncUpdate() {
       return resource != null &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['publicStock', 'updatedAt']);
@@ -40,13 +34,18 @@ service cloud.firestore {
         resource.data.status == 'active'
       );
       allow create, delete: if isAdmin();
-      allow update: if isAdmin() || ((isSales() || isCourier()) && isPublicStockSyncUpdate());
+      allow update: if isAdmin() || (isSales() && isPublicStockSyncUpdate());
     }
 
     match /product_variants/{variantId} {
       allow read: if signedIn() || (
         resource.data.status == 'active'
       );
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /product_categories/{categoryId} {
+      allow read: if signedIn();
       allow create, update, delete: if isAdmin();
     }
 
@@ -62,8 +61,8 @@ service cloud.firestore {
 
     match /movements/{movementId} {
       allow read: if signedIn();
-      allow create: if isAdmin() || isSales() || isCourier();
-      allow update: if isAdmin() || isSales() || isCourier();
+      allow create: if isAdmin() || isSales();
+      allow update: if isAdmin() || isSales();
       allow delete: if isAdmin() || isSales();
     }
 
@@ -79,8 +78,8 @@ service cloud.firestore {
 
     match /inventory_movements/{movementId} {
       allow read: if signedIn();
-      allow create: if isAdmin() || isSales() || isCourier();
-      allow update: if isAdmin() || isSales() || isCourier();
+      allow create: if isAdmin() || isSales();
+      allow update: if isAdmin() || isSales();
       allow delete: if isAdmin() || isSales();
     }
 
@@ -100,7 +99,7 @@ service cloud.firestore {
 
     match /admin-notifications/{notificationId} {
       allow read: if isAdmin();
-      allow create: if isAdmin() || isSales() || isCourier();
+      allow create: if isAdmin() || isSales();
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
@@ -112,11 +111,5 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    match /deliveryOrders/{orderId} {
-      allow create: if true;
-      allow read: if isAdmin() || isSales() || isCourier();
-      allow update: if isAdmin() || isSales() || isCourier();
-      allow delete: if isAdmin();
-    }
   }
 }

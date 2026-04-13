@@ -33,12 +33,6 @@ export function AdminRouteGuard({ children }: { children: React.ReactNode }) {
       }
     }
 
-    if (!loading && user && role === 'courier') {
-      const allowedRoutes = new Set(['/dashboard']);
-      if (!allowedRoutes.has(pathname)) {
-        router.replace('/dashboard');
-      }
-    }
   }, [loading, logout, pathname, profile?.status, role, router, user]);
 
   if (loading) {
@@ -67,10 +61,6 @@ export function AdminRouteGuard({ children }: { children: React.ReactNode }) {
     pathname !== '/dashboard/servicios' &&
     pathname !== '/dashboard/inventario'
   ) {
-    return null;
-  }
-
-  if (role === 'courier' && pathname !== '/dashboard') {
     return null;
   }
 

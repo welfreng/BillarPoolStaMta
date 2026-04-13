@@ -61,10 +61,7 @@ export default function UsuariosPage() {
               nombre: String(data.nombre ?? ''),
               email: String(data.email ?? ''),
               telefono: String(data.telefono ?? ''),
-              role:
-                data.role === 'sales' || data.role === 'courier'
-                  ? data.role
-                  : 'admin',
+              role: data.role === 'sales' ? 'sales' : 'admin',
               status: data.status === 'inactive' ? 'inactive' : 'active',
               createdAt: normalizeDateValue(data.createdAt),
               updatedAt: normalizeDateValue(data.updatedAt),
@@ -199,12 +196,6 @@ export default function UsuariosPage() {
             {users.filter((user) => user.role === 'sales').length}
           </p>
         </div>
-        <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-          <p className="text-sm text-slate-500">Domiciliarios</p>
-          <p className="mt-2 text-3xl font-semibold text-slate-950">
-            {users.filter((user) => user.role === 'courier').length}
-          </p>
-        </div>
         <div className="rounded-3xl border border-cyan-200 bg-cyan-50 p-4 shadow-sm sm:p-6">
           <p className="text-sm text-cyan-800">Regla aplicada</p>
           <p className="mt-2 text-lg font-semibold text-cyan-950">
@@ -243,8 +234,7 @@ export default function UsuariosPage() {
               </TableHeader>
               <TableBody>
                 {filteredUsers.map((item) => {
-                  const roleLabel =
-                    item.role === 'sales' ? 'Ventas' : item.role === 'courier' ? 'Domiciliario' : 'Administrador';
+                  const roleLabel = item.role === 'sales' ? 'Ventas' : 'Administrador';
                   const rowHoverSummary = [
                     item.nombre,
                     `Correo: ${item.email}`,

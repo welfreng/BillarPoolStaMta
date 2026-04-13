@@ -13,6 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatCurrency, formatDateTime, formatNumber, getProductById } from '@/lib/admin/calculations';
+import { getSaleLineDisplayName } from '@/lib/admin/sale-line-display';
 import { SITE_LOGO } from '@/lib/branding';
 import type { Product, Sale, ServiceOrder } from '@/lib/admin/types';
 
@@ -318,7 +319,7 @@ export function SaleDetailsDialog({
 
       return {
         quantity: item.quantity,
-        name: `${product?.name ?? 'Producto'}${item.variantName ? ` - ${item.variantName}` : ''}`,
+        name: getSaleLineDisplayName(product, item),
         unitPrice: effectiveUnitPrice,
         total: item.totalSale + lineServiceRevenue,
       };
@@ -642,7 +643,7 @@ export function SaleDetailsDialog({
                       <div className="flex items-start justify-between gap-4">
                         <div>
                           <p className="font-medium text-slate-900">
-                            {formatNumber(item.quantity)} x {product?.name ?? 'Producto'}{item.variantName ? ` - ${item.variantName}` : ''}
+                            {formatNumber(item.quantity)} x {getSaleLineDisplayName(product, item)}
                           </p>
                           <p className="text-sm text-slate-500">Precio unitario: {formatCurrency(item.unitPrice)}</p>
                           {!hideFinancialDetails ? (
