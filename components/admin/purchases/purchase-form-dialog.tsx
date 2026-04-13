@@ -576,8 +576,8 @@ export function PurchaseFormDialog({
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] w-[calc(100vw-1rem)] max-w-[96vw] overflow-y-auto px-4 pb-24 sm:w-[calc(100vw-2rem)] sm:px-5 sm:pb-6 lg:max-w-4xl lg:px-6">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[92dvh] w-[calc(100vw-1rem)] max-w-[96vw] flex-col overflow-hidden px-0 sm:w-[calc(100vw-2rem)] lg:max-w-4xl">
+        <DialogHeader className="shrink-0 px-4 pt-6 sm:px-5 lg:px-6">
           <DialogTitle>{initialValues ? 'Editar compra' : 'Registrar compra'}</DialogTitle>
           <DialogDescription>
             Registra una compra con uno o varios productos del mismo proveedor.
@@ -591,8 +591,9 @@ export function PurchaseFormDialog({
               form.reset(defaultValues);
             })}
             onKeyDown={moveFocusToNextField}
-            className="space-y-6"
+            className="flex min-h-0 flex-1 flex-col"
           >
+            <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-4 pb-6 sm:px-5 lg:px-6">
             <section className="rounded-3xl border border-slate-200 bg-slate-50/60 p-4 sm:p-6">
                 <div className="mb-4">
                   <p className="text-sm font-medium text-slate-900">Datos generales de la compra</p>
@@ -1031,8 +1032,9 @@ export function PurchaseFormDialog({
                 </div>
               </div>
             </section>
+            </div>
 
-            <DialogFooter className="sticky bottom-0 -mx-4 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:border-t-0 sm:bg-transparent sm:px-0 sm:py-0">
+            <DialogFooter className="shrink-0 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-5 lg:px-6">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancelar
               </Button>
@@ -1044,8 +1046,8 @@ export function PurchaseFormDialog({
     </Dialog>
 
     <Dialog open={lineDialogOpen} onOpenChange={setLineDialogOpen}>
-      <DialogContent className="w-[calc(100vw-1rem)] max-w-xl px-4 pb-24 sm:w-[calc(100vw-2rem)] sm:px-5 sm:pb-5">
-          <DialogHeader>
+      <DialogContent className="flex max-h-[92dvh] w-[calc(100vw-1rem)] max-w-xl flex-col overflow-hidden px-0 sm:w-[calc(100vw-2rem)]">
+          <DialogHeader className="shrink-0 px-4 pt-6 sm:px-5">
             <DialogTitle>{editingLineIndex === null ? 'Agregar producto a la compra' : 'Editar producto de la compra'}</DialogTitle>
             <DialogDescription>
               {isLockedVariantFlow
@@ -1054,7 +1056,7 @@ export function PurchaseFormDialog({
             </DialogDescription>
           </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pb-6 sm:px-5">
           {isLockedVariantFlow && draftProduct ? (
             <div className="rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-3">
               <p className="text-xs font-medium uppercase tracking-wide text-cyan-800">Producto fijo</p>
@@ -1231,7 +1233,7 @@ export function PurchaseFormDialog({
           ) : null}
         </div>
 
-        <DialogFooter className="sticky bottom-0 -mx-4 gap-3 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:border-t-0 sm:bg-transparent sm:px-0 sm:py-0">
+        <DialogFooter className="shrink-0 gap-3 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-5">
           <Button
             type="button"
             variant="outline"
