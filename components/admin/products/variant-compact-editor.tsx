@@ -111,8 +111,8 @@ export function VariantCompactEditor({
         ) : null}
 
         {manualRows ? (
-          <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-            <div>
+          <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
               <p className="text-sm font-semibold text-slate-900">Variantes reales</p>
               <p className="mt-1 text-sm text-slate-600">
                 Agrega solo las combinaciones que realmente existen en inventario.
@@ -121,7 +121,7 @@ export function VariantCompactEditor({
             <Button
               type="button"
               variant="outline"
-              className="rounded-xl bg-white"
+              className="w-full rounded-xl bg-white sm:w-auto"
               disabled={structureLocked}
               onClick={onAddRow}
             >
@@ -168,7 +168,7 @@ export function VariantCompactEditor({
                           Gestionar {attribute.label.toLowerCase()}
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-[320px] p-0" align="end">
+                      <PopoverContent className="w-[min(20rem,calc(100vw-2rem))] p-0" align="end">
                         <Command>
                           <CommandInput placeholder={`Buscar ${attribute.label.toLowerCase()}...`} />
                           <CommandList>
@@ -294,7 +294,7 @@ export function VariantCompactEditor({
                               onValueChange={(value) => onRowAttributeChange?.(index, attribute.key, value)}
                               disabled={structureLocked}
                             >
-                              <SelectTrigger className="w-[150px]">
+                              <SelectTrigger className="w-full min-w-[9rem] sm:w-[150px]">
                                 <SelectValue placeholder={`Selecciona ${attribute.label.toLowerCase()}`} />
                               </SelectTrigger>
                               <SelectContent>
@@ -336,7 +336,7 @@ export function VariantCompactEditor({
                             event.target.select();
                           }
                         }}
-                        className="w-[120px]"
+                        className="w-full min-w-[7rem] sm:w-[120px]"
                       />
                     </TableCell>
                   ) : null}
@@ -352,7 +352,7 @@ export function VariantCompactEditor({
                           event.target.select();
                         }
                       }}
-                      className="w-[110px]"
+                      className="w-full min-w-[6.5rem] sm:w-[110px]"
                     />
                   </TableCell>
                   {!hiddenColumnSet.has('sku') ? (
@@ -362,7 +362,7 @@ export function VariantCompactEditor({
                         placeholder="Opcional"
                         disabled={structureLocked}
                         onChange={(event) => onRowSkuChange(index, event.target.value)}
-                        className="w-[150px]"
+                        className="w-full min-w-[9rem] sm:w-[150px]"
                       />
                     </TableCell>
                   ) : null}

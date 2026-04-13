@@ -111,7 +111,7 @@ function SearchableSelect({
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        className="w-[var(--radix-popover-trigger-width)] min-w-[280px] p-0"
+        className="w-[min(var(--radix-popover-trigger-width),calc(100vw-2rem))] min-w-[min(280px,calc(100vw-2rem))] p-0"
         align="start"
         side="bottom"
         sideOffset={8}
@@ -1122,7 +1122,7 @@ export function SaleFormDialog({
                           control={form.control}
                           name="items.0.variantId"
                           render={({ field }) => (
-                            <FormItem className="max-w-sm">
+                          <FormItem className="min-w-0 max-w-full sm:max-w-sm">
                               <FormLabel>{firstItemProduct?.variantLabel || 'Variante'}</FormLabel>
                               <Select
                                 value={field.value}
@@ -1156,12 +1156,12 @@ export function SaleFormDialog({
                       </div>
                     ) : null}
 
-                    <div className="grid gap-4 sm:grid-cols-[minmax(124px,0.72fr)_minmax(160px,0.92fr)] sm:items-end">
+                    <div className="grid gap-4 sm:grid-cols-2 sm:items-end">
                       <FormField
                         control={form.control}
                         name="items.0.quantity"
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="min-w-0">
                             <FormLabel>Cantidad</FormLabel>
                             <FormControl>
                               <Input
@@ -1180,7 +1180,7 @@ export function SaleFormDialog({
                         control={form.control}
                         name="items.0.unitPrice"
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="min-w-0">
                             <FormLabel>Precio unidad</FormLabel>
                             <FormControl>
                               <Input type="number" min="0" step="0.01" {...field} />
@@ -1530,7 +1530,7 @@ export function SaleFormDialog({
 
             <div className="grid gap-4 sm:grid-cols-2">
               {draftVariantOptions.length > 0 ? (
-                      <div className="space-y-2 sm:col-span-2">
+                      <div className="min-w-0 space-y-2 sm:col-span-2">
                         <Label>{draftProduct?.variantLabel || 'Variante'}</Label>
                   <Select
                     value={draftLine.variantId}
@@ -1547,7 +1547,7 @@ export function SaleFormDialog({
                       setLineError('');
                     }}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="w-full">
                       <SelectValue placeholder={`Selecciona ${draftProduct?.variantLabel?.toLowerCase() || 'una opcion'}`} />
                     </SelectTrigger>
                     <SelectContent>
@@ -1572,7 +1572,7 @@ export function SaleFormDialog({
                   </p>
                 </div>
               ) : null}
-              <div className="space-y-2">
+              <div className="min-w-0 space-y-2">
                 <Label>Cantidad</Label>
                 <Input
                   type="number"
@@ -1593,7 +1593,7 @@ export function SaleFormDialog({
                 />
               </div>
 
-              <div className="space-y-2">
+              <div className="min-w-0 space-y-2">
                 <Label>Precio unidad</Label>
                 <Input
                   type="number"

@@ -1568,8 +1568,8 @@ export function ProductFormDialog({
 
                         {saleMode === 'varianted' ? (
                           <div className="space-y-2 rounded-2xl border border-slate-200 bg-white p-4">
-                            <div className="flex items-center justify-between gap-3">
-                              <div>
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                              <div className="min-w-0">
                                 <p className="text-sm font-semibold text-slate-900">Atributos de la variante</p>
                                 {!variantTemplate ? (
                                   <p className="mt-1 text-xs text-slate-500">
@@ -1582,7 +1582,7 @@ export function ProductFormDialog({
                                   type="button"
                                   variant="outline"
                                   size="sm"
-                                  className="rounded-xl bg-white"
+                                  className="w-full rounded-xl bg-white sm:w-auto"
                                   disabled={structureLocked}
                                   onClick={addManualVariantAttribute}
                                 >
@@ -1626,12 +1626,12 @@ export function ProductFormDialog({
                                       {form.getValues(`variantAttributes.${index}.label`) || `Atributo ${index + 1}`}
                                     </p>
                                   ) : (
-                                    <div className="flex items-start gap-2">
+                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
                                       <FormField
                                         control={form.control}
                                         name={`variantAttributes.${index}.label`}
                                         render={({ field }) => (
-                                          <FormItem className="flex-1">
+                                          <FormItem className="min-w-0 flex-1">
                                             <FormControl>
                                               <Input
                                                 {...field}
@@ -1652,7 +1652,7 @@ export function ProductFormDialog({
                                         type="button"
                                         variant="ghost"
                                         size="icon"
-                                        className="mt-0.5 shrink-0 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-rose-600"
+                                        className="mt-0.5 shrink-0 self-end rounded-xl text-slate-500 hover:bg-slate-100 hover:text-rose-600 sm:self-auto"
                                         disabled={structureLocked}
                                         onClick={() => removeManualVariantAttribute(index)}
                                         aria-label="Eliminar atributo"
@@ -1741,7 +1741,7 @@ export function ProductFormDialog({
                                 <Button
                                   type="button"
                                   variant="outline"
-                                  className="rounded-xl"
+                                  className="w-full rounded-xl sm:w-auto"
                                   disabled={
                                     structureLocked ||
                                     !customSingleAxisValue.trim() ||
@@ -1918,7 +1918,7 @@ export function ProductFormDialog({
                                   className={
                                     usesSingleAxisTemplate
                                       ? 'grid grid-cols-[minmax(0,1fr)_120px_64px] items-end gap-3 border-b border-slate-100 px-3 py-2 last:border-b-0'
-                                      : 'grid gap-3 rounded-2xl border border-slate-200 bg-white p-3'
+                                      : 'grid min-w-0 gap-3 rounded-2xl border border-slate-200 bg-white p-3'
                                   }
                                 >
                                 {normalizedAttributeDefinitions.length > 0 ? (
@@ -1926,7 +1926,7 @@ export function ProductFormDialog({
                                     className={
                                       usesSingleAxisTemplate
                                         ? 'grid gap-2'
-                                        : `grid gap-3 ${normalizedAttributeDefinitions.length > 1 ? 'md:grid-cols-2' : ''}`
+                                        : `grid min-w-0 gap-3 ${normalizedAttributeDefinitions.length > 1 ? 'md:grid-cols-2' : ''}`
                                     }
                                   >
                                     {normalizedAttributeDefinitions.map((attribute, attributeIndex) => (
@@ -1935,7 +1935,7 @@ export function ProductFormDialog({
                                         control={form.control}
                                         name={`variants.${index}.attributeValues.${attributeIndex}`}
                                         render={({ field }) => (
-                                          <FormItem>
+                                          <FormItem className="min-w-0">
                                             {!usesSingleAxisTemplate ? <FormLabel>{attribute.label}</FormLabel> : null}
                                             <FormControl>
                                               <Input
@@ -2004,12 +2004,12 @@ export function ProductFormDialog({
                                 ) : null}
 
                                 {!usesSingleAxisTemplate ? (
-                                  <div className="grid gap-3 sm:grid-cols-[140px_140px_auto]">
+                                  <div className="grid gap-3 sm:grid-cols-3">
                                     <FormField
                                       control={form.control}
                                       name={`variants.${index}.salePrice`}
                                       render={({ field }) => (
-                                          <FormItem>
+                                          <FormItem className="min-w-0">
                                             <FormLabel>Precio venta</FormLabel>
                                             <FormControl>
                                               <Input type="number" min="0" step="0.01" {...field} />
@@ -2022,7 +2022,7 @@ export function ProductFormDialog({
                                       control={form.control}
                                       name={`variants.${index}.stock`}
                                       render={({ field }) => (
-                                          <FormItem>
+                                          <FormItem className="min-w-0">
                                             <FormLabel>Stock inicial</FormLabel>
                                             <FormControl>
                                             <Input type="number" min="0" {...field} disabled={structureLocked} />

@@ -155,7 +155,7 @@ function SearchableSelect({
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        className="w-[var(--radix-popover-trigger-width)] min-w-[280px] p-0"
+        className="w-[min(var(--radix-popover-trigger-width),calc(100vw-2rem))] min-w-[min(280px,calc(100vw-2rem))] p-0"
         align="start"
         onWheelCapture={(event) => {
           handleWheel(event.deltaY);
@@ -776,12 +776,12 @@ export function PurchaseFormDialog({
                       />
                     ) : null}
 
-                    <div className="grid gap-4 sm:grid-cols-[minmax(124px,0.72fr)_minmax(160px,0.92fr)] lg:grid-cols-3 sm:items-end">
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 sm:items-end">
                       <FormField
                         control={form.control}
                         name="items.0.presentationQuantity"
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="min-w-0">
                             <FormLabel>{firstItemIsPack12 ? 'Cantidad en unidades' : 'Cantidad comprada'}</FormLabel>
                             <FormControl>
                               <Input
@@ -807,7 +807,7 @@ export function PurchaseFormDialog({
                         control={form.control}
                         name="items.0.purchaseUnitValue"
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="min-w-0">
                             <FormLabel>{firstItemIsPack12 ? 'Valor unitario por pieza' : 'Valor unitario de compra'}</FormLabel>
                             <FormControl>
                               <Input
@@ -841,7 +841,7 @@ export function PurchaseFormDialog({
                         control={form.control}
                         name="items.0.suggestedSalePrice"
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="min-w-0">
                             <FormLabel>Precio sugerido de venta</FormLabel>
                             <FormControl>
                               <Input
@@ -897,7 +897,7 @@ export function PurchaseFormDialog({
                           <span className="font-medium text-slate-900">Total linea: {formatCurrency(firstPreview?.purchaseValueTotal ?? 0)}</span>
                         </div>
                         {firstItemVariantOptions.length > 0 ? (
-                          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-3">
+                          <div className="flex flex-col gap-2 border-t border-slate-200 pt-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                             <p className="text-xs text-slate-500">
                               {firstAvailableSiblingVariants.length > 0
                                 ? `Quedan ${formatNumber(firstAvailableSiblingVariants.length)} variantes disponibles para este producto.`
@@ -908,7 +908,7 @@ export function PurchaseFormDialog({
                                 type="button"
                                 variant="outline"
                                 size="sm"
-                                className="rounded-xl bg-white"
+                                className="w-full rounded-xl bg-white sm:w-auto"
                                 disabled={!firstLineCanSeedVariants}
                                 onClick={() =>
                                   openNewLineDialog(firstItemProduct.id, true, {
@@ -971,13 +971,13 @@ export function PurchaseFormDialog({
                             </p>
                           </div>
 
-                          <div className="flex gap-2 sm:shrink-0">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:shrink-0">
                             {selectedProduct && availableSiblingVariants.length > 0 ? (
                               <Button
                                 type="button"
                                 variant="ghost"
                                 size="sm"
-                                className="rounded-xl"
+                                className="w-full rounded-xl sm:w-auto"
                                 disabled={!canSeedSiblingVariants}
                                 onClick={() =>
                                   openNewLineDialog(selectedProduct.id, true, {
@@ -990,11 +990,11 @@ export function PurchaseFormDialog({
                                 Otra variante
                               </Button>
                             ) : null}
-                            <Button type="button" variant="ghost" size="sm" className="rounded-xl" onClick={() => openEditLineDialog(index)}>
+                            <Button type="button" variant="ghost" size="sm" className="w-full rounded-xl sm:w-auto" onClick={() => openEditLineDialog(index)}>
                               <Pencil className="mr-2 h-4 w-4" />
                               Editar
                             </Button>
-                            <Button type="button" variant="ghost" size="sm" className="rounded-xl" onClick={() => remove(index)}>
+                            <Button type="button" variant="ghost" size="sm" className="w-full rounded-xl sm:w-auto" onClick={() => remove(index)}>
                               <MinusCircle className="mr-2 h-4 w-4" />
                               Quitar
                             </Button>
@@ -1189,7 +1189,7 @@ export function PurchaseFormDialog({
             </div>
 
             {!isLockedVariantFlow ? (
-              <div className="space-y-2">
+              <div className="min-w-0 space-y-2">
                 <Label>{isDraftPack12 ? 'Valor unitario por pieza' : 'Valor unitario de compra'}</Label>
                   <Input
                     type="number"
@@ -1221,7 +1221,7 @@ export function PurchaseFormDialog({
           </div>
 
           {!isLockedVariantFlow ? (
-            <div className="space-y-2">
+            <div className="min-w-0 space-y-2">
               <Label>Precio sugerido de venta</Label>
               <Input
                 type="number"
