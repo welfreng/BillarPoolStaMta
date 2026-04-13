@@ -185,7 +185,7 @@ export function MovementFormDialog({
               await onSubmit(values);
               form.reset(defaultValues);
             })}
-            className="space-y-5"
+            className="space-y-4"
           >
             <div className="grid gap-4 md:grid-cols-2">
               <FormField

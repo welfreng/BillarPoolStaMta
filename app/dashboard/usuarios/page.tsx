@@ -217,7 +217,7 @@ export default function UsuariosPage() {
 
         {filteredUsers.length > 0 ? (
           <div className="min-w-0">
-            <div className="mb-2 text-xs text-slate-500">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
+            <div className="mb-2 hidden text-xs text-slate-500 md:block">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
             <div className="pb-2">
             <Table className="min-w-[760px]">
               <TableHeader>
@@ -227,7 +227,7 @@ export default function UsuariosPage() {
                   <TableHead>Rol</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Creado</TableHead>
-                  <TableHead className="sticky right-0 z-10 bg-slate-50/95 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
+                  <TableHead className="sticky right-0 z-10 bg-[rgba(248,250,252,0.96)] text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.22)] backdrop-blur">
                     Acciones
                   </TableHead>
                 </TableRow>
@@ -257,7 +257,7 @@ export default function UsuariosPage() {
                     </TableCell>
                     <TableCell>{item.status === 'active' ? 'Activo' : 'Inactivo'}</TableCell>
                     <TableCell>{new Date(item.createdAt).toLocaleDateString('es-CO')}</TableCell>
-                    <TableCell className="sticky right-0 bg-white/95 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
+                    <TableCell className="sticky right-0 bg-[rgba(248,250,252,0.96)] text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.22)] backdrop-blur">
                       <Button
                         type="button"
                         variant="outline"

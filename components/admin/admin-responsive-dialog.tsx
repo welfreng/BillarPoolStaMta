@@ -11,7 +11,6 @@ import {
 import {
   Sheet,
   SheetContent,
-  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
@@ -53,22 +52,21 @@ export function AdminResponsiveDialog({
         <SheetContent
           side="bottom"
           className={cn(
-            'flex h-[100dvh] max-h-[100dvh] flex-col gap-0 overflow-hidden rounded-t-[28px] border-slate-200 bg-gradient-to-b from-white via-slate-50/80 to-slate-100/90 px-0 shadow-2xl',
+            'flex h-[100dvh] max-h-[100dvh] flex-col gap-0 overflow-hidden rounded-t-[24px] border-slate-200 bg-gradient-to-b from-white via-slate-50/75 to-slate-100/85 px-0 shadow-2xl',
             mobileContentClassName
           )}
         >
-          <SheetHeader className={cn('shrink-0 border-b border-slate-200/80 px-3 pt-3 text-left sm:px-4 sm:pt-4', headerClassName)}>
-            <div className="mx-auto mb-3 h-1.5 w-14 rounded-full bg-slate-300/80" />
-            <SheetTitle className="pr-10 text-[1.05rem] font-semibold tracking-[-0.01em] text-slate-950">
+          <SheetHeader className={cn('shrink-0 border-b border-slate-200/80 px-3 pt-2.5 pb-2.5 text-left sm:px-4 sm:pt-4 sm:pb-3', headerClassName)}>
+            <div className="mx-auto mb-2.5 h-1.5 w-14 rounded-full bg-slate-300/80" />
+            <SheetTitle className="pr-10 text-[1rem] font-semibold tracking-[-0.01em] text-slate-950 sm:text-[1.05rem]">
               {title}
             </SheetTitle>
-            {description ? <SheetDescription>{description}</SheetDescription> : null}
           </SheetHeader>
-          <div className={cn('min-h-0 flex-1 overflow-y-auto px-3 py-3 pb-5 sm:px-4 sm:py-4 sm:pb-6', bodyClassName)}>{children}</div>
+          <div className={cn('min-h-0 flex-1 overflow-y-auto px-2.5 py-2.5 pb-4 sm:px-4 sm:py-4 sm:pb-6', bodyClassName)}>{children}</div>
           {footer ? (
             <div
               className={cn(
-                'shrink-0 border-t border-slate-200/90 bg-white/90 px-3 py-3 shadow-[0_-8px_24px_rgba(15,23,42,0.06)] backdrop-blur supports-[padding:max(0px)]:pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-4',
+                'shrink-0 border-t border-slate-200/90 bg-white/90 px-2.5 py-2.5 shadow-[0_-8px_24px_rgba(15,23,42,0.06)] backdrop-blur supports-[padding:max(0px)]:pb-[max(0.65rem,env(safe-area-inset-bottom))] sm:px-4 sm:py-3',
                 footerClassName
               )}
             >

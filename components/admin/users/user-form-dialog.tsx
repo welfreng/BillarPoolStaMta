@@ -115,7 +115,7 @@ export function UserFormDialog({
               await onSubmit(values);
               form.reset(defaultValues);
             })}
-            className="space-y-5"
+            className="space-y-4"
           >
             <FormField
               control={form.control}

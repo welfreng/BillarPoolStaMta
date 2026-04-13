@@ -192,7 +192,7 @@ export default function InventarioPage() {
 
             {filteredProducts.length > 0 ? (
               <div className="min-w-0">
-                <div className="mb-2 text-xs text-slate-500">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
+                <div className="mb-2 hidden text-xs text-slate-500 md:block">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
                 <div className="pb-2">
                   <Table className="min-w-[860px]">
                     <TableHeader>
@@ -202,7 +202,7 @@ export default function InventarioPage() {
                         <TableHead>Stock</TableHead>
                         <TableHead>Precio de venta</TableHead>
                         <TableHead>Estado</TableHead>
-                        <TableHead className="sticky right-0 z-10 bg-slate-50/95 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
+                        <TableHead className="sticky right-0 z-10 bg-[rgba(248,250,252,0.96)] text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.22)] backdrop-blur">
                           Accion
                         </TableHead>
                       </TableRow>
@@ -240,7 +240,7 @@ export default function InventarioPage() {
                                 {getStockAlertLabel(alert)}
                               </span>
                             </TableCell>
-                            <TableCell className="sticky right-0 bg-white/95 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
+                            <TableCell className="sticky right-0 bg-[rgba(248,250,252,0.96)] text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.22)] backdrop-blur">
                               <Button
                                 type="button"
                                 className="rounded-xl"
@@ -355,14 +355,14 @@ export default function InventarioPage() {
             <TabsContent value="movements" className="space-y-4">
               <div>
                 <p className="text-sm font-semibold text-slate-950">Historial de movimientos</p>
-                <p className="text-sm text-slate-500">
+                <p className="hidden text-sm text-slate-500 sm:block">
                   Entradas, salidas y ajustes para revisar lo que ha pasado en el inventario.
                 </p>
               </div>
 
               {filteredMovements.length > 0 ? (
                 <div className="min-w-0">
-                  <div className="mb-2 text-xs text-slate-500">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
+                  <div className="mb-2 hidden text-xs text-slate-500 lg:block">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
                   <div className="pb-2">
                   <Table className="min-w-[860px]">
                     <TableHeader>
@@ -374,7 +374,7 @@ export default function InventarioPage() {
                         <TableHead>Responsable</TableHead>
                         <TableHead>Valor</TableHead>
                         <TableHead>Fecha</TableHead>
-                        <TableHead className="sticky right-0 z-10 bg-slate-50/95 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
+                        <TableHead className="sticky right-0 z-10 bg-[rgba(248,250,252,0.96)] text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.22)] backdrop-blur">
                           Detalle
                         </TableHead>
                       </TableRow>
@@ -458,7 +458,7 @@ export default function InventarioPage() {
                               </div>
                             </TableCell>
                             <TableCell>{formatDateTime(movement.occurredAt)}</TableCell>
-                            <TableCell className="sticky right-0 bg-white/95 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
+                            <TableCell className="sticky right-0 bg-[rgba(248,250,252,0.96)] text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.22)] backdrop-blur">
                               {relatedSale ? (
                                 <Button
                                   type="button"
@@ -497,27 +497,27 @@ export default function InventarioPage() {
 
             <TabsContent value="stock" className="space-y-4">
               <div className="grid gap-4 md:grid-cols-3">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="rounded-[24px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.94)_100%)] p-3.5 shadow-sm sm:p-4">
                   <p className="text-sm text-slate-500">Unidades por producto</p>
                   <p className="mt-2 text-2xl font-semibold text-slate-950">{formatNumber(totalInventoryUnits)}</p>
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="rounded-[24px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.94)_100%)] p-3.5 shadow-sm sm:p-4">
                   <p className="text-sm text-slate-500">Valor por producto</p>
                   <p className="mt-2 text-2xl font-semibold text-slate-950">{formatCurrency(totalInventoryValue)}</p>
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="rounded-[24px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.94)_100%)] p-3.5 shadow-sm sm:p-4">
                   <p className="text-sm text-slate-500">Productos agotados</p>
                   <p className="mt-2 text-2xl font-semibold text-slate-950">{formatNumber(outOfStockCount)}</p>
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="rounded-[24px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.94)_100%)] p-3.5 shadow-sm sm:p-4">
                   <p className="text-sm text-slate-500">Unidades por variante</p>
                   <p className="mt-2 text-2xl font-semibold text-slate-950">{formatNumber(totalVariantUnits)}</p>
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="rounded-[24px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.94)_100%)] p-3.5 shadow-sm sm:p-4">
                   <p className="text-sm text-slate-500">Valor por variante</p>
                   <p className="mt-2 text-2xl font-semibold text-slate-950">{formatCurrency(totalVariantValue)}</p>
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="rounded-[24px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.94)_100%)] p-3.5 shadow-sm sm:p-4">
                   <p className="text-sm text-slate-500">Variantes agotadas</p>
                   <p className="mt-2 text-2xl font-semibold text-slate-950">{formatNumber(outOfStockVariantCount)}</p>
                 </div>
@@ -525,15 +525,15 @@ export default function InventarioPage() {
 
               <div>
                 <p className="text-sm font-semibold text-slate-950">Stock actual por producto</p>
-                <p className="text-sm text-slate-500">
+                <p className="hidden text-sm text-slate-500 sm:block">
                   Existencias reales, costo unitario y valor estimado del inventario por producto.
                 </p>
               </div>
 
               {inventorySummary.length > 0 ? (
                 <div className="min-w-0 space-y-6">
-                  <div className="mb-2 text-xs text-slate-500">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
-                  <div className="overflow-x-auto pb-2">
+                  <div className="mb-2 hidden text-xs text-slate-500 lg:block">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
+                  <div className="pb-2">
                   <Table className="min-w-[920px]">
                     <TableHeader>
                       <TableRow>
@@ -590,13 +590,13 @@ export default function InventarioPage() {
 
                   {variantInventorySummary.length > 0 ? (
                     <div className="space-y-3">
-                      <div>
+                      <div className="space-y-1">
                         <p className="text-sm font-semibold text-slate-950">Stock actual por variante</p>
-                        <p className="text-sm text-slate-500">
+                        <p className="hidden text-sm text-slate-500 sm:block">
                           Aqui si puedes ver precios, stock y agotados por cada combinacion real.
                         </p>
                       </div>
-                      <div className="overflow-x-auto pb-2">
+                      <div className="pb-2">
                         <Table className="min-w-[1080px]">
                           <TableHeader>
                             <TableRow>

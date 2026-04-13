@@ -165,7 +165,7 @@ export function ServiceFormDialog({
             })}
             className="space-y-6"
           >
-            <div className="grid gap-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:grid-cols-2">
+            <div className="grid gap-4 rounded-3xl border border-slate-200 bg-white p-3.5 shadow-sm sm:grid-cols-2 sm:p-5">
               <FormField
                 control={form.control}
                 name="serviceType"
@@ -248,7 +248,7 @@ export function ServiceFormDialog({
               />
             </div>
 
-            <div className="grid gap-4 rounded-3xl border border-slate-200 bg-slate-50/60 p-5 lg:grid-cols-2">
+            <div className="grid gap-4 rounded-3xl border border-slate-200 bg-slate-50/60 p-3.5 lg:grid-cols-2 sm:p-5">
               {(values.serviceType === 'tip-installation' || values.serviceType === 'tip-ferrule-installation') && (
                 <FormField
                   control={form.control}
@@ -362,14 +362,14 @@ export function ServiceFormDialog({
                     control={form.control}
                     name="includeSuppressor"
                     render={({ field }) => (
-                      <FormItem className="rounded-2xl border border-slate-200 bg-white p-4">
+                      <FormItem className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-4">
                         <div className="flex items-center gap-3">
                           <FormControl>
                             <Checkbox checked={field.value} onCheckedChange={(checked) => field.onChange(checked === true)} />
                           </FormControl>
                           <div>
                             <FormLabel>Agregar supresor</FormLabel>
-                            <p className="text-sm text-slate-500">Activalo si este trabajo tambien lleva supresor.</p>
+                            <p className="hidden text-sm text-slate-500 sm:block">Activalo si este trabajo tambien lleva supresor.</p>
                           </div>
                         </div>
                       </FormItem>
@@ -406,8 +406,8 @@ export function ServiceFormDialog({
               )}
             </div>
 
-            <div className="grid gap-4 rounded-3xl border border-cyan-100 bg-cyan-50/70 p-5 lg:grid-cols-[1.1fr_0.9fr]">
-              <div className="space-y-4">
+            <div className="grid gap-4 rounded-3xl border border-cyan-100 bg-cyan-50/70 p-3.5 lg:grid-cols-[1.1fr_0.9fr] sm:p-5">
+              <div className="space-y-3.5 sm:space-y-4">
                 <FormField
                   control={form.control}
                   name="servicePrice"
@@ -437,7 +437,7 @@ export function ServiceFormDialog({
                 />
               </div>
 
-              <div className="rounded-3xl border border-cyan-100 bg-white p-4">
+              <div className="rounded-3xl border border-cyan-100 bg-white p-3 sm:p-4">
                 <p className="text-sm font-semibold text-slate-950">Resumen del servicio</p>
                 <div className="mt-4 space-y-3">
                   {materialSummary.length > 0 ? (
@@ -451,7 +451,7 @@ export function ServiceFormDialog({
                       </div>
                     ))
                   ) : (
-                    <p className="text-sm text-slate-500">
+                    <p className="hidden text-sm text-slate-500 sm:block">
                       {hideFinancialSummary
                         ? 'Selecciona los insumos para revisar disponibilidad y registrar el trabajo.'
                         : 'Selecciona los insumos para calcular el costo del trabajo.'}

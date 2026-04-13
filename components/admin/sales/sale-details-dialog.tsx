@@ -3,13 +3,7 @@
 import { useEffect, useState } from 'react';
 import { jsPDF } from 'jspdf';
 import { BarChart3, Download, Printer, ReceiptText, Share2 } from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { AdminResponsiveDialog } from '@/components/admin/admin-responsive-dialog';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatCurrency, formatDateTime, formatNumber, getProductById } from '@/lib/admin/calculations';
@@ -537,16 +531,15 @@ export function SaleDetailsDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] w-[calc(100vw-1rem)] max-w-[96vw] overflow-y-auto px-4 sm:w-[calc(100vw-2rem)] sm:px-5 lg:max-w-4xl lg:px-6">
-        <DialogHeader>
-          <DialogTitle>Detalle de la venta</DialogTitle>
-          <DialogDescription>
-            Revisa el detalle de la venta y cambia a la factura del cliente para imprimir, descargar o compartir el PDF.
-          </DialogDescription>
-        </DialogHeader>
-
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'details' | 'invoice')} className="space-y-4">
+    <AdminResponsiveDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Detalle de la venta"
+      description="Revisa el detalle de la venta y cambia a la factura del cliente para imprimir, descargar o compartir el PDF."
+      desktopContentClassName="lg:max-w-4xl"
+      bodyClassName="px-3 py-3 pb-4 sm:px-5 sm:py-4 sm:pb-6"
+    >
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'details' | 'invoice')} className="space-y-3.5 sm:space-y-4">
           <TabsList className="grid w-full grid-cols-2 rounded-2xl bg-slate-100 p-1">
             <TabsTrigger value="details" className="rounded-xl">
               <BarChart3 className="mr-2 h-4 w-4" />
@@ -558,9 +551,9 @@ export function SaleDetailsDialog({
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="details" className="space-y-4">
+          <TabsContent value="details" className="space-y-3.5 sm:space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
                 <p className="text-xs text-slate-500">Cliente</p>
                 <p className="mt-1 font-semibold text-slate-950">{baseSale.customerName}</p>
                 {baseSale.customerPhone ? (
@@ -568,7 +561,7 @@ export function SaleDetailsDialog({
                 ) : null}
                 <p className="mt-1 text-sm text-slate-500">{formatDateTime(baseSale.soldAt)}</p>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
                 <p className="text-xs text-slate-500">Responsable</p>
                 <p className="mt-1 font-semibold text-slate-950">{baseSale.responsibleUser}</p>
                 <p className="mt-1 text-sm text-slate-500">Lineas vendidas: {formatNumber(lineItems.length)}</p>
@@ -576,32 +569,32 @@ export function SaleDetailsDialog({
             </div>
 
             <div className={`grid gap-3 sm:grid-cols-2 ${hideFinancialDetails ? 'xl:grid-cols-3' : 'xl:grid-cols-4'}`}>
-              <div className="rounded-2xl border border-cyan-100 bg-cyan-50/70 p-4">
+              <div className="rounded-2xl border border-cyan-100 bg-cyan-50/70 p-3 sm:p-4">
                 <p className="text-xs text-slate-500">Cantidad neta</p>
                 <p className="mt-1 font-semibold text-slate-950">{formatNumber(netUnits)} uds</p>
               </div>
-              <div className="rounded-2xl border border-cyan-100 bg-cyan-50/70 p-4">
+              <div className="rounded-2xl border border-cyan-100 bg-cyan-50/70 p-3 sm:p-4">
                 <p className="text-xs text-slate-500">Total factura</p>
                 <p className="mt-1 font-semibold text-slate-950">{formatCurrency(netRevenue)}</p>
               </div>
               {returnedUnits > 0 || returnedAmount > 0 ? (
-                <div className="rounded-2xl border border-rose-100 bg-rose-50/70 p-4">
+                <div className="rounded-2xl border border-rose-100 bg-rose-50/70 p-3 sm:p-4">
                   <p className="text-xs text-slate-500">Devoluciones</p>
                   <p className="mt-1 font-semibold text-rose-700">{formatNumber(returnedUnits)} uds</p>
                 </div>
               ) : (
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
                   <p className="text-xs text-slate-500">Estado</p>
                   <p className="mt-1 font-semibold text-slate-950">Venta activa</p>
                 </div>
               )}
               {!hideFinancialDetails ? (
                 <>
-                  <div className="rounded-2xl border border-amber-100 bg-amber-50/80 p-4">
+                  <div className="rounded-2xl border border-amber-100 bg-amber-50/80 p-3 sm:p-4">
                     <p className="text-xs text-slate-500">Costo neto</p>
                     <p className="mt-1 font-semibold text-amber-800">{formatCurrency(netCost)}</p>
                   </div>
-                  <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4">
+                  <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-3 sm:p-4">
                     <p className="text-xs text-slate-500">Utilidad neta</p>
                     <p className="mt-1 font-semibold text-emerald-800">{formatCurrency(netProfit)}</p>
                   </div>
@@ -611,16 +604,16 @@ export function SaleDetailsDialog({
 
             {(returnedUnits > 0 || returnedAmount > 0) && (
               <div className={`grid gap-3 ${hideFinancialDetails ? 'sm:grid-cols-2' : 'sm:grid-cols-3'}`}>
-                <div className="rounded-2xl border border-rose-100 bg-rose-50/70 p-4">
+                <div className="rounded-2xl border border-rose-100 bg-rose-50/70 p-3 sm:p-4">
                   <p className="text-xs text-slate-500">Unidades devueltas</p>
                   <p className="mt-1 font-semibold text-rose-700">{formatNumber(returnedUnits)} uds</p>
                 </div>
-                <div className="rounded-2xl border border-rose-100 bg-rose-50/70 p-4">
+                <div className="rounded-2xl border border-rose-100 bg-rose-50/70 p-3 sm:p-4">
                   <p className="text-xs text-slate-500">Valor devuelto</p>
                   <p className="mt-1 font-semibold text-rose-700">{formatCurrency(returnedAmount)}</p>
                 </div>
                 {!hideFinancialDetails ? (
-                  <div className="rounded-2xl border border-rose-100 bg-rose-50/70 p-4">
+                  <div className="rounded-2xl border border-rose-100 bg-rose-50/70 p-3 sm:p-4">
                     <p className="text-xs text-slate-500">Costo devuelto</p>
                     <p className="mt-1 font-semibold text-rose-700">{formatCurrency(returnedCost)}</p>
                   </div>
@@ -628,7 +621,7 @@ export function SaleDetailsDialog({
               </div>
             )}
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <div className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-4">
               <h3 className="text-sm font-semibold text-slate-950">
                 {hideFinancialDetails ? 'Detalle de productos' : 'Detalle interno de productos'}
               </h3>
@@ -638,10 +631,10 @@ export function SaleDetailsDialog({
                   return (
                     <div
                       key={`${item.productId}-${index}`}
-                      className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                      className="rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4"
                     >
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                        <div className="min-w-0">
                           <p className="font-medium text-slate-900">
                             {formatNumber(item.quantity)} x {getSaleLineDisplayName(product, item)}
                           </p>
@@ -650,7 +643,7 @@ export function SaleDetailsDialog({
                             <p className="text-sm text-slate-500">Costo unitario: {formatCurrency(item.realUnitCost)}</p>
                           ) : null}
                         </div>
-                        <div className="text-right">
+                        <div className="text-left sm:text-right">
                           <p className="text-xs text-slate-500">Total</p>
                           <p className="font-medium text-slate-900">{formatCurrency(item.totalSale)}</p>
                           {!hideFinancialDetails ? (
@@ -668,10 +661,10 @@ export function SaleDetailsDialog({
                   linkedServices.map((service, index) => (
                     <div
                       key={`${service.id}-${index}`}
-                      className="rounded-2xl border border-cyan-200 bg-cyan-50/70 p-4"
+                      className="rounded-2xl border border-cyan-200 bg-cyan-50/70 p-3 sm:p-4"
                     >
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                        <div className="min-w-0">
                           <p className="font-medium text-slate-900">
                             Servicio: {service.serviceCategory || 'torno'}
                           </p>
@@ -686,7 +679,7 @@ export function SaleDetailsDialog({
                                 : 'Instalacion de extension'}
                           </p>
                         </div>
-                        <div className="text-right">
+                        <div className="text-left sm:text-right">
                           <p className="text-xs text-slate-500">Total servicio</p>
                           <p className="font-medium text-slate-900">{formatCurrency(service.totalRevenue)}</p>
                           <p className="mt-2 text-xs text-slate-500">Costo servicio</p>
@@ -704,7 +697,7 @@ export function SaleDetailsDialog({
             </div>
 
             <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-4">
                 <h3 className="text-sm font-semibold text-slate-950">Obsequios de la venta</h3>
                 {giftItems.length > 0 ? (
                   <div className="mt-4 space-y-3">
@@ -713,7 +706,7 @@ export function SaleDetailsDialog({
                       return (
                         <div
                           key={`${giftItem.productId}-${index}`}
-                          className="flex items-center justify-between rounded-2xl bg-violet-50 p-4"
+                          className="flex flex-col gap-3 rounded-2xl bg-violet-50 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4"
                         >
                           <div>
                             <p className="font-medium text-slate-900">
@@ -735,7 +728,7 @@ export function SaleDetailsDialog({
                   <p className="mt-4 text-sm text-slate-500">Esta venta no tuvo productos obsequiados.</p>
                 )}
                 {automaticMaterialItems.length > 0 ? (
-                  <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
                     <p className="text-sm font-medium text-slate-900">Descuentos internos automaticos</p>
                     <div className="mt-2 space-y-2 text-sm text-slate-500">
                       {automaticMaterialItems.map((item, index) => {
@@ -751,7 +744,7 @@ export function SaleDetailsDialog({
                 ) : null}
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-4">
                 <h3 className="text-sm font-semibold text-slate-950">
                   {hideFinancialDetails ? 'Resumen de la venta' : 'Resumen interno'}
                 </h3>
@@ -780,7 +773,7 @@ export function SaleDetailsDialog({
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <div className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-4">
               <h3 className="text-sm font-semibold text-slate-950">Notas</h3>
               <p className="mt-3 text-sm leading-6 text-slate-600">
                 {baseSale.notes?.trim() ? baseSale.notes : 'Sin observaciones registradas.'}
@@ -788,23 +781,23 @@ export function SaleDetailsDialog({
             </div>
           </TabsContent>
 
-          <TabsContent value="invoice" className="space-y-4">
+          <TabsContent value="invoice" className="space-y-3.5 sm:space-y-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-              <Button type="button" variant="outline" className="rounded-xl" onClick={handlePrint}>
+              <Button type="button" variant="outline" className="w-full rounded-xl sm:w-auto" onClick={handlePrint}>
                 <Printer className="mr-2 h-4 w-4" />
                 Imprimir factura
               </Button>
               <Button
                 type="button"
                 variant="outline"
-                className="rounded-xl"
+                className="w-full rounded-xl sm:w-auto"
                 onClick={() => void handleDownloadPdf()}
                 disabled={isExportingPdf}
               >
                 <Download className="mr-2 h-4 w-4" />
                 {isExportingPdf ? 'Generando PDF...' : 'Descargar PDF'}
               </Button>
-              <Button type="button" className="rounded-xl" onClick={() => void handleSharePdf()} disabled={isExportingPdf}>
+              <Button type="button" className="w-full rounded-xl sm:w-auto" onClick={() => void handleSharePdf()} disabled={isExportingPdf}>
                 <Share2 className="mr-2 h-4 w-4" />
                 {isExportingPdf
                   ? 'Preparando...'
@@ -814,21 +807,21 @@ export function SaleDetailsDialog({
               </Button>
             </div>
 
-            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-start sm:justify-between">
+            <div className="rounded-3xl border border-slate-200 bg-white p-3.5 shadow-sm sm:p-5">
+              <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:gap-4 sm:pb-5 sm:flex-row sm:items-start sm:justify-between">
                 <div className="rounded-3xl bg-gradient-to-br from-[#082f49] to-[#0f766e] p-3 text-white shadow-sm">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-[70px] w-[70px] items-center justify-center rounded-2xl border border-white/20 bg-white/8 p-2">
+                    <div className="flex h-[58px] w-[58px] items-center justify-center rounded-2xl border border-white/20 bg-white/8 p-2 sm:h-[70px] sm:w-[70px]">
                       <img src={invoiceLogoUrl} alt="Logo Billar Pool Santa Marta" className="h-full w-full object-contain" />
                     </div>
                     <div className="flex min-w-0 flex-col justify-center">
                       <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-100">Factura de venta</p>
-                      <h3 className="mt-1 text-lg font-semibold text-white">Billar Pool Santa Marta</h3>
+                      <h3 className="mt-1 text-base font-semibold text-white sm:text-lg">Billar Pool Santa Marta</h3>
                       <p className="mt-1 text-xs text-cyan-100 sm:text-sm">Fecha: {formatDateTime(baseSale.soldAt)}</p>
                     </div>
                   </div>
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm sm:px-4">
                   <p className="text-slate-500">Cliente</p>
                   <p className="mt-1 font-semibold text-slate-950">{baseSale.customerName}</p>
                   {baseSale.customerPhone ? (
@@ -838,13 +831,13 @@ export function SaleDetailsDialog({
                 </div>
               </div>
 
-              <div className="mt-5 rounded-2xl border border-cyan-100 bg-gradient-to-r from-cyan-50 to-teal-50 p-4">
-                <p className="text-sm text-cyan-900">
+              <div className="mt-4 rounded-2xl border border-cyan-100 bg-gradient-to-r from-cyan-50 to-teal-50 p-3 sm:mt-5 sm:p-4">
+                <p className="text-sm leading-5 text-cyan-900">
                   Gracias por tu compra. Puedes imprimir esta factura o compartirla como PDF por WhatsApp.
                 </p>
               </div>
 
-              <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200">
+              <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 sm:mt-5">
                 <div className="hidden grid-cols-[0.8fr_2.2fr_1fr_1fr] gap-3 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 md:grid">
                   <p>Cantidad</p>
                   <p>Producto</p>
@@ -856,7 +849,7 @@ export function SaleDetailsDialog({
                     return (
                       <div
                         key={`${item.name}-${index}`}
-                        className="grid gap-3 px-4 py-4 text-sm text-slate-700 md:grid-cols-[0.8fr_2.2fr_1fr_1fr] md:items-center"
+                        className="grid gap-2.5 px-3 py-3 text-sm text-slate-700 sm:px-4 sm:py-4 md:grid-cols-[0.8fr_2.2fr_1fr_1fr] md:items-center"
                       >
                         <div className="grid grid-cols-2 gap-3 md:contents">
                           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 md:hidden">Cantidad</p>
@@ -880,8 +873,8 @@ export function SaleDetailsDialog({
                 </div>
               </div>
 
-              <div className="mt-5 grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="mt-4 grid gap-4 xl:grid-cols-[1.2fr_0.8fr] sm:mt-5">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
                   <h4 className="text-sm font-semibold text-slate-950">Obsequios</h4>
                   {giftItems.length > 0 ? (
                     <div className="mt-3 space-y-2 text-sm text-slate-600">
@@ -906,7 +899,7 @@ export function SaleDetailsDialog({
                   ) : null}
                 </div>
 
-                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-4">
                   <div className="space-y-3 text-sm">
                     <div className="flex items-center justify-between">
                       <span className="text-slate-500">Subtotal productos</span>
@@ -928,7 +921,6 @@ export function SaleDetailsDialog({
             </div>
           </TabsContent>
         </Tabs>
-      </DialogContent>
-    </Dialog>
+    </AdminResponsiveDialog>
   );
 }

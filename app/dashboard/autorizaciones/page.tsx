@@ -3,18 +3,11 @@
 import { useMemo, useState } from 'react';
 import { CheckCircle2, Clock3, ShieldCheck, XCircle } from 'lucide-react';
 import { SectionHeader } from '@/components/admin/shared/section-header';
+import { AdminResponsiveDialog } from '@/components/admin/admin-responsive-dialog';
 import { useAdminData } from '@/components/admin/admin-data-context';
 import { useAuth } from '@/components/auth-context';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
@@ -110,15 +103,15 @@ export default function AutorizacionesPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6">
       <SectionHeader
         eyebrow="Control de aprobaciones"
         title="Autorizaciones"
         description="Aprueba o rechaza las solicitudes que envian los vendedores para editar o devolver ventas."
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
+      <div className="grid gap-3.5 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
+        <div className="rounded-3xl border border-amber-200 bg-amber-50 p-3.5 shadow-sm sm:p-5">
           <div className="flex items-center gap-3">
             <div className="rounded-2xl bg-white/80 p-3 text-amber-800">
               <Clock3 className="h-5 w-5" />
@@ -129,7 +122,7 @@ export default function AutorizacionesPage() {
             </div>
           </div>
         </div>
-        <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
+        <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-3.5 shadow-sm sm:p-5">
           <div className="flex items-center gap-3">
             <div className="rounded-2xl bg-white/80 p-3 text-emerald-800">
               <CheckCircle2 className="h-5 w-5" />
@@ -140,7 +133,7 @@ export default function AutorizacionesPage() {
             </div>
           </div>
         </div>
-        <div className="rounded-3xl border border-rose-200 bg-rose-50 p-5 shadow-sm">
+        <div className="rounded-3xl border border-rose-200 bg-rose-50 p-3.5 shadow-sm sm:p-5">
           <div className="flex items-center gap-3">
             <div className="rounded-2xl bg-white/80 p-3 text-rose-800">
               <XCircle className="h-5 w-5" />
@@ -153,11 +146,11 @@ export default function AutorizacionesPage() {
         </div>
       </div>
 
-      <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div className="rounded-3xl border border-slate-200 bg-white p-3.5 shadow-sm sm:p-6">
+        <div className="flex flex-col gap-3.5 md:flex-row md:items-center md:justify-between md:gap-4">
           <div>
             <h2 className="text-lg font-semibold text-slate-950">Bandeja de solicitudes</h2>
-            <p className="text-sm text-slate-500">
+            <p className="hidden text-sm text-slate-500 sm:block">
               Aqui revisas quien solicita editar o devolver una venta antes de autorizarla.
             </p>
           </div>
@@ -169,7 +162,7 @@ export default function AutorizacionesPage() {
           />
         </div>
 
-        <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50/70 p-2">
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-2 sm:mt-5">
           <div className="pb-2">
             <Table className="min-w-[980px] bg-white">
               <TableHeader>
@@ -248,7 +241,7 @@ export default function AutorizacionesPage() {
         </div>
       </div>
 
-      <Dialog
+      <AdminResponsiveDialog
         open={Boolean(selectedRequest)}
         onOpenChange={(open) => {
           if (!open) {
@@ -256,18 +249,32 @@ export default function AutorizacionesPage() {
             setReviewNote('');
           }
         }}
+        title="Revisar solicitud"
+        description="Confirma si autorizas la accion solicitada por el vendedor."
+        desktopContentClassName="sm:max-w-2xl"
+        footer={
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
+            <Button
+              variant="outline"
+              className="w-full rounded-xl border-rose-200 text-rose-700 hover:bg-rose-50 sm:w-auto"
+              onClick={() => void handleReview('rejected')}
+              disabled={!selectedRequest || selectedRequest.status !== 'pending'}
+            >
+              Rechazar
+            </Button>
+            <Button
+              className="w-full rounded-xl sm:w-auto"
+              onClick={() => void handleReview('approved')}
+              disabled={!selectedRequest || selectedRequest.status !== 'pending'}
+            >
+              Aprobar
+            </Button>
+          </div>
+        }
       >
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Revisar solicitud</DialogTitle>
-            <DialogDescription>
-              Confirma si autorizas la accion solicitada por el vendedor.
-            </DialogDescription>
-          </DialogHeader>
-
           {selectedRequest ? (
-            <div className="space-y-4">
-              <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2">
+            <div className="space-y-3.5 sm:space-y-4">
+              <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-2 sm:p-4">
                 <div>
                   <p className="text-xs uppercase tracking-wide text-slate-500">Tipo</p>
                   <p className="mt-1 font-medium text-slate-900">
@@ -288,7 +295,7 @@ export default function AutorizacionesPage() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-slate-200 p-4">
+              <div className="rounded-2xl border border-slate-200 p-3 sm:p-4">
                 <p className="text-xs uppercase tracking-wide text-slate-500">Venta</p>
                 <p className="mt-1 text-sm font-medium text-slate-900">{selectedRequest.saleSummary}</p>
                 <p className="mt-3 text-xs uppercase tracking-wide text-slate-500">Motivo enviado</p>
@@ -306,26 +313,7 @@ export default function AutorizacionesPage() {
               </div>
             </div>
           ) : null}
-
-          <DialogFooter className="gap-2 sm:justify-between">
-            <Button
-              variant="outline"
-              className="rounded-xl border-rose-200 text-rose-700 hover:bg-rose-50"
-              onClick={() => void handleReview('rejected')}
-              disabled={!selectedRequest || selectedRequest.status !== 'pending'}
-            >
-              Rechazar
-            </Button>
-            <Button
-              className="rounded-xl"
-              onClick={() => void handleReview('approved')}
-              disabled={!selectedRequest || selectedRequest.status !== 'pending'}
-            >
-              Aprobar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      </AdminResponsiveDialog>
     </div>
   );
 }

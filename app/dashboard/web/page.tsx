@@ -126,7 +126,7 @@ export default function WebPageManagementPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6">
       <SectionHeader
         eyebrow="Gestion web"
         title="Pagina web y contenido visual"
@@ -143,26 +143,26 @@ export default function WebPageManagementPage() {
         }
       />
 
-      <div className="grid gap-6 2xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
-        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="grid gap-4 sm:gap-6 2xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
+        <section className="rounded-3xl border border-slate-200 bg-white p-3.5 shadow-sm sm:p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
             <div className="rounded-2xl bg-cyan-50 p-3">
               <Globe className="h-5 w-5 text-cyan-700" />
             </div>
             <div>
               <h2 className="text-lg font-semibold text-slate-950">Catalogo y tienda virtual</h2>
-              <p className="mt-1 text-sm leading-6 text-slate-500">
+              <p className="mt-1 hidden text-sm leading-6 text-slate-500 sm:block">
                 Desde aqui puedes cambiar las fotos que se ven en la portada destacada y en la tienda virtual sin tocar el inventario.
               </p>
             </div>
           </div>
 
-          <div className="mt-5 rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-5">
+          <div className="mt-4 rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-3.5 sm:mt-5 sm:p-5">
             <p className="text-sm font-medium text-slate-900">Recomendacion</p>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
+            <p className="mt-2 hidden text-sm leading-6 text-slate-600 sm:block">
               Lo mejor es concentrar aqui todo lo visual de la web: fotos del catalogo, galeria de servicios y luego textos destacados si decides cambiarlos despues.
             </p>
-            <div className="mt-4 grid gap-2 sm:flex sm:flex-wrap">
+            <div className="mt-3 grid gap-2 sm:mt-4 sm:flex sm:flex-wrap">
               <Button
                 type="button"
                 variant="outline"
@@ -186,20 +186,20 @@ export default function WebPageManagementPage() {
           </div>
         </section>
 
-        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <section className="rounded-3xl border border-slate-200 bg-white p-3.5 shadow-sm sm:p-5">
           <div>
             <h2 className="text-lg font-semibold text-slate-950">Trabajos del torno en servicios</h2>
-            <p className="mt-1 text-sm leading-6 text-slate-500">
+            <p className="mt-1 hidden text-sm leading-6 text-slate-500 sm:block">
               Sube maximo 3 imagenes de cambios de casquillo, suela u otros trabajos en tacos. Asi se ve profesional y no recarga la pagina.
             </p>
-            <p>Las imagenes ahora se optimizan automaticamente al subirlas desde el celular.</p>
+            <p className="hidden text-sm text-slate-500 sm:block">Las imagenes ahora se optimizan automaticamente al subirlas desde el celular.</p>
           </div>
 
-          <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="mt-4 grid gap-3.5 sm:mt-5 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
             {serviceSlots.map((slot) => {
               const image = draftServiceImages[slot] || '';
               return (
-                <div key={slot} className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                <div key={slot} className="rounded-3xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
                   <div className="overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-100">
                     <div className="relative aspect-[4/5] w-full">
                       {image ? (
@@ -218,7 +218,7 @@ export default function WebPageManagementPage() {
                     </div>
                   </div>
 
-                  <div className="mt-4 space-y-3">
+                  <div className="mt-3 space-y-2.5 sm:mt-4 sm:space-y-3">
                     <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:border-cyan-400 hover:bg-cyan-50">
                       <ImagePlus className="h-4 w-4" />
                       Subir imagen
@@ -269,14 +269,14 @@ export default function WebPageManagementPage() {
             })}
           </div>
 
-          <div className="mt-5 flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <div className="mt-4 hidden flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-3.5 text-sm text-amber-900 sm:mt-5 sm:flex sm:p-4">
             <p className="font-medium">Sugerencia visual</p>
             <p>
-              Lo mejor es mostrar solo 2 o 3 fotos pequeñas de trabajos reales debajo del bloque del torno. Asi inspiran confianza sin que la pagina se vea empañada o recargada.
+              Lo mejor es mostrar solo 2 o 3 fotos pequenas de trabajos reales debajo del bloque del torno. Asi inspiran confianza sin que la pagina se vea ligera y no recargada.
             </p>
           </div>
 
-          <div className="mt-5 grid gap-2 sm:flex sm:flex-wrap sm:justify-end">
+          <div className="mt-4 grid gap-2 sm:mt-5 sm:flex sm:flex-wrap sm:justify-end">
             <Button
               type="button"
               variant="outline"

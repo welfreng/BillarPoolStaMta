@@ -4,14 +4,8 @@ import Image from 'next/image';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { collection, doc, onSnapshot, serverTimestamp, setDoc, type DocumentData } from 'firebase/firestore';
 import { Check, ImagePlus, Images, LoaderCircle, RotateCcw } from 'lucide-react';
+import { AdminResponsiveDialog } from '@/components/admin/admin-responsive-dialog';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import {
   buildCatalogVariantImageKey,
@@ -314,16 +308,15 @@ export function CatalogImageDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] w-[min(1040px,calc(100vw-1rem))] max-w-[min(1040px,calc(100vw-1rem))] overflow-y-auto px-4 sm:max-w-[min(1040px,calc(100vw-3rem))] sm:px-5 lg:px-6">
-        <DialogHeader>
-          <DialogTitle>Imagenes del catalogo web</DialogTitle>
-          <DialogDescription>
-            Aqui cambias las imagenes de los productos que se muestran en la tienda virtual y en los destacados.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4">
+    <AdminResponsiveDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Imagenes del catalogo web"
+      description="Aqui cambias las imagenes de los productos que se muestran en la tienda virtual y en los destacados."
+      desktopContentClassName="max-w-[1040px]"
+      bodyClassName="px-3 py-3 pb-4 sm:px-5 sm:py-4 sm:pb-6"
+    >
+        <div className="space-y-3.5 sm:space-y-4">
           <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto]">
             <Input
               value={search}
@@ -361,32 +354,32 @@ export function CatalogImageDialog({
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
               <p className="text-xs text-slate-500">Productos visibles</p>
               <p className="mt-1 text-2xl font-semibold text-slate-950">{summary.totalProducts}</p>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
               <p className="text-xs text-slate-500">Productos con variantes</p>
               <p className="mt-1 text-2xl font-semibold text-slate-950">{summary.productsWithVariants}</p>
             </div>
-            <div className="rounded-2xl border border-cyan-200 bg-cyan-50 p-4">
+            <div className="rounded-2xl border border-cyan-200 bg-cyan-50 p-3 sm:p-4">
               <p className="text-xs text-cyan-800">Variantes con foto web</p>
               <p className="mt-1 text-2xl font-semibold text-cyan-950">{summary.variantsWithImage}</p>
             </div>
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 sm:p-4">
               <p className="text-xs text-amber-800">Variantes pendientes</p>
               <p className="mt-1 text-2xl font-semibold text-amber-950">{summary.variantsPending}</p>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+          <div className="hidden rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 sm:block">
             La imagen principal sigue siendo la base del producto. Solo sube imagen por variante cuando esa combinacion realmente necesite verse distinta en la web.
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-3.5 sm:space-y-4">
             {filteredItems.map((item) => (
-            <div key={item.id} className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm lg:p-5">
-              <div className="grid gap-5 xl:grid-cols-[180px_minmax(0,1fr)] xl:items-start">
+            <div key={item.id} className="rounded-[28px] border border-slate-200 bg-white p-3.5 shadow-sm lg:p-5">
+              <div className="grid gap-4 xl:grid-cols-[180px_minmax(0,1fr)] xl:items-start xl:gap-5">
                 <div className="overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-100">
                   <div className="relative aspect-square w-full">
                     <Image
@@ -398,7 +391,7 @@ export function CatalogImageDialog({
                     />
                   </div>
                 </div>
-                <div className="min-w-0 space-y-4">
+                <div className="min-w-0 space-y-3 sm:space-y-4">
                   <div className="space-y-2">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -423,7 +416,7 @@ export function CatalogImageDialog({
                         </span>
                       </div>
                     ) : null}
-                    <p className="text-xs leading-5 text-slate-500">
+                    <p className="hidden text-xs leading-5 text-slate-500 sm:block">
                       {overrides.byProductId[item.id] ||
                       overrides.byProductName[normalizeCatalogImageName(item.name)]
                         ? 'Esta imagen esta activa en la web y puedes usarla como base del producto.'
@@ -508,11 +501,11 @@ export function CatalogImageDialog({
               </div>
 
               {item.variants.length > 0 ? (
-                <details className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <details className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:mt-5 sm:p-4">
                   <summary className="cursor-pointer text-sm font-medium text-slate-900">
                     Imagenes por variante ({item.variants.length})
                   </summary>
-                  <p className="mt-2 text-xs text-slate-500">
+                  <p className="mt-2 hidden text-xs text-slate-500 sm:block">
                     Solo carga foto por variante cuando realmente la necesites en la web. Si no, se usa la imagen principal.
                   </p>
                   <div className="mt-4 space-y-3">
@@ -627,8 +620,7 @@ export function CatalogImageDialog({
             ))}
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+    </AdminResponsiveDialog>
   );
 }
 

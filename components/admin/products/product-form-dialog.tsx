@@ -1317,9 +1317,9 @@ export function ProductFormDialog({
                   value="product-info"
                   title="Informacion del producto"
                   defaultOpen
-                  className="rounded-3xl border border-slate-200 bg-white p-3.5 shadow-sm sm:p-4"
-                  headerClassName="mb-3"
-                  contentClassName="space-y-4"
+                  className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4"
+                  headerClassName="mb-2.5 sm:mb-3"
+                  contentClassName="space-y-3 sm:space-y-4"
                 >
                     <FormField
                       control={form.control}
@@ -1342,7 +1342,7 @@ export function ProductFormDialog({
                         <FormItem>
                           <FormLabel>Descripcion</FormLabel>
                           <FormControl>
-                            <Textarea rows={4} placeholder="Describe el producto y su valor para el cliente." {...field} />
+                            <Textarea rows={3} placeholder="Describe el producto y su valor para el cliente." {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -1473,10 +1473,10 @@ export function ProductFormDialog({
                     <div
                       className={
                         variantGuidance.tone === 'varianted'
-                          ? 'rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900'
+                          ? 'hidden rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 sm:block'
                           : variantGuidance.tone === 'simple'
-                            ? 'rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700'
-                            : 'rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm text-cyan-900'
+                            ? 'hidden rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 sm:block'
+                            : 'hidden rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm text-cyan-900 sm:block'
                       }
                     >
                       <div className="flex items-start gap-3">
@@ -1494,7 +1494,7 @@ export function ProductFormDialog({
                       </div>
                     </div>
 
-                    <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                    <div className="space-y-2.5 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 sm:space-y-3 sm:p-4">
                       {variantsDisabledForSelection ? (
                         <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
                           <span className="font-semibold text-slate-900">
@@ -1513,7 +1513,7 @@ export function ProductFormDialog({
                             type="button"
                             variant="outline"
                             size="sm"
-                            className="rounded-xl bg-white"
+                            className="rounded-xl bg-white max-sm:h-9"
                             disabled={structureLocked}
                             onClick={applyVariantTemplate}
                           >
@@ -1559,7 +1559,7 @@ export function ProductFormDialog({
                           />
 
                           {variantTemplate ? (
-                            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                            <div className="hidden rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 sm:block">
                               <span className="font-semibold text-slate-900">{variantTemplate.label}</span>{' '}
                               {variantTemplate.helper}
                             </div>
@@ -1567,12 +1567,12 @@ export function ProductFormDialog({
                         </div>
 
                         {saleMode === 'varianted' ? (
-                          <div className="space-y-2 rounded-2xl border border-slate-200 bg-white p-4">
+                          <div className="space-y-2 rounded-2xl border border-slate-200 bg-white p-3 sm:p-4">
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                               <div className="min-w-0">
                                 <p className="text-sm font-semibold text-slate-900">Atributos de la variante</p>
                                 {!variantTemplate ? (
-                                  <p className="mt-1 text-xs text-slate-500">
+                                  <p className="mt-1 hidden text-xs text-slate-500 sm:block">
                                     Paso 1: define primero los atributos. Paso 2: agrega las variantes reales.
                                   </p>
                                 ) : null}
@@ -1582,7 +1582,7 @@ export function ProductFormDialog({
                                   type="button"
                                   variant="outline"
                                   size="sm"
-                                  className="w-full rounded-xl bg-white sm:w-auto"
+                                  className="h-9 w-full rounded-xl bg-white sm:h-10 sm:w-auto"
                                   disabled={structureLocked}
                                   onClick={addManualVariantAttribute}
                                 >
@@ -1600,7 +1600,7 @@ export function ProductFormDialog({
                                     type="button"
                                     variant="outline"
                                     size="sm"
-                                    className="rounded-full bg-slate-50"
+                                    className="h-9 rounded-full bg-slate-50 px-3"
                                     disabled={
                                       structureLocked ||
                                       form
@@ -1620,7 +1620,7 @@ export function ProductFormDialog({
 
                             {attributeFields.length > 0 ? (
                               attributeFields.map((field, index) => (
-                                <div key={field.id} className="rounded-2xl border border-slate-200 p-3">
+                                <div key={field.id} className="rounded-2xl border border-slate-200 p-2.5 sm:p-3">
                                   {!templateAllowsAttributeEditing ? (
                                     <p className="text-sm font-semibold text-slate-900">
                                       {form.getValues(`variantAttributes.${index}.label`) || `Atributo ${index + 1}`}
@@ -1652,7 +1652,7 @@ export function ProductFormDialog({
                                         type="button"
                                         variant="ghost"
                                         size="icon"
-                                        className="mt-0.5 shrink-0 self-end rounded-xl text-slate-500 hover:bg-slate-100 hover:text-rose-600 sm:self-auto"
+                                        className="mt-0.5 h-9 w-9 shrink-0 self-end rounded-xl text-slate-500 hover:bg-slate-100 hover:text-rose-600 sm:self-auto"
                                         disabled={structureLocked}
                                         onClick={() => removeManualVariantAttribute(index)}
                                         aria-label="Eliminar atributo"
@@ -1664,7 +1664,7 @@ export function ProductFormDialog({
                                 </div>
                               ))
                             ) : templateAllowsAttributeEditing ? (
-                              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                              <div className="hidden rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-500 sm:block">
                                 Empieza por definir al menos un atributo, por ejemplo `Color`, `Tamano` o `Presentacion`.
                               </div>
                             ) : null}
@@ -2004,7 +2004,7 @@ export function ProductFormDialog({
                                 ) : null}
 
                                 {!usesSingleAxisTemplate ? (
-                                  <div className="grid gap-3 sm:grid-cols-3">
+                                  <div className="grid gap-2.5 sm:grid-cols-3 sm:gap-3">
                                     <FormField
                                       control={form.control}
                                       name={`variants.${index}.salePrice`}
@@ -2035,7 +2035,7 @@ export function ProductFormDialog({
                                       <Button
                                         type="button"
                                         variant="outline"
-                                        className="w-full rounded-xl"
+                                        className="h-10 w-full rounded-xl"
                                         disabled={structureLocked}
                                         onClick={() => removeVariant(index)}
                                       >
@@ -2046,7 +2046,7 @@ export function ProductFormDialog({
                                 ) : null}
 
                                 {!usesSingleAxisTemplate ? (
-                                  <div className="rounded-2xl bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                                  <div className="rounded-2xl bg-slate-50 px-3 py-2 text-sm leading-5 text-slate-600">
                                     Nombre generado: {buildVariantDisplayName({
                                       name: '',
                                       attributes: normalizedAttributeDefinitions.reduce<Record<string, string>>((accumulator, attribute, attributeIndex) => {
@@ -2062,7 +2062,7 @@ export function ProductFormDialog({
                             </div>
                             )
                           ) : (
-                            <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-5 text-sm text-slate-500">
+                            <div className="hidden rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-5 text-sm text-slate-500 sm:block">
                               {saleMode === 'varianted'
                                 ? variantTemplate?.mode === 'manual-combinations'
                                   ? 'Agrega combinaciones reales para stock, costo y precio por variante.'
@@ -2079,7 +2079,7 @@ export function ProductFormDialog({
                             <Button
                               type="button"
                               variant="outline"
-                              className="rounded-xl bg-white"
+                              className="h-10 rounded-xl bg-white"
                               disabled={structureLocked || (templateAllowsAttributeEditing && !canAddManualVariants)}
                               onClick={() =>
                                 appendVariant({
@@ -2099,7 +2099,7 @@ export function ProductFormDialog({
                           ) : null}
 
                           {saleMode === 'varianted' && templateAllowsAttributeEditing && !canAddManualVariants ? (
-                            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                            <div className="hidden rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 sm:block">
                               Define primero los atributos para habilitar la carga de combinaciones.
                             </div>
                           ) : null}
@@ -2113,12 +2113,12 @@ export function ProductFormDialog({
                 <AdminMobileSection
                   value="product-commerce"
                   title="Configuracion comercial"
-                  className="rounded-3xl border border-slate-200 bg-white p-3.5 shadow-sm sm:p-4"
-                  headerClassName="mb-3"
+                  className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4"
+                  headerClassName="mb-2.5 sm:mb-3"
                 >
                   <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
                     {usesCompactVariantEditor && compactEditorConfig?.priceMode === 'global' ? (
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                      <div className="hidden rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 sm:block">
                         El precio global de este preset de variantes se configura arriba, dentro del bloque de variantes.
                       </div>
                     ) : (
@@ -2166,7 +2166,7 @@ export function ProductFormDialog({
                       control={form.control}
                       name="featured"
                       render={({ field }) => (
-                        <FormItem className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                        <FormItem className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3 sm:p-4">
                           <div className="flex items-start gap-3">
                             <FormControl>
                               <Checkbox checked={field.value} onCheckedChange={(checked) => field.onChange(checked === true)} />
@@ -2183,19 +2183,19 @@ export function ProductFormDialog({
                 </AdminMobileSection>
               </div>
 
-              <AdminMobileSection
-                value="product-image"
-                title="Imagen"
-                className="space-y-3 rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-slate-100 p-3.5 shadow-sm sm:p-4"
-                defaultOpen
-              >
+                <AdminMobileSection
+                  value="product-image"
+                  title="Imagen"
+                  className="space-y-3 rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-slate-100 p-3 shadow-sm sm:p-4"
+                  defaultOpen
+                >
                 <FormField
                   control={form.control}
                   name="image"
                   render={({ field }) => (
                     <FormItem>
                       <FormControl>
-                        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_240px] md:items-start">
+                        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_240px] md:items-start md:gap-4">
                           <input
                             ref={imageInputRef}
                             type="file"
@@ -2206,7 +2206,7 @@ export function ProductFormDialog({
                           <button
                             type="button"
                             onClick={() => imageInputRef.current?.click()}
-                            className="block min-h-[220px] w-full rounded-3xl border border-dashed border-slate-300 bg-white p-4 text-left transition hover:border-slate-400 hover:shadow-sm"
+                            className="block min-h-[190px] w-full rounded-3xl border border-dashed border-slate-300 bg-white p-3.5 text-left transition hover:border-slate-400 hover:shadow-sm sm:min-h-[220px] sm:p-4"
                           >
                             <div>
                               <p className="text-sm font-medium text-slate-700">Cargar imagen</p>

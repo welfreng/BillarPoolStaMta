@@ -103,30 +103,30 @@ export default function ServiciosPage() {
         <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
           <p className="text-sm text-slate-500">Servicios registrados</p>
           <p className="mt-3 text-3xl font-semibold text-slate-950">{formatNumber(filteredServices.length)}</p>
-          <p className="mt-2 text-sm text-slate-500">Trabajos visibles con el filtro actual.</p>
+          <p className="mt-2 hidden text-sm text-slate-500 sm:block">Trabajos visibles con el filtro actual.</p>
         </div>
         {isSalesUser ? (
           <div className="rounded-[28px] border border-cyan-200 bg-[linear-gradient(180deg,rgba(236,254,255,0.98)_0%,rgba(207,250,254,0.82)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
             <p className="text-sm text-cyan-800">Servicios del mes</p>
             <p className="mt-3 text-3xl font-semibold text-cyan-950">{formatNumber(monthTotals.count)}</p>
-            <p className="mt-2 text-sm text-cyan-900">Trabajos registrados en {currentMonth}.</p>
+            <p className="mt-2 hidden text-sm text-cyan-900 sm:block">Trabajos registrados en {currentMonth}.</p>
           </div>
         ) : (
           <>
             <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
               <p className="text-sm text-slate-500">Ingresos del mes</p>
               <p className="mt-3 text-3xl font-semibold text-slate-950">{formatCurrency(monthTotals.revenue)}</p>
-              <p className="mt-2 text-sm text-slate-500">Total cobrado en {currentMonth}.</p>
+              <p className="mt-2 hidden text-sm text-slate-500 sm:block">Total cobrado en {currentMonth}.</p>
             </div>
             <div className="rounded-[28px] border border-amber-200 bg-[linear-gradient(180deg,rgba(255,251,235,0.98)_0%,rgba(254,243,199,0.82)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
               <p className="text-sm text-amber-800">Costo del servicio</p>
               <p className="mt-3 text-3xl font-semibold text-amber-950">{formatCurrency(monthTotals.cost)}</p>
-              <p className="mt-2 text-sm text-amber-900">Incluye materiales y costo operativo cuando aplique.</p>
+              <p className="mt-2 hidden text-sm text-amber-900 sm:block">Incluye materiales y costo operativo cuando aplique.</p>
             </div>
             <div className="rounded-[28px] border border-emerald-200 bg-[linear-gradient(180deg,rgba(236,253,245,0.98)_0%,rgba(209,250,229,0.82)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
               <p className="text-sm text-emerald-800">Utilidad del torno</p>
               <p className="mt-3 text-3xl font-semibold text-emerald-950">{formatCurrency(monthTotals.profit)}</p>
-              <p className="mt-2 text-sm text-emerald-900">{formatNumber(monthTotals.count)} servicios en el mes actual.</p>
+              <p className="mt-2 hidden text-sm text-emerald-900 sm:block">{formatNumber(monthTotals.count)} servicios en el mes actual.</p>
             </div>
           </>
         )}
@@ -166,7 +166,7 @@ export default function ServiciosPage() {
                   return (
                     <article
                       key={service.id}
-                      className="rounded-[22px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.94)_100%)] p-4 shadow-sm"
+                      className="rounded-[22px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.94)_100%)] p-3.5 shadow-sm"
                       title={rowHoverSummary}
                     >
                     <div className="flex items-start justify-between gap-3">
@@ -176,7 +176,7 @@ export default function ServiciosPage() {
                       </div>
                       <p className="shrink-0 text-sm font-semibold text-slate-900">{formatCurrency(service.totalRevenue)}</p>
                     </div>
-                    <div className="mt-3 space-y-2 text-sm text-slate-600">
+                    <div className="mt-3 space-y-1.5 text-sm text-slate-600">
                       <p><span className="font-medium text-slate-800">Cliente:</span> {service.customerName}</p>
                       <p>
                         <span className="font-medium text-slate-800">Materiales:</span>{' '}
@@ -199,7 +199,7 @@ export default function ServiciosPage() {
             </div>
 
             <div className="hidden min-w-0 md:block">
-            <div className="mb-2 text-xs text-slate-500">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
+            <div className="mb-2 hidden text-xs text-slate-500 lg:block">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
             <div className="pb-2">
             <Table className={isSalesUser ? 'min-w-[1080px]' : 'min-w-[900px]'}>
               <TableHeader>

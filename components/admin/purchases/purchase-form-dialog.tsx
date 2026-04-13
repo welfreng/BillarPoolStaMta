@@ -596,14 +596,14 @@ export function PurchaseFormDialog({
               form.reset(defaultValues);
             })}
             onKeyDown={moveFocusToNextField}
-            className="space-y-4 sm:space-y-6"
+            className="space-y-3.5 sm:space-y-6"
           >
             <AdminMobileSection
               value="purchase-general"
               title="Datos generales de la compra"
               description="Selecciona o escribe el proveedor, define la fecha y luego registra el envio total del pedido."
               defaultOpen
-              className="rounded-3xl border border-slate-200 bg-slate-50/60 p-3.5 sm:p-6"
+              className="rounded-3xl border border-slate-200 bg-slate-50/60 p-3 sm:p-6"
             >
                 <div className="grid gap-4">
                   <FormField
@@ -653,7 +653,7 @@ export function PurchaseFormDialog({
                       </FormItem>
                     )}
                   />
-                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:p-5">
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3.5 sm:p-5">
                     <FormField
                       control={form.control}
                       name="shippingValueTotal"
@@ -681,12 +681,12 @@ export function PurchaseFormDialog({
               value="purchase-items"
               title="Productos de la compra"
               defaultOpen
-              className="min-w-0 rounded-3xl border border-slate-200 bg-slate-50/60 p-3.5 sm:p-5 lg:p-6"
-              contentClassName="space-y-4 sm:space-y-5"
+              className="min-w-0 rounded-3xl border border-slate-200 bg-slate-50/60 p-3 sm:p-5 lg:p-6"
+              contentClassName="space-y-3.5 sm:space-y-5"
             >
 
               {fields.length <= 1 ? (
-                  <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm sm:p-4">
+                  <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
                   <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full bg-slate-100 px-2 text-xs font-semibold text-slate-700">
@@ -868,7 +868,7 @@ export function PurchaseFormDialog({
                     </div>
 
                     <div className="grid gap-2 sm:grid-cols-3 sm:gap-3">
-                      <div className="rounded-2xl bg-slate-50 p-3 sm:p-4">
+                      <div className="rounded-2xl bg-slate-50 p-2.5 sm:p-4">
                         <p className="text-xs text-slate-500">
                           {firstItemIsPack12 ? 'Cantidad convertida a paquetes' : 'Cantidad comprada'}
                         </p>
@@ -876,13 +876,13 @@ export function PurchaseFormDialog({
                           {formatNumber(firstPreview?.quantityPurchased ?? 0)} articulos
                         </p>
                       </div>
-                      <div className="rounded-2xl bg-slate-50 p-3 sm:p-4">
+                      <div className="rounded-2xl bg-slate-50 p-2.5 sm:p-4">
                         <p className="text-xs text-slate-500">Valor total compra</p>
                         <p className="mt-1 font-semibold text-slate-900">
                           {formatCurrency(firstPreview?.purchaseValueTotal ?? 0)}
                         </p>
                       </div>
-                      <div className="rounded-2xl bg-slate-50 p-3 sm:p-4">
+                      <div className="rounded-2xl bg-slate-50 p-2.5 sm:p-4">
                         <p className="text-xs text-slate-500">Envio asignado</p>
                         <p className="mt-1 font-semibold text-slate-900">
                           {formatCurrency(firstPreview?.shippingShare ?? 0)}
@@ -948,7 +948,7 @@ export function PurchaseFormDialog({
                       (Number(values.items[index]?.purchaseUnitValue) || 0) > 0 &&
                       (Number(values.items[index]?.suggestedSalePrice) || 0) > 0;
                     return (
-                      <div key={field.id} className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm sm:p-4">
+                      <div key={field.id} className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                           <div className="min-w-0 space-y-1">
                             <p className="font-medium text-slate-900">
@@ -1239,16 +1239,16 @@ export function PurchaseFormDialog({
             </div>
           ) : null}
 
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl bg-slate-50 p-4">
+          <div className="grid gap-2.5 sm:grid-cols-3 sm:gap-3">
+            <div className="rounded-2xl bg-slate-50 p-3 sm:p-4">
               <p className="text-xs text-slate-500">{isDraftPack12 ? 'Cantidad convertida' : 'Cantidad comprada'}</p>
               <p className="mt-1 font-semibold text-slate-900">{formatNumber(draftQuantity)} articulos</p>
             </div>
-            <div className="rounded-2xl bg-slate-50 p-4">
+            <div className="rounded-2xl bg-slate-50 p-3 sm:p-4">
               <p className="text-xs text-slate-500">Valor total compra</p>
               <p className="mt-1 font-semibold text-slate-900">{formatCurrency(draftPurchaseValueTotal)}</p>
             </div>
-            <div className="rounded-2xl bg-slate-50 p-4">
+            <div className="rounded-2xl bg-slate-50 p-3 sm:p-4">
               <p className="text-xs text-slate-500">Envio estimado</p>
               <p className="mt-1 font-semibold text-slate-900">
                 {formatCurrency((Number(values.shippingValueTotal) || 0) * (draftQuantity > 0 && totalPurchasedUnits > 0 ? draftQuantity / (editingLineIndex === null ? totalPurchasedUnits + draftQuantity : Math.max(totalPurchasedUnits - (Number(values.items[editingLineIndex]?.presentationQuantity) || 0) + draftQuantity, draftQuantity)) : 0))}

@@ -240,7 +240,7 @@ export default function VentasPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6">
       <SectionHeader
         eyebrow="Operacion comercial"
         title="Ventas"
@@ -263,14 +263,14 @@ export default function VentasPage() {
         }
       />
 
-      <div className={`grid gap-4 sm:gap-6 ${isSalesUser ? 'sm:grid-cols-1 lg:grid-cols-1' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
-        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
+      <div className={`grid gap-3.5 sm:gap-6 ${isSalesUser ? 'sm:grid-cols-1 lg:grid-cols-1' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
+        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-3.5 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
           <p className="text-sm text-slate-500">Ventas registradas</p>
           <p className="mt-3 text-3xl font-semibold text-slate-950">{formatNumber(filteredSales.length)}</p>
           <p className="mt-2 text-sm text-slate-500">Historial de ventas del periodo visible.</p>
         </div>
         {isSalesUser ? (
-          <div className="rounded-[28px] border border-amber-200 bg-[linear-gradient(180deg,rgba(255,251,235,0.98)_0%,rgba(254,243,199,0.82)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
+          <div className="rounded-[28px] border border-amber-200 bg-[linear-gradient(180deg,rgba(255,251,235,0.98)_0%,rgba(254,243,199,0.82)_100%)] p-3.5 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
             <p className="text-sm text-amber-800">Solicitudes de autorizacion</p>
             <p className="mt-3 text-3xl font-semibold text-amber-950">{formatNumber(pendingAuthorizationsCount)}</p>
             <p className="mt-2 text-sm text-amber-900">
@@ -285,12 +285,12 @@ export default function VentasPage() {
         ) : null}
         {!isSalesUser && (
           <>
-            <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
+            <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-3.5 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
               <p className="text-sm text-slate-500">Ingresos</p>
               <p className="mt-3 text-3xl font-semibold text-slate-950">{formatCurrency(totals.totalRevenue)}</p>
               <p className="mt-2 text-sm text-slate-500">Suma de las ventas filtradas.</p>
             </div>
-            <div className="rounded-[28px] border border-emerald-200 bg-[linear-gradient(180deg,rgba(236,253,245,0.98)_0%,rgba(209,250,229,0.82)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:col-span-2 sm:p-6 lg:col-span-1">
+            <div className="rounded-[28px] border border-emerald-200 bg-[linear-gradient(180deg,rgba(236,253,245,0.98)_0%,rgba(209,250,229,0.82)_100%)] p-3.5 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:col-span-2 sm:p-6 lg:col-span-1">
               <p className="text-sm text-emerald-800">Utilidad bruta</p>
               <p className="mt-3 text-3xl font-semibold text-emerald-950">{formatCurrency(totals.totalProfit)}</p>
               <p className="mt-2 text-sm text-emerald-900">Calculada contra el costo real del inventario.</p>
@@ -299,7 +299,7 @@ export default function VentasPage() {
         )}
       </div>
 
-      <div className="min-w-0 space-y-4 rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
+      <div className="min-w-0 space-y-3.5 rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-3.5 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:space-y-4 sm:p-6">
         <div className="relative max-w-md">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <Input
@@ -316,7 +316,7 @@ export default function VentasPage() {
               <p>Desliza la tabla hacia la derecha para ver todas las columnas.</p>
               <p className="hidden sm:block">Scroll horizontal activo</p>
             </div>
-            <div className="space-y-2 md:hidden">
+            <div className="space-y-2.5 md:hidden">
                 {filteredSales.map((group) => {
                   const baseSale = group.sales[0];
                   const saleBatchId = group.key;
@@ -382,15 +382,16 @@ export default function VentasPage() {
                   return (
                     <div
                       key={group.key}
-                      className="rounded-[22px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] px-3 py-3 shadow-sm"
+                      className="rounded-[22px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] px-3 py-3.5 shadow-sm"
                       title={rowHoverSummary}
                     >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="line-clamp-2 text-sm font-medium leading-5 text-slate-900">{lineSummary || 'Venta registrada'}</p>
                         <p className="mt-1 line-clamp-2 text-xs text-slate-500">
-                          {baseSale.customerName}
-                          {serviceSummary ? ` · Servicio: ${serviceSummary}` : ''}
+                          {[baseSale.customerName, serviceSummary ? `Servicio: ${serviceSummary}` : '']
+                            .filter(Boolean)
+                            .join(' · ')}
                         </p>
                       </div>
                       <Button
@@ -570,11 +571,15 @@ export default function VentasPage() {
                       <TableRow key={group.key} className={salesRowHighlightClass}>
                         <TableCell className="max-w-[390px] py-2" title={rowHoverSummary}>
                           <div className="space-y-0.5">
-                            <p className="line-clamp-2 text-sm font-medium leading-4.5 text-slate-900">{lineSummary}</p>
+                            <p className="line-clamp-2 text-sm font-medium leading-5 text-slate-900">{lineSummary}</p>
                             <p className="line-clamp-1 text-[11px] text-slate-500">
-                              {formatNumber(group.sales.length)} linea(s)
-                              {serviceSummary ? ` · Servicio: ${serviceSummary}` : ''}
-                              {giftSummary ? ` · Obsequio` : ''}
+                              {[
+                                `${formatNumber(group.sales.length)} linea(s)`,
+                                serviceSummary ? `Servicio: ${serviceSummary}` : '',
+                                giftSummary ? 'Obsequio' : '',
+                              ]
+                                .filter(Boolean)
+                                .join(' · ')}
                             </p>
                           </div>
                         </TableCell>
