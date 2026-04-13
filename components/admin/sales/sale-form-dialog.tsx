@@ -1,21 +1,14 @@
 ﻿'use client';
 
 import Image from 'next/image';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Check, ChevronsUpDown, Gift, MinusCircle, Pencil, PlusCircle } from 'lucide-react';
+import { AdminResponsiveDialog } from '@/components/admin/admin-responsive-dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import {
   Form,
   FormControl,
@@ -659,6 +652,8 @@ export function SaleFormDialog({
   hideFinancialSummary?: boolean;
   onSubmit: (values: SaleFormValues) => Promise<void> | void;
 }) {
+  const saleFormId = useId();
+  const lineFormId = useId();
   const isEditingSale = mode === 'edit';
   const form = useForm<SaleFormValues>({
     resolver: zodResolver(saleSchema),
@@ -893,19 +888,36 @@ export function SaleFormDialog({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-h-[92vh] w-[calc(100vw-1rem)] max-w-[96vw] overflow-y-auto px-4 pb-36 sm:w-[calc(100vw-2rem)] sm:px-5 lg:max-w-4xl lg:px-6">
-          <DialogHeader>
-            <DialogTitle>{isEditingSale ? 'Editar venta' : 'Registrar venta'}</DialogTitle>
-            <DialogDescription>
-              {hideFinancialSummary
-                ? 'Cada venta descuenta stock y mantiene actualizado el inventario.'
-                : 'Cada venta descuenta stock y deja trazabilidad para los reportes del negocio.'}
-            </DialogDescription>
-          </DialogHeader>
-
+      <AdminResponsiveDialog
+        open={open}
+        onOpenChange={onOpenChange}
+        title={isEditingSale ? 'Editar venta' : 'Registrar venta'}
+        description={
+          hideFinancialSummary
+            ? 'Cada venta descuenta stock y mantiene actualizado el inventario.'
+            : 'Cada venta descuenta stock y deja trazabilidad para los reportes del negocio.'
+        }
+        desktopContentClassName="lg:max-w-4xl"
+        footer={
+          <div className="grid gap-2 sm:flex sm:items-center sm:justify-between">
+            <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={openNewLineDialog}>
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Agregar producto
+            </Button>
+            <div className="grid grid-cols-2 gap-2 sm:flex">
+              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => onOpenChange(false)}>
+                Cancelar
+              </Button>
+              <Button form={saleFormId} type="submit" className="w-full sm:w-auto">
+                {isEditingSale ? 'Actualizar venta' : 'Registrar venta'}
+              </Button>
+            </div>
+          </div>
+        }
+      >
           <Form {...form}>
             <form
+              id={saleFormId}
               onSubmit={form.handleSubmit(async (submittedValues) => {
                 await onSubmit(submittedValues);
                 form.reset(defaultValues);
@@ -1424,45 +1436,35 @@ export function SaleFormDialog({
                   )}
                 </div>
               </div>
-
-              <div className="fixed inset-x-3 bottom-2 z-20 rounded-2xl border border-slate-200 bg-white/95 p-2.5 shadow-xl backdrop-blur supports-[padding:max(0px)]:pb-[max(0.625rem,env(safe-area-inset-bottom))] sm:inset-x-6 lg:hidden">
-                <div className="grid grid-cols-3 gap-2">
-                  <Button type="button" variant="outline" className="h-11 rounded-xl px-2" onClick={openNewLineDialog}>
-                    <PlusCircle className="mr-1 h-4 w-4" />
-                    <span className="text-xs">Agregar</span>
-                  </Button>
-                  <Button type="button" variant="outline" className="h-11 rounded-xl" onClick={() => onOpenChange(false)}>
-                    Cancelar
-                  </Button>
-                  <Button type="submit" className="h-11 rounded-xl">
-                    {isEditingSale ? 'Actualizar venta' : 'Registrar venta'}
-                  </Button>
-                </div>
-              </div>
-
-              <DialogFooter className="hidden gap-3 border-t border-slate-200 pt-4 sm:flex sm:pt-5">
-                <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => onOpenChange(false)}>
-                  Cancelar
-                </Button>
-                <Button type="submit" className="w-full sm:w-auto">
-                  {isEditingSale ? 'Actualizar venta' : 'Registrar venta'}
-                </Button>
-              </DialogFooter>
             </form>
           </Form>
-        </DialogContent>
-      </Dialog>
+      </AdminResponsiveDialog>
 
-      <Dialog open={lineDialogOpen} onOpenChange={setLineDialogOpen}>
-        <DialogContent className="max-h-[92vh] w-[calc(100vw-1rem)] max-w-[96vw] overflow-y-auto px-4 pb-32 sm:w-[calc(100vw-2rem)] sm:px-5 lg:max-w-4xl lg:px-6">
-          <DialogHeader>
-            <DialogTitle>{editingLineIndex === null ? 'Agregar producto a la venta' : 'Editar producto de la venta'}</DialogTitle>
-            <DialogDescription>
-              Configura esta linea y al guardarla quedara en la lista de productos solicitados.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
+      <AdminResponsiveDialog
+        open={lineDialogOpen}
+        onOpenChange={setLineDialogOpen}
+        title={editingLineIndex === null ? 'Agregar producto a la venta' : 'Editar producto de la venta'}
+        description="Configura esta linea y al guardarla quedara en la lista de productos solicitados."
+        desktopContentClassName="lg:max-w-4xl"
+        footer={
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button type="button" variant="outline" onClick={() => setLineDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button form={lineFormId} type="submit">
+              {editingLineIndex === null ? 'Agregar producto' : 'Guardar cambios'}
+            </Button>
+          </div>
+        }
+      >
+          <form
+            id={lineFormId}
+            onSubmit={(event) => {
+              event.preventDefault();
+              saveDraftLine();
+            }}
+            className="space-y-4"
+          >
             <div className="space-y-2">
               <Label>Producto</Label>
               <SearchableSelect
@@ -1628,29 +1630,8 @@ export function SaleFormDialog({
                 {lineError}
               </p>
             ) : null}
-          </div>
-
-          <div className="fixed inset-x-3 bottom-2 z-20 rounded-2xl border border-slate-200 bg-white/95 p-2.5 shadow-xl backdrop-blur supports-[padding:max(0px)]:pb-[max(0.625rem,env(safe-area-inset-bottom))] sm:hidden">
-            <div className="grid grid-cols-2 gap-3">
-              <Button type="button" variant="outline" className="h-11 rounded-xl" onClick={() => setLineDialogOpen(false)}>
-                Cancelar
-              </Button>
-              <Button type="button" className="h-11 rounded-xl" onClick={saveDraftLine}>
-                {editingLineIndex === null ? 'Agregar producto' : 'Guardar cambios'}
-              </Button>
-            </div>
-          </div>
-
-          <DialogFooter className="hidden gap-3 sm:flex">
-            <Button type="button" variant="outline" onClick={() => setLineDialogOpen(false)}>
-              Cancelar
-            </Button>
-            <Button type="button" onClick={saveDraftLine}>
-              {editingLineIndex === null ? 'Agregar producto' : 'Guardar cambios'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </form>
+      </AdminResponsiveDialog>
     </>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -12,15 +12,8 @@ import {
 } from '@/lib/admin/calculations';
 import { shouldNormalizePackPurchaseToBundle } from '@/lib/admin/category-rules';
 import type { Product, Supplier } from '@/lib/admin/types';
+import { AdminResponsiveDialog } from '@/components/admin/admin-responsive-dialog';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import {
   Form,
   FormControl,
@@ -222,6 +215,8 @@ export function PurchaseFormDialog({
   initialValues?: PurchaseFormValues;
   onSubmit: (values: PurchaseFormValues) => Promise<void> | void;
 }) {
+  const purchaseFormId = useId();
+  const lineFormId = useId();
   const form = useForm<PurchaseFormValues>({
     resolver: zodResolver(purchaseSchema),
     defaultValues: initialValues ?? defaultValues,
@@ -575,25 +570,33 @@ export function PurchaseFormDialog({
 
   return (
     <>
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[92dvh] w-[calc(100vw-1rem)] max-w-[96vw] flex-col overflow-hidden px-0 sm:w-[calc(100vw-2rem)] lg:max-w-4xl">
-        <DialogHeader className="shrink-0 px-4 pt-6 sm:px-5 lg:px-6">
-          <DialogTitle>{initialValues ? 'Editar compra' : 'Registrar compra'}</DialogTitle>
-          <DialogDescription>
-            Registra una compra con uno o varios productos del mismo proveedor.
-          </DialogDescription>
-        </DialogHeader>
-
+    <AdminResponsiveDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={initialValues ? 'Editar compra' : 'Registrar compra'}
+      description="Registra una compra con uno o varios productos del mismo proveedor."
+      desktopContentClassName="lg:max-w-4xl"
+      footer={
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Cancelar
+          </Button>
+          <Button form={purchaseFormId} type="submit">
+            {initialValues ? 'Guardar cambios' : 'Registrar compra'}
+          </Button>
+        </div>
+      }
+    >
         <Form {...form}>
           <form
+            id={purchaseFormId}
             onSubmit={form.handleSubmit(async (submittedValues) => {
               await onSubmit(submittedValues);
               form.reset(defaultValues);
             })}
             onKeyDown={moveFocusToNextField}
-            className="flex min-h-0 flex-1 flex-col"
+            className="space-y-6"
           >
-            <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-4 pb-6 sm:px-5 lg:px-6">
             <section className="rounded-3xl border border-slate-200 bg-slate-50/60 p-4 sm:p-6">
                 <div className="mb-4">
                   <p className="text-sm font-medium text-slate-900">Datos generales de la compra</p>
@@ -1014,7 +1017,16 @@ export function PurchaseFormDialog({
                 <Button
                   type="button"
                   variant="outline"
-                  className="w-full rounded-xl bg-white"
+                  className="w-full rounded-xl bg-white sm:hidden"
+                  onClick={() => openNewLineDialog()}
+                >
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Agregar producto
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-xl bg-white max-sm:hidden"
                   onClick={() => openNewLineDialog()}
                 >
                   <PlusCircle className="mr-2 h-4 w-4" />
@@ -1032,31 +1044,51 @@ export function PurchaseFormDialog({
                 </div>
               </div>
             </section>
-            </div>
-
-            <DialogFooter className="shrink-0 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-5 lg:px-6">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit">{initialValues ? 'Guardar cambios' : 'Registrar compra'}</Button>
-            </DialogFooter>
           </form>
         </Form>
-      </DialogContent>
-    </Dialog>
+    </AdminResponsiveDialog>
 
-    <Dialog open={lineDialogOpen} onOpenChange={setLineDialogOpen}>
-      <DialogContent className="flex max-h-[92dvh] w-[calc(100vw-1rem)] max-w-xl flex-col overflow-hidden px-0 sm:w-[calc(100vw-2rem)]">
-          <DialogHeader className="shrink-0 px-4 pt-6 sm:px-5">
-            <DialogTitle>{editingLineIndex === null ? 'Agregar producto a la compra' : 'Editar producto de la compra'}</DialogTitle>
-            <DialogDescription>
-              {isLockedVariantFlow
-                ? 'Agrega otra variante del mismo producto usando los mismos valores de compra.'
-                : 'Selecciona el producto y define cantidad, valor de compra y precio sugerido.'}
-            </DialogDescription>
-          </DialogHeader>
-
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pb-6 sm:px-5">
+    <AdminResponsiveDialog
+      open={lineDialogOpen}
+      onOpenChange={setLineDialogOpen}
+      title={editingLineIndex === null ? 'Agregar producto a la compra' : 'Editar producto de la compra'}
+      description={
+        isLockedVariantFlow
+          ? 'Agrega otra variante del mismo producto usando los mismos valores de compra.'
+          : 'Selecciona el producto y define cantidad, valor de compra y precio sugerido.'
+      }
+      desktopContentClassName="max-w-xl"
+      footer={
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              setLineDialogOpen(false);
+              setLockedDraftProductId(null);
+            }}
+          >
+            Cancelar
+          </Button>
+          {editingLineIndex === null && lockedDraftProductId && draftSelectableVariantOptions.length > 1 ? (
+            <Button type="button" variant="outline" onClick={() => saveDraftLine(true)}>
+              Agregar y seguir
+            </Button>
+          ) : null}
+          <Button form={lineFormId} type="submit">
+            {editingLineIndex === null ? 'Agregar producto' : 'Guardar cambios'}
+          </Button>
+        </div>
+      }
+    >
+        <form
+          id={lineFormId}
+          onSubmit={(event) => {
+            event.preventDefault();
+            saveDraftLine(false);
+          }}
+          className="space-y-4"
+        >
           {isLockedVariantFlow && draftProduct ? (
             <div className="rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-3">
               <p className="text-xs font-medium uppercase tracking-wide text-cyan-800">Producto fijo</p>
@@ -1231,30 +1263,8 @@ export function PurchaseFormDialog({
               Esta variante usa automaticamente el mismo valor unitario y el mismo precio sugerido del producto base.
             </p>
           ) : null}
-        </div>
-
-        <DialogFooter className="shrink-0 gap-3 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-5">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => {
-              setLineDialogOpen(false);
-              setLockedDraftProductId(null);
-            }}
-          >
-            Cancelar
-          </Button>
-          {editingLineIndex === null && lockedDraftProductId && draftSelectableVariantOptions.length > 1 ? (
-            <Button type="button" variant="outline" onClick={() => saveDraftLine(true)}>
-              Agregar y seguir
-            </Button>
-          ) : null}
-          <Button type="button" onClick={() => saveDraftLine(false)}>
-            {editingLineIndex === null ? 'Agregar producto' : 'Guardar cambios'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </form>
+    </AdminResponsiveDialog>
     </>
   );
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { type ChangeEvent, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -16,14 +16,7 @@ import {
 } from '@/lib/admin/variant-helpers';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog } from '@/components/ui/dialog';
 import {
   Form,
   FormControl,
@@ -46,6 +39,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { optimizeImageFile } from '@/lib/image-upload';
 import { SITE_LOGO } from '@/lib/branding';
+import { AdminResponsiveDialog } from '@/components/admin/admin-responsive-dialog';
 import { VariantCompactEditor } from '@/components/admin/products/variant-compact-editor';
 import { useAdminData } from '@/components/admin/admin-data-context';
 import { toCategoryOptions } from '@/lib/admin/category-utils';
@@ -347,6 +341,7 @@ export function ProductFormDialog({
   historySummary?: ProductHistorySummary;
   onSubmit: (values: ProductFormValues) => Promise<void> | void;
 }) {
+  const productFormId = useId();
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
     defaultValues,
@@ -1245,19 +1240,30 @@ export function ProductFormDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] w-[calc(100vw-1rem)] max-w-[96vw] overflow-y-auto px-4 pb-24 sm:w-[calc(100vw-2rem)] sm:px-5 sm:pb-6 lg:max-w-3xl lg:px-6">
-        <DialogHeader>
-          <DialogTitle>{initialProduct ? 'Editar producto' : 'Nuevo producto'}</DialogTitle>
-          <DialogDescription>
-            {structureLocked
-              ? 'Este producto ya tiene historial. Puedes ajustar datos comerciales y visuales, pero la estructura de variantes queda protegida para no afectar compras ni inventario.'
-              : 'Registra la informacion esencial del producto y carga su imagen desde tu equipo.'}
-          </DialogDescription>
-        </DialogHeader>
-
+    <AdminResponsiveDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={initialProduct ? 'Editar producto' : 'Nuevo producto'}
+      description={
+        structureLocked
+          ? 'Este producto ya tiene historial. Puedes ajustar datos comerciales y visuales, pero la estructura de variantes queda protegida para no afectar compras ni inventario.'
+          : 'Registra la informacion esencial del producto y carga su imagen desde tu equipo.'
+      }
+      desktopContentClassName="lg:max-w-3xl"
+      footer={
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Cancelar
+          </Button>
+          <Button form={productFormId} type="submit">
+            {initialProduct ? 'Guardar cambios' : 'Crear producto'}
+          </Button>
+        </div>
+      }
+    >
         <Form {...form}>
           <form
+            id={productFormId}
             onSubmit={form.handleSubmit(
               async (values) => {
                 const selectedCategoryRecord = categoryOptions.find((category) => category.id === values.category);
@@ -2225,13 +2231,6 @@ export function ProductFormDialog({
                 />
               </section>
             </div>
-
-            <DialogFooter className="sticky bottom-0 -mx-4 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:border-t-0 sm:bg-transparent sm:px-0 sm:py-0">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit">{initialProduct ? 'Guardar cambios' : 'Crear producto'}</Button>
-            </DialogFooter>
           </form>
         </Form>
         <CategoryFormDialog
@@ -2245,7 +2244,6 @@ export function ProductFormDialog({
           category={categories.find((category) => category.id === selectedCategoryId)}
           onSubmit={handleQuickSubcategoryCreate}
         />
-      </DialogContent>
-    </Dialog>
+    </AdminResponsiveDialog>
   );
 }
