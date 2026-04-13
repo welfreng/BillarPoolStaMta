@@ -12,6 +12,7 @@ import {
 } from '@/lib/admin/calculations';
 import { shouldNormalizePackPurchaseToBundle } from '@/lib/admin/category-rules';
 import type { Product, Supplier } from '@/lib/admin/types';
+import { AdminMobileSection } from '@/components/admin/admin-mobile-section';
 import { AdminResponsiveDialog } from '@/components/admin/admin-responsive-dialog';
 import { Button } from '@/components/ui/button';
 import {
@@ -595,14 +596,15 @@ export function PurchaseFormDialog({
               form.reset(defaultValues);
             })}
             onKeyDown={moveFocusToNextField}
-            className="space-y-6"
+            className="space-y-4 sm:space-y-6"
           >
-            <section className="rounded-3xl border border-slate-200 bg-slate-50/60 p-4 sm:p-6">
-                <div className="mb-4">
-                  <p className="text-sm font-medium text-slate-900">Datos generales de la compra</p>
-                  <p className="text-sm text-slate-500">Selecciona o escribe el proveedor, define la fecha y luego registra el envio total del pedido.</p>
-                </div>
-
+            <AdminMobileSection
+              value="purchase-general"
+              title="Datos generales de la compra"
+              description="Selecciona o escribe el proveedor, define la fecha y luego registra el envio total del pedido."
+              defaultOpen
+              className="rounded-3xl border border-slate-200 bg-slate-50/60 p-3.5 sm:p-6"
+            >
                 <div className="grid gap-4">
                   <FormField
                     control={form.control}
@@ -673,17 +675,18 @@ export function PurchaseFormDialog({
                     />
                   </div>
                 </div>
-            </section>
+            </AdminMobileSection>
 
-            <section className="min-w-0 space-y-5 rounded-3xl border border-slate-200 bg-slate-50/60 p-4 sm:p-5 lg:p-6">
-              <div>
-                <div>
-                  <p className="text-sm font-semibold text-slate-950">Productos de la compra</p>
-                </div>
-              </div>
+            <AdminMobileSection
+              value="purchase-items"
+              title="Productos de la compra"
+              defaultOpen
+              className="min-w-0 rounded-3xl border border-slate-200 bg-slate-50/60 p-3.5 sm:p-5 lg:p-6"
+              contentClassName="space-y-4 sm:space-y-5"
+            >
 
               {fields.length <= 1 ? (
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm sm:p-4">
                   <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full bg-slate-100 px-2 text-xs font-semibold text-slate-700">
@@ -864,8 +867,8 @@ export function PurchaseFormDialog({
                       />
                     </div>
 
-                    <div className="grid gap-3 sm:grid-cols-3">
-                      <div className="rounded-2xl bg-slate-50 p-4">
+                    <div className="grid gap-2 sm:grid-cols-3 sm:gap-3">
+                      <div className="rounded-2xl bg-slate-50 p-3 sm:p-4">
                         <p className="text-xs text-slate-500">
                           {firstItemIsPack12 ? 'Cantidad convertida a paquetes' : 'Cantidad comprada'}
                         </p>
@@ -873,13 +876,13 @@ export function PurchaseFormDialog({
                           {formatNumber(firstPreview?.quantityPurchased ?? 0)} articulos
                         </p>
                       </div>
-                      <div className="rounded-2xl bg-slate-50 p-4">
+                      <div className="rounded-2xl bg-slate-50 p-3 sm:p-4">
                         <p className="text-xs text-slate-500">Valor total compra</p>
                         <p className="mt-1 font-semibold text-slate-900">
                           {formatCurrency(firstPreview?.purchaseValueTotal ?? 0)}
                         </p>
                       </div>
-                      <div className="rounded-2xl bg-slate-50 p-4">
+                      <div className="rounded-2xl bg-slate-50 p-3 sm:p-4">
                         <p className="text-xs text-slate-500">Envio asignado</p>
                         <p className="mt-1 font-semibold text-slate-900">
                           {formatCurrency(firstPreview?.shippingShare ?? 0)}
@@ -888,7 +891,7 @@ export function PurchaseFormDialog({
                     </div>
 
                     {firstItemProduct ? (
-                      <div className="mt-4 space-y-3 rounded-2xl bg-slate-50 px-3 py-2.5 text-sm text-slate-600">
+                      <div className="mt-4 space-y-2 rounded-2xl bg-slate-50 px-3 py-2.5 text-sm text-slate-600 sm:space-y-3">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <span className="truncate">{firstItemProduct.name} - {firstItemProduct.brand || 'Sin marca'}</span>
                           <span className="font-medium text-slate-900">Total linea: {formatCurrency(firstPreview?.purchaseValueTotal ?? 0)}</span>
@@ -945,7 +948,7 @@ export function PurchaseFormDialog({
                       (Number(values.items[index]?.purchaseUnitValue) || 0) > 0 &&
                       (Number(values.items[index]?.suggestedSalePrice) || 0) > 0;
                     return (
-                      <div key={field.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                      <div key={field.id} className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm sm:p-4">
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                           <div className="min-w-0 space-y-1">
                             <p className="font-medium text-slate-900">
@@ -1043,7 +1046,7 @@ export function PurchaseFormDialog({
                   <p className="text-lg font-semibold text-emerald-950">{formatCurrency(totalPurchaseValue)}</p>
                 </div>
               </div>
-            </section>
+            </AdminMobileSection>
           </form>
         </Form>
     </AdminResponsiveDialog>

@@ -96,33 +96,33 @@ export default function ProveedoresPage() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 sm:gap-6">
-        <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
           <p className="text-sm text-slate-500">Proveedores activos</p>
           <p className="mt-3 text-3xl font-semibold text-slate-950">
             {suppliers.filter((supplier) => supplier.status === 'active').length}
           </p>
           <p className="mt-2 text-sm text-slate-500">Base de apoyo para compras recurrentes.</p>
         </div>
-        <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
           <p className="text-sm text-slate-500">Total registrados</p>
           <p className="mt-3 text-3xl font-semibold text-slate-950">{suppliers.length}</p>
           <p className="mt-2 text-sm text-slate-500">Control centralizado para evitar duplicados.</p>
         </div>
-        <div className="rounded-3xl border border-cyan-200 bg-cyan-50 p-4 shadow-sm sm:col-span-2 sm:p-6 lg:col-span-1">
+        <div className="rounded-[28px] border border-cyan-200 bg-[linear-gradient(180deg,rgba(236,254,255,0.98)_0%,rgba(207,250,254,0.82)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:col-span-2 sm:p-6 lg:col-span-1">
           <p className="text-sm text-cyan-800">Uso recomendado</p>
           <p className="mt-3 text-lg font-semibold text-cyan-950">Primero crea el proveedor y luego registra la compra</p>
           <p className="mt-2 text-sm text-cyan-900">Asi el historial queda mas limpio y facil de consultar.</p>
         </div>
       </div>
 
-      <div className="min-w-0 space-y-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+      <div className="min-w-0 space-y-4 rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
         <div className="relative max-w-md">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Buscar proveedor, contacto o ciudad"
-            className="pl-9"
+            className="rounded-2xl border-slate-200 bg-white/90 pl-9 shadow-sm"
           />
         </div>
 
@@ -130,7 +130,7 @@ export default function ProveedoresPage() {
           <div className="min-w-0">
             <div className="space-y-3 md:hidden">
               {filteredSuppliers.map((supplier) => (
-                <div key={supplier.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div key={supplier.id} className="rounded-[22px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.94)_100%)] p-4 shadow-sm">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="font-medium text-slate-900">{supplier.name}</p>
@@ -167,7 +167,7 @@ export default function ProveedoresPage() {
             </div>
 
             <div className="mb-2 hidden text-xs text-slate-500 md:block">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
-            <div className="hidden overflow-x-auto pb-2 md:block">
+            <div className="hidden pb-2 md:block">
             <Table className="min-w-[720px]">
               <TableHeader>
                 <TableRow>
@@ -176,7 +176,7 @@ export default function ProveedoresPage() {
                   <TableHead>Telefono</TableHead>
                   <TableHead>Ciudad</TableHead>
                   <TableHead>Estado</TableHead>
-                  <TableHead className="sticky right-0 z-10 bg-white text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
+                  <TableHead className="sticky right-0 z-10 bg-slate-50/95 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
                     Acciones
                   </TableHead>
                 </TableRow>
@@ -205,7 +205,7 @@ export default function ProveedoresPage() {
                     <TableCell>{supplier.phone}</TableCell>
                     <TableCell>{supplier.city}</TableCell>
                     <TableCell>{supplier.status === 'active' ? 'Activo' : 'Inactivo'}</TableCell>
-                    <TableCell className="sticky right-0 bg-white text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
+                    <TableCell className="sticky right-0 bg-white/95 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
                       <ResponsiveRowActions
                         actions={[
                           {

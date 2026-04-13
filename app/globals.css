@@ -86,5 +86,13 @@
   }
   body {
     @apply bg-background text-foreground;
+    min-height: 100vh;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  ::selection {
+    background: rgba(10, 36, 114, 0.18);
+    color: #081120;
   }
 }

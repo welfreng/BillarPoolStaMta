@@ -170,7 +170,7 @@ export default function AutorizacionesPage() {
         </div>
 
         <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50/70 p-2">
-          <div className="overflow-x-auto pb-2">
+          <div className="pb-2">
             <Table className="min-w-[980px] bg-white">
               <TableHeader>
                 <TableRow>
@@ -180,7 +180,7 @@ export default function AutorizacionesPage() {
                   <TableHead>Motivo</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Fecha</TableHead>
-                  <TableHead className="sticky right-0 z-10 bg-white text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
+                  <TableHead className="sticky right-0 z-10 bg-slate-50/95 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
                     Acciones
                   </TableHead>
                 </TableRow>
@@ -215,7 +215,7 @@ export default function AutorizacionesPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>{new Date(request.createdAt).toLocaleString('es-CO')}</TableCell>
-                    <TableCell className="sticky right-0 bg-white text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
+                    <TableCell className="sticky right-0 bg-white/95 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
                       <Button
                         variant="ghost"
                         className="rounded-xl"

@@ -1,18 +1,11 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useId, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { AdminResponsiveDialog } from '@/components/admin/admin-responsive-dialog';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import {
   Form,
   FormControl,
@@ -103,6 +96,7 @@ export function ServiceFormDialog({
   hideFinancialSummary?: boolean;
   onSubmit: (values: ServiceFormValues) => Promise<void> | void;
 }) {
+  const serviceFormId = useId();
   const form = useForm<ServiceFormValues>({
     resolver: zodResolver(serviceSchema),
     defaultValues,
@@ -145,17 +139,26 @@ export function ServiceFormDialog({
   const estimatedProfit = (Number(values.servicePrice) || 0) - totalMaterialCost;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] w-[calc(100vw-1rem)] max-w-[96vw] overflow-y-auto px-4 pb-24 sm:w-[calc(100vw-2rem)] sm:px-5 sm:pb-6 lg:max-w-4xl lg:px-6">
-        <DialogHeader>
-          <DialogTitle>Registrar servicio de torno</DialogTitle>
-          <DialogDescription>
-            Registra el valor del trabajo y descuenta del inventario los productos usados en el servicio.
-          </DialogDescription>
-        </DialogHeader>
-
+    <AdminResponsiveDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Registrar servicio de torno"
+      description="Registra el valor del trabajo y descuenta del inventario los productos usados en el servicio."
+      desktopContentClassName="lg:max-w-4xl"
+      footer={
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Cancelar
+          </Button>
+          <Button form={serviceFormId} type="submit">
+            Guardar servicio
+          </Button>
+        </div>
+      }
+    >
         <Form {...form}>
           <form
+            id={serviceFormId}
             onSubmit={form.handleSubmit(async (submittedValues) => {
               await onSubmit(submittedValues);
               form.reset(defaultValues);
@@ -470,15 +473,8 @@ export function ServiceFormDialog({
               </div>
             </div>
 
-            <DialogFooter className="sticky bottom-0 -mx-4 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:border-t-0 sm:bg-transparent sm:px-0 sm:py-0">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit">Guardar servicio</Button>
-            </DialogFooter>
           </form>
         </Form>
-      </DialogContent>
-    </Dialog>
+    </AdminResponsiveDialog>
   );
 }

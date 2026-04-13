@@ -162,7 +162,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-[32px] bg-slate-950 p-6 text-white shadow-xl md:p-8">
+      <section className="overflow-hidden rounded-[32px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.28),transparent_28%),linear-gradient(135deg,#08162f_0%,#0a2472_52%,#0b1d3f_100%)] p-6 text-white shadow-[0_30px_80px_rgba(8,22,47,0.34)] md:p-8">
         <div className="grid gap-6 lg:grid-cols-[1.45fr_1fr]">
           <div>
             <p className="text-sm font-medium text-cyan-300">Centro de control</p>
@@ -178,7 +178,7 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          <div className="grid gap-3 rounded-3xl border border-white/10 bg-white/5 p-5">
+          <div className="grid gap-3 rounded-[28px] border border-white/10 bg-white/8 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur">
             <div className="flex items-center gap-3">
               <div className="rounded-2xl bg-emerald-400/10 p-3">
                 <PackageCheck className="h-5 w-5 text-emerald-300" />
@@ -271,7 +271,7 @@ export default function DashboardPage() {
         ) : null}
       </section>
 
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-6 shadow-[0_18px_45px_rgba(15,23,42,0.07)]">
         <div className="mb-5 flex items-center gap-3">
           <div className="rounded-2xl bg-cyan-50 p-3">
             <ShoppingCart className="h-5 w-5 text-cyan-700" />
@@ -300,7 +300,7 @@ export default function DashboardPage() {
               setOpenSaleDialog(true);
             }}
             placeholder="Buscar producto por nombre, marca o categoria"
-            className="pl-9"
+            className="rounded-2xl border-slate-200 bg-white/90 pl-9 shadow-sm"
           />
         </div>
 
@@ -308,7 +308,7 @@ export default function DashboardPage() {
           {quickResults.map((product) => (
             <div
               key={product.id}
-              className="flex items-center justify-between gap-4 rounded-2xl border border-cyan-100 bg-cyan-50/50 p-4"
+              className="flex items-center justify-between gap-4 rounded-[22px] border border-cyan-100 bg-[linear-gradient(180deg,rgba(236,254,255,0.96)_0%,rgba(207,250,254,0.58)_100%)] p-4 shadow-sm"
             >
               <div className="min-w-0">
                 <p className="truncate font-medium text-slate-900">{product.name}</p>
@@ -352,7 +352,7 @@ export default function DashboardPage() {
       </section>
 
       <section className="grid gap-6 xl:grid-cols-2">
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-6 shadow-[0_18px_45px_rgba(15,23,42,0.07)]">
           <div className="mb-6 flex items-center gap-3">
             <div className="rounded-2xl bg-emerald-50 p-3">
               <PackageCheck className="h-5 w-5 text-emerald-700" />
@@ -367,7 +367,7 @@ export default function DashboardPage() {
             {availableProducts.slice(0, 12).map((product) => (
               <div
                 key={product.id}
-                className="flex items-center justify-between rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4"
+                className="flex items-center justify-between rounded-[22px] border border-emerald-100 bg-[linear-gradient(180deg,rgba(236,253,245,0.96)_0%,rgba(209,250,229,0.7)_100%)] p-4 shadow-sm"
               >
                 <div className="min-w-0">
                   <p className="truncate font-medium text-slate-900">{product.name}</p>
@@ -390,7 +390,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-6 shadow-[0_18px_45px_rgba(15,23,42,0.07)]">
           <div className="mb-6 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="rounded-2xl bg-rose-50 p-3">
@@ -419,7 +419,7 @@ export default function DashboardPage() {
             {outProducts.map((product) => (
               <div
                 key={product.id}
-                className="flex items-center justify-between rounded-2xl border border-rose-100 bg-rose-50 p-4"
+                className="flex items-center justify-between rounded-[22px] border border-rose-100 bg-[linear-gradient(180deg,rgba(255,241,242,0.96)_0%,rgba(255,228,230,0.72)_100%)] p-4 shadow-sm"
               >
                 <div className="min-w-0">
                   <p className="truncate font-medium text-slate-900">{product.name}</p>
@@ -443,7 +443,7 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-6 shadow-[0_18px_45px_rgba(15,23,42,0.07)]">
         <div className="mb-6 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="rounded-2xl bg-rose-50 p-3">
@@ -474,7 +474,7 @@ export default function DashboardPage() {
           {outVariants.map(({ product, variant, stock, salePrice }) => (
             <div
               key={variant.id}
-              className="flex items-center justify-between rounded-2xl border border-rose-100 bg-rose-50 p-4"
+              className="flex items-center justify-between rounded-[22px] border border-rose-100 bg-[linear-gradient(180deg,rgba(255,241,242,0.96)_0%,rgba(255,228,230,0.72)_100%)] p-4 shadow-sm"
             >
               <div className="min-w-0">
                 <p className="truncate font-medium text-slate-900">{product.name}</p>

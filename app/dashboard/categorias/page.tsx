@@ -124,7 +124,7 @@ export default function CategoriasPage() {
         }
       />
 
-      <div className="rounded-3xl border border-cyan-200 bg-cyan-50 p-4 text-sm text-cyan-900 shadow-sm">
+      <div className="rounded-[28px] border border-cyan-200 bg-[linear-gradient(180deg,rgba(236,254,255,0.98)_0%,rgba(207,250,254,0.82)_100%)] p-4 text-sm text-cyan-900 shadow-[0_18px_45px_rgba(15,23,42,0.07)]">
         Las categorias viven ahora en Firebase como estructura administrable de 2 niveles. Si una categoria o subcategoria ya tiene productos, se recomienda desactivarla o editarla; eliminar solo cuando no este en uso.
       </div>
 
@@ -137,7 +137,7 @@ export default function CategoriasPage() {
                 <AccordionItem
                   key={category.id}
                   value={category.id}
-                  className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"
+                  className="overflow-hidden rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] shadow-[0_18px_45px_rgba(15,23,42,0.07)]"
                 >
                   <div className="flex flex-col gap-4 p-5">
                     <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
@@ -206,7 +206,7 @@ export default function CategoriasPage() {
                       />
                     </div>
 
-                    <AccordionTrigger className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 hover:no-underline">
+                    <AccordionTrigger className="rounded-[22px] border border-slate-200 bg-white/80 px-4 py-3 hover:no-underline">
                       <div className="flex min-w-0 items-center gap-3">
                         <Rows3 className="mt-0.5 h-4 w-4 text-slate-500" />
                         <div className="min-w-0">
@@ -219,7 +219,7 @@ export default function CategoriasPage() {
                     </AccordionTrigger>
                   </div>
 
-                  <AccordionContent className="border-t border-slate-200 bg-slate-50 px-5 pb-5">
+                  <AccordionContent className="border-t border-slate-200 bg-slate-50/70 px-5 pb-5">
                     {category.subcategories.length > 0 ? (
                       <>
                         <div className="hidden md:block">
@@ -300,7 +300,7 @@ export default function CategoriasPage() {
                             const key = `${category.id}:${subcategory.id}`;
                             const subcategoryUsage = usageBySubcategory.get(key) ?? 0;
                             return (
-                              <div key={subcategory.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+                              <div key={subcategory.id} className="rounded-[22px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.94)_100%)] p-4 shadow-sm">
                                 <div className="flex items-start justify-between gap-3">
                                   <div className="min-w-0">
                                     <p className="font-medium text-slate-900">{subcategory.label}</p>
@@ -362,7 +362,7 @@ export default function CategoriasPage() {
                         </div>
                       </>
                     ) : (
-                      <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-sm text-slate-500">
+                      <div className="rounded-[22px] border border-dashed border-slate-200 bg-white/90 p-4 text-sm text-slate-500">
                         Esta categoria aun no tiene subcategorias.
                       </div>
                     )}
@@ -372,7 +372,7 @@ export default function CategoriasPage() {
             })}
           </Accordion>
         ) : (
-          <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-10 text-center text-sm text-slate-500 shadow-sm">
+          <div className="rounded-[28px] border border-dashed border-slate-200 bg-white/90 p-10 text-center text-sm text-slate-500 shadow-[0_18px_45px_rgba(15,23,42,0.07)]">
             Aun no hay categorias. Crea la primera para empezar a estructurar el catalogo.
           </div>
         )}

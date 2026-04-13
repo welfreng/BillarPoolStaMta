@@ -157,13 +157,13 @@ export function AdminHeader() {
   };
 
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/80 backdrop-blur-xl">
+    <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/72 shadow-[0_10px_30px_rgba(15,23,42,0.05)] backdrop-blur-2xl">
       <div className="flex flex-col gap-4 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-6">
         <div className="flex items-center gap-3">
-          <SidebarTrigger className="rounded-xl border border-slate-200 bg-white md:hidden" />
+          <SidebarTrigger className="rounded-2xl border border-slate-200 bg-white/90 shadow-sm md:hidden" />
           <div>
-            <p className="text-sm font-medium text-cyan-700">Billar Pool Santa Marta</p>
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-950">{title}</h1>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-700">Billar Pool Santa Marta</p>
+            <h1 className="text-2xl font-semibold tracking-[-0.02em] text-slate-950">{title}</h1>
           </div>
         </div>
 
@@ -184,15 +184,15 @@ export function AdminHeader() {
                 navigateToItem(filteredItems[0].href);
               }}
               placeholder="Buscar modulo o accion..."
-              className="rounded-xl border-slate-200 bg-slate-50 pl-9"
+              className="rounded-2xl border-slate-200 bg-white/85 pl-9 shadow-sm"
             />
             {isFocused && filteredItems.length > 0 ? (
-              <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-40 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+              <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-40 overflow-hidden rounded-[22px] border border-slate-200 bg-white/98 shadow-[0_24px_60px_rgba(15,23,42,0.14)]">
                 {filteredItems.slice(0, 7).map((item) => (
                   <button
                     key={`${item.href}-${item.label}`}
                     type="button"
-                    className="flex w-full flex-col items-start gap-1 border-b border-slate-100 px-4 py-3 text-left last:border-b-0 hover:bg-slate-50"
+                    className="flex w-full flex-col items-start gap-1 border-b border-slate-100 px-4 py-3 text-left last:border-b-0 hover:bg-slate-50/80"
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => navigateToItem(item.href)}
                   >
@@ -213,7 +213,7 @@ export function AdminHeader() {
               }}
             >
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" className="relative rounded-xl self-start md:self-auto">
+                <Button variant="outline" size="icon" className="relative rounded-2xl border-slate-200 bg-white/90 shadow-sm self-start md:self-auto">
                   <Bell className="h-4 w-4" />
                   {unreadNotifications.length > 0 ? (
                     <span className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-rose-600 px-1.5 text-[10px] font-semibold text-white">
@@ -222,7 +222,7 @@ export function AdminHeader() {
                   ) : null}
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-[320px] rounded-2xl p-0">
+              <DropdownMenuContent align="end" className="w-[320px] rounded-[22px] border border-slate-200 bg-white/98 p-0 shadow-[0_24px_60px_rgba(15,23,42,0.14)]">
                 <DropdownMenuLabel className="px-4 py-3">
                   <div>
                     <p className="text-sm font-semibold text-slate-950">Notificaciones</p>
@@ -264,7 +264,7 @@ export function AdminHeader() {
 
           <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3 sm:flex-row sm:items-center">
             <Avatar className="h-10 w-10 rounded-xl">
-              <AvatarFallback className="rounded-xl bg-slate-900 text-white">
+              <AvatarFallback className="rounded-2xl bg-slate-950 text-white">
                 {initials}
               </AvatarFallback>
             </Avatar>

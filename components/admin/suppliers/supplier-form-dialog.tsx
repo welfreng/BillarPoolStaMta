@@ -1,19 +1,12 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useId } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { AdminResponsiveDialog } from '@/components/admin/admin-responsive-dialog';
 import type { Supplier } from '@/lib/admin/types';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import {
   Form,
   FormControl,
@@ -63,6 +56,7 @@ export function SupplierFormDialog({
   initialSupplier?: Supplier;
   onSubmit: (values: SupplierFormValues) => Promise<void> | void;
 }) {
+  const supplierFormId = useId();
   const form = useForm<SupplierFormValues>({
     resolver: zodResolver(supplierSchema),
     defaultValues,
@@ -85,17 +79,26 @@ export function SupplierFormDialog({
   }, [form, initialSupplier]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] w-[calc(100vw-1rem)] max-w-[96vw] overflow-y-auto px-4 pb-24 sm:w-[calc(100vw-2rem)] sm:px-5 sm:pb-6 lg:max-w-4xl lg:px-6">
-        <DialogHeader>
-          <DialogTitle>{initialSupplier ? 'Editar proveedor' : 'Nuevo proveedor'}</DialogTitle>
-          <DialogDescription>
-            Registra los datos clave del proveedor para usarlo luego en las compras.
-          </DialogDescription>
-        </DialogHeader>
-
+    <AdminResponsiveDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={initialSupplier ? 'Editar proveedor' : 'Nuevo proveedor'}
+      description="Registra los datos clave del proveedor para usarlo luego en las compras."
+      desktopContentClassName="lg:max-w-4xl"
+      footer={
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Cancelar
+          </Button>
+          <Button form={supplierFormId} type="submit">
+            {initialSupplier ? 'Guardar cambios' : 'Crear proveedor'}
+          </Button>
+        </div>
+      }
+    >
         <Form {...form}>
           <form
+            id={supplierFormId}
             onSubmit={form.handleSubmit(async (values) => {
               await onSubmit(values);
               form.reset(defaultValues);
@@ -195,15 +198,8 @@ export function SupplierFormDialog({
               )}
             />
 
-            <DialogFooter className="sticky bottom-0 -mx-4 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:border-t-0 sm:bg-transparent sm:px-0 sm:py-0">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit">{initialSupplier ? 'Guardar cambios' : 'Crear proveedor'}</Button>
-            </DialogFooter>
           </form>
         </Form>
-      </DialogContent>
-    </Dialog>
+    </AdminResponsiveDialog>
   );
 }

@@ -39,6 +39,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { optimizeImageFile } from '@/lib/image-upload';
 import { SITE_LOGO } from '@/lib/branding';
+import { AdminMobileSection } from '@/components/admin/admin-mobile-section';
 import { AdminResponsiveDialog } from '@/components/admin/admin-responsive-dialog';
 import { VariantCompactEditor } from '@/components/admin/products/variant-compact-editor';
 import { useAdminData } from '@/components/admin/admin-data-context';
@@ -1308,16 +1309,18 @@ export function ProductFormDialog({
                 });
               }
             )}
-            className="space-y-5"
+            className="space-y-4 sm:space-y-5"
           >
-            <div className="space-y-5">
-              <div className="space-y-5">
-                <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <div className="mb-3">
-                    <h3 className="text-sm font-semibold text-slate-900">Informacion del producto</h3>
-                  </div>
-
-                  <div className="space-y-4">
+            <div className="space-y-4 sm:space-y-5">
+              <div className="space-y-4 sm:space-y-5">
+                <AdminMobileSection
+                  value="product-info"
+                  title="Informacion del producto"
+                  defaultOpen
+                  className="rounded-3xl border border-slate-200 bg-white p-3.5 shadow-sm sm:p-4"
+                  headerClassName="mb-3"
+                  contentClassName="space-y-4"
+                >
                     <FormField
                       control={form.control}
                       name="name"
@@ -2105,14 +2108,14 @@ export function ProductFormDialog({
                         </>
                       )}
                     </div>
-                  </div>
-                </section>
+                </AdminMobileSection>
 
-                <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <div className="mb-3">
-                    <h3 className="text-sm font-semibold text-slate-900">Configuracion comercial</h3>
-                  </div>
-
+                <AdminMobileSection
+                  value="product-commerce"
+                  title="Configuracion comercial"
+                  className="rounded-3xl border border-slate-200 bg-white p-3.5 shadow-sm sm:p-4"
+                  headerClassName="mb-3"
+                >
                   <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
                     {usesCompactVariantEditor && compactEditorConfig?.priceMode === 'global' ? (
                       <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
@@ -2177,14 +2180,15 @@ export function ProductFormDialog({
                       )}
                     />
                   </div>
-                </section>
+                </AdminMobileSection>
               </div>
 
-              <section className="space-y-3 rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-slate-100 p-4 shadow-sm">
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-900">Imagen</h3>
-                </div>
-
+              <AdminMobileSection
+                value="product-image"
+                title="Imagen"
+                className="space-y-3 rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-slate-100 p-3.5 shadow-sm sm:p-4"
+                defaultOpen
+              >
                 <FormField
                   control={form.control}
                   name="image"
@@ -2229,7 +2233,7 @@ export function ProductFormDialog({
                     </FormItem>
                   )}
                 />
-              </section>
+              </AdminMobileSection>
             </div>
           </form>
         </Form>

@@ -327,7 +327,7 @@ export default function ComprasPage() {
                         <TableHead>Costo unitario real</TableHead>
                         <TableHead>Precio sugerido</TableHead>
                         <TableHead>Utilidad</TableHead>
-                        <TableHead className="sticky right-0 z-10 bg-white text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
+                        <TableHead className="sticky right-0 z-10 bg-slate-50/95 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
                           Acciones
                         </TableHead>
                       </TableRow>
@@ -365,7 +365,7 @@ export default function ComprasPage() {
                             <TableCell>{formatCurrency(purchase.realUnitCost)}</TableCell>
                             <TableCell>{formatCurrency(currentSuggestedSalePrice)}</TableCell>
                             <TableCell>{formatCurrency(unitProfit)}</TableCell>
-                            <TableCell className="sticky right-0 bg-white text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
+                            <TableCell className="sticky right-0 bg-white/95 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
                               <ResponsiveRowActions
                                 actions={[
                                   {

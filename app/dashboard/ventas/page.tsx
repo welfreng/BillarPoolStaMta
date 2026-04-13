@@ -264,13 +264,13 @@ export default function VentasPage() {
       />
 
       <div className={`grid gap-4 sm:gap-6 ${isSalesUser ? 'sm:grid-cols-1 lg:grid-cols-1' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
-        <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
           <p className="text-sm text-slate-500">Ventas registradas</p>
           <p className="mt-3 text-3xl font-semibold text-slate-950">{formatNumber(filteredSales.length)}</p>
           <p className="mt-2 text-sm text-slate-500">Historial de ventas del periodo visible.</p>
         </div>
         {isSalesUser ? (
-          <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4 shadow-sm sm:p-6">
+          <div className="rounded-[28px] border border-amber-200 bg-[linear-gradient(180deg,rgba(255,251,235,0.98)_0%,rgba(254,243,199,0.82)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
             <p className="text-sm text-amber-800">Solicitudes de autorizacion</p>
             <p className="mt-3 text-3xl font-semibold text-amber-950">{formatNumber(pendingAuthorizationsCount)}</p>
             <p className="mt-2 text-sm text-amber-900">
@@ -285,12 +285,12 @@ export default function VentasPage() {
         ) : null}
         {!isSalesUser && (
           <>
-            <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+            <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
               <p className="text-sm text-slate-500">Ingresos</p>
               <p className="mt-3 text-3xl font-semibold text-slate-950">{formatCurrency(totals.totalRevenue)}</p>
               <p className="mt-2 text-sm text-slate-500">Suma de las ventas filtradas.</p>
             </div>
-            <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm sm:col-span-2 sm:p-6 lg:col-span-1">
+            <div className="rounded-[28px] border border-emerald-200 bg-[linear-gradient(180deg,rgba(236,253,245,0.98)_0%,rgba(209,250,229,0.82)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:col-span-2 sm:p-6 lg:col-span-1">
               <p className="text-sm text-emerald-800">Utilidad bruta</p>
               <p className="mt-3 text-3xl font-semibold text-emerald-950">{formatCurrency(totals.totalProfit)}</p>
               <p className="mt-2 text-sm text-emerald-900">Calculada contra el costo real del inventario.</p>
@@ -299,14 +299,14 @@ export default function VentasPage() {
         )}
       </div>
 
-      <div className="min-w-0 space-y-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+      <div className="min-w-0 space-y-4 rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
         <div className="relative max-w-md">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Buscar por producto, cliente o nota"
-            className="pl-9"
+            className="rounded-2xl border-slate-200 bg-white/90 pl-9 shadow-sm"
           />
         </div>
 
@@ -382,7 +382,7 @@ export default function VentasPage() {
                   return (
                     <div
                       key={group.key}
-                      className="rounded-2xl border border-slate-200 bg-white px-3 py-3 shadow-sm"
+                      className="rounded-[22px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] px-3 py-3 shadow-sm"
                       title={rowHoverSummary}
                     >
                     <div className="flex items-start justify-between gap-3">
@@ -452,7 +452,7 @@ export default function VentasPage() {
                     {!isSalesUser && <TableHead>Utilidad</TableHead>}
                     <TableHead>Estado</TableHead>
                     <TableHead>Fecha</TableHead>
-                    <TableHead className="sticky right-0 z-10 bg-white text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
+                    <TableHead className="sticky right-0 z-10 bg-slate-50/95 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
                       Acciones
                     </TableHead>
                   </TableRow>
@@ -592,7 +592,7 @@ export default function VentasPage() {
                         {!isSalesUser && <TableCell className="py-2" title={rowHoverSummary}>{formatCurrency(netProfit)}</TableCell>}
                         <TableCell className="py-2 text-xs" title={rowHoverSummary}>{returnStatus}</TableCell>
                         <TableCell className="py-2 whitespace-nowrap text-xs" title={rowHoverSummary}>{formatDateTime(baseSale.soldAt)}</TableCell>
-                        <TableCell className="sticky right-0 bg-white text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
+                        <TableCell className="sticky right-0 bg-white/95 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
                           <div className="flex items-center justify-end gap-2">
                             <Button
                               type="button"

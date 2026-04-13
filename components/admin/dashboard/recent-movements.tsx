@@ -17,9 +17,9 @@ export function RecentMovements({
   movements: InventoryMovement[];
 }) {
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+    <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-6 shadow-[0_18px_45px_rgba(15,23,42,0.07)]">
       <div className="mb-6">
-        <h2 className="text-lg font-semibold text-slate-950">Ultimos movimientos</h2>
+        <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Ultimos movimientos</h2>
         <p className="text-sm text-slate-500">Actividad reciente del inventario y ajustes operativos.</p>
       </div>
 
@@ -31,10 +31,10 @@ export function RecentMovements({
           return (
             <div
               key={movement.id}
-              className="flex flex-col gap-3 rounded-2xl border border-slate-100 bg-slate-50/70 p-4 md:flex-row md:items-center md:justify-between"
+              className="flex flex-col gap-3 rounded-[22px] border border-slate-100 bg-white/80 p-4 shadow-sm md:flex-row md:items-center md:justify-between"
             >
               <div className="flex items-start gap-4">
-                <div className="rounded-2xl bg-white p-3 shadow-sm">
+                <div className="rounded-2xl border border-slate-100 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-3 shadow-sm">
                   <Icon className="h-4 w-4 text-cyan-700" />
                 </div>
                 <div>

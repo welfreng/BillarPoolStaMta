@@ -193,7 +193,7 @@ export default function InventarioPage() {
             {filteredProducts.length > 0 ? (
               <div className="min-w-0">
                 <div className="mb-2 text-xs text-slate-500">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
-                <div className="overflow-x-auto pb-2">
+                <div className="pb-2">
                   <Table className="min-w-[860px]">
                     <TableHeader>
                       <TableRow>
@@ -202,7 +202,7 @@ export default function InventarioPage() {
                         <TableHead>Stock</TableHead>
                         <TableHead>Precio de venta</TableHead>
                         <TableHead>Estado</TableHead>
-                        <TableHead className="sticky right-0 z-10 bg-white text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
+                        <TableHead className="sticky right-0 z-10 bg-slate-50/95 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
                           Accion
                         </TableHead>
                       </TableRow>
@@ -240,7 +240,7 @@ export default function InventarioPage() {
                                 {getStockAlertLabel(alert)}
                               </span>
                             </TableCell>
-                            <TableCell className="sticky right-0 bg-white text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
+                            <TableCell className="sticky right-0 bg-white/95 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
                               <Button
                                 type="button"
                                 className="rounded-xl"
@@ -363,7 +363,7 @@ export default function InventarioPage() {
               {filteredMovements.length > 0 ? (
                 <div className="min-w-0">
                   <div className="mb-2 text-xs text-slate-500">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
-                  <div className="overflow-x-auto pb-2">
+                  <div className="pb-2">
                   <Table className="min-w-[860px]">
                     <TableHeader>
                       <TableRow>
@@ -374,7 +374,7 @@ export default function InventarioPage() {
                         <TableHead>Responsable</TableHead>
                         <TableHead>Valor</TableHead>
                         <TableHead>Fecha</TableHead>
-                        <TableHead className="sticky right-0 z-10 bg-white text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
+                        <TableHead className="sticky right-0 z-10 bg-slate-50/95 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
                           Detalle
                         </TableHead>
                       </TableRow>
@@ -458,7 +458,7 @@ export default function InventarioPage() {
                               </div>
                             </TableCell>
                             <TableCell>{formatDateTime(movement.occurredAt)}</TableCell>
-                            <TableCell className="sticky right-0 bg-white text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
+                            <TableCell className="sticky right-0 bg-white/95 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
                               {relatedSale ? (
                                 <Button
                                   type="button"

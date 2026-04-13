@@ -256,7 +256,7 @@ export default function ProductosPage() {
       />
 
       <div className="grid gap-6 xl:grid-cols-[1.75fr_0.75fr]">
-        <div className="min-w-0 space-y-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <div className="min-w-0 space-y-4 rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <div className="relative sm:col-span-2 xl:col-span-2">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -267,7 +267,7 @@ export default function ProductosPage() {
                   setQuery(event.target.value);
                 }}
                 placeholder="Buscar por nombre, marca o categoria"
-                className="pl-9"
+                className="rounded-2xl border-slate-200 bg-white/90 pl-9 shadow-sm"
               />
             </div>
             <Select
@@ -315,7 +315,7 @@ export default function ProductosPage() {
                   {paginatedProducts.map((product) => (
                     <div
                       key={product.id}
-                      className="rounded-2xl border border-slate-200 bg-white p-4"
+                      className="rounded-[22px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-sm"
                       onClick={() => setSelectedProduct(product)}
                     >
                       <div className="flex items-start justify-between gap-3">
@@ -368,7 +368,7 @@ export default function ProductosPage() {
                 </div>
 
                 <div className="mb-2 hidden text-xs text-slate-500 md:block">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
-                <div className="hidden overflow-x-auto pb-2 md:block">
+                <div className="hidden pb-2 md:block">
                 <Table className="min-w-[680px]">
                   <TableHeader>
                     <TableRow>
@@ -378,7 +378,7 @@ export default function ProductosPage() {
                       <TableHead>Venta</TableHead>
                       <TableHead>Destacado</TableHead>
                       <TableHead>Estado</TableHead>
-                      <TableHead className="sticky right-0 z-10 bg-white text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
+                      <TableHead className="sticky right-0 z-10 bg-slate-50/95 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
                         Acciones
                       </TableHead>
                     </TableRow>
@@ -422,7 +422,7 @@ export default function ProductosPage() {
                         <TableCell>
                           <ProductStatusBadge status={product.status} />
                         </TableCell>
-                        <TableCell className="sticky right-0 bg-white text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
+                        <TableCell className="sticky right-0 bg-white/95 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
                           <ResponsiveRowActions
                             actions={[
                               {
@@ -498,10 +498,10 @@ export default function ProductosPage() {
           )}
         </div>
 
-        <aside className="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 xl:sticky xl:top-24 xl:self-start">
+        <aside className="min-w-0 rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6 xl:sticky xl:top-24 xl:self-start">
           {selectedProduct ? (
             <div className="space-y-5">
-              <div className="overflow-hidden rounded-3xl border border-slate-200 bg-slate-50">
+              <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#f8fbff_0%,#eef4fb_100%)]">
                 <div className="relative aspect-[16/10] w-full">
                   <Image
                     src={selectedProductPreviewImage}
@@ -515,8 +515,8 @@ export default function ProductosPage() {
               </div>
 
               <div>
-                <p className="text-sm font-medium text-cyan-700">Vista del producto</p>
-                <h3 className="mt-2 text-2xl font-semibold text-slate-950">{selectedProduct.name}</h3>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-700">Vista del producto</p>
+                <h3 className="mt-2 text-2xl font-semibold tracking-[-0.02em] text-slate-950">{selectedProduct.name}</h3>
                 <p className="mt-3 text-sm leading-6 text-slate-500">{selectedProduct.description}</p>
               </div>
 

@@ -221,34 +221,34 @@ export default function ReportesPage() {
         }
       />
 
-      <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 shadow-sm">
+      <div className="rounded-[28px] border border-amber-200 bg-[linear-gradient(180deg,rgba(255,251,235,0.98)_0%,rgba(254,243,199,0.82)_100%)] p-4 text-sm text-amber-900 shadow-[0_18px_45px_rgba(15,23,42,0.07)]">
         El reporte ya incluye cliente, telefono, vendedor, items, costos, utilidad y observaciones. `Metodo de pago` no existe hoy en la estructura de `sales/services`, por eso se exporta como `No registrado`. El `estado` se infiere desde devoluciones o se marca como `Completada`.
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
           <p className="text-sm text-slate-500">Ventas / transacciones</p>
           <p className="mt-2 text-2xl font-semibold text-slate-950">{formatNumber(monthlyTotals.transactions)}</p>
         </div>
-        <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
           <p className="text-sm text-slate-500">Items vendidos</p>
           <p className="mt-2 text-2xl font-semibold text-slate-950">{formatNumber(dataset.detailRows.length)}</p>
         </div>
-        <div className="rounded-3xl border border-cyan-200 bg-cyan-50 p-4 shadow-sm sm:p-6">
+        <div className="rounded-[28px] border border-cyan-200 bg-[linear-gradient(180deg,rgba(236,254,255,0.98)_0%,rgba(207,250,254,0.82)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
           <p className="text-sm text-cyan-800">Ingreso total</p>
           <p className="mt-2 text-2xl font-semibold text-cyan-950">{formatCurrency(monthlyTotals.totalRevenue)}</p>
         </div>
-        <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4 shadow-sm sm:p-6">
+        <div className="rounded-[28px] border border-amber-200 bg-[linear-gradient(180deg,rgba(255,251,235,0.98)_0%,rgba(254,243,199,0.82)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
           <p className="text-sm text-amber-800">Costo total</p>
           <p className="mt-2 text-2xl font-semibold text-amber-950">{formatCurrency(monthlyTotals.totalCost)}</p>
         </div>
-        <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm sm:p-6">
+        <div className="rounded-[28px] border border-emerald-200 bg-[linear-gradient(180deg,rgba(236,253,245,0.98)_0%,rgba(209,250,229,0.82)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
           <p className="text-sm text-emerald-800">Utilidad total</p>
           <p className="mt-2 text-2xl font-semibold text-emerald-950">{formatCurrency(monthlyTotals.totalProfit)}</p>
         </div>
       </div>
 
-      <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+      <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-slate-950">Resumen por venta</p>
@@ -306,7 +306,7 @@ export default function ReportesPage() {
         )}
       </div>
 
-      <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+      <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-slate-950">Detalle por item vendido</p>
@@ -379,7 +379,7 @@ export default function ReportesPage() {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-        <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
           <p className="text-sm font-semibold text-slate-950">Productos mas vendidos</p>
           <p className="mt-1 text-sm text-slate-500">Top del mes por unidades facturadas.</p>
           <div className="mt-4 space-y-3">
@@ -398,7 +398,7 @@ export default function ReportesPage() {
         </div>
 
         <div className="space-y-6">
-          <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+          <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
             <div className="flex items-center gap-3">
               <div className="rounded-2xl bg-cyan-100 p-2 text-cyan-700">
                 <Wrench className="h-5 w-5" />
@@ -435,7 +435,7 @@ export default function ReportesPage() {
         </div>
       </div>
 
-      <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+      <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
         <p className="text-sm font-semibold text-slate-950">Materiales mas usados en servicios</p>
         <p className="mt-1 text-sm text-slate-500">Te ayuda a ver que insumos del torno se estan consumiendo con mayor frecuencia.</p>
         <div className="mt-4">

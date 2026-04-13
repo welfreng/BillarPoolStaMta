@@ -178,25 +178,25 @@ export default function UsuariosPage() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
           <p className="text-sm text-slate-500">Usuarios activos</p>
           <p className="mt-2 text-3xl font-semibold text-slate-950">
             {users.filter((user) => user.status === 'active').length}
           </p>
         </div>
-        <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
           <p className="text-sm text-slate-500">Administradores</p>
           <p className="mt-2 text-3xl font-semibold text-slate-950">
             {users.filter((user) => user.role === 'admin').length}
           </p>
         </div>
-        <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
           <p className="text-sm text-slate-500">Usuarios de ventas</p>
           <p className="mt-2 text-3xl font-semibold text-slate-950">
             {users.filter((user) => user.role === 'sales').length}
           </p>
         </div>
-        <div className="rounded-3xl border border-cyan-200 bg-cyan-50 p-4 shadow-sm sm:p-6">
+        <div className="rounded-[28px] border border-cyan-200 bg-[linear-gradient(180deg,rgba(236,254,255,0.98)_0%,rgba(207,250,254,0.82)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
           <p className="text-sm text-cyan-800">Regla aplicada</p>
           <p className="mt-2 text-lg font-semibold text-cyan-950">
             Ventas solo ve dashboard y ventas
@@ -204,21 +204,21 @@ export default function UsuariosPage() {
         </div>
       </div>
 
-      <div className="min-w-0 space-y-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+      <div className="min-w-0 space-y-4 rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
         <div className="relative max-w-md">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <Input
             value={queryText}
             onChange={(event) => setQueryText(event.target.value)}
             placeholder="Buscar por nombre, email o rol"
-            className="pl-9"
+            className="rounded-2xl border-slate-200 bg-white/90 pl-9 shadow-sm"
           />
         </div>
 
         {filteredUsers.length > 0 ? (
           <div className="min-w-0">
             <div className="mb-2 text-xs text-slate-500">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
-            <div className="overflow-x-auto pb-2">
+            <div className="pb-2">
             <Table className="min-w-[760px]">
               <TableHeader>
                 <TableRow>
@@ -227,7 +227,7 @@ export default function UsuariosPage() {
                   <TableHead>Rol</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Creado</TableHead>
-                  <TableHead className="sticky right-0 z-10 bg-white text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
+                  <TableHead className="sticky right-0 z-10 bg-slate-50/95 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
                     Acciones
                   </TableHead>
                 </TableRow>
@@ -257,7 +257,7 @@ export default function UsuariosPage() {
                     </TableCell>
                     <TableCell>{item.status === 'active' ? 'Activo' : 'Inactivo'}</TableCell>
                     <TableCell>{new Date(item.createdAt).toLocaleDateString('es-CO')}</TableCell>
-                    <TableCell className="sticky right-0 bg-white text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
+                    <TableCell className="sticky right-0 bg-white/95 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
                       <Button
                         type="button"
                         variant="outline"
