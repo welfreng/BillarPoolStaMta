@@ -48,6 +48,7 @@ function createCompactSelectionEditor(config: Partial<ProductVariantTemplateEdit
   return {
     kind: 'compact-table',
     creationMode: 'selection-driven',
+    hiddenColumns: ['sku', 'status'],
     ...config,
   };
 }
@@ -56,6 +57,7 @@ function createCompactManualEditor(config: Partial<ProductVariantTemplateEditorC
   return {
     kind: 'compact-table',
     creationMode: 'manual-rows',
+    hiddenColumns: ['sku', 'status'],
     ...config,
   };
 }
@@ -347,15 +349,16 @@ export function getProductVariantTemplate(input: {
     return {
       id: 'tacos-yfen',
       label: 'Tacos Yfen',
-      helper: 'Configura modelo, color y diametro de flecha. Luego agrega solo las combinaciones reales por serie.',
+      helper: 'Empieza con los atributos que apliquen hoy y agrega tus propios valores sin quedar amarrado a una lista fija.',
       mode: 'manual-combinations',
       editor: createCompactManualEditor({
         priceMode: 'global',
-        searchableAttributes: ['modelo', 'color', 'diametro'],
+        searchableAttributes: ['modelo'],
         allowCustomValuesFor: ['modelo', 'color', 'diametro'],
       }),
+      allowAttributeEditing: true,
       attributes: [
-        { label: 'Modelo', key: 'modelo', options: ['M1', 'M2', 'M3', 'M4', 'M9', 'M10', 'M11'] },
+        { label: 'Modelo', key: 'modelo', options: [] },
         { label: 'Color', key: 'color', options: ['Negro', 'Blanco', 'Rojo', 'Azul', 'Gris'] },
         {
           label: 'Diametro',

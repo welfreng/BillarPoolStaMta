@@ -90,12 +90,12 @@ export function VariantCompactEditor({
   const showDeleteColumn = manualRows && Boolean(onRemoveRow);
 
   return (
-    <div className="space-y-3">
-      <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+    <div className="min-w-0 space-y-2.5">
+      <div className="min-w-0 space-y-2.5 rounded-2xl bg-transparent p-0">
         {globalPrice ? (
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+          <div className="rounded-2xl border border-slate-200/90 bg-white p-3">
             <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{globalPrice.label}</p>
-            <div className="mt-2 max-w-[220px]">
+            <div className="mt-2 max-w-full sm:max-w-[220px]">
               <Input
                 type="number"
                 min="0"
@@ -106,15 +106,14 @@ export function VariantCompactEditor({
                 className="bg-white"
               />
             </div>
-            <p className="mt-2 text-xs text-slate-500">{globalPrice.description}</p>
           </div>
         ) : null}
 
         {manualRows ? (
-          <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 flex-col gap-3 rounded-2xl border border-slate-200/90 bg-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
             <div className="min-w-0">
               <p className="text-sm font-semibold text-slate-900">Variantes reales</p>
-              <p className="mt-1 text-sm text-slate-600">
+              <p className="mt-1 hidden text-sm text-slate-600 sm:block">
                 Agrega solo las combinaciones que realmente existen en inventario.
               </p>
             </div>
@@ -132,7 +131,7 @@ export function VariantCompactEditor({
           <div className="grid gap-3 md:grid-cols-2">
             {attributes.map((attribute) =>
               attribute.fixed ? (
-                <div key={attribute.key} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                <div key={attribute.key} className="min-w-0 rounded-2xl border border-slate-200/90 bg-white p-3">
                   <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{attribute.label}</p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {attribute.options.map((option) => (
@@ -146,11 +145,11 @@ export function VariantCompactEditor({
                   </div>
                 </div>
               ) : (
-                <div key={attribute.key} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                <div key={attribute.key} className="min-w-0 rounded-2xl border border-slate-200/90 bg-white p-3">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                     <div>
                       <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{attribute.label}</p>
-                      <p className="mt-1 text-sm text-slate-600">
+                      <p className="mt-1 hidden text-sm text-slate-600 sm:block">
                         Selecciona los valores activos para regenerar la tabla sin duplicados.
                       </p>
                     </div>
@@ -246,13 +245,10 @@ export function VariantCompactEditor({
           </div>
         )}
 
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-          La tabla de abajo queda enfocada en operacion y edicion rapida por variante.
-        </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white">
-        <Table>
+      <div className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        <Table className={cn(manualRows ? 'min-w-[780px]' : 'min-w-[720px]')}>
           <TableHeader>
             <TableRow>
               {attributes.map((attribute) => (
@@ -270,7 +266,7 @@ export function VariantCompactEditor({
               rows.map((row, index) => (
                 <TableRow key={row.id || `${index}-${Object.values(row.values).join('-')}`}>
                   {attributes.map((attribute) => (
-                    <TableCell key={`${row.id}-${attribute.key}`}>
+                    <TableCell key={`${row.id}-${attribute.key}`} className="align-top">
                       {(() => {
                         const rowOptions = getRowAttributeOptions?.(index, attribute.key, attribute.options) ?? attribute.options;
 
@@ -287,6 +283,7 @@ export function VariantCompactEditor({
                               allowCreate={attribute.allowCustom}
                               createLabel={`Crear "${attribute.label.toLowerCase()}"`}
                               onCreate={(value) => onAddAttributeValue(attribute.key, value)}
+                              triggerClassName="min-h-11 sm:min-h-10"
                             />
                           ) : (
                             <Select
@@ -294,7 +291,7 @@ export function VariantCompactEditor({
                               onValueChange={(value) => onRowAttributeChange?.(index, attribute.key, value)}
                               disabled={structureLocked}
                             >
-                              <SelectTrigger className="w-full min-w-[9rem] sm:w-[150px]">
+                              <SelectTrigger className="w-full min-w-[7rem] sm:w-[140px]">
                                 <SelectValue placeholder={`Selecciona ${attribute.label.toLowerCase()}`} />
                               </SelectTrigger>
                               <SelectContent>
@@ -323,7 +320,7 @@ export function VariantCompactEditor({
                     </TableCell>
                   ))}
                   {!globalPrice ? (
-                    <TableCell>
+                    <TableCell className="align-top">
                       <Input
                         type="number"
                         min="0"
@@ -336,11 +333,11 @@ export function VariantCompactEditor({
                             event.target.select();
                           }
                         }}
-                        className="w-full min-w-[7rem] sm:w-[120px]"
+                        className="w-full min-w-[6.25rem] sm:w-[110px]"
                       />
                     </TableCell>
                   ) : null}
-                  <TableCell>
+                  <TableCell className="align-top">
                     <Input
                       type="number"
                       min="0"
@@ -352,22 +349,22 @@ export function VariantCompactEditor({
                           event.target.select();
                         }
                       }}
-                      className="w-full min-w-[6.5rem] sm:w-[110px]"
+                      className="w-full min-w-[5.75rem] sm:w-[96px]"
                     />
                   </TableCell>
                   {!hiddenColumnSet.has('sku') ? (
-                    <TableCell>
+                    <TableCell className="align-top">
                       <Input
                         value={row.sku}
                         placeholder="Opcional"
                         disabled={structureLocked}
                         onChange={(event) => onRowSkuChange(index, event.target.value)}
-                        className="w-full min-w-[9rem] sm:w-[150px]"
+                        className="w-full min-w-[7rem] sm:w-[130px]"
                       />
                     </TableCell>
                   ) : null}
                   {!hiddenColumnSet.has('status') ? (
-                    <TableCell>
+                    <TableCell className="align-top">
                       <div className="flex items-center gap-3">
                         <Switch
                           checked={row.status !== 'inactive'}

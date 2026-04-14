@@ -149,13 +149,18 @@ export default function ServiciosPage() {
                 {filteredServices.map((service) => {
                   const { materialChips, hiddenCount, isSaleAddon } = buildMaterialMeta(service);
                   const materialsSummary = materialChips.join(', ');
+                  const operationalCost = Number(service.totalOperationalCost ?? 0);
+                  const materialCost = Number(service.totalMaterialCost ?? 0);
+                  const totalCost = Number(service.totalCost ?? materialCost + operationalCost);
                   const rowHoverSummary = [
                     serviceTypeLabels[service.serviceType],
                     `Cliente: ${service.customerName}`,
                     `Referencia: ${service.cueReference}`,
                     `Categoria: ${service.serviceCategory || 'General'}`,
                     `Valor: ${formatCurrency(service.totalRevenue)}`,
-                    `Costo: ${formatCurrency(service.totalCost ?? service.totalMaterialCost)}`,
+                    `Costo: ${formatCurrency(totalCost)}`,
+                    `Materiales: ${formatCurrency(materialCost)}`,
+                    `Operativo: ${formatCurrency(operationalCost)}`,
                     !isSalesUser ? `Utilidad: ${formatCurrency(service.grossProfit)}` : '',
                     `Materiales: ${materialsSummary}`,
                     `Fecha: ${formatDateTime(service.performedAt)}`,
@@ -185,6 +190,14 @@ export default function ServiciosPage() {
                           : materialsSummary}
                       </p>
                       <p><span className="font-medium text-slate-800">Categoria:</span> {service.serviceCategory || 'General'}</p>
+                      {!isSalesUser ? (
+                        <div className="rounded-2xl bg-slate-50/80 px-3 py-2">
+                          <p><span className="font-medium text-slate-800">Costo total:</span> {formatCurrency(totalCost)}</p>
+                          <p className="text-xs text-slate-500">
+                            Materiales {formatCurrency(materialCost)} + Operativo {formatCurrency(operationalCost)}
+                          </p>
+                        </div>
+                      ) : null}
                       <p><span className="font-medium text-slate-800">Fecha:</span> {formatDateTime(service.performedAt)}</p>
                       {service.notes ? <p><span className="font-medium text-slate-800">Nota:</span> {service.notes}</p> : null}
                       {!isSalesUser ? (
@@ -217,6 +230,9 @@ export default function ServiciosPage() {
                 {filteredServices.map((service) => {
                     const { materialChips, visibleChips, hiddenCount, detailLabel, isSaleAddon } = buildMaterialMeta(service);
                     const materialsSummary = materialChips.join(', ');
+                    const operationalCost = Number(service.totalOperationalCost ?? 0);
+                    const materialCost = Number(service.totalMaterialCost ?? 0);
+                    const totalCost = Number(service.totalCost ?? materialCost + operationalCost);
                     const rowHoverSummary = [
                       serviceTypeLabels[service.serviceType],
                       `Cliente: ${service.customerName}`,
@@ -224,7 +240,9 @@ export default function ServiciosPage() {
                       `Referencia: ${service.cueReference}`,
                       `Categoria: ${service.serviceCategory || 'General'}`,
                       `Valor: ${formatCurrency(service.totalRevenue)}`,
-                      `Costo: ${formatCurrency(service.totalCost ?? service.totalMaterialCost)}`,
+                      `Costo: ${formatCurrency(totalCost)}`,
+                      `Materiales: ${formatCurrency(materialCost)}`,
+                      `Operativo: ${formatCurrency(operationalCost)}`,
                       !isSalesUser ? `Utilidad: ${formatCurrency(service.grossProfit)}` : '',
                       `Materiales: ${materialsSummary}`,
                       service.notes ? `Nota: ${service.notes}` : '',
@@ -270,7 +288,16 @@ export default function ServiciosPage() {
                       <TableCell className={isSalesUser ? 'align-top whitespace-nowrap font-semibold text-slate-900' : undefined}>
                         {formatCurrency(service.totalRevenue)}
                       </TableCell>
-                      {!isSalesUser ? <TableCell>{formatCurrency(service.totalCost ?? service.totalMaterialCost)}</TableCell> : null}
+                      {!isSalesUser ? (
+                        <TableCell>
+                          <div>
+                            <p className="font-medium text-slate-900">{formatCurrency(totalCost)}</p>
+                            <p className="text-xs text-slate-500">
+                              Mat. {formatCurrency(materialCost)} + Op. {formatCurrency(operationalCost)}
+                            </p>
+                          </div>
+                        </TableCell>
+                      ) : null}
                       {!isSalesUser ? (
                         <TableCell className="font-medium text-emerald-700">{formatCurrency(service.grossProfit)}</TableCell>
                       ) : null}
@@ -331,6 +358,7 @@ export default function ServiciosPage() {
             customerName: values.customerName,
             cueReference: values.cueReference,
             servicePrice: values.servicePrice,
+            serviceCost: values.serviceCost,
             materials,
             notes: values.notes,
             actorRole: role ?? 'admin',

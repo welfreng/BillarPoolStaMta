@@ -36,6 +36,7 @@ const serviceSchema = z.object({
   customerName: z.string().min(2, 'Ingresa el cliente'),
   cueReference: z.string().min(2, 'Describe el taco o referencia'),
   servicePrice: z.coerce.number().positive('Ingresa un valor valido para el servicio'),
+  serviceCost: z.coerce.number().min(0, 'Ingresa un costo valido').default(0),
   tipProductId: z.string().default(''),
   ferruleProductId: z.string().default(''),
   suppressorProductId: z.string().default(''),
@@ -70,6 +71,7 @@ const defaultValues: ServiceFormValues = {
   customerName: '',
   cueReference: '',
   servicePrice: 0,
+  serviceCost: 0,
   tipProductId: '',
   ferruleProductId: '',
   suppressorProductId: '',
@@ -136,7 +138,9 @@ export function ServiceFormDialog({
   });
 
   const totalMaterialCost = materialSummary.reduce((sum, item) => sum + item.unitCost, 0);
-  const estimatedProfit = (Number(values.servicePrice) || 0) - totalMaterialCost;
+  const operationalCost = Math.max(Number(values.serviceCost) || 0, 0);
+  const estimatedTotalCost = totalMaterialCost + operationalCost;
+  const estimatedProfit = (Number(values.servicePrice) || 0) - estimatedTotalCost;
 
   return (
     <AdminResponsiveDialog
@@ -424,6 +428,20 @@ export function ServiceFormDialog({
 
                 <FormField
                   control={form.control}
+                  name="serviceCost"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Costo del servicio</FormLabel>
+                      <FormControl>
+                        <Input type="number" min="0" step="0.01" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
                   name="notes"
                   render={({ field }) => (
                     <FormItem>
@@ -460,14 +478,11 @@ export function ServiceFormDialog({
 
                   <div className="rounded-2xl bg-slate-950 px-4 py-3 text-white">
                     <p className="text-sm">Valor servicio: {formatCurrency(Number(values.servicePrice) || 0)}</p>
-                    {!hideFinancialSummary ? (
-                      <>
-                        <p className="mt-1 text-sm">Costo materiales: {formatCurrency(totalMaterialCost)}</p>
-                        <p className="mt-2 text-lg font-semibold">Utilidad estimada: {formatCurrency(estimatedProfit)}</p>
-                      </>
-                    ) : (
-                      <p className="mt-2 text-sm text-slate-300">El sistema descontara automaticamente los materiales del inventario.</p>
-                    )}
+                    <p className="mt-1 text-sm">Costo operativo: {formatCurrency(operationalCost)}</p>
+                    {!hideFinancialSummary ? <p className="mt-1 text-sm">Costo materiales: {formatCurrency(totalMaterialCost)}</p> : null}
+                    <p className="mt-1 text-sm">Costo total: {formatCurrency(estimatedTotalCost)}</p>
+                    <p className="mt-2 text-lg font-semibold">Utilidad estimada: {formatCurrency(estimatedProfit)}</p>
+                    <p className="mt-2 text-sm text-slate-300">El sistema descontara automaticamente los materiales del inventario.</p>
                   </div>
                 </div>
               </div>

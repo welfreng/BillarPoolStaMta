@@ -1250,7 +1250,10 @@ export function ProductFormDialog({
           ? 'Este producto ya tiene historial. Puedes ajustar datos comerciales y visuales, pero la estructura de variantes queda protegida para no afectar compras ni inventario.'
           : 'Registra la informacion esencial del producto y carga su imagen desde tu equipo.'
       }
-      desktopContentClassName="lg:max-w-3xl"
+      desktopContentClassName="lg:max-w-[58rem] xl:max-w-[62rem]"
+      headerClassName="px-4 pt-5 pb-3 lg:px-5"
+      bodyClassName="px-4 py-3 pb-5 lg:px-5"
+      footerClassName="px-4 py-2.5 lg:px-5"
       footer={
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
@@ -1309,17 +1312,17 @@ export function ProductFormDialog({
                 });
               }
             )}
-            className="space-y-4 sm:space-y-5"
+            className="space-y-3"
           >
-            <div className="space-y-4 sm:space-y-5">
-              <div className="space-y-4 sm:space-y-5">
+            <div className="space-y-3">
+              <div className="space-y-3">
                 <AdminMobileSection
                   value="product-info"
                   title="Informacion del producto"
                   defaultOpen
-                  className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4"
-                  headerClassName="mb-2.5 sm:mb-3"
-                  contentClassName="space-y-3 sm:space-y-4"
+                  className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:p-3.5"
+                  headerClassName="mb-2 sm:mb-2.5"
+                  contentClassName="space-y-3"
                 >
                     <FormField
                       control={form.control}
@@ -1349,7 +1352,7 @@ export function ProductFormDialog({
                       )}
                     />
 
-                    <div className="grid gap-4 md:grid-cols-3">
+                    <div className="grid gap-3 md:grid-cols-3">
                       <FormField
                         control={form.control}
                         name="category"
@@ -1470,33 +1473,9 @@ export function ProductFormDialog({
                       />
                     </div>
 
-                    <div
-                      className={
-                        variantGuidance.tone === 'varianted'
-                          ? 'hidden rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 sm:block'
-                          : variantGuidance.tone === 'simple'
-                            ? 'hidden rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 sm:block'
-                            : 'hidden rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm text-cyan-900 sm:block'
-                      }
-                    >
-                      <div className="flex items-start gap-3">
-                        {variantGuidance.tone === 'varianted' ? (
-                          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-                        ) : variantGuidance.tone === 'simple' ? (
-                          <Package2 className="mt-0.5 h-4 w-4 shrink-0" />
-                        ) : (
-                          <Boxes className="mt-0.5 h-4 w-4 shrink-0" />
-                        )}
-                        <div>
-                          <span className="font-semibold">{variantGuidance.label}</span>{' '}
-                          {variantGuidance.description}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2.5 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 sm:space-y-3 sm:p-4">
+                    <div className="space-y-3 rounded-2xl border border-slate-200/90 bg-white px-3 py-3 sm:px-3.5 sm:py-3.5">
                       {variantsDisabledForSelection ? (
-                        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-700">
                           <span className="font-semibold text-slate-900">
                             {selectedSubcategory || 'Esta presentacion'}
                           </span>{' '}
@@ -1522,7 +1501,7 @@ export function ProductFormDialog({
                         ) : null}
                       </div>
 
-                      <div className="grid gap-3">
+                      <div className="grid gap-2.5">
                         {structureLocked ? (
                           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                             Este producto ya tiene historial y la estructura de variantes esta protegida.
@@ -1535,7 +1514,7 @@ export function ProductFormDialog({
                           </div>
                         ) : null}
 
-                        <div className="grid gap-3">
+                        <div className="grid gap-2.5">
                           <FormField
                             control={form.control}
                             name="saleMode"
@@ -1558,24 +1537,13 @@ export function ProductFormDialog({
                             )}
                           />
 
-                          {variantTemplate ? (
-                            <div className="hidden rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 sm:block">
-                              <span className="font-semibold text-slate-900">{variantTemplate.label}</span>{' '}
-                              {variantTemplate.helper}
-                            </div>
-                          ) : null}
                         </div>
 
                         {saleMode === 'varianted' ? (
-                          <div className="space-y-2 rounded-2xl border border-slate-200 bg-white p-3 sm:p-4">
+                          <div className="space-y-2 rounded-2xl bg-slate-50/55 p-2.5">
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                               <div className="min-w-0">
                                 <p className="text-sm font-semibold text-slate-900">Atributos de la variante</p>
-                                {!variantTemplate ? (
-                                  <p className="mt-1 hidden text-xs text-slate-500 sm:block">
-                                    Paso 1: define primero los atributos. Paso 2: agrega las variantes reales.
-                                  </p>
-                                ) : null}
                               </div>
                               {templateAllowsAttributeEditing ? (
                                 <Button
@@ -1620,7 +1588,7 @@ export function ProductFormDialog({
 
                             {attributeFields.length > 0 ? (
                               attributeFields.map((field, index) => (
-                                <div key={field.id} className="rounded-2xl border border-slate-200 p-2.5 sm:p-3">
+                                <div key={field.id} className="rounded-2xl border border-slate-200/90 bg-white p-2.5">
                                   {!templateAllowsAttributeEditing ? (
                                     <p className="text-sm font-semibold text-slate-900">
                                       {form.getValues(`variantAttributes.${index}.label`) || `Atributo ${index + 1}`}
@@ -1664,7 +1632,7 @@ export function ProductFormDialog({
                                 </div>
                               ))
                             ) : templateAllowsAttributeEditing ? (
-                              <div className="hidden rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-500 sm:block">
+                              <div className="hidden rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-3 text-sm text-slate-500 sm:block">
                                 Empieza por definir al menos un atributo, por ejemplo `Color`, `Tamano` o `Presentacion`.
                               </div>
                             ) : null}
@@ -2061,17 +2029,7 @@ export function ProductFormDialog({
                               ))}
                             </div>
                             )
-                          ) : (
-                            <div className="hidden rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-5 text-sm text-slate-500 sm:block">
-                              {saleMode === 'varianted'
-                                ? variantTemplate?.mode === 'manual-combinations'
-                                  ? 'Agrega combinaciones reales para stock, costo y precio por variante.'
-                                  : variantTemplate?.mode === 'auto-combinations'
-                                    ? 'Usa la configuracion por categoria para generar automaticamente las combinaciones validas.'
-                                    : 'Configura la categoria para generar filas de captura rapida.'
-                                : 'Este producto se conservara como simple y seguira funcionando con el flujo actual.'}
-                            </div>
-                          )}
+                          ) : null}
 
                           {saleMode === 'varianted' &&
                           !usesCompactVariantEditor &&
@@ -2098,11 +2056,6 @@ export function ProductFormDialog({
                             </Button>
                           ) : null}
 
-                          {saleMode === 'varianted' && templateAllowsAttributeEditing && !canAddManualVariants ? (
-                            <div className="hidden rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 sm:block">
-                              Define primero los atributos para habilitar la carga de combinaciones.
-                            </div>
-                          ) : null}
                         </div>
                       </div>
                         </>
@@ -2113,13 +2066,13 @@ export function ProductFormDialog({
                 <AdminMobileSection
                   value="product-commerce"
                   title="Configuracion comercial"
-                  className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4"
-                  headerClassName="mb-2.5 sm:mb-3"
+                  className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:p-3.5"
+                  headerClassName="mb-2 sm:mb-2.5"
                 >
-                  <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
+                  <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
                     {usesCompactVariantEditor && compactEditorConfig?.priceMode === 'global' ? (
-                      <div className="hidden rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 sm:block">
-                        El precio global de este preset de variantes se configura arriba, dentro del bloque de variantes.
+                      <div className="hidden rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-600 sm:block">
+                        El precio de venta se controla desde el bloque de variantes.
                       </div>
                     ) : (
                       <FormField
@@ -2161,12 +2114,12 @@ export function ProductFormDialog({
                     />
                   </div>
 
-                  <div className="mt-4">
+                  <div className="mt-3">
                     <FormField
                       control={form.control}
                       name="featured"
                       render={({ field }) => (
-                        <FormItem className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3 sm:p-4">
+                        <FormItem className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3 sm:p-3.5">
                           <div className="flex items-start gap-3">
                             <FormControl>
                               <Checkbox checked={field.value} onCheckedChange={(checked) => field.onChange(checked === true)} />
@@ -2186,7 +2139,7 @@ export function ProductFormDialog({
                 <AdminMobileSection
                   value="product-image"
                   title="Imagen"
-                  className="space-y-3 rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-slate-100 p-3 shadow-sm sm:p-4"
+                  className="space-y-3 rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-slate-100 p-3 shadow-sm sm:p-3.5"
                   defaultOpen
                 >
                 <FormField

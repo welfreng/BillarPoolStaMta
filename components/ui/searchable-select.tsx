@@ -25,6 +25,7 @@ export function SearchableSelect({
   allowCreate,
   createLabel,
   onCreate,
+  triggerClassName,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -36,6 +37,7 @@ export function SearchableSelect({
   allowCreate?: boolean;
   createLabel?: string;
   onCreate?: (value: string) => void;
+  triggerClassName?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -50,7 +52,7 @@ export function SearchableSelect({
           variant="outline"
           role="combobox"
           disabled={disabled}
-          className="w-full min-w-0 justify-between overflow-hidden px-3 font-normal"
+          className={cn('w-full min-w-0 justify-between overflow-hidden px-3 font-normal', triggerClassName)}
         >
           <span className="truncate text-left">
             {selectedOption ? selectedOption.label : placeholder}
@@ -58,7 +60,7 @@ export function SearchableSelect({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[var(--radix-popover-trigger-width)] min-w-[260px] p-0" align="start">
+      <PopoverContent className="z-50 w-[min(var(--radix-popover-trigger-width),calc(100vw-2rem))] min-w-[min(260px,calc(100vw-2rem))] p-0" align="start" sideOffset={6}>
         <Command>
           <CommandInput
             placeholder={searchPlaceholder}
@@ -66,6 +68,7 @@ export function SearchableSelect({
             onValueChange={setQuery}
           />
           <CommandList
+            className="max-h-[min(15rem,42vh)]"
             ref={listRef}
             onWheel={(event) => {
               const element = listRef.current;
