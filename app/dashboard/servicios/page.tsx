@@ -357,6 +357,8 @@ export default function ServiciosPage() {
             performedAt: values.performedAt,
             customerName: values.customerName,
             cueReference: values.cueReference,
+            paymentMethod: values.paymentMethod,
+            paymentReference: values.paymentReference,
             servicePrice: values.servicePrice,
             serviceCost: values.serviceCost,
             materials,

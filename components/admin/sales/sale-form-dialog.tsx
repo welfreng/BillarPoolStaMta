@@ -165,6 +165,8 @@ const saleSchema = z
     items: z.array(saleLineItemSchema).min(1, 'Agrega al menos un producto'),
     customerPhone: z.string().default(''),
     customerName: z.string().min(2, 'Ingresa el nombre del cliente'),
+    paymentMethod: z.string().min(1, 'Selecciona el metodo de pago'),
+    paymentReference: z.string().default(''),
     notes: z.string().default(''),
   })
   .superRefine((values, context) => {
@@ -629,6 +631,8 @@ const defaultValues: SaleFormValues = {
   items: [createDefaultLineItem()],
   customerPhone: '',
   customerName: 'Cliente mostrador',
+  paymentMethod: 'efectivo',
+  paymentReference: '',
   notes: '',
 };
 
@@ -977,6 +981,46 @@ export function SaleFormDialog({
                       <FormLabel>Fecha de venta</FormLabel>
                       <FormControl>
                         <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="paymentMethod"
+                  render={({ field }) => (
+                    <FormItem className="min-w-0">
+                      <FormLabel>Metodo de pago</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Selecciona metodo" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="efectivo">Efectivo</SelectItem>
+                          <SelectItem value="nequi">Nequi</SelectItem>
+                          <SelectItem value="bancolombia">Bancolombia</SelectItem>
+                          <SelectItem value="daviplata">Daviplata</SelectItem>
+                          <SelectItem value="transferencia">Transferencia</SelectItem>
+                          <SelectItem value="mixto">Mixto</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="paymentReference"
+                  render={({ field }) => (
+                    <FormItem className="min-w-0">
+                      <FormLabel>Referencia de pago</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Opcional: comprobante, ultimos 4 digitos o nota breve" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

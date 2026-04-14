@@ -194,6 +194,8 @@ export default function VentasPage() {
         ),
         customerPhone: editingSale.customerPhone ?? '',
         customerName: editingSale.customerName,
+        paymentMethod: editingSale.paymentMethod || 'efectivo',
+        paymentReference: editingSale.paymentReference || '',
         notes: editingSale.notes,
       }
     : null;

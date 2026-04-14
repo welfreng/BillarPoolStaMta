@@ -153,6 +153,8 @@ interface RegisterSaleInput {
   }>;
   customerName: string;
   customerPhone: string;
+  paymentMethod: string;
+  paymentReference?: string;
   notes: string;
   responsibleUser: string;
   actorRole?: UserRole;
@@ -182,6 +184,8 @@ interface RegisterServiceInput {
   performedAt: string;
   customerName: string;
   cueReference: string;
+  paymentMethod: string;
+  paymentReference?: string;
   servicePrice: number;
   serviceCost?: number;
   materials: Array<{
@@ -697,6 +701,8 @@ function mapSaleDocument(documentId: string, data: DocumentData): Sale {
     returnedCostAmount: Number(data.returnedCostAmount ?? 0),
     customerName: String(data.customerName ?? ''),
     customerPhone: String(data.customerPhone ?? ''),
+    paymentMethod: String(data.paymentMethod ?? ''),
+    paymentReference: String(data.paymentReference ?? ''),
     notes: String(data.notes ?? ''),
     responsibleUser: String(data.responsibleUser ?? 'Administrador'),
   };
@@ -735,6 +741,8 @@ function mapServiceDocument(documentId: string, data: DocumentData): ServiceOrde
     performedAt: normalizeDateValue(data.performedAt),
     customerName: String(data.customerName ?? ''),
     cueReference: String(data.cueReference ?? ''),
+    paymentMethod: String(data.paymentMethod ?? ''),
+    paymentReference: String(data.paymentReference ?? ''),
     servicePrice: Number(data.servicePrice ?? data.totalRevenue ?? 0),
     totalRevenue,
     totalMaterialCost,
@@ -2615,8 +2623,13 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     }
 
     const normalizedCustomerPhone = input.customerPhone.trim();
+    const normalizedPaymentMethod = input.paymentMethod.trim();
+    const normalizedPaymentReference = input.paymentReference?.trim() ?? '';
     if (normalizedCustomerPhone && normalizedCustomerPhone.length < 7) {
       throw new Error('Ingresa un telefono valido o dejalo vacio.');
+    }
+    if (!normalizedPaymentMethod) {
+      throw new Error('Selecciona el metodo de pago.');
     }
 
     const variantStockMap = buildVariantStockMap(baseProducts);
@@ -2728,6 +2741,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         returnedCostAmount: 0,
         customerName: input.customerName,
         customerPhone: normalizedCustomerPhone,
+        paymentMethod: normalizedPaymentMethod,
+        paymentReference: normalizedPaymentReference,
         notes: input.notes,
         responsibleUser: input.responsibleUser,
       };
@@ -2745,6 +2760,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         variantId: lineItem.variantId ?? null,
         variantName: lineItem.variantName ?? null,
         giftedProductId: sale.giftedProductId ?? null,
+        paymentMethod: sale.paymentMethod,
+        paymentReference: sale.paymentReference ?? null,
         soldAt: Timestamp.fromDate(new Date(input.soldAt)),
       });
       const movementRef = doc(collection(db, 'movements'));
@@ -2834,6 +2851,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
           performedAt: input.soldAt,
           customerName: input.customerName,
           cueReference: serviceItem.cueReference,
+          paymentMethod: normalizedPaymentMethod,
+          paymentReference: normalizedPaymentReference,
           servicePrice: serviceItem.price,
           totalRevenue: serviceItem.price,
           totalMaterialCost: 0,
@@ -2853,6 +2872,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
           source: service.source ?? 'sale-addon',
           saleId: service.saleId ?? null,
           saleBatchId: service.saleBatchId ?? null,
+          paymentMethod: service.paymentMethod,
+          paymentReference: service.paymentReference ?? null,
           performedAt: Timestamp.fromDate(new Date(input.soldAt)),
         });
       });
@@ -3221,6 +3242,11 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     if ((Number(input.servicePrice) || 0) <= 0) {
       throw new Error('El valor del servicio debe ser mayor a cero.');
     }
+    const normalizedPaymentMethod = input.paymentMethod.trim();
+    const normalizedPaymentReference = input.paymentReference?.trim() ?? '';
+    if (!normalizedPaymentMethod) {
+      throw new Error('Selecciona el metodo de pago.');
+    }
 
     const directServiceCost = Math.max(Number(input.serviceCost ?? 0), 0);
     if (input.materials.length === 0 && directServiceCost <= 0) {
@@ -3275,6 +3301,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       performedAt: input.performedAt,
       customerName: input.customerName,
       cueReference: input.cueReference,
+      paymentMethod: normalizedPaymentMethod,
+      paymentReference: normalizedPaymentReference,
       servicePrice: totalRevenue,
       totalRevenue,
       totalMaterialCost,
@@ -3293,6 +3321,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       source: service.source ?? 'standalone',
       saleId: service.saleId ?? null,
       saleBatchId: service.saleBatchId ?? null,
+      paymentMethod: service.paymentMethod,
+      paymentReference: service.paymentReference ?? null,
       performedAt: Timestamp.fromDate(new Date(input.performedAt)),
     });
 

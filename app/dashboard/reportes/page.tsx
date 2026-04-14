@@ -215,7 +215,7 @@ export default function ReportesPage() {
       />
 
       <div className="rounded-[28px] border border-amber-200 bg-[linear-gradient(180deg,rgba(255,251,235,0.98)_0%,rgba(254,243,199,0.82)_100%)] p-4 text-sm text-amber-900 shadow-[0_18px_45px_rgba(15,23,42,0.07)]">
-        El panel ya consolida ingresos, costos y utilidad real del mes. `Metodo de pago` todavia no existe como dato real en `sales/services`, y el `estado` se infiere desde devoluciones, asi que esos dos campos conviene tratarlos como referencia operativa y no como auditoria final.
+        El panel ya consolida ingresos, costos, utilidad y metodo de pago real del mes. El `estado` todavia se infiere desde devoluciones, asi que conviene leerlo como referencia operativa y no como auditoria final.
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">

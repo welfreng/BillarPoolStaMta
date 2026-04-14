@@ -214,6 +214,8 @@ export interface Sale {
   returnedCostAmount: number;
   customerName: string;
   customerPhone: string;
+  paymentMethod?: string;
+  paymentReference?: string;
   notes: string;
   responsibleUser: string;
 }
@@ -262,6 +264,8 @@ export interface ServiceOrder {
   performedAt: string;
   customerName: string;
   cueReference: string;
+  paymentMethod?: string;
+  paymentReference?: string;
   servicePrice: number;
   totalRevenue: number;
   totalMaterialCost: number;

@@ -79,8 +79,16 @@ function inferSaleStatus(items: Sale[]) {
   return 'Completada';
 }
 
-function paymentMethodLabel() {
-  return 'No registrado';
+function paymentMethodLabel(value?: string) {
+  const normalized = String(value ?? '').trim().toLowerCase();
+  if (!normalized) return 'No registrado';
+  if (normalized === 'nequi') return 'Nequi';
+  if (normalized === 'bancolombia') return 'Bancolombia';
+  if (normalized === 'daviplata') return 'Daviplata';
+  if (normalized === 'transferencia') return 'Transferencia';
+  if (normalized === 'mixto') return 'Mixto';
+  if (normalized === 'efectivo') return 'Efectivo';
+  return value ?? 'No registrado';
 }
 
 function getSaleGroupTotals(groupSales: Sale[]) {
@@ -146,7 +154,7 @@ export function buildSalesReportDataset(input: {
     const customerPhone = baseSale?.customerPhone ?? '';
     const seller = baseSale?.responsibleUser || baseService?.responsibleUser || 'Usuario no registrado';
     const saleStatus = groupedSales.length > 0 ? inferSaleStatus(groupedSales) : 'Completada';
-    const paymentMethod = paymentMethodLabel();
+    const paymentMethod = paymentMethodLabel(baseSale?.paymentMethod ?? baseService?.paymentMethod);
     const saleTotals = getSaleGroupTotals(groupedSales);
     const serviceRevenue = groupedServices.reduce((sum, service) => sum + service.totalRevenue, 0);
     const serviceCost = groupedServices.reduce((sum, service) => sum + Number(service.totalCost ?? service.totalMaterialCost ?? 0), 0);

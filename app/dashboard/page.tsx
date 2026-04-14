@@ -139,6 +139,8 @@ export default function DashboardPage() {
         ],
         customerPhone: '',
         customerName: '',
+        paymentMethod: 'efectivo',
+        paymentReference: '',
         notes: '',
       }
     : null;

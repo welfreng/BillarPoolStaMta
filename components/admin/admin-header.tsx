@@ -160,7 +160,6 @@ export function AdminHeader() {
     <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/72 shadow-[0_10px_30px_rgba(15,23,42,0.05)] backdrop-blur-2xl">
       <div className="flex flex-col gap-4 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-6">
         <div className="flex items-center gap-3">
-          <SidebarTrigger className="rounded-2xl border border-slate-200 bg-white/90 shadow-sm md:hidden" />
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-700">Billar Pool Santa Marta</p>
             <h1 className="text-2xl font-semibold tracking-[-0.02em] text-slate-950">{title}</h1>

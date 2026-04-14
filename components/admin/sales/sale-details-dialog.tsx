@@ -53,6 +53,17 @@ function fileNameFromSale(sale: Sale) {
   return `factura-${date}-${customer || 'venta'}.pdf`;
 }
 
+function paymentMethodLabel(value?: string) {
+  const normalized = (value ?? '').trim().toLowerCase();
+  if (normalized === 'nequi') return 'Nequi';
+  if (normalized === 'bancolombia') return 'Bancolombia';
+  if (normalized === 'daviplata') return 'Daviplata';
+  if (normalized === 'transferencia') return 'Transferencia';
+  if (normalized === 'mixto') return 'Mixto';
+  if (normalized === 'efectivo') return 'Efectivo';
+  return 'No registrado';
+}
+
 async function loadImageAsDataUrl(src: string) {
   const response = await fetch(src);
   const blob = await response.blob();
@@ -83,6 +94,8 @@ async function buildInvoicePdf({
   returnedAmount,
   notes,
   responsibleUser,
+  paymentMethod,
+  paymentReference,
 }: {
   sale: Sale;
   logoUrl: string;
@@ -94,6 +107,8 @@ async function buildInvoicePdf({
   returnedAmount: number;
   notes: string;
   responsibleUser: string;
+  paymentMethod: string;
+  paymentReference: string;
 }) {
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -138,6 +153,12 @@ async function buildInvoicePdf({
     doc.text(`Telefono: ${sale.customerPhone}`, marginX + 4, cursorY + 20);
   }
   doc.text(responsibleUser, marginX + 110, cursorY + 15);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text(`Pago: ${paymentMethod}`, marginX + 110, cursorY + 20);
+  if (paymentReference.trim()) {
+    doc.text(`Referencia: ${paymentReference}`, marginX + 110, cursorY + 25);
+  }
 
   cursorY += 34;
 
@@ -302,6 +323,8 @@ export function SaleDetailsDialog({
   const returnedAmount = groupedSales.reduce((sum, item) => sum + (item.returnedSaleAmount ?? 0), 0);
   const returnedCost = groupedSales.reduce((sum, item) => sum + (item.returnedCostAmount ?? 0), 0);
   const invoiceLogoUrl = typeof window !== 'undefined' ? `${window.location.origin}${SITE_LOGO}` : SITE_LOGO;
+  const paymentMethod = paymentMethodLabel(baseSale.paymentMethod);
+  const paymentReference = baseSale.paymentReference?.trim() ?? '';
   const invoiceLines: InvoiceLine[] = groupedSales.flatMap((saleItem) =>
     saleItem.lineItems.map((item) => {
       const product = getProductById(products, item.productId);
@@ -407,6 +430,8 @@ export function SaleDetailsDialog({
                 <p style="font-weight:700; margin-top:6px;">${escapeHtml(baseSale.customerName)}</p>
                 ${baseSale.customerPhone ? `<p class="muted" style="margin-top:8px;">Telefono: ${escapeHtml(baseSale.customerPhone)}</p>` : ''}
                 <p class="muted" style="margin-top:8px;">Responsable: ${escapeHtml(baseSale.responsibleUser)}</p>
+                <p class="muted" style="margin-top:8px;">Metodo de pago: ${escapeHtml(paymentMethod)}</p>
+                ${paymentReference ? `<p class="muted" style="margin-top:8px;">Referencia: ${escapeHtml(paymentReference)}</p>` : ''}
               </div>
             </div>
 
@@ -471,6 +496,8 @@ export function SaleDetailsDialog({
       returnedAmount,
       notes: baseSale.notes?.trim() ? baseSale.notes : '',
       responsibleUser: baseSale.responsibleUser,
+      paymentMethod,
+      paymentReference,
     });
 
   const handlePrint = () => {
@@ -564,6 +591,10 @@ export function SaleDetailsDialog({
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
                 <p className="text-xs text-slate-500">Responsable</p>
                 <p className="mt-1 font-semibold text-slate-950">{baseSale.responsibleUser}</p>
+                <p className="mt-1 text-sm text-slate-500">Pago: {paymentMethod}</p>
+                {paymentReference ? (
+                  <p className="mt-1 text-sm text-slate-500">Ref: {paymentReference}</p>
+                ) : null}
                 <p className="mt-1 text-sm text-slate-500">Lineas vendidas: {formatNumber(lineItems.length)}</p>
               </div>
             </div>
@@ -828,6 +859,10 @@ export function SaleDetailsDialog({
                     <p className="mt-2 text-slate-500">Telefono: {baseSale.customerPhone}</p>
                   ) : null}
                   <p className="mt-2 text-slate-500">Atendido por: {baseSale.responsibleUser}</p>
+                  <p className="mt-2 text-slate-500">Metodo de pago: {paymentMethod}</p>
+                  {paymentReference ? (
+                    <p className="mt-2 text-slate-500">Referencia: {paymentReference}</p>
+                  ) : null}
                 </div>
               </div>
 

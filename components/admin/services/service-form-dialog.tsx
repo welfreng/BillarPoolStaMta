@@ -35,6 +35,8 @@ const serviceSchema = z.object({
   performedAt: z.string().min(1, 'Selecciona la fecha'),
   customerName: z.string().min(2, 'Ingresa el cliente'),
   cueReference: z.string().min(2, 'Describe el taco o referencia'),
+  paymentMethod: z.string().min(1, 'Selecciona el metodo de pago'),
+  paymentReference: z.string().default(''),
   servicePrice: z.coerce.number().positive('Ingresa un valor valido para el servicio'),
   serviceCost: z.coerce.number().min(0, 'Ingresa un costo valido').default(0),
   tipProductId: z.string().default(''),
@@ -70,6 +72,8 @@ const defaultValues: ServiceFormValues = {
   performedAt: new Date().toISOString().slice(0, 10),
   customerName: '',
   cueReference: '',
+  paymentMethod: 'efectivo',
+  paymentReference: '',
   servicePrice: 0,
   serviceCost: 0,
   tipProductId: '',
@@ -245,6 +249,46 @@ export function ServiceFormDialog({
                     <FormLabel>Taco o referencia</FormLabel>
                     <FormControl>
                       <Input placeholder="Ejemplo: taco Cuetec de Juan" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="paymentMethod"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Metodo de pago</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecciona metodo" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="efectivo">Efectivo</SelectItem>
+                        <SelectItem value="nequi">Nequi</SelectItem>
+                        <SelectItem value="bancolombia">Bancolombia</SelectItem>
+                        <SelectItem value="daviplata">Daviplata</SelectItem>
+                        <SelectItem value="transferencia">Transferencia</SelectItem>
+                        <SelectItem value="mixto">Mixto</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="paymentReference"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Referencia de pago</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Opcional: comprobante, ultimos 4 digitos o nota breve" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
