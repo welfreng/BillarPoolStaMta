@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { CalendarDays, Download, FileSpreadsheet, FileText, Wrench } from 'lucide-react';
+import { CalendarDays, FileText, ShoppingBag, TrendingUp, Wallet, Wrench } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -13,31 +13,17 @@ import { formatCurrency, formatNumber, getProductById } from '@/lib/admin/calcul
 import { serviceTypeLabels } from '@/lib/admin/catalogs';
 import {
   buildSalesReportDataset,
-  buildSalesReportExcelContent,
   buildSalesReportPdf,
 } from '@/lib/admin/report-export';
 import { useToast } from '@/hooks/use-toast';
 
 const currentMonth = new Date().toISOString().slice(0, 7);
 
-function downloadBlob(content: BlobPart, fileName: string, type: string) {
-  const blob = new Blob([content], { type });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = fileName;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(url);
-}
-
 export default function ReportesPage() {
   const { products, sales, services } = useAdminData();
   const { toast } = useToast();
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
   const [calendarOpen, setCalendarOpen] = useState(false);
-  const [isExportingExcel, setIsExportingExcel] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
 
   const monthServices = useMemo(
@@ -70,6 +56,42 @@ export default function ReportesPage() {
     }),
     [dataset]
   );
+
+  const executiveSummary = useMemo(() => {
+    const salesDetailRows = dataset.detailRows.filter((row) => row.itemType === 'product');
+    const serviceDetailRows = dataset.detailRows.filter((row) => row.itemType === 'service');
+    const averageTicket = monthlyTotals.transactions > 0 ? monthlyTotals.totalRevenue / monthlyTotals.transactions : 0;
+    const profitMargin = monthlyTotals.totalRevenue > 0 ? (monthlyTotals.totalProfit / monthlyTotals.totalRevenue) * 100 : 0;
+    const salesRevenue = salesDetailRows.reduce((sum, row) => sum + row.subtotal, 0);
+    const salesProfit = salesDetailRows.reduce((sum, row) => sum + row.utility, 0);
+    const serviceRevenue = serviceDetailRows.reduce((sum, row) => sum + row.subtotal, 0);
+    const serviceProfit = serviceDetailRows.reduce((sum, row) => sum + row.utility, 0);
+    const serviceCost = serviceDetailRows.reduce((sum, row) => sum + row.unitCost, 0);
+    const bestSellerMap = new Map<string, { revenue: number; profit: number; transactions: number }>();
+
+    dataset.summaryRows.forEach((row) => {
+      const current = bestSellerMap.get(row.seller) ?? { revenue: 0, profit: 0, transactions: 0 };
+      current.revenue += row.totalRevenue;
+      current.profit += row.totalProfit;
+      current.transactions += 1;
+      bestSellerMap.set(row.seller, current);
+    });
+
+    const topSeller = Array.from(bestSellerMap.entries())
+      .map(([seller, totals]) => ({ seller, ...totals }))
+      .sort((left, right) => right.profit - left.profit || right.revenue - left.revenue)[0] ?? null;
+
+    return {
+      averageTicket,
+      profitMargin,
+      salesRevenue,
+      salesProfit,
+      serviceRevenue,
+      serviceProfit,
+      serviceCost,
+      topSeller,
+    };
+  }, [dataset.detailRows, dataset.summaryRows, monthlyTotals.totalProfit, monthlyTotals.totalRevenue, monthlyTotals.transactions]);
 
   const topProducts = useMemo(() => {
     const totals = new Map<string, { quantity: number; revenue: number }>();
@@ -128,31 +150,6 @@ export default function ReportesPage() {
     return new Date(year, (month || 1) - 1, 1);
   }, [selectedMonth]);
 
-  const exportExcel = async () => {
-    setIsExportingExcel(true);
-    try {
-      const xml = buildSalesReportExcelContent(dataset);
-      downloadBlob(
-        xml,
-        `reporte-ventas-${selectedMonth}.xls`,
-        'application/vnd.ms-excel;charset=utf-8'
-      );
-      toast({
-        title: 'Excel generado',
-        description: 'Se descargaron las hojas de detalle por item y resumen por venta.',
-      });
-    } catch (error) {
-      console.error('Error exportando Excel de ventas:', error);
-      toast({
-        title: 'No se pudo generar el Excel',
-        description: error instanceof Error ? error.message : 'La exportacion fallo.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsExportingExcel(false);
-    }
-  };
-
   const exportPdf = async () => {
     setIsExportingPdf(true);
     try {
@@ -177,9 +174,9 @@ export default function ReportesPage() {
   return (
     <div className="space-y-6">
       <SectionHeader
-        eyebrow="Reporte comercial"
-        title="Ventas detalladas"
-        description="Reporte util para historico, reconstruccion y analisis de utilidad por venta, cliente e item."
+        eyebrow="Control gerencial"
+        title="Reportes del negocio"
+        description="Vista ejecutiva para controlar ventas, servicios, costos y utilidad del mes sin depender solo de exportaciones."
         actions={
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
             <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
@@ -209,42 +206,163 @@ export default function ReportesPage() {
                 />
               </PopoverContent>
             </Popover>
-            <Button type="button" variant="outline" onClick={() => void exportExcel()} disabled={isExportingExcel} className="rounded-xl">
-              <FileSpreadsheet className="mr-2 h-4 w-4" />
-              {isExportingExcel ? 'Generando Excel...' : 'Descargar Excel'}
-            </Button>
             <Button type="button" onClick={() => void exportPdf()} disabled={isExportingPdf} className="rounded-xl">
               <FileText className="mr-2 h-4 w-4" />
-              {isExportingPdf ? 'Generando PDF...' : 'Descargar PDF'}
+              {isExportingPdf ? 'Generando PDF...' : 'Descargar reporte PDF'}
             </Button>
           </div>
         }
       />
 
       <div className="rounded-[28px] border border-amber-200 bg-[linear-gradient(180deg,rgba(255,251,235,0.98)_0%,rgba(254,243,199,0.82)_100%)] p-4 text-sm text-amber-900 shadow-[0_18px_45px_rgba(15,23,42,0.07)]">
-        El reporte ya incluye cliente, telefono, vendedor, items, costos, utilidad y observaciones. `Metodo de pago` no existe hoy en la estructura de `sales/services`, por eso se exporta como `No registrado`. El `estado` se infiere desde devoluciones o se marca como `Completada`.
+        El panel ya consolida ingresos, costos y utilidad real del mes. `Metodo de pago` todavia no existe como dato real en `sales/services`, y el `estado` se infiere desde devoluciones, asi que esos dos campos conviene tratarlos como referencia operativa y no como auditoria final.
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
-          <p className="text-sm text-slate-500">Ventas / transacciones</p>
+          <p className="text-sm text-slate-500">Transacciones</p>
           <p className="mt-2 text-2xl font-semibold text-slate-950">{formatNumber(monthlyTotals.transactions)}</p>
+          <p className="mt-2 text-sm text-slate-500">Ventas consolidadas del periodo.</p>
         </div>
         <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
-          <p className="text-sm text-slate-500">Items vendidos</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-950">{formatNumber(dataset.detailRows.length)}</p>
+          <p className="text-sm text-slate-500">Ticket promedio</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-950">{formatCurrency(executiveSummary.averageTicket)}</p>
+          <p className="mt-2 text-sm text-slate-500">Ingreso promedio por transaccion.</p>
         </div>
         <div className="rounded-[28px] border border-cyan-200 bg-[linear-gradient(180deg,rgba(236,254,255,0.98)_0%,rgba(207,250,254,0.82)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
           <p className="text-sm text-cyan-800">Ingreso total</p>
           <p className="mt-2 text-2xl font-semibold text-cyan-950">{formatCurrency(monthlyTotals.totalRevenue)}</p>
+          <p className="mt-2 text-sm text-cyan-900">Ventas y servicios del periodo.</p>
         </div>
         <div className="rounded-[28px] border border-amber-200 bg-[linear-gradient(180deg,rgba(255,251,235,0.98)_0%,rgba(254,243,199,0.82)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
           <p className="text-sm text-amber-800">Costo total</p>
           <p className="mt-2 text-2xl font-semibold text-amber-950">{formatCurrency(monthlyTotals.totalCost)}</p>
+          <p className="mt-2 text-sm text-amber-900">Costo de productos y servicios.</p>
         </div>
         <div className="rounded-[28px] border border-emerald-200 bg-[linear-gradient(180deg,rgba(236,253,245,0.98)_0%,rgba(209,250,229,0.82)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
           <p className="text-sm text-emerald-800">Utilidad total</p>
           <p className="mt-2 text-2xl font-semibold text-emerald-950">{formatCurrency(monthlyTotals.totalProfit)}</p>
+          <p className="mt-2 text-sm text-emerald-900">Margen {executiveSummary.profitMargin.toFixed(1)}%.</p>
+        </div>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
+          <div className="flex items-start gap-3">
+            <div className="rounded-2xl bg-cyan-100 p-2 text-cyan-700">
+              <Wallet className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-950">Resumen ejecutivo</p>
+              <p className="text-sm text-slate-500">Lectura rapida del negocio para el mes seleccionado.</p>
+            </div>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Items facturados</p>
+              <p className="mt-2 text-xl font-semibold text-slate-950">{formatNumber(dataset.detailRows.length)}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Utilidad neta</p>
+              <p className="mt-2 text-xl font-semibold text-emerald-700">{formatCurrency(monthlyTotals.totalProfit)}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Margen</p>
+              <p className="mt-2 text-xl font-semibold text-slate-950">{executiveSummary.profitMargin.toFixed(1)}%</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Servicios</p>
+              <p className="mt-2 text-xl font-semibold text-slate-950">{formatNumber(monthlyTotals.serviceCount)}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
+          <div className="flex items-start gap-3">
+            <div className="rounded-2xl bg-emerald-100 p-2 text-emerald-700">
+              <TrendingUp className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-950">Responsable destacado</p>
+              <p className="text-sm text-slate-500">Quien mas aporta en utilidad dentro del periodo.</p>
+            </div>
+          </div>
+          <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+            {executiveSummary.topSeller ? (
+              <>
+                <p className="text-lg font-semibold text-slate-950">{executiveSummary.topSeller.seller}</p>
+                <p className="mt-1 text-sm text-slate-500">{formatNumber(executiveSummary.topSeller.transactions)} transacciones</p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <div className="rounded-xl bg-white px-3 py-2">
+                    <p className="text-xs uppercase tracking-[0.12em] text-slate-500">Ingreso</p>
+                    <p className="mt-1 font-semibold text-slate-950">{formatCurrency(executiveSummary.topSeller.revenue)}</p>
+                  </div>
+                  <div className="rounded-xl bg-white px-3 py-2">
+                    <p className="text-xs uppercase tracking-[0.12em] text-slate-500">Utilidad</p>
+                    <p className="mt-1 font-semibold text-emerald-700">{formatCurrency(executiveSummary.topSeller.profit)}</p>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-slate-500">Aun no hay ventas suficientes para destacar un responsable.</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
+          <div className="flex items-start gap-3">
+            <div className="rounded-2xl bg-slate-100 p-2 text-slate-700">
+              <ShoppingBag className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-950">Linea de ventas</p>
+              <p className="text-sm text-slate-500">Comportamiento comercial de productos vendidos.</p>
+            </div>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Ingreso</p>
+              <p className="mt-2 text-xl font-semibold text-slate-950">{formatCurrency(executiveSummary.salesRevenue)}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Utilidad</p>
+              <p className="mt-2 text-xl font-semibold text-emerald-700">{formatCurrency(executiveSummary.salesProfit)}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Items</p>
+              <p className="mt-2 text-xl font-semibold text-slate-950">
+                {formatNumber(dataset.detailRows.filter((row) => row.itemType === 'product').length)}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
+          <div className="flex items-start gap-3">
+            <div className="rounded-2xl bg-cyan-100 p-2 text-cyan-700">
+              <Wrench className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-950">Linea de servicios</p>
+              <p className="text-sm text-slate-500">Control del torno, materiales y utilidad del trabajo.</p>
+            </div>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Ingreso</p>
+              <p className="mt-2 text-xl font-semibold text-slate-950">{formatCurrency(executiveSummary.serviceRevenue)}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Costo</p>
+              <p className="mt-2 text-xl font-semibold text-amber-700">{formatCurrency(executiveSummary.serviceCost)}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Utilidad</p>
+              <p className="mt-2 text-xl font-semibold text-emerald-700">{formatCurrency(executiveSummary.serviceProfit)}</p>
+            </div>
+          </div>
         </div>
       </div>
 
