@@ -27,7 +27,7 @@ export function MetricCard({
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">{title}</p>
           <p className="mt-3 text-3xl font-semibold tracking-[-0.03em] text-slate-950 dark:text-slate-50">{value}</p>
         </div>
-        <div className="rounded-2xl border border-white/70 bg-white/80 p-2.5 shadow-sm dark:border-slate-700 dark:bg-slate-900/80">
+        <div className="rounded-2xl border border-border bg-background/88 p-2.5 shadow-sm dark:border-slate-700 dark:bg-background/72">
           <ArrowUpRight className="h-4 w-4 text-slate-600 dark:text-slate-300" />
         </div>
       </div>

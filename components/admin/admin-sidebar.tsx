@@ -80,22 +80,30 @@ export function AdminSidebar() {
                       className={cn(
                         'h-auto rounded-2xl px-3 py-3 transition-all duration-200',
                         active
-                          ? 'bg-[linear-gradient(135deg,#0a2472_0%,#12389b_100%)] text-white shadow-[0_16px_30px_rgba(10,36,114,0.24)] hover:text-white'
+                          ? 'bg-[linear-gradient(135deg,#0a2472_0%,#12389b_100%)] text-white shadow-[0_16px_30px_rgba(10,36,114,0.24)] hover:text-white focus-visible:text-white'
                           : 'bg-transparent text-slate-700 hover:bg-card/72 hover:text-slate-950 hover:shadow-sm dark:text-slate-200 dark:hover:bg-slate-900/80 dark:hover:text-slate-50'
                       )}
                     >
                       <Link
                         href={item.href}
+                        className="flex w-full items-start gap-3"
                         onClick={() => {
                           if (isMobile) {
                             setOpenMobile(false);
                           }
                         }}
                       >
-                        <Icon className="h-4 w-4" />
-                        <span className="flex flex-col">
-                          <span>{item.label}</span>
-                          <span className={cn('text-xs', active ? 'text-cyan-100/85' : 'text-slate-500 dark:text-slate-400')}>{item.helper}</span>
+                        <Icon className={cn('mt-0.5 h-4 w-4 shrink-0', active ? 'text-white' : 'text-current')} />
+                        <span className="flex min-w-0 flex-col">
+                          <span className={cn('truncate font-medium', active ? 'text-white' : 'text-current')}>{item.label}</span>
+                          <span
+                            className={cn(
+                              'truncate text-xs',
+                              active ? 'text-blue-100 dark:text-white/80' : 'text-slate-500 dark:text-slate-400'
+                            )}
+                          >
+                            {item.helper}
+                          </span>
                         </span>
                       </Link>
                     </SidebarMenuButton>

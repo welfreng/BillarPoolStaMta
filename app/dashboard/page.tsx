@@ -1,19 +1,47 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
-import { CircleAlert, PackageCheck, Search, SendHorizonal, ShieldCheck, ShoppingCart } from 'lucide-react';
+import { useMemo, useState, type ComponentType, type ReactNode } from 'react';
+import {
+  Activity,
+  ArrowUpRight,
+  Boxes,
+  ChevronRight,
+  CircleAlert,
+  Clock3,
+  Package,
+  PackageCheck,
+  ReceiptText,
+  Search,
+  SendHorizonal,
+  ShieldCheck,
+  ShoppingCart,
+  TrendingUp,
+  Wrench,
+} from 'lucide-react';
 import { useAuth } from '@/components/auth-context';
-import { MetricCard } from '@/components/admin/dashboard/metric-card';
 import { SaleDetailsDialog } from '@/components/admin/sales/sale-details-dialog';
 import { SaleFormDialog, type SaleFormValues } from '@/components/admin/sales/sale-form-dialog';
+import { useAdminData } from '@/components/admin/admin-data-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useAdminData } from '@/components/admin/admin-data-context';
 import { useToast } from '@/hooks/use-toast';
-import { formatCurrency, formatNumber, getProductStock, getStockAlert } from '@/lib/admin/calculations';
+import {
+  formatCurrency,
+  formatDateTime,
+  formatNumber,
+  getOperationalProductStock,
+  getProductById,
+  getProductStock,
+  getStockAlert,
+} from '@/lib/admin/calculations';
 import { getFriendlyFirestoreWriteErrorMessage } from '@/lib/firestore-write-retry';
-import type { Product } from '@/lib/admin/types';
+import type { InventoryMovement, Product, ServiceOrder } from '@/lib/admin/types';
+import { cn } from '@/lib/utils';
+
+const DASHBOARD_TIMEZONE = 'America/Bogota';
+const LOW_STOCK_THRESHOLD = 3;
+type DashboardPeriod = 'today' | 'week' | 'month';
 
 function getProductSalePriceSummary(product: Product) {
   const prices = (product.variants ?? [])
@@ -24,9 +52,7 @@ function getProductSalePriceSummary(product: Product) {
 
   const minPrice = Math.min(...prices);
   const maxPrice = Math.max(...prices);
-  return minPrice === maxPrice
-    ? formatCurrency(minPrice)
-    : `${formatCurrency(minPrice)} - ${formatCurrency(maxPrice)}`;
+  return minPrice === maxPrice ? formatCurrency(minPrice) : `${formatCurrency(minPrice)} - ${formatCurrency(maxPrice)}`;
 }
 
 function getVariantAvailabilitySummary(product: Product) {
@@ -37,7 +63,7 @@ function getVariantAvailabilitySummary(product: Product) {
   const outOfStockCount = variants.length - inStockCount;
 
   if (outOfStockCount > 0) {
-    return `${inStockCount}/${variants.length} variantes con stock · ${outOfStockCount} agotadas`;
+    return `${inStockCount}/${variants.length} variantes con stock - ${outOfStockCount} agotadas`;
   }
 
   return `${variants.length} variantes con stock`;
@@ -50,14 +76,304 @@ function getSellableVariants(product: Product | null | undefined) {
   );
 }
 
+function getDateKeyInBogota(value: string | Date) {
+  const parsed = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '';
+
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: DASHBOARD_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(parsed);
+}
+
+function formatLongDateInBogota(value: Date) {
+  return new Intl.DateTimeFormat('es-CO', {
+    timeZone: DASHBOARD_TIMEZONE,
+    weekday: 'long',
+    day: '2-digit',
+    month: 'long',
+  }).format(value);
+}
+
+function normalizePaymentMethodLabel(value?: string) {
+  return value?.trim() || 'Sin metodo';
+}
+
+function getBogotaDateParts(value: Date) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: DASHBOARD_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(value);
+
+  const year = Number(parts.find((part) => part.type === 'year')?.value ?? 0);
+  const month = Number(parts.find((part) => part.type === 'month')?.value ?? 0);
+  const day = Number(parts.find((part) => part.type === 'day')?.value ?? 0);
+
+  return { year, month, day };
+}
+
+function getDateKeyFromParts(year: number, month: number, day: number) {
+  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function shiftDateKey(dateKey: string, deltaDays: number) {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  const shifted = new Date(Date.UTC(year, month - 1, day + deltaDays));
+  return getDateKeyFromParts(shifted.getUTCFullYear(), shifted.getUTCMonth() + 1, shifted.getUTCDate());
+}
+
+function getMonthInputValue(value: Date) {
+  const { year, month } = getBogotaDateParts(value);
+  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}`;
+}
+
+function getDashboardRange(period: DashboardPeriod, selectedMonth: string, now: Date) {
+  const { year, month, day } = getBogotaDateParts(now);
+  const todayKey = getDateKeyFromParts(year, month, day);
+
+  if (period === 'today') {
+    return {
+      startKey: todayKey,
+      endKey: todayKey,
+      monthValue: selectedMonth,
+      label: 'Hoy',
+      longLabel: formatLongDateInBogota(now),
+      kpiLabel: 'de hoy',
+    };
+  }
+
+  if (period === 'week') {
+    const currentDate = new Date(Date.UTC(year, month - 1, day));
+    const weekday = currentDate.getUTCDay();
+    const diffToMonday = weekday === 0 ? 6 : weekday - 1;
+    const startKey = shiftDateKey(todayKey, -diffToMonday);
+
+    return {
+      startKey,
+      endKey: todayKey,
+      monthValue: selectedMonth,
+      label: 'Semana',
+      longLabel: `${startKey} al ${todayKey}`,
+      kpiLabel: 'de la semana',
+    };
+  }
+
+  const normalizedMonth = /^\d{4}-\d{2}$/.test(selectedMonth) ? selectedMonth : getMonthInputValue(now);
+  const [selectedYear, selectedMonthNumber] = normalizedMonth.split('-').map(Number);
+  const lastDay = new Date(Date.UTC(selectedYear, selectedMonthNumber, 0)).getUTCDate();
+
+  return {
+    startKey: `${normalizedMonth}-01`,
+    endKey: `${normalizedMonth}-${String(lastDay).padStart(2, '0')}`,
+    monthValue: normalizedMonth,
+    label: 'Mes',
+    longLabel: normalizedMonth,
+    kpiLabel: 'del mes',
+  };
+}
+
+function isDateKeyWithinRange(dateKey: string, startKey: string, endKey: string) {
+  return Boolean(dateKey) && dateKey >= startKey && dateKey <= endKey;
+}
+
+function formatMonthLabel(monthValue: string) {
+  const [year, month] = monthValue.split('-').map(Number);
+  if (!year || !month) return monthValue;
+
+  return new Intl.DateTimeFormat('es-CO', {
+    timeZone: DASHBOARD_TIMEZONE,
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(Date.UTC(year, month - 1, 1)));
+}
+
+function getServiceLabel(service: ServiceOrder) {
+  if (service.serviceCategory?.trim()) return service.serviceCategory.trim();
+
+  switch (service.serviceType) {
+    case 'tip-installation':
+      return 'Instalacion de suela';
+    case 'tip-ferrule-installation':
+      return 'Suela y ferrule';
+    case 'extension-installation':
+      return 'Instalacion de extension';
+    default:
+      return 'Servicio';
+  }
+}
+
+function getMovementLabel(movement: InventoryMovement) {
+  switch (movement.reason) {
+    case 'manual-adjustment':
+      return 'Ajuste manual';
+    case 'damage':
+      return 'Ajuste por dano';
+    case 'transfer':
+      return 'Transferencia';
+    case 'return':
+      return 'Devolucion';
+    case 'initial-load':
+      return 'Carga inicial';
+    case 'purchase':
+      return 'Compra';
+    case 'sale':
+      return 'Venta';
+    case 'service':
+      return 'Servicio';
+    case 'gift':
+      return 'Obsequio';
+    default:
+      return 'Movimiento';
+  }
+}
+
+function SectionCard({
+  title,
+  description,
+  action,
+  children,
+  className,
+}: {
+  title: string;
+  description: string;
+  action?: ReactNode;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <section
+      className={cn(
+        'rounded-[28px] border border-border bg-card/88 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-card/88 dark:shadow-[0_20px_48px_rgba(2,6,23,0.28)] sm:p-6',
+        className
+      )}
+    >
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+          <p className="text-sm text-muted-foreground">{description}</p>
+        </div>
+        {action ? <div className="w-full sm:w-auto">{action}</div> : null}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function KpiCard({
+  title,
+  value,
+  helper,
+  icon: Icon,
+  tone = 'default',
+}: {
+  title: string;
+  value: string;
+  helper: string;
+  icon: ComponentType<{ className?: string }>;
+  tone?: 'default' | 'success' | 'warning' | 'danger';
+}) {
+  const toneClasses =
+    tone === 'success'
+      ? 'border-emerald-200/80 bg-emerald-50/70 dark:border-emerald-900/60 dark:bg-emerald-950/20'
+      : tone === 'warning'
+        ? 'border-amber-200/80 bg-amber-50/70 dark:border-amber-900/60 dark:bg-amber-950/20'
+        : tone === 'danger'
+          ? 'border-rose-200/80 bg-rose-50/70 dark:border-rose-900/60 dark:bg-rose-950/20'
+          : 'border-border bg-background/88 dark:border-slate-800 dark:bg-background/60';
+
+  return (
+    <div className={cn('rounded-[24px] border p-4 shadow-sm', toneClasses)}>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{title}</p>
+          <p className="mt-2 text-xl font-semibold tracking-[-0.03em] text-foreground sm:text-2xl">{value}</p>
+        </div>
+        <div className="rounded-2xl border border-border bg-background/88 p-2.5 dark:border-slate-700 dark:bg-background/72">
+          <Icon className="h-4 w-4 text-muted-foreground" />
+        </div>
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground sm:text-sm">{helper}</p>
+    </div>
+  );
+}
+
+function QuickActionLink({
+  href,
+  onClick,
+  icon: Icon,
+  title,
+  className,
+}: {
+  href?: string;
+  onClick?: () => void;
+  icon: ComponentType<{ className?: string }>;
+  title: string;
+  className?: string;
+}) {
+  const content = (
+    <>
+      <span className="rounded-xl border border-border bg-muted/60 p-2 dark:border-slate-700">
+        <Icon className="h-3.5 w-3.5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-semibold text-foreground">{title}</span>
+      </span>
+      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+    </>
+  );
+
+  if (href) {
+    return (
+      <Button
+        asChild
+        variant="outline"
+        className={cn(
+          'h-auto min-h-[62px] w-full justify-start gap-3 overflow-hidden rounded-2xl px-3.5 py-3 text-left',
+          className
+        )}
+      >
+        <Link href={href}>{content}</Link>
+      </Button>
+    );
+  }
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      className={cn(
+        'h-auto min-h-[62px] w-full justify-start gap-3 overflow-hidden rounded-2xl px-3.5 py-3 text-left',
+        className
+      )}
+      onClick={onClick}
+    >
+      {content}
+    </Button>
+  );
+}
+
 export default function DashboardPage() {
-  const { products, movements, purchases, summary, sales, services, registerSale, authorizationRequests } = useAdminData();
+  const { products, movements, purchases, sales, services, registerSale, authorizationRequests } = useAdminData();
   const { role, profile, user } = useAuth();
   const { toast } = useToast();
+  const isSalesUser = role === 'sales';
+  const [period, setPeriod] = useState<DashboardPeriod>('today');
+  const [selectedMonth, setSelectedMonth] = useState(() => getMonthInputValue(new Date()));
   const [productQuery, setProductQuery] = useState('');
   const [openSaleDialog, setOpenSaleDialog] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [detailsSaleId, setDetailsSaleId] = useState<string | null>(null);
+
+  const effectivePeriod = isSalesUser ? 'today' : period;
+  const dashboardRange = useMemo(
+    () => getDashboardRange(effectivePeriod, selectedMonth, new Date()),
+    [effectivePeriod, selectedMonth]
+  );
+  const periodLabel = effectivePeriod === 'month' ? formatMonthLabel(dashboardRange.monthValue) : dashboardRange.label;
 
   const availableProducts = products
     .map((product) => ({
@@ -97,9 +413,20 @@ export default function DashboardPage() {
       });
   }, [products]);
 
+  const lowStockProducts = useMemo(() => {
+    return products
+      .filter((product) => product.status === 'active')
+      .map((product) => ({
+        product,
+        stock: getOperationalProductStock(product, movements),
+      }))
+      .filter((item) => item.stock > 0 && item.stock <= LOW_STOCK_THRESHOLD)
+      .sort((left, right) => left.stock - right.stock || left.product.name.localeCompare(right.product.name));
+  }, [movements, products]);
+
   const quickResults = useMemo(() => {
     const normalizedQuery = productQuery.trim().toLowerCase();
-    if (!normalizedQuery) return availableProducts.slice(0, 8);
+    if (!normalizedQuery) return availableProducts.slice(0, 5);
 
     return availableProducts
       .filter((product) =>
@@ -107,8 +434,195 @@ export default function DashboardPage() {
           .toLowerCase()
           .includes(normalizedQuery)
       )
-      .slice(0, 8);
+      .slice(0, 5);
   }, [availableProducts, productQuery]);
+
+  const filteredSales = useMemo(
+    () =>
+      sales.filter((sale) =>
+        isDateKeyWithinRange(getDateKeyInBogota(sale.soldAt), dashboardRange.startKey, dashboardRange.endKey)
+      ),
+    [dashboardRange.endKey, dashboardRange.startKey, sales]
+  );
+
+  const filteredServices = useMemo(
+    () =>
+      services.filter((service) =>
+        isDateKeyWithinRange(getDateKeyInBogota(service.performedAt), dashboardRange.startKey, dashboardRange.endKey)
+      ),
+    [dashboardRange.endKey, dashboardRange.startKey, services]
+  );
+
+  const filteredPurchases = useMemo(
+    () =>
+      purchases.filter((purchase) =>
+        isDateKeyWithinRange(getDateKeyInBogota(purchase.purchasedAt), dashboardRange.startKey, dashboardRange.endKey)
+      ),
+    [dashboardRange.endKey, dashboardRange.startKey, purchases]
+  );
+
+  const periodRevenue = useMemo(() => {
+    const salesRevenue = filteredSales.reduce(
+      (sum, sale) => sum + Math.max(Number(sale.totalSale ?? 0) - Number(sale.returnedSaleAmount ?? 0), 0),
+      0
+    );
+    const servicesRevenue = filteredServices.reduce((sum, service) => sum + Number(service.totalRevenue ?? 0), 0);
+    return salesRevenue + servicesRevenue;
+  }, [filteredSales, filteredServices]);
+
+  const periodProfit = useMemo(() => {
+    const salesProfit = filteredSales.reduce((sum, sale) => {
+      const baseProfit = Number(sale.grossProfit ?? 0);
+      const returnedRevenue = Number(sale.returnedSaleAmount ?? 0);
+      const returnedCost = Number(sale.returnedCostAmount ?? 0);
+      return sum + (baseProfit - (returnedRevenue - returnedCost));
+    }, 0);
+    const servicesProfit = filteredServices.reduce((sum, service) => sum + Number(service.grossProfit ?? 0), 0);
+    return salesProfit + servicesProfit;
+  }, [filteredSales, filteredServices]);
+
+  const periodUnitsSold = useMemo(
+    () =>
+      filteredSales.reduce(
+        (sum, sale) => sum + Math.max(Number(sale.quantity ?? 0) - Number(sale.returnedQuantity ?? 0), 0),
+        0
+      ),
+    [filteredSales]
+  );
+
+  const periodTransactions = filteredSales.length + filteredServices.length;
+
+  const productPerformance = useMemo(() => {
+    const totals = new Map<
+      string,
+      {
+        product: Product | undefined;
+        quantity: number;
+        revenue: number;
+      }
+    >();
+
+    filteredSales.forEach((sale) => {
+      const quantity = Math.max(Number(sale.quantity ?? 0) - Number(sale.returnedQuantity ?? 0), 0);
+      if (quantity <= 0) return;
+
+      const existing = totals.get(sale.productId);
+      const revenue = Math.max(Number(sale.totalSale ?? 0) - Number(sale.returnedSaleAmount ?? 0), 0);
+      if (existing) {
+        existing.quantity += quantity;
+        existing.revenue += revenue;
+        return;
+      }
+
+      totals.set(sale.productId, {
+        product: getProductById(products, sale.productId),
+        quantity,
+        revenue,
+      });
+    });
+
+    const sorted = Array.from(totals.values()).sort(
+      (left, right) => right.quantity - left.quantity || right.revenue - left.revenue
+    );
+
+    return {
+      top: sorted[0] ?? null,
+      bottom: [...sorted].reverse()[0] ?? null,
+    };
+  }, [filteredSales, products]);
+
+  const topService = useMemo(() => {
+    const totals = new Map<
+      string,
+      {
+        label: string;
+        count: number;
+        revenue: number;
+      }
+    >();
+
+    filteredServices.forEach((service) => {
+      const label = getServiceLabel(service);
+      const existing = totals.get(label);
+      if (existing) {
+        existing.count += 1;
+        existing.revenue += Number(service.totalRevenue ?? 0);
+        return;
+      }
+
+      totals.set(label, {
+        label,
+        count: 1,
+        revenue: Number(service.totalRevenue ?? 0),
+      });
+    });
+
+    return Array.from(totals.values()).sort(
+      (left, right) => right.count - left.count || right.revenue - left.revenue
+    )[0] ?? null;
+  }, [filteredServices]);
+
+  const activityItems = useMemo(() => {
+    const recentSales = [...filteredSales]
+      .sort((a, b) => new Date(b.soldAt).getTime() - new Date(a.soldAt).getTime())
+      .slice(0, 4)
+      .map((sale) => ({
+        id: `sale-${sale.id}`,
+        occurredAt: sale.soldAt,
+        icon: ShoppingCart,
+        title: `Venta - ${getProductById(products, sale.productId)?.name ?? 'Producto'}`,
+        subtitle: `${sale.customerName || sale.responsibleUser} - ${normalizePaymentMethodLabel(sale.paymentMethod)}`,
+        value: formatCurrency(Math.max(Number(sale.totalSale ?? 0) - Number(sale.returnedSaleAmount ?? 0), 0)),
+        tone: 'text-emerald-700 dark:text-emerald-300',
+      }));
+
+    const recentPurchases = [...filteredPurchases]
+      .sort((a, b) => new Date(b.purchasedAt).getTime() - new Date(a.purchasedAt).getTime())
+      .slice(0, 4)
+      .map((purchase) => ({
+        id: `purchase-${purchase.id}`,
+        occurredAt: purchase.purchasedAt,
+        icon: Boxes,
+        title: `Compra - ${purchase.supplier}`,
+        subtitle: `${getProductById(products, purchase.productId)?.name ?? 'Producto'} - ${formatNumber(purchase.quantityPurchased)} uds`,
+        value: formatCurrency(Number(purchase.totalInvestment ?? 0)),
+        tone: 'text-cyan-700 dark:text-cyan-300',
+      }));
+
+    const recentServices = [...filteredServices]
+      .sort((a, b) => new Date(b.performedAt).getTime() - new Date(a.performedAt).getTime())
+      .slice(0, 4)
+      .map((service) => ({
+        id: `service-${service.id}`,
+        occurredAt: service.performedAt,
+        icon: Wrench,
+        title: `Servicio - ${getServiceLabel(service)}`,
+        subtitle: `${service.customerName} - ${normalizePaymentMethodLabel(service.paymentMethod)}`,
+        value: formatCurrency(Number(service.totalRevenue ?? 0)),
+        tone: 'text-violet-700 dark:text-violet-300',
+      }));
+
+    const importantMovements = [...movements]
+      .filter((movement) =>
+        ['manual-adjustment', 'damage', 'transfer', 'return', 'initial-load'].includes(movement.reason) &&
+        isDateKeyWithinRange(getDateKeyInBogota(movement.occurredAt), dashboardRange.startKey, dashboardRange.endKey)
+      )
+      .sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime())
+      .slice(0, 4)
+      .map((movement) => ({
+        id: `movement-${movement.id}`,
+        occurredAt: movement.occurredAt,
+        icon: Activity,
+        title: `${getMovementLabel(movement)} - ${getProductById(products, movement.productId)?.name ?? 'Producto'}`,
+        subtitle: movement.notes || movement.responsibleUser,
+        value: `${movement.quantity > 0 ? '+' : ''}${formatNumber(movement.quantity)} uds`,
+        tone: 'text-amber-700 dark:text-amber-300',
+      }));
+
+    return [...recentSales, ...recentPurchases, ...recentServices, ...importantMovements]
+      .sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime())
+      .slice(0, 8);
+  }, [dashboardRange.endKey, dashboardRange.startKey, filteredPurchases, filteredSales, filteredServices, movements, products]);
 
   const selectedProduct = selectedProductId
     ? products.find((product) => product.id === selectedProductId) ?? null
@@ -127,11 +641,10 @@ export default function DashboardPage() {
             productId: selectedProduct.id,
             variantId: suggestedSelectedVariant?.id ?? '',
             quantity: 1,
-            unitPrice:
-              suggestedSelectedVariant
-                ? Number(suggestedSelectedVariant.salePrice ?? selectedProduct.salePrice)
-                : selectedProductHasVariants
-                  ? 0
+            unitPrice: suggestedSelectedVariant
+              ? Number(suggestedSelectedVariant.salePrice ?? selectedProduct.salePrice)
+              : selectedProductHasVariants
+                ? 0
                 : selectedProduct.salePrice,
             serviceItems: [],
             giftItems: [],
@@ -161,344 +674,503 @@ export default function DashboardPage() {
           .join('%0A')}`
       : 'Hola, por ahora no tenemos variantes agotadas para solicitar.';
   const pendingAuthorizationRequests = authorizationRequests.filter((request) => request.status === 'pending');
+  const quickActions = [
+    {
+      icon: ShoppingCart,
+      title: 'Nueva venta',
+      onClick: () => {
+        setSelectedProductId(null);
+        setOpenSaleDialog(true);
+      },
+    },
+    ...(role === 'admin' || role === 'sales'
+      ? [{ href: '/dashboard/servicios', icon: Wrench, title: 'Registrar servicio' }]
+      : []),
+    ...(!isSalesUser ? [{ href: '/dashboard/compras', icon: Boxes, title: 'Nueva compra' }] : []),
+    ...(!isSalesUser ? [{ href: '/dashboard/inventario', icon: Package, title: 'Inventario' }] : []),
+    ...(role === 'admin' ? [{ href: '/dashboard/autorizaciones', icon: ShieldCheck, title: 'Autorizaciones' }] : []),
+    ...(!isSalesUser ? [{ href: '/dashboard/reportes', icon: ArrowUpRight, title: 'Reportes' }] : []),
+  ];
+
+  const executiveKpis = isSalesUser
+    ? [
+        {
+          title: 'Ventas de hoy',
+          value: formatNumber(periodUnitsSold),
+          helper: 'Unidades netas vendidas hoy.',
+          icon: ShoppingCart,
+          tone: 'default' as const,
+        },
+        {
+          title: 'Transacciones de hoy',
+          value: formatNumber(periodTransactions),
+          helper: 'Ventas y servicios registrados hoy.',
+          icon: ReceiptText,
+          tone: 'success' as const,
+        },
+      ]
+    : [
+        {
+          title: `Ventas ${dashboardRange.kpiLabel}`,
+          value: formatNumber(periodUnitsSold),
+          helper: 'Unidades netas vendidas en el periodo.',
+          icon: ShoppingCart,
+          tone: 'default' as const,
+        },
+        {
+          title: `Ingresos ${dashboardRange.kpiLabel}`,
+          value: formatCurrency(periodRevenue),
+          helper: 'Ventas y servicios consolidados del periodo.',
+          icon: ArrowUpRight,
+          tone: 'success' as const,
+        },
+        {
+          title: `Utilidad ${dashboardRange.kpiLabel}`,
+          value: formatCurrency(periodProfit),
+          helper: 'Margen bruto estimado con datos actuales.',
+          icon: TrendingUp,
+          tone: periodProfit >= 0 ? ('warning' as const) : ('danger' as const),
+        },
+        {
+          title: `Transacciones ${dashboardRange.kpiLabel}`,
+          value: formatNumber(periodTransactions),
+          helper: 'Ventas y servicios registrados en el rango.',
+          icon: ReceiptText,
+          tone: 'default' as const,
+        },
+      ];
 
   return (
     <div className="space-y-6">
-      <section className="overflow-hidden rounded-[32px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.28),transparent_28%),linear-gradient(135deg,#08162f_0%,#0a2472_52%,#0b1d3f_100%)] p-6 text-white shadow-[0_30px_80px_rgba(8,22,47,0.34)] md:p-8">
-        <div className="grid gap-6 lg:grid-cols-[1.45fr_1fr]">
-          <div>
-            <p className="text-sm font-medium text-cyan-300">Centro de control</p>
-            <h2 className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight md:text-4xl">
-              {role === 'sales'
-                ? 'Busca el producto, mira el precio y vende desde aqui.'
-                : 'Controla el stock, consulta precios y registra ventas rapido.'}
-            </h2>
-            <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300 md:text-base">
-              {role === 'sales'
-                ? 'Este tablero te deja encontrar productos disponibles, ver su precio de venta y abrir el formulario para vender sin pasar por inventario.'
-                : 'Usa este panel como vista operativa para consultar precios, detectar agotados y abrir ventas desde la pantalla principal.'}
+      <section className="overflow-hidden rounded-[32px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.24),transparent_24%),linear-gradient(140deg,#08162f_0%,#0a2472_48%,#0b1d3f_100%)] p-5 text-white shadow-[0_30px_80px_rgba(8,22,47,0.34)] sm:p-6 lg:p-7">
+        <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-cyan-300">Dashboard ejecutivo</p>
+            <h1 className="mt-3 max-w-3xl text-2xl font-semibold tracking-tight sm:text-3xl">
+              {isSalesUser ? 'Tablero operativo para vender rapido y detectar faltantes.' : 'Tablero compacto para ventas, rendimiento e inventario critico.'}
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
+              {isSalesUser
+                ? 'Consulta ventas de hoy, revisa disponibilidad para vender y actua rapido con las tareas operativas.'
+                : 'Consulta el periodo clave, revisa lo que mejor rota, detecta faltantes y entra rapido a las acciones del negocio.'}
             </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-sm text-slate-100">
+                <Clock3 className="h-4 w-4 text-cyan-300" />
+                {effectivePeriod === 'today' ? dashboardRange.longLabel : periodLabel}
+              </div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-sm text-slate-100">
+                <PackageCheck className="h-4 w-4 text-emerald-300" />
+                {formatNumber(availableProducts.length)} referencias con stock
+              </div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-sm text-slate-100">
+                <CircleAlert className="h-4 w-4 text-amber-300" />
+                {formatNumber(outProducts.length + outVariants.length)} alertas clave
+              </div>
+            </div>
           </div>
 
-          <div className="grid gap-3 rounded-[28px] border border-white/10 bg-white/8 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur">
-            <div className="flex items-center gap-3">
-              <div className="rounded-2xl bg-emerald-400/10 p-3">
-                <PackageCheck className="h-5 w-5 text-emerald-300" />
-              </div>
+          <div className="rounded-[28px] border border-white/10 bg-white/8 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <p className="text-sm text-slate-300">Productos con stock</p>
-                <p className="text-2xl font-semibold">{formatNumber(availableProducts.length)}</p>
+                <p className="text-sm font-medium text-slate-100">{isSalesUser ? 'Resumen operativo' : 'Periodo visible'}</p>
+                <p className="text-xs text-slate-300">
+                  {isSalesUser
+                    ? 'Vista enfocada en ventas del dia, disponibilidad y faltantes.'
+                    : 'Este filtro actualiza KPIs, rendimiento y actividad reciente.'}
+                </p>
               </div>
+              {!isSalesUser && period === 'month' ? (
+                <Input
+                  type="month"
+                  value={selectedMonth}
+                  onChange={(event) => setSelectedMonth(event.target.value)}
+                  className="w-full border-white/15 bg-black/10 text-white sm:w-[190px]"
+                />
+              ) : null}
             </div>
-            <div className="flex items-center gap-3">
-              <div className="rounded-2xl bg-amber-400/10 p-3">
-                <CircleAlert className="h-5 w-5 text-amber-300" />
+            {!isSalesUser ? (
+              <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                {([
+                  { value: 'today', label: 'Hoy' },
+                  { value: 'week', label: 'Semana' },
+                  { value: 'month', label: 'Mes' },
+                ] as Array<{ value: DashboardPeriod; label: string }>).map((item) => (
+                  <Button
+                    key={item.value}
+                    type="button"
+                    variant={period === item.value ? 'secondary' : 'ghost'}
+                    className={cn(
+                      'rounded-2xl border border-white/10 text-white hover:bg-white/10 hover:text-white',
+                      period === item.value ? 'bg-white/16' : 'bg-black/10'
+                    )}
+                    onClick={() => setPeriod(item.value)}
+                  >
+                    {item.label}
+                  </Button>
+                ))}
               </div>
-              <div>
-                <p className="text-sm text-slate-300">Productos agotados</p>
-                <p className="text-2xl font-semibold">{formatNumber(outProducts.length)}</p>
+            ) : null}
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-[22px] border border-white/10 bg-black/10 p-3">
+                <p className="text-xs uppercase tracking-[0.16em] text-slate-300">{isSalesUser ? 'Agotados' : 'Inventario critico'}</p>
+                <p className="mt-2 text-2xl font-semibold">{formatNumber(outProducts.length + outVariants.length)}</p>
+                <p className="mt-1 text-xs text-slate-300">Productos y variantes sin stock.</p>
               </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="rounded-2xl bg-rose-400/10 p-3">
-                <CircleAlert className="h-5 w-5 text-rose-300" />
+              <div className="rounded-[22px] border border-white/10 bg-black/10 p-3">
+                <p className="text-xs uppercase tracking-[0.16em] text-slate-300">{isSalesUser ? 'Disponibles' : 'Autorizaciones'}</p>
+                <p className="mt-2 text-2xl font-semibold">
+                  {formatNumber(isSalesUser ? availableProducts.length : pendingAuthorizationRequests.length)}
+                </p>
+                <p className="mt-1 text-xs text-slate-300">
+                  {isSalesUser ? 'Referencias listas para vender.' : 'Solicitudes pendientes por revisar.'}
+                </p>
               </div>
-              <div>
-                <p className="text-sm text-slate-300">Variantes agotadas</p>
-                <p className="text-2xl font-semibold">{formatNumber(outVariants.length)}</p>
-              </div>
-            </div>
-            <div className="pt-2">
-              <a
-                href={`https://wa.me/573006775284?text=${outProductsMessage}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Button className="w-full rounded-2xl bg-[#d4a017] text-[#0a1628] hover:bg-[#d4a017]/90">
-                  <SendHorizonal className="mr-2 h-4 w-4" />
-                  Solicitar agotados
-                </Button>
-              </a>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <MetricCard
-          title="Total de productos"
-          value={formatNumber(summary.totalProducts)}
-          helper="Referencias registradas actualmente en el sistema."
-        />
-        <MetricCard
-          title="Productos disponibles"
-          value={formatNumber(availableProducts.length)}
-          helper="Productos que tienen existencias para vender."
-          tone="success"
-        />
-        <MetricCard
-          title="Productos agotados"
-          value={formatNumber(outProducts.length)}
-          helper="Productos que debes reponer o solicitar."
-          tone="danger"
-        />
-        <MetricCard
-          title="Variantes agotadas"
-          value={formatNumber(outVariants.length)}
-          helper="Combinaciones sin stock para reponer con mas precision."
-          tone="danger"
-        />
-        {role === 'admin' ? (
-          <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 shadow-sm dark:border-amber-900/70 dark:bg-[linear-gradient(180deg,rgba(120,53,15,0.34)_0%,rgba(146,64,14,0.22)_100%)]">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-sm text-amber-800 dark:text-amber-200">Autorizaciones pendientes</p>
-                <p className="mt-2 text-3xl font-semibold text-amber-950 dark:text-amber-50">
-                  {formatNumber(pendingAuthorizationRequests.length)}
+      <section className={cn('grid gap-4 sm:grid-cols-2', isSalesUser ? 'xl:grid-cols-2' : 'xl:grid-cols-4')}>
+        {executiveKpis.map((item) => (
+          <KpiCard
+            key={item.title}
+            title={item.title}
+            value={item.value}
+            helper={item.helper}
+            icon={item.icon}
+            tone={item.tone}
+          />
+        ))}
+      </section>
+
+      <section className="space-y-6">
+        <div className="grid gap-6 xl:grid-cols-2">
+          <SectionCard
+            title="Acciones rapidas"
+            description="Accesos directos a las tareas mas frecuentes del negocio."
+          >
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-2">
+              {quickActions.map((action, index) => {
+                const isLastOddItem = quickActions.length % 2 === 1 && index === quickActions.length - 1;
+
+                return (
+                  <QuickActionLink
+                    key={action.title}
+                    href={'href' in action ? action.href : undefined}
+                    onClick={'onClick' in action ? action.onClick : undefined}
+                    icon={action.icon}
+                    title={action.title}
+                    className={isLastOddItem ? 'xl:col-span-2' : undefined}
+                  />
+                );
+              })}
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            title={isSalesUser ? 'Productos disponibles para vender' : 'Venta rapida'}
+            description={
+              isSalesUser
+                ? 'Busca productos disponibles, revisa precio y abre la venta desde aqui.'
+                : 'Busca un producto, revisa su precio y abre la venta sin salir del dashboard.'
+            }
+          >
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={productQuery}
+                onChange={(event) => setProductQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter') return;
+                  if (quickResults.length === 0) return;
+                  event.preventDefault();
+                  setSelectedProductId(quickResults[0].id);
+                  setOpenSaleDialog(true);
+                }}
+                placeholder="Buscar producto por nombre, marca o categoria"
+                className="rounded-2xl border-border bg-background/88 pl-9 shadow-sm dark:border-slate-700 dark:bg-background/88 dark:text-slate-100"
+              />
+            </div>
+
+            <div className="mt-4 space-y-2">
+              {quickResults.map((product) => (
+                <div
+                  key={product.id}
+                  className="flex flex-col gap-3 rounded-[22px] border border-border bg-background/72 px-4 py-3 dark:border-slate-800 dark:bg-background/48 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0">
+                    <p className="line-clamp-1 text-sm font-medium text-foreground">{product.name}</p>
+                    <p className="line-clamp-1 text-xs text-muted-foreground">
+                      {product.brand} - {product.category}
+                    </p>
+                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                      <span>Stock {formatNumber(product.stock)}</span>
+                      <span>{getProductSalePriceSummary(product)}</span>
+                    </div>
+                    {getVariantAvailabilitySummary(product) ? (
+                      <p className="mt-1 line-clamp-1 text-xs text-cyan-700 dark:text-cyan-300">
+                        {getVariantAvailabilitySummary(product)}
+                      </p>
+                    ) : null}
+                  </div>
+                  <Button
+                    size="sm"
+                    className="w-full rounded-xl sm:w-auto"
+                    onClick={() => {
+                      setSelectedProductId(product.id);
+                      setOpenSaleDialog(true);
+                    }}
+                  >
+                    Vender
+                  </Button>
+                </div>
+              ))}
+              {quickResults.length === 0 ? (
+                <div className="rounded-2xl border border-border bg-muted/60 p-4 text-sm text-muted-foreground dark:border-slate-800 dark:bg-muted/60">
+                  No encontramos productos disponibles con esa busqueda.
+                </div>
+              ) : null}
+            </div>
+          </SectionCard>
+        </div>
+
+        {!isSalesUser ? (
+          <SectionCard
+            title="Rendimiento comercial"
+            description={`Resumen comercial para ${periodLabel.toLowerCase()}.`}
+          >
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-1">
+              <div className="rounded-[24px] border border-emerald-200/80 bg-emerald-50/70 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/20">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">Producto mas vendido</p>
+                    <p className="mt-2 line-clamp-2 text-base font-semibold text-foreground">
+                      {productPerformance.top?.product?.name ?? 'Sin ventas aun'}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl bg-background/80 p-2.5 dark:bg-background/40">
+                    <TrendingUp className="h-4 w-4 text-emerald-700 dark:text-emerald-300" />
+                  </div>
+                </div>
+                <p className="mt-3 text-sm text-muted-foreground">
+                  {productPerformance.top ? `${formatNumber(productPerformance.top.quantity)} uds` : 'Sin ventas aun'}
                 </p>
-                <p className="mt-2 text-sm text-amber-900 dark:text-amber-100/90">
-                  Revisa solicitudes de edicion o devolucion enviadas por vendedores.
-                </p>
+                {productPerformance.top ? (
+                  <p className="mt-1 text-sm font-medium text-foreground">
+                    {formatCurrency(productPerformance.top.revenue)}
+                  </p>
+                ) : null}
               </div>
-              <div className="rounded-2xl bg-white/80 p-3 text-amber-800 dark:bg-slate-950/50 dark:text-amber-200">
-                <ShieldCheck className="h-5 w-5" />
+
+              <div className="rounded-[24px] border border-amber-200/80 bg-amber-50/70 p-4 dark:border-amber-900/60 dark:bg-amber-950/20">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Producto menos vendido</p>
+                    <p className="mt-2 line-clamp-2 text-base font-semibold text-foreground">
+                      {productPerformance.bottom?.product?.name ?? 'Sin historial'}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl bg-background/80 p-2.5 dark:bg-background/40">
+                    <Package className="h-4 w-4 text-amber-700 dark:text-amber-300" />
+                  </div>
+                </div>
+                <p className="mt-3 text-sm text-muted-foreground">
+                  {productPerformance.bottom ? `${formatNumber(productPerformance.bottom.quantity)} uds` : 'Sin historial'}
+                </p>
+                {productPerformance.bottom ? (
+                  <p className="mt-1 text-sm font-medium text-foreground">
+                    {formatCurrency(productPerformance.bottom.revenue)}
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="rounded-[24px] border border-violet-200/80 bg-violet-50/70 p-4 dark:border-violet-900/60 dark:bg-violet-950/20 md:col-span-2 xl:col-span-1">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-violet-800 dark:text-violet-200">Servicio mas solicitado</p>
+                    <p className="mt-2 line-clamp-2 text-base font-semibold text-foreground">
+                      {topService?.label ?? 'Sin registros'}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl bg-background/80 p-2.5 dark:bg-background/40">
+                    <Wrench className="h-4 w-4 text-violet-700 dark:text-violet-300" />
+                  </div>
+                </div>
+                <p className="mt-3 text-sm text-muted-foreground">
+                  {topService ? `${formatNumber(topService.count)} servicios` : 'Sin registros'}
+                </p>
+                {topService ? (
+                  <p className="mt-1 text-sm font-medium text-foreground">{formatCurrency(topService.revenue)}</p>
+                ) : null}
               </div>
             </div>
-            <Link href="/dashboard/autorizaciones" className="mt-4 inline-flex">
-              <Button variant="outline" className="rounded-2xl border-amber-300 bg-white text-amber-900 hover:bg-amber-100 dark:border-amber-800 dark:bg-slate-950/70 dark:text-amber-100 dark:hover:bg-slate-900">
-                Ver solicitudes
-              </Button>
-            </Link>
-          </div>
+          </SectionCard>
         ) : null}
       </section>
 
-      <section className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-6 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-[linear-gradient(180deg,rgba(2,6,23,0.92)_0%,rgba(15,23,42,0.88)_100%)] dark:shadow-[0_20px_48px_rgba(2,6,23,0.28)]">
-        <div className="mb-5 flex items-center gap-3">
-          <div className="rounded-2xl bg-cyan-50 p-3 dark:bg-cyan-950/40">
-            <ShoppingCart className="h-5 w-5 text-cyan-700" />
-          </div>
-          <div>
-            <h2 className="text-lg font-semibold text-slate-950 dark:text-slate-50">Busqueda rapida para vender</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Escribe el producto, revisa el precio y abre la venta desde este panel.
-            </p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Cuando un producto tenga variantes, el valor mostrado es referencia y el precio final sale de la combinacion elegida.
-            </p>
-          </div>
-        </div>
-
-        <div className="relative max-w-2xl">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <Input
-              value={productQuery}
-            onChange={(event) => setProductQuery(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key !== 'Enter') return;
-              if (quickResults.length === 0) return;
-              event.preventDefault();
-              setSelectedProductId(quickResults[0].id);
-              setOpenSaleDialog(true);
-            }}
-            placeholder="Buscar producto por nombre, marca o categoria"
-              className="rounded-2xl border-slate-200 bg-white/90 pl-9 shadow-sm dark:border-slate-700 dark:bg-slate-900/75 dark:text-slate-100"
-            />
-        </div>
-
-        <div className="mt-5 grid gap-3 lg:grid-cols-2">
-          {quickResults.map((product) => (
-            <div
-              key={product.id}
-              className="flex items-center justify-between gap-4 rounded-[22px] border border-cyan-100 bg-[linear-gradient(180deg,rgba(236,254,255,0.96)_0%,rgba(207,250,254,0.58)_100%)] p-4 shadow-sm dark:border-cyan-900/60 dark:bg-[linear-gradient(180deg,rgba(8,47,73,0.46)_0%,rgba(14,116,144,0.18)_100%)]"
-            >
+      <SectionCard
+        title="Inventario critico"
+        description="Lectura ejecutiva del inventario que requiere accion inmediata."
+      >
+        <div className={cn('grid gap-4', isSalesUser ? 'lg:grid-cols-2' : 'lg:grid-cols-3')}>
+          <div className="rounded-[24px] border border-rose-200/80 bg-rose-50/70 p-4 dark:border-rose-900/60 dark:bg-rose-950/20">
+            <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="truncate font-medium text-slate-900 dark:text-slate-100">{product.name}</p>
-                {getVariantAvailabilitySummary(product) ? (
-                  <p className="mt-1 text-xs font-medium text-cyan-700 dark:text-cyan-200">
-                    {getVariantAvailabilitySummary(product)}
-                  </p>
-                ) : null}
-                <p className="text-sm text-slate-500 dark:text-slate-400">
-                  {product.brand} · {product.category}
-                </p>
-                <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-                  Stock: <span className="font-medium text-slate-900 dark:text-slate-100">{formatNumber(product.stock)}</span>
-                </p>
-                <p className="text-sm text-slate-600 dark:text-slate-300">
-                  Precio de venta: <span className="font-semibold text-emerald-700 dark:text-emerald-300">{getProductSalePriceSummary(product)}</span>
-                </p>
-                {(product.variants?.length ?? 0) > 0 ? (
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    El precio final se define segun la variante elegida en la venta.
-                  </p>
-                ) : null}
+                <p className="text-sm font-medium text-rose-800 dark:text-rose-200">Productos agotados</p>
+                <p className="mt-2 text-2xl font-semibold text-foreground">{formatNumber(outProducts.length)}</p>
               </div>
-              <Button
-                className="rounded-xl"
-                onClick={() => {
-                  setSelectedProductId(product.id);
-                  setOpenSaleDialog(true);
-                }}
-              >
-                Vender
-              </Button>
+              <CircleAlert className="h-5 w-5 shrink-0 text-rose-700 dark:text-rose-300" />
             </div>
-          ))}
-          {quickResults.length === 0 && (
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300 lg:col-span-2">
-              No encontramos productos disponibles con esa busqueda.
-            </div>
-          )}
-        </div>
-      </section>
-
-      <section className="grid gap-6 xl:grid-cols-2">
-        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-6 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-[linear-gradient(180deg,rgba(2,6,23,0.92)_0%,rgba(15,23,42,0.88)_100%)] dark:shadow-[0_20px_48px_rgba(2,6,23,0.28)]">
-          <div className="mb-6 flex items-center gap-3">
-            <div className="rounded-2xl bg-emerald-50 p-3 dark:bg-emerald-950/40">
-              <PackageCheck className="h-5 w-5 text-emerald-700" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-slate-950 dark:text-slate-50">Disponibles para vender</h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400">Productos con stock y su valor de venta actual.</p>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            {availableProducts.slice(0, 12).map((product) => (
-              <div
-                key={product.id}
-                className="flex items-center justify-between rounded-[22px] border border-emerald-100 bg-[linear-gradient(180deg,rgba(236,253,245,0.96)_0%,rgba(209,250,229,0.7)_100%)] p-4 shadow-sm dark:border-emerald-900/60 dark:bg-[linear-gradient(180deg,rgba(6,78,59,0.38)_0%,rgba(5,150,105,0.16)_100%)]"
-              >
-                <div className="min-w-0">
-                  <p className="truncate font-medium text-slate-900 dark:text-slate-100">{product.name}</p>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">{product.brand}</p>
-                  <p className="mt-1 text-sm font-medium text-emerald-800 dark:text-emerald-200">
-                    {getProductSalePriceSummary(product)}
+            <div className="mt-4 space-y-2">
+              {outProducts.slice(0, 4).map((product) => (
+                <div key={product.id} className="rounded-2xl border border-border/60 bg-background/72 px-3 py-2 dark:border-slate-800 dark:bg-background/48">
+                  <p className="line-clamp-1 text-sm font-medium text-foreground">{product.name}</p>
+                  <p className="line-clamp-1 text-xs text-muted-foreground">
+                    {product.brand || 'Sin marca'} - Stock {formatNumber(product.stock)}
                   </p>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm text-slate-500 dark:text-slate-400">Stock</p>
-                  <p className="text-lg font-semibold text-emerald-950 dark:text-emerald-50">{formatNumber(product.stock)}</p>
+              ))}
+              {outProducts.length === 0 ? (
+                <div className="rounded-2xl border border-border/60 bg-background/72 px-3 py-3 text-sm text-muted-foreground dark:border-slate-800 dark:bg-background/48">
+                  No hay productos agotados.
                 </div>
-              </div>
-            ))}
-            {availableProducts.length === 0 && (
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300">
-                No hay productos disponibles para vender en este momento.
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-6 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-[linear-gradient(180deg,rgba(2,6,23,0.92)_0%,rgba(15,23,42,0.88)_100%)] dark:shadow-[0_20px_48px_rgba(2,6,23,0.28)]">
-          <div className="mb-6 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="rounded-2xl bg-rose-50 p-3 dark:bg-rose-950/40">
-                <CircleAlert className="h-5 w-5 text-rose-700" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-slate-950 dark:text-slate-50">Productos agotados</h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Referencias agotadas con su ultimo precio de venta.</p>
-              </div>
+              ) : null}
             </div>
-            {outProducts.length > 0 && (
-              <a
-                href={`https://wa.me/573006775284?text=${outProductsMessage}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Button variant="outline" className="rounded-2xl">
-                  <SendHorizonal className="mr-2 h-4 w-4" />
-                  Reporte
+            {!isSalesUser ? (
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                <Button asChild size="sm" variant="outline" className="rounded-2xl">
+                  <Link href="/dashboard/inventario">Ver todos</Link>
                 </Button>
-              </a>
-            )}
-          </div>
-
-          <div className="space-y-3">
-            {outProducts.map((product) => (
-              <div
-                key={product.id}
-                className="flex items-center justify-between rounded-[22px] border border-rose-100 bg-[linear-gradient(180deg,rgba(255,241,242,0.96)_0%,rgba(255,228,230,0.72)_100%)] p-4 shadow-sm"
-              >
-                <div className="min-w-0">
-                  <p className="truncate font-medium text-slate-900">{product.name}</p>
-                  <p className="text-sm text-slate-500">{product.brand}</p>
-                  <p className="mt-1 text-sm font-medium text-rose-800">
-                    {getProductSalePriceSummary(product)}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm text-slate-500">Stock</p>
-                  <p className="text-lg font-semibold text-rose-950">{formatNumber(product.stock)}</p>
-                </div>
+                <a
+                  className="inline-flex"
+                  href={`https://wa.me/573006775284?text=${outProductsMessage}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Button size="sm" variant="outline" className="w-full rounded-2xl sm:w-auto">
+                    <SendHorizonal className="h-4 w-4" />
+                    Reporte
+                  </Button>
+                </a>
               </div>
-            ))}
-            {outProducts.length === 0 && (
-              <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm text-emerald-900">
-                No hay productos agotados. Todo el stock esta disponible para venta.
-              </div>
-            )}
+            ) : null}
           </div>
-        </div>
-      </section>
 
-      <section className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-6 shadow-[0_18px_45px_rgba(15,23,42,0.07)]">
-        <div className="mb-6 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="rounded-2xl bg-rose-50 p-3">
-              <CircleAlert className="h-5 w-5 text-rose-700" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-slate-950">Variantes agotadas</h2>
-              <p className="text-sm text-slate-500">
-                Combinaciones reales agotadas con su precio actual para reponer con mas precision.
-              </p>
-            </div>
-          </div>
-          {outVariants.length > 0 && (
-            <a
-              href={`https://wa.me/573006775284?text=${outVariantMessage}`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <Button variant="outline" className="rounded-2xl">
-                <SendHorizonal className="mr-2 h-4 w-4" />
-                Reporte
-              </Button>
-            </a>
-          )}
-        </div>
-
-        <div className="space-y-3">
-          {outVariants.map(({ product, variant, stock, salePrice }) => (
-            <div
-              key={variant.id}
-              className="flex items-center justify-between rounded-[22px] border border-rose-100 bg-[linear-gradient(180deg,rgba(255,241,242,0.96)_0%,rgba(255,228,230,0.72)_100%)] p-4 shadow-sm"
-            >
+          <div className="rounded-[24px] border border-amber-200/80 bg-amber-50/70 p-4 dark:border-amber-900/60 dark:bg-amber-950/20">
+            <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="truncate font-medium text-slate-900">{product.name}</p>
-                <p className="text-sm text-slate-500">{variant.displayName ?? variant.name}</p>
-                <p className="text-xs text-slate-500">
-                  {product.brand} · {product.category}
-                </p>
-                <p className="mt-1 text-sm font-medium text-rose-800">{formatCurrency(salePrice)}</p>
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Variantes agotadas</p>
+                <p className="mt-2 text-2xl font-semibold text-foreground">{formatNumber(outVariants.length)}</p>
               </div>
-              <div className="text-right">
-                <p className="text-sm text-slate-500">Stock</p>
-                <p className="text-lg font-semibold text-rose-950">{formatNumber(stock)}</p>
+              <Boxes className="h-5 w-5 shrink-0 text-amber-700 dark:text-amber-300" />
+            </div>
+            <div className="mt-4 space-y-2">
+              {outVariants.slice(0, 4).map(({ product, variant }) => (
+                <div key={variant.id} className="rounded-2xl border border-border/60 bg-background/72 px-3 py-2 dark:border-slate-800 dark:bg-background/48">
+                  <p className="line-clamp-1 text-sm font-medium text-foreground">{product.name}</p>
+                  <p className="line-clamp-1 text-xs text-muted-foreground">{variant.displayName ?? variant.name}</p>
+                </div>
+              ))}
+              {outVariants.length === 0 ? (
+                <div className="rounded-2xl border border-border/60 bg-background/72 px-3 py-3 text-sm text-muted-foreground dark:border-slate-800 dark:bg-background/48">
+                  No hay variantes agotadas activas.
+                </div>
+              ) : null}
+            </div>
+            {!isSalesUser ? (
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                <Button asChild size="sm" variant="outline" className="rounded-2xl">
+                  <Link href="/dashboard/inventario">Ver todos</Link>
+                </Button>
+                <a
+                  className="inline-flex"
+                  href={`https://wa.me/573006775284?text=${outVariantMessage}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Button size="sm" variant="outline" className="w-full rounded-2xl sm:w-auto">
+                    <SendHorizonal className="h-4 w-4" />
+                    Reporte
+                  </Button>
+                </a>
+              </div>
+            ) : null}
+          </div>
+
+          {!isSalesUser ? (
+            <div className="rounded-[24px] border border-cyan-200/80 bg-cyan-50/70 p-4 dark:border-cyan-900/60 dark:bg-cyan-950/20">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-cyan-800 dark:text-cyan-200">Stock bajo</p>
+                  <p className="mt-2 text-2xl font-semibold text-foreground">{formatNumber(lowStockProducts.length)}</p>
+                </div>
+                <PackageCheck className="h-5 w-5 shrink-0 text-cyan-700 dark:text-cyan-300" />
+              </div>
+              <div className="mt-4 space-y-2">
+                {lowStockProducts.slice(0, 4).map(({ product, stock }) => (
+                  <div key={product.id} className="rounded-2xl border border-border/60 bg-background/72 px-3 py-2 dark:border-slate-800 dark:bg-background/48">
+                    <p className="line-clamp-1 text-sm font-medium text-foreground">{product.name}</p>
+                    <p className="line-clamp-1 text-xs text-muted-foreground">{formatNumber(stock)} uds disponibles</p>
+                  </div>
+                ))}
+                {lowStockProducts.length === 0 ? (
+                  <div className="rounded-2xl border border-border/60 bg-background/72 px-3 py-3 text-sm text-muted-foreground dark:border-slate-800 dark:bg-background/48">
+                    No hay referencias en rango critico.
+                  </div>
+                ) : null}
+              </div>
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                <Button asChild size="sm" variant="outline" className="rounded-2xl">
+                  <Link href="/dashboard/inventario">Ver todos</Link>
+                </Button>
+                <Button asChild size="sm" variant="outline" className="rounded-2xl">
+                  <Link href="/dashboard/reportes">Reporte</Link>
+                </Button>
               </div>
             </div>
-          ))}
-          {outVariants.length === 0 && (
-            <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm text-emerald-900">
-              No hay variantes agotadas. Las combinaciones activas tienen stock disponible.
-            </div>
-          )}
+          ) : null}
         </div>
-      </section>
+      </SectionCard>
+
+      {!isSalesUser ? (
+        <SectionCard
+          title="Actividad reciente"
+          description={`Ultimos eventos relevantes filtrados por ${periodLabel.toLowerCase()}.`}
+        >
+          <div className="space-y-3">
+            {activityItems.map((item) => {
+              const Icon = item.icon;
+
+              return (
+                <div
+                  key={item.id}
+                  className="flex flex-col gap-3 rounded-[20px] border border-border bg-background/72 px-4 py-3 dark:border-slate-800 dark:bg-background/48 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className="rounded-2xl bg-muted/60 p-2.5">
+                      <Icon className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="line-clamp-1 text-sm font-medium text-foreground">{item.title}</p>
+                      <p className="line-clamp-2 text-xs text-muted-foreground">{item.subtitle}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 sm:block sm:text-right">
+                    <p className={cn('text-sm font-semibold', item.tone)}>{item.value}</p>
+                    <p className="text-xs text-muted-foreground">{formatDateTime(item.occurredAt)}</p>
+                  </div>
+                </div>
+              );
+            })}
+            {activityItems.length === 0 ? (
+              <div className="rounded-2xl border border-border bg-muted/60 p-4 text-sm text-muted-foreground dark:border-slate-800 dark:bg-muted/60">
+                No hay actividad suficiente en el periodo seleccionado.
+              </div>
+            ) : null}
+          </div>
+        </SectionCard>
+      ) : null}
 
       <SaleFormDialog
         open={openSaleDialog}
@@ -531,7 +1203,7 @@ export default function DashboardPage() {
             }
             toast({
               title: 'Venta registrada',
-              description: 'El producto fue vendido desde el dashboard y el inventario quedo actualizado.',
+              description: 'La venta se registro desde el dashboard y el inventario quedo actualizado.',
             });
           } catch (error) {
             toast({

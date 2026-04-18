@@ -268,6 +268,24 @@ const saleSchema = z
         }
       });
     });
+
+    const seenSaleVariants = new Map<string, number>();
+    values.items.forEach((item, index) => {
+      const variantKey = buildSaleVariantKey(item.productId, item.variantId);
+      if (!variantKey) return;
+
+      const firstIndex = seenSaleVariants.get(variantKey);
+      if (firstIndex !== undefined && firstIndex !== index) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['items', index, 'variantId'],
+          message: 'Esta variante ya fue agregada en otra linea de la venta.',
+        });
+        return;
+      }
+
+      seenSaleVariants.set(variantKey, index);
+    });
   });
 
 export type SaleFormValues = z.infer<typeof saleSchema>;
@@ -280,6 +298,31 @@ type DraftSaleLine = {
   serviceItems: SaleLineFormValue['serviceItems'];
   giftItems: SaleLineFormValue['giftItems'];
 };
+
+function buildSaleVariantKey(productId?: string, variantId?: string) {
+  const normalizedProductId = productId?.trim() ?? '';
+  const normalizedVariantId = variantId?.trim() ?? '';
+  return normalizedProductId && normalizedVariantId ? `${normalizedProductId}::${normalizedVariantId}` : '';
+}
+
+function getUsedVariantIdsForProduct(
+  items: SaleLineFormValue[],
+  productId: string,
+  excludedIndex?: number | null
+) {
+  const normalizedProductId = productId.trim();
+  const usedVariantIds = new Set<string>();
+
+  if (!normalizedProductId) return usedVariantIds;
+
+  items.forEach((item, index) => {
+    if (excludedIndex !== null && excludedIndex !== undefined && index === excludedIndex) return;
+    if (item.productId !== normalizedProductId || !item.variantId) return;
+    usedVariantIds.add(item.variantId);
+  });
+
+  return usedVariantIds;
+}
 
 const giftCategoryCopy: Record<SaleGiftCategory, { toggle: string; placeholder: string }> = {
   guantes: { toggle: 'Incluir guante', placeholder: 'Selecciona el guante' },
@@ -325,28 +368,51 @@ function createDraftLineFromValue(line?: SaleLineFormValue): DraftSaleLine {
 
 function getSelectableSaleVariants(
   product: Product | null | undefined,
-  movements: InventoryMovement[]
+  movements: InventoryMovement[],
+  options?: {
+    usedVariantIds?: Set<string>;
+    currentVariantId?: string;
+  }
 ) {
   if (!product) return [];
 
-  return (product.variants ?? []).filter(
-    (variant) => variant.status !== 'inactive' && getProductVariantStock(product, variant.id, movements) > 0
-  );
+  const usedVariantIds = options?.usedVariantIds ?? new Set<string>();
+  const currentVariantId = options?.currentVariantId?.trim() ?? '';
+
+  return (product.variants ?? []).filter((variant) => {
+    const isCurrentVariant = variant.id === currentVariantId;
+    const hasStock = getProductVariantStock(product, variant.id, movements) > 0;
+    const isAvailableVariant = !usedVariantIds.has(variant.id) || isCurrentVariant;
+
+    return variant.status !== 'inactive' && (hasStock || isCurrentVariant) && isAvailableVariant;
+  });
 }
 
 function getSuggestedSaleVariant(
   product: Product | null | undefined,
-  movements: InventoryMovement[]
+  movements: InventoryMovement[],
+  options?: {
+    usedVariantIds?: Set<string>;
+    currentVariantId?: string;
+  }
 ) {
-  const variants = getSelectableSaleVariants(product, movements);
+  const variants = getSelectableSaleVariants(product, movements, options);
   return variants.length === 1 ? variants[0] : null;
 }
 
 function getDefaultSaleVariant(
   product: Product | null | undefined,
-  movements: InventoryMovement[]
+  movements: InventoryMovement[],
+  options?: {
+    usedVariantIds?: Set<string>;
+    currentVariantId?: string;
+  }
 ) {
-  return getSuggestedSaleVariant(product, movements) ?? getSelectableSaleVariants(product, movements)[0] ?? null;
+  return (
+    getSuggestedSaleVariant(product, movements, options) ??
+    getSelectableSaleVariants(product, movements, options)[0] ??
+    null
+  );
 }
 
 function getInitialSaleUnitPrice(
@@ -784,9 +850,13 @@ export function SaleFormDialog({
   }, [saleSummaries]);
   const firstLineSummary = saleSummaries[0] ?? null;
   const firstItemProduct = products.find((product) => product.id === firstItem.productId) ?? null;
-  const firstItemVariantOptions = getSelectableSaleVariants(firstItemProduct, movements);
+  const firstItemUsedVariantIds = getUsedVariantIdsForProduct(values.items, firstItem.productId, 0);
+  const firstItemVariantOptions = getSelectableSaleVariants(firstItemProduct, movements, {
+    usedVariantIds: firstItemUsedVariantIds,
+    currentVariantId: firstItem.variantId,
+  });
   const firstItemSelectedVariant =
-    firstItemVariantOptions.find((variant) => variant.id === firstItem.variantId) ?? null;
+    (firstItemProduct?.variants ?? []).find((variant) => variant.id === firstItem.variantId) ?? null;
   const firstItemDisplayStock = firstItemSelectedVariant
     ? getProductVariantStock(firstItemProduct ?? undefined, firstItemSelectedVariant.id, movements)
     : firstLineSummary?.stock ?? 0;
@@ -794,8 +864,17 @@ export function SaleFormDialog({
   const firstItemCanHaveGift = firstItemAllowedGiftCategories.length > 0;
   const firstItemHasGiftSelection = hasSelectedGiftItems(firstItem.giftItems, products);
   const draftProduct = products.find((product) => product.id === draftLine.productId) ?? null;
-  const draftVariantOptions = getSelectableSaleVariants(draftProduct, movements);
-  const draftSelectedVariant = draftVariantOptions.find((variant) => variant.id === draftLine.variantId) ?? null;
+  const draftUsedVariantIds = getUsedVariantIdsForProduct(values.items, draftLine.productId, editingLineIndex);
+  const draftVariantOptions = getSelectableSaleVariants(draftProduct, movements, {
+    usedVariantIds: draftUsedVariantIds,
+    currentVariantId: draftLine.variantId,
+  });
+  const draftSelectedVariant = (draftProduct?.variants ?? []).find((variant) => variant.id === draftLine.variantId) ?? null;
+  const draftDisplayStock = draftSelectedVariant
+    ? getProductVariantStock(draftProduct ?? undefined, draftSelectedVariant.id, movements)
+    : draftLine.productId
+      ? getProductStock(movements, draftLine.productId)
+      : 0;
   const draftAllowedGiftCategories = draftProduct ? getAllowedSaleGiftCategories(draftProduct) : [];
   const draftCanHaveGift = draftAllowedGiftCategories.length > 0;
   const draftHasGiftSelection = hasSelectedGiftItems(draftLine.giftItems, products);
@@ -924,6 +1003,18 @@ export function SaleFormDialog({
     const draftLineProduct = products.find((product) => product.id === normalizedDraftLine.productId);
     if ((draftLineProduct?.variants?.length ?? 0) > 0 && !normalizedDraftLine.variantId) {
       setLineError(`Selecciona ${draftLineProduct?.variantLabel?.toLowerCase() || 'la variante'} del producto.`);
+      return;
+    }
+    const duplicatedVariantIndex = values.items.findIndex((item, index) => {
+      if (editingLineIndex !== null && index === editingLineIndex) return false;
+      return (
+        buildSaleVariantKey(item.productId, item.variantId) !== '' &&
+        buildSaleVariantKey(item.productId, item.variantId) ===
+          buildSaleVariantKey(normalizedDraftLine.productId, normalizedDraftLine.variantId)
+      );
+    });
+    if (duplicatedVariantIndex !== -1) {
+      setLineError('Esa variante ya fue agregada en otra linea de la venta.');
       return;
     }
     if (normalizedDraftLine.giftItems.length > 0) {
@@ -1125,7 +1216,9 @@ export function SaleFormDialog({
                               onChange={(value) => {
                                 field.onChange(value);
                                 const product = products.find((item) => item.id === value);
-                                const defaultVariant = getDefaultSaleVariant(product, movements);
+                                const defaultVariant = getDefaultSaleVariant(product, movements, {
+                                  usedVariantIds: getUsedVariantIdsForProduct(form.getValues('items'), value, 0),
+                                });
                                 if (product) {
                                   form.setValue(
                                     'items.0.unitPrice',
@@ -1170,19 +1263,39 @@ export function SaleFormDialog({
                     />
 
                     {firstLineSummary?.product ? (
-                      <div className="sticky bottom-24 z-10 rounded-2xl border border-cyan-200/70 bg-cyan-50/85 px-3.5 py-3 shadow-sm dark:border-cyan-900/60 dark:bg-cyan-950/22 md:static md:px-4 md:shadow-none">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-cyan-800">Stock disponible</p>
-                        <p className="mt-1 text-lg font-semibold text-cyan-950">
-                          {formatNumber(firstItemDisplayStock)} unidades
+                      <div className="sticky bottom-24 z-10 space-y-3 rounded-2xl border border-border bg-card/88 px-3.5 py-3 shadow-sm dark:bg-slate-900/82 md:static md:px-4 md:shadow-none">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-700 dark:text-cyan-300">
+                              Stock disponible
+                            </p>
+                            <p className="mt-1 text-2xl font-semibold text-foreground">
+                              {formatNumber(firstItemDisplayStock)} unidades
+                            </p>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                              {firstLineSummary.product.name} - {firstLineSummary.product.brand || 'Sin marca'}
+                            </p>
+                          </div>
+                          {firstItemSelectedVariant ? (
+                            <div className="rounded-2xl border border-border/80 bg-muted/60 px-3 py-2.5 sm:min-w-[220px]">
+                              <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                                {firstItemProduct?.variantLabel || 'Variante'} elegida
+                              </p>
+                              <p className="mt-1 flex items-center gap-2 text-sm font-medium text-foreground">
+                                {firstItemSelectedVariant.colorHex ? (
+                                  <span
+                                    className="h-3.5 w-3.5 rounded-full border border-border"
+                                    style={{ backgroundColor: firstItemSelectedVariant.colorHex }}
+                                  />
+                                ) : null}
+                                {firstItemSelectedVariant.name}
+                              </p>
+                            </div>
+                          ) : null}
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {firstItemDisplayStock > 0 ? 'Inventario disponible para esta seleccion.' : 'Sin unidades disponibles para esta seleccion.'}
                         </p>
-                        <p className="mt-1 text-sm text-cyan-900">
-                          {firstLineSummary.product.name} - {firstLineSummary.product.brand || 'Sin marca'}
-                        </p>
-                        {firstItemSelectedVariant ? (
-                          <p className="mt-1 text-xs font-medium text-cyan-800">
-                            {firstItemProduct?.variantLabel || 'Variante'}: {firstItemSelectedVariant.name}
-                          </p>
-                        ) : null}
                       </div>
                     ) : null}
 
@@ -1196,6 +1309,11 @@ export function SaleFormDialog({
                             <p className="hidden text-sm text-slate-500 sm:block">
                               Selecciona la opcion que le queda al cliente y revisa cuantas unidades hay.
                             </p>
+                            {firstItemUsedVariantIds.size > 0 ? (
+                              <p className="hidden text-xs text-slate-500 sm:block">
+                                Las variantes ya usadas en otras lineas no aparecen aqui.
+                              </p>
+                            ) : null}
                             {firstItemVariantOptions.length > 1 ? (
                               <p className="hidden text-xs text-amber-700 sm:block">
                                 El precio se define cuando eliges la variante.
@@ -1591,7 +1709,9 @@ export function SaleFormDialog({
                 value={draftLine.productId}
                 onChange={(value) => {
                   const product = products.find((item) => item.id === value);
-                  const defaultVariant = getDefaultSaleVariant(product, movements);
+                  const defaultVariant = getDefaultSaleVariant(product, movements, {
+                    usedVariantIds: getUsedVariantIdsForProduct(values.items, value, editingLineIndex),
+                  });
                     setDraftLine((current) => ({
                       ...current,
                       productId: value,
@@ -1623,7 +1743,14 @@ export function SaleFormDialog({
             <div className="grid gap-4 sm:grid-cols-2">
               {draftVariantOptions.length > 0 ? (
                       <div className="min-w-0 space-y-2 sm:col-span-2">
-                        <Label>{draftProduct?.variantLabel || 'Variante'}</Label>
+                        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                          <Label>{draftProduct?.variantLabel || 'Variante'}</Label>
+                          {draftUsedVariantIds.size > 0 ? (
+                            <p className="text-xs text-muted-foreground">
+                              Las variantes ya usadas en otras lineas no se pueden repetir.
+                            </p>
+                          ) : null}
+                        </div>
                   <Select
                     value={draftLine.variantId}
                   onValueChange={(value) => {
@@ -1648,15 +1775,36 @@ export function SaleFormDialog({
                 </div>
               ) : null}
               {draftLine.productId ? (
-                <div className="sticky bottom-24 z-10 sm:col-span-2 rounded-2xl border border-cyan-200/70 bg-cyan-50/85 px-3.5 py-3 shadow-sm dark:border-cyan-900/60 dark:bg-cyan-950/22 md:static md:px-4 md:shadow-none">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-cyan-800">Stock disponible</p>
-                  <p className="mt-1 text-lg font-semibold text-cyan-950">
-                    {formatNumber(
-                      draftLine.variantId
-                        ? getProductVariantStock(draftProduct ?? undefined, draftLine.variantId, movements)
-                        : getProductStock(movements, draftLine.productId)
-                    )} unidades
-                  </p>
+                <div className="sticky bottom-24 z-10 space-y-3 rounded-2xl border border-border bg-card/88 px-3.5 py-3 shadow-sm dark:bg-slate-900/82 sm:col-span-2 md:static md:px-4 md:shadow-none">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-700 dark:text-cyan-300">
+                        Stock disponible
+                      </p>
+                      <p className="mt-1 text-2xl font-semibold text-foreground">
+                        {formatNumber(draftDisplayStock)} unidades
+                      </p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {draftDisplayStock > 0 ? 'Inventario listo para esta linea.' : 'Sin unidades disponibles para esta seleccion.'}
+                      </p>
+                    </div>
+                    {draftSelectedVariant ? (
+                      <div className="rounded-2xl border border-border/80 bg-muted/60 px-3 py-2.5 sm:min-w-[220px]">
+                        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                          {draftProduct?.variantLabel || 'Variante'} elegida
+                        </p>
+                        <p className="mt-1 flex items-center gap-2 text-sm font-medium text-foreground">
+                          {draftSelectedVariant.colorHex ? (
+                            <span
+                              className="h-3.5 w-3.5 rounded-full border border-border"
+                              style={{ backgroundColor: draftSelectedVariant.colorHex }}
+                            />
+                          ) : null}
+                          {draftSelectedVariant.name}
+                        </p>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               ) : null}
               <div className="min-w-0 space-y-2">

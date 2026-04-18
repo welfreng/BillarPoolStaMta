@@ -123,8 +123,17 @@ export function AdminMobileNav() {
                           <Icon className="h-4 w-4" />
                         </div>
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold">{item.label}</p>
-                          <p className="truncate text-xs text-slate-500">{item.helper}</p>
+                          <p className={cn('truncate text-sm font-semibold', active ? 'text-slate-950 dark:text-white' : 'text-current')}>
+                            {item.label}
+                          </p>
+                          <p
+                            className={cn(
+                              'truncate text-xs',
+                              active ? 'text-[#12389b]/80 dark:text-white/75' : 'text-slate-500 dark:text-slate-400'
+                            )}
+                          >
+                            {item.helper}
+                          </p>
                         </div>
                       </Link>
                     );

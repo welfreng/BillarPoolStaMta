@@ -97,6 +97,13 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    match /service-visits/{visitId} {
+      allow read: if signedIn();
+      allow create: if isAdmin() || isSales();
+      allow update: if isAdmin() || isSales();
+      allow delete: if isAdmin();
+    }
+
     match /admin-notifications/{notificationId} {
       allow read: if isAdmin();
       allow create: if isAdmin() || isSales();
