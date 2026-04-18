@@ -567,12 +567,12 @@ export function SaleDetailsDialog({
       bodyClassName="px-3 py-3 pb-4 sm:px-5 sm:py-4 sm:pb-6"
     >
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'details' | 'invoice')} className="space-y-3.5 sm:space-y-4">
-          <TabsList className="grid w-full grid-cols-2 rounded-2xl bg-slate-100 p-1">
-            <TabsTrigger value="details" className="rounded-xl">
+          <TabsList className="grid w-full grid-cols-2 rounded-2xl border border-border bg-muted/75 p-1 dark:border-slate-800 dark:bg-slate-900/70">
+            <TabsTrigger value="details" className="rounded-xl text-slate-600 data-[state=active]:bg-card/92 data-[state=active]:text-foreground data-[state=active]:shadow-sm dark:text-slate-400 dark:data-[state=active]:bg-slate-950/85 dark:data-[state=active]:text-slate-50">
               <BarChart3 className="mr-2 h-4 w-4" />
               Detalle venta
             </TabsTrigger>
-            <TabsTrigger value="invoice" className="rounded-xl">
+            <TabsTrigger value="invoice" className="rounded-xl text-slate-600 data-[state=active]:bg-card/92 data-[state=active]:text-foreground data-[state=active]:shadow-sm dark:text-slate-400 dark:data-[state=active]:bg-slate-950/85 dark:data-[state=active]:text-slate-50">
               <ReceiptText className="mr-2 h-4 w-4" />
               Factura cliente
             </TabsTrigger>
@@ -580,54 +580,54 @@ export function SaleDetailsDialog({
 
           <TabsContent value="details" className="space-y-3.5 sm:space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
-                <p className="text-xs text-slate-500">Cliente</p>
-                <p className="mt-1 font-semibold text-slate-950">{baseSale.customerName}</p>
+              <div className="rounded-2xl border border-border bg-card/88 p-3 dark:border-slate-800 dark:bg-slate-950/72 sm:p-4">
+                <p className="text-xs text-muted-foreground">Cliente</p>
+                <p className="mt-1 font-semibold text-foreground">{baseSale.customerName}</p>
                 {baseSale.customerPhone ? (
-                  <p className="mt-1 text-sm text-slate-500">Telefono: {baseSale.customerPhone}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Telefono: {baseSale.customerPhone}</p>
                 ) : null}
-                <p className="mt-1 text-sm text-slate-500">{formatDateTime(baseSale.soldAt)}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{formatDateTime(baseSale.soldAt)}</p>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
-                <p className="text-xs text-slate-500">Responsable</p>
-                <p className="mt-1 font-semibold text-slate-950">{baseSale.responsibleUser}</p>
-                <p className="mt-1 text-sm text-slate-500">Pago: {paymentMethod}</p>
+              <div className="rounded-2xl border border-border bg-card/88 p-3 dark:border-slate-800 dark:bg-slate-950/72 sm:p-4">
+                <p className="text-xs text-muted-foreground">Responsable</p>
+                <p className="mt-1 font-semibold text-foreground">{baseSale.responsibleUser}</p>
+                <p className="mt-1 text-sm text-muted-foreground">Pago: {paymentMethod}</p>
                 {paymentReference ? (
-                  <p className="mt-1 text-sm text-slate-500">Ref: {paymentReference}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Ref: {paymentReference}</p>
                 ) : null}
-                <p className="mt-1 text-sm text-slate-500">Lineas vendidas: {formatNumber(lineItems.length)}</p>
+                <p className="mt-1 text-sm text-muted-foreground">Lineas vendidas: {formatNumber(lineItems.length)}</p>
               </div>
             </div>
 
             <div className={`grid gap-3 sm:grid-cols-2 ${hideFinancialDetails ? 'xl:grid-cols-3' : 'xl:grid-cols-4'}`}>
-              <div className="rounded-2xl border border-cyan-100 bg-cyan-50/70 p-3 sm:p-4">
-                <p className="text-xs text-slate-500">Cantidad neta</p>
-                <p className="mt-1 font-semibold text-slate-950">{formatNumber(netUnits)} uds</p>
+              <div className="rounded-2xl border border-cyan-200/70 bg-cyan-50/70 p-3 dark:border-cyan-900/60 dark:bg-cyan-950/20 sm:p-4">
+                <p className="text-xs text-muted-foreground dark:text-cyan-100/70">Cantidad neta</p>
+                <p className="mt-1 font-semibold text-slate-950 dark:text-cyan-50">{formatNumber(netUnits)} uds</p>
               </div>
-              <div className="rounded-2xl border border-cyan-100 bg-cyan-50/70 p-3 sm:p-4">
-                <p className="text-xs text-slate-500">Total factura</p>
-                <p className="mt-1 font-semibold text-slate-950">{formatCurrency(netRevenue)}</p>
+              <div className="rounded-2xl border border-cyan-200/70 bg-cyan-50/70 p-3 dark:border-cyan-900/60 dark:bg-cyan-950/20 sm:p-4">
+                <p className="text-xs text-muted-foreground dark:text-cyan-100/70">Total factura</p>
+                <p className="mt-1 font-semibold text-slate-950 dark:text-cyan-50">{formatCurrency(netRevenue)}</p>
               </div>
               {returnedUnits > 0 || returnedAmount > 0 ? (
-                <div className="rounded-2xl border border-rose-100 bg-rose-50/70 p-3 sm:p-4">
-                  <p className="text-xs text-slate-500">Devoluciones</p>
-                  <p className="mt-1 font-semibold text-rose-700">{formatNumber(returnedUnits)} uds</p>
+                <div className="rounded-2xl border border-rose-200/70 bg-rose-50/70 p-3 dark:border-rose-900/60 dark:bg-rose-950/20 sm:p-4">
+                  <p className="text-xs text-muted-foreground dark:text-rose-100/70">Devoluciones</p>
+                  <p className="mt-1 font-semibold text-rose-700 dark:text-rose-200">{formatNumber(returnedUnits)} uds</p>
                 </div>
               ) : (
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
-                  <p className="text-xs text-slate-500">Estado</p>
-                  <p className="mt-1 font-semibold text-slate-950">Venta activa</p>
+                <div className="rounded-2xl border border-border bg-card/88 p-3 dark:border-slate-800 dark:bg-slate-950/72 sm:p-4">
+                  <p className="text-xs text-muted-foreground">Estado</p>
+                  <p className="mt-1 font-semibold text-foreground">Venta activa</p>
                 </div>
               )}
               {!hideFinancialDetails ? (
                 <>
-                  <div className="rounded-2xl border border-amber-100 bg-amber-50/80 p-3 sm:p-4">
-                    <p className="text-xs text-slate-500">Costo neto</p>
-                    <p className="mt-1 font-semibold text-amber-800">{formatCurrency(netCost)}</p>
+                  <div className="rounded-2xl border border-amber-200/70 bg-amber-50/80 p-3 dark:border-amber-900/60 dark:bg-amber-950/20 sm:p-4">
+                    <p className="text-xs text-muted-foreground dark:text-amber-100/70">Costo neto</p>
+                    <p className="mt-1 font-semibold text-amber-800 dark:text-amber-200">{formatCurrency(netCost)}</p>
                   </div>
-                  <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-3 sm:p-4">
-                    <p className="text-xs text-slate-500">Utilidad neta</p>
-                    <p className="mt-1 font-semibold text-emerald-800">{formatCurrency(netProfit)}</p>
+                  <div className="rounded-2xl border border-emerald-200/70 bg-emerald-50/70 p-3 dark:border-emerald-900/60 dark:bg-emerald-950/20 sm:p-4">
+                    <p className="text-xs text-muted-foreground dark:text-emerald-100/70">Utilidad neta</p>
+                    <p className="mt-1 font-semibold text-emerald-800 dark:text-emerald-200">{formatCurrency(netProfit)}</p>
                   </div>
                 </>
               ) : null}
@@ -635,25 +635,25 @@ export function SaleDetailsDialog({
 
             {(returnedUnits > 0 || returnedAmount > 0) && (
               <div className={`grid gap-3 ${hideFinancialDetails ? 'sm:grid-cols-2' : 'sm:grid-cols-3'}`}>
-                <div className="rounded-2xl border border-rose-100 bg-rose-50/70 p-3 sm:p-4">
-                  <p className="text-xs text-slate-500">Unidades devueltas</p>
-                  <p className="mt-1 font-semibold text-rose-700">{formatNumber(returnedUnits)} uds</p>
+                <div className="rounded-2xl border border-rose-200/70 bg-rose-50/70 p-3 dark:border-rose-900/60 dark:bg-rose-950/20 sm:p-4">
+                  <p className="text-xs text-muted-foreground dark:text-rose-100/70">Unidades devueltas</p>
+                  <p className="mt-1 font-semibold text-rose-700 dark:text-rose-200">{formatNumber(returnedUnits)} uds</p>
                 </div>
-                <div className="rounded-2xl border border-rose-100 bg-rose-50/70 p-3 sm:p-4">
-                  <p className="text-xs text-slate-500">Valor devuelto</p>
-                  <p className="mt-1 font-semibold text-rose-700">{formatCurrency(returnedAmount)}</p>
+                <div className="rounded-2xl border border-rose-200/70 bg-rose-50/70 p-3 dark:border-rose-900/60 dark:bg-rose-950/20 sm:p-4">
+                  <p className="text-xs text-muted-foreground dark:text-rose-100/70">Valor devuelto</p>
+                  <p className="mt-1 font-semibold text-rose-700 dark:text-rose-200">{formatCurrency(returnedAmount)}</p>
                 </div>
                 {!hideFinancialDetails ? (
-                  <div className="rounded-2xl border border-rose-100 bg-rose-50/70 p-3 sm:p-4">
-                    <p className="text-xs text-slate-500">Costo devuelto</p>
-                    <p className="mt-1 font-semibold text-rose-700">{formatCurrency(returnedCost)}</p>
+                  <div className="rounded-2xl border border-rose-200/70 bg-rose-50/70 p-3 dark:border-rose-900/60 dark:bg-rose-950/20 sm:p-4">
+                    <p className="text-xs text-muted-foreground dark:text-rose-100/70">Costo devuelto</p>
+                    <p className="mt-1 font-semibold text-rose-700 dark:text-rose-200">{formatCurrency(returnedCost)}</p>
                   </div>
                 ) : null}
               </div>
             )}
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-4">
-              <h3 className="text-sm font-semibold text-slate-950">
+            <div className="rounded-2xl border border-border bg-card/88 p-3 dark:border-slate-800 dark:bg-slate-950/72 sm:p-4">
+              <h3 className="text-sm font-semibold text-foreground">
                 {hideFinancialDetails ? 'Detalle de productos' : 'Detalle interno de productos'}
               </h3>
               <div className="mt-4 space-y-3">
@@ -662,25 +662,25 @@ export function SaleDetailsDialog({
                   return (
                     <div
                       key={`${item.productId}-${index}`}
-                      className="rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4"
+                      className="rounded-2xl border border-border bg-muted/70 p-3 dark:border-slate-800 dark:bg-slate-900/60 sm:p-4"
                     >
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                         <div className="min-w-0">
-                          <p className="font-medium text-slate-900">
+                          <p className="font-medium text-foreground">
                             {formatNumber(item.quantity)} x {getSaleLineDisplayName(product, item)}
                           </p>
-                          <p className="text-sm text-slate-500">Precio unitario: {formatCurrency(item.unitPrice)}</p>
+                          <p className="text-sm text-muted-foreground">Precio unitario: {formatCurrency(item.unitPrice)}</p>
                           {!hideFinancialDetails ? (
-                            <p className="text-sm text-slate-500">Costo unitario: {formatCurrency(item.realUnitCost)}</p>
+                            <p className="text-sm text-muted-foreground">Costo unitario: {formatCurrency(item.realUnitCost)}</p>
                           ) : null}
                         </div>
                         <div className="text-left sm:text-right">
-                          <p className="text-xs text-slate-500">Total</p>
-                          <p className="font-medium text-slate-900">{formatCurrency(item.totalSale)}</p>
+                          <p className="text-xs text-muted-foreground">Total</p>
+                          <p className="font-medium text-foreground">{formatCurrency(item.totalSale)}</p>
                           {!hideFinancialDetails ? (
                             <>
-                              <p className="mt-2 text-xs text-slate-500">Costo</p>
-                              <p className="font-medium text-amber-800">{formatCurrency(item.totalCost)}</p>
+                              <p className="mt-2 text-xs text-muted-foreground">Costo</p>
+                              <p className="font-medium text-amber-800 dark:text-amber-200">{formatCurrency(item.totalCost)}</p>
                             </>
                           ) : null}
                         </div>
@@ -692,17 +692,17 @@ export function SaleDetailsDialog({
                   linkedServices.map((service, index) => (
                     <div
                       key={`${service.id}-${index}`}
-                      className="rounded-2xl border border-cyan-200 bg-cyan-50/70 p-3 sm:p-4"
+                      className="rounded-2xl border border-cyan-200/70 bg-cyan-50/70 p-3 dark:border-cyan-900/60 dark:bg-cyan-950/20 sm:p-4"
                     >
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                         <div className="min-w-0">
-                          <p className="font-medium text-slate-900">
+                          <p className="font-medium text-foreground">
                             Servicio: {service.serviceCategory || 'torno'}
                           </p>
-                          <p className="text-sm text-slate-500">
+                          <p className="text-sm text-muted-foreground">
                             {service.cueReference || 'Sin referencia'}
                           </p>
-                          <p className="text-sm text-slate-500">
+                          <p className="text-sm text-muted-foreground">
                             Tipo: {service.serviceType === 'tip-installation'
                               ? 'Instalacion de casquillo'
                               : service.serviceType === 'tip-ferrule-installation'
@@ -711,14 +711,14 @@ export function SaleDetailsDialog({
                           </p>
                         </div>
                         <div className="text-left sm:text-right">
-                          <p className="text-xs text-slate-500">Total servicio</p>
-                          <p className="font-medium text-slate-900">{formatCurrency(service.totalRevenue)}</p>
-                          <p className="mt-2 text-xs text-slate-500">Costo servicio</p>
-                          <p className="font-medium text-amber-800">
+                          <p className="text-xs text-muted-foreground dark:text-cyan-100/70">Total servicio</p>
+                          <p className="font-medium text-foreground">{formatCurrency(service.totalRevenue)}</p>
+                          <p className="mt-2 text-xs text-muted-foreground dark:text-cyan-100/70">Costo servicio</p>
+                          <p className="font-medium text-amber-800 dark:text-amber-200">
                             {formatCurrency(service.totalCost ?? service.totalOperationalCost ?? service.totalMaterialCost)}
                           </p>
-                          <p className="mt-2 text-xs text-slate-500">Utilidad</p>
-                          <p className="font-medium text-emerald-800">{formatCurrency(service.grossProfit)}</p>
+                          <p className="mt-2 text-xs text-muted-foreground dark:text-cyan-100/70">Utilidad</p>
+                          <p className="font-medium text-emerald-800 dark:text-emerald-200">{formatCurrency(service.grossProfit)}</p>
                         </div>
                       </div>
                     </div>
@@ -728,8 +728,8 @@ export function SaleDetailsDialog({
             </div>
 
             <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-              <div className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-4">
-                <h3 className="text-sm font-semibold text-slate-950">Obsequios de la venta</h3>
+              <div className="rounded-2xl border border-border bg-card/88 p-3 dark:border-slate-800 dark:bg-slate-950/72 sm:p-4">
+                <h3 className="text-sm font-semibold text-foreground">Obsequios de la venta</h3>
                 {giftItems.length > 0 ? (
                   <div className="mt-4 space-y-3">
                     {giftItems.map((giftItem, index) => {
@@ -737,18 +737,18 @@ export function SaleDetailsDialog({
                       return (
                         <div
                           key={`${giftItem.productId}-${index}`}
-                          className="flex flex-col gap-3 rounded-2xl bg-violet-50 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4"
+                          className="flex flex-col gap-3 rounded-2xl border border-violet-200/70 bg-violet-50/70 p-3 dark:border-violet-900/60 dark:bg-violet-950/20 sm:flex-row sm:items-center sm:justify-between sm:p-4"
                         >
                           <div>
-                            <p className="font-medium text-slate-900">
+                            <p className="font-medium text-foreground">
                               {formatNumber(giftItem.quantity)} x {giftProduct?.name ?? 'Producto obsequiado'}
                             </p>
-                            <p className="text-sm text-slate-500">Registrado como obsequio</p>
+                            <p className="text-sm text-muted-foreground">Registrado como obsequio</p>
                           </div>
                           {!hideFinancialDetails ? (
                             <div className="text-right">
-                              <p className="text-xs text-slate-500">Costo obsequio</p>
-                              <p className="font-medium text-violet-700">{formatCurrency(giftItem.totalCost)}</p>
+                              <p className="text-xs text-muted-foreground dark:text-violet-100/70">Costo obsequio</p>
+                              <p className="font-medium text-violet-700 dark:text-violet-200">{formatCurrency(giftItem.totalCost)}</p>
                             </div>
                           ) : null}
                         </div>
@@ -756,12 +756,12 @@ export function SaleDetailsDialog({
                     })}
                   </div>
                 ) : (
-                  <p className="mt-4 text-sm text-slate-500">Esta venta no tuvo productos obsequiados.</p>
+                  <p className="mt-4 text-sm text-muted-foreground">Esta venta no tuvo productos obsequiados.</p>
                 )}
                 {automaticMaterialItems.length > 0 ? (
-                  <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
-                    <p className="text-sm font-medium text-slate-900">Descuentos internos automaticos</p>
-                    <div className="mt-2 space-y-2 text-sm text-slate-500">
+                  <div className="mt-4 rounded-2xl border border-border bg-muted/70 p-3 dark:border-slate-800 dark:bg-slate-900/60 sm:p-4">
+                    <p className="text-sm font-medium text-foreground">Descuentos internos automaticos</p>
+                    <div className="mt-2 space-y-2 text-sm text-muted-foreground">
                       {automaticMaterialItems.map((item, index) => {
                         const product = getProductById(products, item.productId);
                         return (
@@ -775,38 +775,38 @@ export function SaleDetailsDialog({
                 ) : null}
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-4">
-                <h3 className="text-sm font-semibold text-slate-950">
+              <div className="rounded-2xl border border-border bg-card/88 p-3 dark:border-slate-800 dark:bg-slate-950/72 sm:p-4">
+                <h3 className="text-sm font-semibold text-foreground">
                   {hideFinancialDetails ? 'Resumen de la venta' : 'Resumen interno'}
                 </h3>
                 <div className="mt-4 space-y-3 text-sm">
-                  <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
-                    <span className="text-slate-500">Subtotal productos</span>
-                    <span className="font-medium text-slate-900">{formatCurrency(subtotal)}</span>
+                  <div className="flex items-center justify-between rounded-xl bg-muted/75 px-3 py-2 dark:bg-slate-900/60">
+                    <span className="text-muted-foreground">Subtotal productos</span>
+                    <span className="font-medium text-foreground">{formatCurrency(subtotal)}</span>
                   </div>
                   {!hideFinancialDetails ? (
-                    <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
-                      <span className="text-slate-500">Costo total original</span>
-                      <span className="font-medium text-slate-900">{formatCurrency(totalCost)}</span>
+                    <div className="flex items-center justify-between rounded-xl bg-muted/75 px-3 py-2 dark:bg-slate-900/60">
+                      <span className="text-muted-foreground">Costo total original</span>
+                      <span className="font-medium text-foreground">{formatCurrency(totalCost)}</span>
                     </div>
                   ) : null}
-                  <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
-                    <span className="text-slate-500">Ingreso neto actual</span>
-                    <span className="font-medium text-slate-900">{formatCurrency(netRevenue)}</span>
+                  <div className="flex items-center justify-between rounded-xl bg-muted/75 px-3 py-2 dark:bg-slate-900/60">
+                    <span className="text-muted-foreground">Ingreso neto actual</span>
+                    <span className="font-medium text-foreground">{formatCurrency(netRevenue)}</span>
                   </div>
                   {!hideFinancialDetails ? (
-                    <div className="flex items-center justify-between rounded-xl bg-emerald-50 px-3 py-2">
-                      <span className="text-emerald-700">Utilidad neta</span>
-                      <span className="font-semibold text-emerald-800">{formatCurrency(netProfit)}</span>
+                    <div className="flex items-center justify-between rounded-xl border border-emerald-200/70 bg-emerald-50/70 px-3 py-2 dark:border-emerald-900/60 dark:bg-emerald-950/20">
+                      <span className="text-emerald-700 dark:text-emerald-100/80">Utilidad neta</span>
+                      <span className="font-semibold text-emerald-800 dark:text-emerald-200">{formatCurrency(netProfit)}</span>
                     </div>
                   ) : null}
                 </div>
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-4">
-              <h3 className="text-sm font-semibold text-slate-950">Notas</h3>
-              <p className="mt-3 text-sm leading-6 text-slate-600">
+            <div className="rounded-2xl border border-border bg-card/88 p-3 dark:border-slate-800 dark:bg-slate-950/72 sm:p-4">
+              <h3 className="text-sm font-semibold text-foreground">Notas</h3>
+              <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
                 {baseSale.notes?.trim() ? baseSale.notes : 'Sin observaciones registradas.'}
               </p>
             </div>
@@ -838,8 +838,8 @@ export function SaleDetailsDialog({
               </Button>
             </div>
 
-            <div className="rounded-3xl border border-slate-200 bg-white p-3.5 shadow-sm sm:p-5">
-              <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:gap-4 sm:pb-5 sm:flex-row sm:items-start sm:justify-between">
+            <div className="rounded-3xl border border-border bg-card/88 p-3.5 shadow-sm dark:border-slate-800 dark:bg-slate-950/72 sm:p-5">
+              <div className="flex flex-col gap-3 border-b border-border pb-4 dark:border-slate-800 sm:gap-4 sm:pb-5 sm:flex-row sm:items-start sm:justify-between">
                 <div className="rounded-3xl bg-gradient-to-br from-[#082f49] to-[#0f766e] p-3 text-white shadow-sm">
                   <div className="flex items-center gap-3">
                     <div className="flex h-[58px] w-[58px] items-center justify-center rounded-2xl border border-white/20 bg-white/8 p-2 sm:h-[70px] sm:w-[70px]">
@@ -852,16 +852,16 @@ export function SaleDetailsDialog({
                     </div>
                   </div>
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm sm:px-4">
-                  <p className="text-slate-500">Cliente</p>
-                  <p className="mt-1 font-semibold text-slate-950">{baseSale.customerName}</p>
+                <div className="rounded-2xl border border-border bg-muted/70 px-3 py-3 text-sm dark:border-slate-800 dark:bg-slate-900/60 sm:px-4">
+                  <p className="text-muted-foreground">Cliente</p>
+                  <p className="mt-1 font-semibold text-foreground">{baseSale.customerName}</p>
                   {baseSale.customerPhone ? (
-                    <p className="mt-2 text-slate-500">Telefono: {baseSale.customerPhone}</p>
+                    <p className="mt-2 text-muted-foreground">Telefono: {baseSale.customerPhone}</p>
                   ) : null}
-                  <p className="mt-2 text-slate-500">Atendido por: {baseSale.responsibleUser}</p>
-                  <p className="mt-2 text-slate-500">Metodo de pago: {paymentMethod}</p>
+                  <p className="mt-2 text-muted-foreground">Atendido por: {baseSale.responsibleUser}</p>
+                  <p className="mt-2 text-muted-foreground">Metodo de pago: {paymentMethod}</p>
                   {paymentReference ? (
-                    <p className="mt-2 text-slate-500">Referencia: {paymentReference}</p>
+                    <p className="mt-2 text-muted-foreground">Referencia: {paymentReference}</p>
                   ) : null}
                 </div>
               </div>
@@ -872,35 +872,35 @@ export function SaleDetailsDialog({
                 </p>
               </div>
 
-              <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 sm:mt-5">
-                <div className="hidden grid-cols-[0.8fr_2.2fr_1fr_1fr] gap-3 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 md:grid">
+              <div className="mt-4 overflow-hidden rounded-2xl border border-border dark:border-slate-800 sm:mt-5">
+                <div className="hidden grid-cols-[0.8fr_2.2fr_1fr_1fr] gap-3 bg-muted/75 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-900/60 dark:text-slate-400 md:grid">
                   <p>Cantidad</p>
                   <p>Producto</p>
                   <p>Valor unitario</p>
                   <p>Total</p>
                 </div>
-                <div className="divide-y divide-slate-200">
+                <div className="divide-y divide-border dark:divide-slate-800">
                   {invoiceLines.map((item, index) => {
                     return (
                       <div
                         key={`${item.name}-${index}`}
-                        className="grid gap-2.5 px-3 py-3 text-sm text-slate-700 sm:px-4 sm:py-4 md:grid-cols-[0.8fr_2.2fr_1fr_1fr] md:items-center"
+                        className="grid gap-2.5 px-3 py-3 text-sm text-slate-700 dark:text-slate-200 sm:px-4 sm:py-4 md:grid-cols-[0.8fr_2.2fr_1fr_1fr] md:items-center"
                       >
                         <div className="grid grid-cols-2 gap-3 md:contents">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 md:hidden">Cantidad</p>
-                          <p className="font-medium text-slate-900">{formatNumber(item.quantity)}</p>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 md:hidden">Cantidad</p>
+                          <p className="font-medium text-foreground">{formatNumber(item.quantity)}</p>
                         </div>
                         <div className="grid grid-cols-2 gap-3 md:contents">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 md:hidden">Producto</p>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 md:hidden">Producto</p>
                           <p>{item.name}</p>
                         </div>
                         <div className="grid grid-cols-2 gap-3 md:contents">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 md:hidden">Valor unitario</p>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 md:hidden">Valor unitario</p>
                           <p>{formatCurrency(item.unitPrice)}</p>
                         </div>
                         <div className="grid grid-cols-2 gap-3 md:contents">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 md:hidden">Total</p>
-                          <p className="font-medium text-slate-900">{formatCurrency(item.total)}</p>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 md:hidden">Total</p>
+                          <p className="font-medium text-foreground">{formatCurrency(item.total)}</p>
                         </div>
                       </div>
                     );
@@ -909,10 +909,10 @@ export function SaleDetailsDialog({
               </div>
 
               <div className="mt-4 grid gap-4 xl:grid-cols-[1.2fr_0.8fr] sm:mt-5">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
-                  <h4 className="text-sm font-semibold text-slate-950">Obsequios</h4>
+                <div className="rounded-2xl border border-border bg-muted/70 p-3 dark:border-slate-800 dark:bg-slate-900/60 sm:p-4">
+                  <h4 className="text-sm font-semibold text-foreground">Obsequios</h4>
                   {giftItems.length > 0 ? (
-                    <div className="mt-3 space-y-2 text-sm text-slate-600">
+                    <div className="mt-3 space-y-2 text-sm text-slate-600 dark:text-slate-300">
                       {giftItems.map((giftItem, index) => {
                         const giftProduct = getProductById(products, giftItem.productId);
                         return (
@@ -923,32 +923,32 @@ export function SaleDetailsDialog({
                       })}
                     </div>
                   ) : (
-                    <p className="mt-3 text-sm text-slate-500">Sin obsequios en esta venta.</p>
+                    <p className="mt-3 text-sm text-muted-foreground">Sin obsequios en esta venta.</p>
                   )}
 
                   {baseSale.notes?.trim() ? (
-                    <div className="mt-4 border-t border-slate-200 pt-4">
-                      <h4 className="text-sm font-semibold text-slate-950">Notas</h4>
-                      <p className="mt-2 text-sm text-slate-600">{baseSale.notes}</p>
+                    <div className="mt-4 border-t border-border pt-4 dark:border-slate-800">
+                      <h4 className="text-sm font-semibold text-foreground">Notas</h4>
+                      <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{baseSale.notes}</p>
                     </div>
                   ) : null}
                 </div>
 
-                <div className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-4">
+                <div className="rounded-2xl border border-border bg-card/88 p-3 dark:border-slate-800 dark:bg-slate-950/72 sm:p-4">
                   <div className="space-y-3 text-sm">
                     <div className="flex items-center justify-between">
-                      <span className="text-slate-500">Subtotal productos</span>
-                      <span className="font-medium text-slate-900">{formatCurrency(subtotal)}</span>
+                      <span className="text-muted-foreground">Subtotal productos</span>
+                      <span className="font-medium text-foreground">{formatCurrency(subtotal)}</span>
                     </div>
                     {returnedAmount > 0 ? (
                       <div className="flex items-center justify-between">
-                        <span className="text-slate-500">Devoluciones</span>
-                        <span className="font-medium text-rose-700">- {formatCurrency(returnedAmount)}</span>
+                        <span className="text-muted-foreground">Devoluciones</span>
+                        <span className="font-medium text-rose-700 dark:text-rose-200">- {formatCurrency(returnedAmount)}</span>
                       </div>
                     ) : null}
-                    <div className="flex items-center justify-between border-t border-slate-200 pt-3 text-base">
-                      <span className="font-semibold text-slate-950">Total factura</span>
-                      <span className="font-semibold text-slate-950">{formatCurrency(netRevenue)}</span>
+                    <div className="flex items-center justify-between border-t border-border pt-3 text-base dark:border-slate-800">
+                      <span className="font-semibold text-foreground">Total factura</span>
+                      <span className="font-semibold text-foreground">{formatCurrency(netRevenue)}</span>
                     </div>
                   </div>
                 </div>

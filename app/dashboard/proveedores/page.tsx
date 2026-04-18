@@ -96,33 +96,33 @@ export default function ProveedoresPage() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 sm:gap-6">
-        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
-          <p className="text-sm text-slate-500">Proveedores activos</p>
-          <p className="mt-3 text-3xl font-semibold text-slate-950">
+        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-[linear-gradient(180deg,rgba(2,6,23,0.92)_0%,rgba(15,23,42,0.88)_100%)] dark:shadow-[0_20px_48px_rgba(2,6,23,0.28)] sm:p-6">
+          <p className="text-sm text-slate-500 dark:text-slate-400">Proveedores activos</p>
+          <p className="mt-3 text-3xl font-semibold text-slate-950 dark:text-slate-50">
             {suppliers.filter((supplier) => supplier.status === 'active').length}
           </p>
-          <p className="mt-2 text-sm text-slate-500">Base de apoyo para compras recurrentes.</p>
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Base de apoyo para compras recurrentes.</p>
         </div>
-        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
-          <p className="text-sm text-slate-500">Total registrados</p>
-          <p className="mt-3 text-3xl font-semibold text-slate-950">{suppliers.length}</p>
-          <p className="mt-2 text-sm text-slate-500">Control centralizado para evitar duplicados.</p>
+        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-[linear-gradient(180deg,rgba(2,6,23,0.92)_0%,rgba(15,23,42,0.88)_100%)] dark:shadow-[0_20px_48px_rgba(2,6,23,0.28)] sm:p-6">
+          <p className="text-sm text-slate-500 dark:text-slate-400">Total registrados</p>
+          <p className="mt-3 text-3xl font-semibold text-slate-950 dark:text-slate-50">{suppliers.length}</p>
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Control centralizado para evitar duplicados.</p>
         </div>
-        <div className="rounded-[28px] border border-cyan-200 bg-[linear-gradient(180deg,rgba(236,254,255,0.98)_0%,rgba(207,250,254,0.82)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:col-span-2 sm:p-6 lg:col-span-1">
-          <p className="text-sm text-cyan-800">Uso recomendado</p>
-          <p className="mt-3 text-lg font-semibold text-cyan-950">Primero crea el proveedor y luego registra la compra</p>
-          <p className="mt-2 text-sm text-cyan-900">Asi el historial queda mas limpio y facil de consultar.</p>
+        <div className="rounded-[28px] border border-cyan-200 bg-[linear-gradient(180deg,rgba(236,254,255,0.98)_0%,rgba(207,250,254,0.82)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-cyan-900/70 dark:bg-[linear-gradient(180deg,rgba(8,47,73,0.52)_0%,rgba(14,116,144,0.24)_100%)] sm:col-span-2 sm:p-6 lg:col-span-1">
+          <p className="text-sm text-cyan-800 dark:text-cyan-200">Uso recomendado</p>
+          <p className="mt-3 text-lg font-semibold text-cyan-950 dark:text-cyan-50">Primero crea el proveedor y luego registra la compra</p>
+          <p className="mt-2 text-sm text-cyan-900 dark:text-cyan-100">Asi el historial queda mas limpio y facil de consultar.</p>
         </div>
       </div>
 
-      <div className="min-w-0 space-y-4 rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
+      <div className="min-w-0 space-y-4 rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-[linear-gradient(180deg,rgba(2,6,23,0.92)_0%,rgba(15,23,42,0.88)_100%)] dark:shadow-[0_20px_48px_rgba(2,6,23,0.28)] sm:p-6">
         <div className="relative max-w-md">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Buscar proveedor, contacto o ciudad"
-            className="rounded-2xl border-slate-200 bg-white/90 pl-9 shadow-sm"
+            className="rounded-2xl border-slate-200 bg-white/90 pl-9 shadow-sm dark:border-slate-700 dark:bg-slate-900/75 dark:text-slate-100"
           />
         </div>
 
@@ -130,18 +130,18 @@ export default function ProveedoresPage() {
           <div className="min-w-0">
             <div className="space-y-3 md:hidden">
               {filteredSuppliers.map((supplier) => (
-                <div key={supplier.id} className="rounded-[22px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.94)_100%)] p-4 shadow-sm">
+                <div key={supplier.id} className="rounded-[22px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.94)_100%)] p-4 shadow-sm dark:border-slate-800 dark:bg-[linear-gradient(180deg,rgba(2,6,23,0.92)_0%,rgba(15,23,42,0.86)_100%)]">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="font-medium text-slate-900">{supplier.name}</p>
-                      <p className="mt-1 text-sm text-slate-500">{supplier.contactName}</p>
-                      <p className="mt-1 text-sm text-slate-500">
+                      <p className="font-medium text-slate-900 dark:text-slate-100">{supplier.name}</p>
+                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{supplier.contactName}</p>
+                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                         {supplier.city} · {supplier.phone}
                       </p>
-                      <p className="mt-1 text-xs text-slate-500">
+                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                         {supplier.status === 'active' ? 'Activo' : 'Inactivo'}
                       </p>
-                      <p className="mt-2 text-xs text-slate-400">{supplier.notes || 'Sin notas'}</p>
+                      <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">{supplier.notes || 'Sin notas'}</p>
                     </div>
                     <ResponsiveRowActions
                       actions={[
@@ -166,9 +166,9 @@ export default function ProveedoresPage() {
               ))}
             </div>
 
-            <div className="mb-2 hidden text-xs text-slate-500 md:block">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
-            <div className="hidden pb-2 md:block">
-            <Table className="min-w-[720px]">
+            <div className="mb-2 hidden text-xs text-slate-500 dark:text-slate-400 md:block">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
+            <div className="hidden rounded-2xl border border-slate-200 bg-slate-50/60 p-2 dark:border-slate-800 dark:bg-slate-900/40 md:block">
+            <Table className="min-w-[720px] bg-white/90 dark:bg-slate-950/40">
               <TableHeader>
                 <TableRow>
                   <TableHead>Proveedor</TableHead>
@@ -176,7 +176,7 @@ export default function ProveedoresPage() {
                   <TableHead>Telefono</TableHead>
                   <TableHead>Ciudad</TableHead>
                   <TableHead>Estado</TableHead>
-                  <TableHead className="sticky right-0 z-10 bg-slate-50/95 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
+                  <TableHead className="sticky right-0 z-10 bg-slate-50/95 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)] dark:bg-slate-900/95 dark:shadow-[-12px_0_16px_-16px_rgba(2,6,23,0.65)]">
                     Acciones
                   </TableHead>
                 </TableRow>
@@ -197,15 +197,15 @@ export default function ProveedoresPage() {
                   <TableRow key={supplier.id} title={rowHoverSummary}>
                     <TableCell>
                       <div>
-                        <p className="font-medium text-slate-900">{supplier.name}</p>
-                        <p className="text-xs text-slate-500">{supplier.notes || 'Sin notas'}</p>
+                        <p className="font-medium text-slate-900 dark:text-slate-100">{supplier.name}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">{supplier.notes || 'Sin notas'}</p>
                       </div>
                     </TableCell>
-                    <TableCell>{supplier.contactName}</TableCell>
-                    <TableCell>{supplier.phone}</TableCell>
-                    <TableCell>{supplier.city}</TableCell>
-                    <TableCell>{supplier.status === 'active' ? 'Activo' : 'Inactivo'}</TableCell>
-                    <TableCell className="sticky right-0 bg-white/95 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
+                    <TableCell className="text-slate-700 dark:text-slate-200">{supplier.contactName}</TableCell>
+                    <TableCell className="text-slate-700 dark:text-slate-200">{supplier.phone}</TableCell>
+                    <TableCell className="text-slate-700 dark:text-slate-200">{supplier.city}</TableCell>
+                    <TableCell className="text-slate-700 dark:text-slate-200">{supplier.status === 'active' ? 'Activo' : 'Inactivo'}</TableCell>
+                    <TableCell className="sticky right-0 bg-[rgba(248,250,252,0.96)] text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.22)] backdrop-blur dark:bg-slate-950/95 dark:shadow-[-12px_0_16px_-16px_rgba(2,6,23,0.65)]">
                       <ResponsiveRowActions
                         actions={[
                           {
@@ -232,7 +232,7 @@ export default function ProveedoresPage() {
             </div>
           </div>
         ) : (
-          <Empty className="border border-dashed border-slate-200 bg-slate-50/70">
+          <Empty className="border border-dashed border-slate-200 bg-slate-50/70 dark:border-slate-800 dark:bg-slate-900/60">
             <EmptyHeader>
               <EmptyMedia variant="icon">
                 <Building2 className="h-5 w-5" />

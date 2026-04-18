@@ -124,7 +124,7 @@ export default function CategoriasPage() {
         }
       />
 
-      <div className="rounded-[28px] border border-cyan-200 bg-[linear-gradient(180deg,rgba(236,254,255,0.98)_0%,rgba(207,250,254,0.82)_100%)] p-4 text-sm text-cyan-900 shadow-[0_18px_45px_rgba(15,23,42,0.07)]">
+      <div className="rounded-[28px] border border-cyan-200 bg-[linear-gradient(180deg,rgba(236,254,255,0.98)_0%,rgba(207,250,254,0.82)_100%)] p-4 text-sm text-cyan-900 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-cyan-900/70 dark:bg-[linear-gradient(180deg,rgba(8,47,73,0.52)_0%,rgba(14,116,144,0.24)_100%)] dark:text-cyan-100">
         Las categorias viven ahora en Firebase como estructura administrable de 2 niveles. Si una categoria o subcategoria ya tiene productos, se recomienda desactivarla o editarla; eliminar solo cuando no este en uso.
       </div>
 
@@ -137,18 +137,18 @@ export default function CategoriasPage() {
                 <AccordionItem
                   key={category.id}
                   value={category.id}
-                  className="overflow-hidden rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] shadow-[0_18px_45px_rgba(15,23,42,0.07)]"
+                  className="overflow-hidden rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-[linear-gradient(180deg,rgba(2,6,23,0.92)_0%,rgba(15,23,42,0.88)_100%)] dark:shadow-[0_20px_48px_rgba(2,6,23,0.28)]"
                 >
                   <div className="flex flex-col gap-4 p-5">
                     <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                       <div className="min-w-0">
                         <div className="flex items-center gap-3">
-                          <div className="rounded-2xl bg-slate-100 p-2 text-slate-700">
+                          <div className="rounded-2xl bg-slate-100 p-2 text-slate-700 dark:bg-slate-900/80 dark:text-slate-200">
                             <FolderTree className="h-5 w-5" />
                           </div>
                           <div className="min-w-0">
-                            <h2 className="truncate text-lg font-semibold text-slate-950">{category.label}</h2>
-                            <p className="text-sm text-slate-500">
+                            <h2 className="truncate text-lg font-semibold text-slate-950 dark:text-slate-50">{category.label}</h2>
+                            <p className="text-sm text-slate-500 dark:text-slate-400">
                               ID: {category.id} · {category.status === 'active' ? 'Activa' : 'Inactiva'} · {categoryUsage} producto(s)
                             </p>
                           </div>
@@ -206,12 +206,12 @@ export default function CategoriasPage() {
                       />
                     </div>
 
-                    <AccordionTrigger className="rounded-[22px] border border-slate-200 bg-white/80 px-4 py-3 hover:no-underline">
+                    <AccordionTrigger className="rounded-[22px] border border-slate-200 bg-white/80 px-4 py-3 hover:no-underline dark:border-slate-800 dark:bg-slate-950/75">
                       <div className="flex min-w-0 items-center gap-3">
-                        <Rows3 className="mt-0.5 h-4 w-4 text-slate-500" />
+                        <Rows3 className="mt-0.5 h-4 w-4 text-slate-500 dark:text-slate-400" />
                         <div className="min-w-0">
-                          <p className="text-sm font-semibold text-slate-900">Subcategorias</p>
-                          <p className="text-xs text-slate-500">
+                          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Subcategorias</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">
                             {category.subcategories.length} registro(s) dentro de esta categoria
                           </p>
                         </div>
@@ -219,7 +219,7 @@ export default function CategoriasPage() {
                     </AccordionTrigger>
                   </div>
 
-                  <AccordionContent className="border-t border-slate-200 bg-slate-50/70 px-5 pb-5">
+                  <AccordionContent className="border-t border-slate-200 bg-slate-50/70 px-5 pb-5 dark:border-slate-800 dark:bg-slate-900/60">
                     {category.subcategories.length > 0 ? (
                       <>
                         <div className="hidden md:block">

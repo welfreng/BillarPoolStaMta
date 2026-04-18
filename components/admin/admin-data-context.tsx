@@ -74,6 +74,8 @@ import type {
   ServiceMaterialItem,
   ServiceOrder,
   ServiceType,
+  ServiceVisit,
+  ServiceVisitStatus,
   Supplier,
   UserRole,
 } from '@/lib/admin/types';
@@ -200,6 +202,23 @@ interface RegisterServiceInput {
   saleBatchId?: string;
 }
 
+interface CreateServiceVisitInput {
+  customerName: string;
+  customerPhone?: string;
+  cueReference: string;
+  scheduledAt: string;
+  address?: string;
+  zone?: string;
+  logisticsNotes?: string;
+  createdBy: string;
+}
+
+interface AssignServiceVisitInput {
+  technicianId: string;
+  technicianName: string;
+  assignedBy: string;
+}
+
 interface CreateAuthorizationRequestInput {
   saleId: string;
   saleBatchId: string;
@@ -281,6 +300,7 @@ interface AdminDataContextValue {
   purchases: Purchase[];
   sales: Sale[];
   services: ServiceOrder[];
+  serviceVisits: ServiceVisit[];
   authorizationRequests: AuthorizationRequest[];
   summary: DashboardSummary;
   latestMovements: InventoryMovement[];
@@ -321,6 +341,11 @@ interface AdminDataContextValue {
   registerSaleReturn: (input: RegisterSaleReturnInput) => Promise<Sale>;
   registerSaleReturns: (input: RegisterSaleReturnBatchInput) => Promise<Sale[]>;
   registerService: (input: RegisterServiceInput) => Promise<ServiceOrder>;
+  createServiceVisit: (input: CreateServiceVisitInput) => Promise<ServiceVisit>;
+  assignServiceVisit: (visitId: string, input: AssignServiceVisitInput) => Promise<ServiceVisit>;
+  startServiceVisit: (visitId: string) => Promise<ServiceVisit>;
+  completeServiceVisit: (visitId: string, serviceOrderId: string) => Promise<ServiceVisit>;
+  cancelServiceVisit: (visitId: string, reason: string) => Promise<ServiceVisit>;
   createAuthorizationRequest: (input: CreateAuthorizationRequestInput) => Promise<AuthorizationRequest>;
   reviewAuthorizationRequest: (
     requestId: string,
@@ -446,6 +471,18 @@ function normalizeDateValue(value: unknown) {
     return value.toDate().toISOString();
   }
   return new Date().toISOString();
+}
+
+function serializePurchaseForFirestore(purchase: Purchase) {
+  return {
+    ...purchase,
+    variantId: purchase.variantId ?? null,
+    variantName: purchase.variantName ?? null,
+    supplierId: purchase.supplierId ?? null,
+    purchaseBatchId: purchase.purchaseBatchId ?? null,
+    source: purchase.source ?? null,
+    notes: purchase.notes ?? null,
+  };
 }
 
 function mapProductDocument(documentId: string, data: DocumentData): Product {
@@ -758,6 +795,39 @@ function mapServiceDocument(documentId: string, data: DocumentData): ServiceOrde
   };
 }
 
+function mapServiceVisitDocument(documentId: string, data: DocumentData): ServiceVisit {
+  const status: ServiceVisitStatus =
+    data.status === 'assigned' ||
+    data.status === 'in_progress' ||
+    data.status === 'completed' ||
+    data.status === 'cancelled'
+      ? data.status
+      : 'scheduled';
+
+  return {
+    id: documentId,
+    status,
+    customerName: String(data.customerName ?? ''),
+    customerPhone: data.customerPhone ? String(data.customerPhone) : undefined,
+    cueReference: String(data.cueReference ?? ''),
+    scheduledAt: normalizeDateValue(data.scheduledAt),
+    address: data.address ? String(data.address) : undefined,
+    zone: data.zone ? String(data.zone) : undefined,
+    logisticsNotes: String(data.logisticsNotes ?? ''),
+    assignedTechnicianId: data.assignedTechnicianId ? String(data.assignedTechnicianId) : undefined,
+    assignedTechnicianName: data.assignedTechnicianName ? String(data.assignedTechnicianName) : undefined,
+    assignedBy: data.assignedBy ? String(data.assignedBy) : undefined,
+    createdBy: String(data.createdBy ?? 'Administrador'),
+    createdAt: normalizeDateValue(data.createdAt),
+    updatedAt: normalizeDateValue(data.updatedAt),
+    startedAt: data.startedAt ? normalizeDateValue(data.startedAt) : undefined,
+    completedAt: data.completedAt ? normalizeDateValue(data.completedAt) : undefined,
+    cancelledAt: data.cancelledAt ? normalizeDateValue(data.cancelledAt) : undefined,
+    cancelledReason: data.cancelledReason ? String(data.cancelledReason) : undefined,
+    linkedServiceOrderId: data.linkedServiceOrderId ? String(data.linkedServiceOrderId) : undefined,
+  };
+}
+
 function mapAuthorizationRequestDocument(documentId: string, data: DocumentData): AuthorizationRequest {
   return {
     id: documentId,
@@ -1025,6 +1095,38 @@ function buildProductWritePayload(
   };
 }
 
+function resetVariantInventoryState(variants: ProductVariant[]) {
+  return variants.map((variant) => ({
+    ...variant,
+    latestUnitCost: Number(variant.latestUnitCost ?? 0),
+    stock: 0,
+    publicStock: 0,
+  }));
+}
+
+function preserveVariantInventoryState(
+  variants: ProductVariant[],
+  existingVariants: ProductVariant[] = []
+) {
+  const existingById = new Map(existingVariants.map((variant) => [variant.id, variant]));
+
+  return variants.map((variant) => {
+    const existingVariant = existingById.get(variant.id);
+    const preservedStock = Math.max(Number(existingVariant?.stock ?? 0), 0);
+    const preservedPublicStock = Math.max(
+      Number(existingVariant?.publicStock ?? existingVariant?.stock ?? preservedStock),
+      0
+    );
+
+    return {
+      ...variant,
+      latestUnitCost: Number(existingVariant?.latestUnitCost ?? variant.latestUnitCost ?? 0),
+      stock: preservedStock,
+      publicStock: preservedPublicStock,
+    };
+  });
+}
+
 export function AdminDataProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<ProductCategoryRecord[]>([]);
@@ -1035,6 +1137,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   const [purchases, setPurchases] = useState<Purchase[]>(initialPurchases);
   const [sales, setSales] = useState<Sale[]>(initialSales);
   const [services, setServices] = useState<ServiceOrder[]>(initialServices);
+  const [serviceVisits, setServiceVisits] = useState<ServiceVisit[]>([]);
   const [authorizationRequests, setAuthorizationRequests] = useState<AuthorizationRequest[]>([]);
 
   const queueAdminNotification = (
@@ -1061,7 +1164,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     const readyCollections = new Set<string>();
     const markReady = (collectionName: string) => {
       readyCollections.add(collectionName);
-      if (readyCollections.size === 9) {
+      if (readyCollections.size === 10) {
         setLoading(false);
       }
     };
@@ -1193,6 +1296,18 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       }
     );
 
+    const unsubServiceVisits = onSnapshot(
+      query(collection(db, 'service-visits'), orderBy('scheduledAt', 'desc')),
+      (snapshot) => {
+        setServiceVisits(snapshot.docs.map((item) => mapServiceVisitDocument(item.id, item.data())));
+        markReady('service-visits');
+      },
+      (error) => {
+        console.error('Error leyendo visitas de servicio desde Firestore:', error);
+        markReady('service-visits');
+      }
+    );
+
     const unsubAuthorizationRequests = onSnapshot(
       query(collection(db, 'authorization-requests'), orderBy('createdAt', 'desc')),
       (snapshot) => {
@@ -1216,6 +1331,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       unsubPurchases();
       unsubSales();
       unsubServices();
+      unsubServiceVisits();
       unsubAuthorizationRequests();
     };
   }, []);
@@ -1350,6 +1466,26 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         { merge: true }
       );
     });
+  };
+
+  const projectProductsWithoutPurchases = (baseProducts: Product[], removedPurchases: Purchase[]) => {
+    const nextProducts = baseProducts.map((product) => ({
+      ...product,
+      variants: (product.variants ?? []).map((variant) => ({ ...variant })),
+    }));
+
+    removedPurchases.forEach((purchase) => {
+      if (!purchase.variantId) return;
+      const targetProduct = nextProducts.find((product) => product.id === purchase.productId);
+      const targetVariant = targetProduct?.variants?.find((variant) => variant.id === purchase.variantId);
+      if (!targetVariant) return;
+      targetVariant.stock = Math.max(
+        Number(targetVariant.stock ?? 0) - Number(purchase.quantityPurchased ?? purchase.presentationQuantity ?? 0),
+        0
+      );
+    });
+
+    return nextProducts;
   };
 
   const getOperationalResetSummary = (
@@ -1795,16 +1931,18 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     const createdAt = new Date().toISOString();
     const productRef = doc(collection(db, 'products'));
     const normalizedVariantAttributes = normalizeVariantAttributeDefinitions(input.variantAttributes);
-    const normalizedVariants = normalizeProductVariantRecords(
-      productRef.id,
-      normalizedVariantAttributes,
-      input.variants
+    const normalizedVariants = resetVariantInventoryState(
+      normalizeProductVariantRecords(
+        productRef.id,
+        normalizedVariantAttributes,
+        input.variants
+      )
     );
     const nextSaleMode = input.saleMode === 'varianted' || normalizedVariants.length > 0 ? 'varianted' : 'simple';
     const productSummary =
       nextSaleMode === 'varianted'
         ? {
-            publicStock: normalizedVariants.reduce((total, variant) => total + Math.max(Number(variant.stock ?? 0), 0), 0),
+            publicStock: 0,
             salePrice:
               normalizedVariants
                 .map((variant) => Number(variant.salePrice ?? 0))
@@ -1856,10 +1994,13 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     }
 
     const normalizedVariantAttributes = normalizeVariantAttributeDefinitions(input.variantAttributes);
-    const normalizedVariants = normalizeProductVariantRecords(
-      productId,
-      normalizedVariantAttributes,
-      input.variants
+    const normalizedVariants = preserveVariantInventoryState(
+      normalizeProductVariantRecords(
+        productId,
+        normalizedVariantAttributes,
+        input.variants
+      ),
+      existingProduct.variants ?? []
     );
     const nextSaleMode = input.saleMode === 'varianted' || normalizedVariants.length > 0 ? 'varianted' : 'simple';
     const nextProduct: Product = {
@@ -1880,7 +2021,10 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       variants: normalizedVariants,
       publicStock:
         nextSaleMode === 'varianted'
-          ? normalizedVariants.reduce((total, variant) => total + Math.max(Number(variant.stock ?? 0), 0), 0)
+          ? normalizedVariants.reduce(
+              (total, variant) => total + Math.max(Number(variant.publicStock ?? variant.stock ?? 0), 0),
+              0
+            )
           : existingProduct.publicStock,
       updatedAt: new Date().toISOString(),
     };
@@ -1920,16 +2064,6 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
 
     if (canAutoMigrateHistory && historyVariant) {
       const currentLegacyStock = Math.max(getProductStock(movements, productId), 0);
-      const desiredTotalStock = normalizedVariants.reduce(
-        (total, variant) => total + Math.max(Number(variant.stock ?? 0), 0),
-        0
-      );
-
-      if (desiredTotalStock !== currentLegacyStock) {
-        throw new Error(
-          `El stock repartido entre variantes debe sumar ${currentLegacyStock}. Ajusta las cantidades antes de guardar.`
-        );
-      }
 
       const baseMigratedVariants = normalizedVariants.map((variant) =>
         variant.id === historyVariant?.id
@@ -1949,7 +2083,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         .map((variant) => {
           const baseVariant = baseMigratedVariants.find((item) => item.id === variant.id);
           const baseStock = Math.max(Number(baseVariant?.stock ?? 0), 0);
-          const desiredStock = Math.max(Number(variant.stock ?? 0), 0);
+          const desiredStock = baseStock;
           const quantity = desiredStock - baseStock;
 
           if (quantity === 0) return null;
@@ -1969,8 +2103,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         null;
       migratedProduct = {
         ...nextProduct,
-        variants: normalizedVariants,
-        publicStock: normalizedVariants.reduce((total, variant) => total + Math.max(Number(variant.stock ?? 0), 0), 0),
+        variants: baseMigratedVariants,
+        publicStock: currentLegacyStock,
       };
     }
 
@@ -2261,6 +2395,10 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     if (!targetProduct) {
       throw new Error('No se encontro el producto para cargar inventario inicial.');
     }
+    const selectedVariant = input.variantId ? getProductVariantById(targetProduct, input.variantId) : null;
+    if (getProductSaleMode(targetProduct) === 'varianted' && !selectedVariant) {
+      throw new Error(`Selecciona una variante valida para cargar inventario inicial de ${targetProduct.name}.`);
+    }
 
     const quantity = Number(input.quantity);
     const estimatedUnitCost = Number(input.estimatedUnitCost);
@@ -2278,8 +2416,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       id: purchaseRef.id,
       purchaseId: purchaseRef.id,
       productId: input.productId,
-      variantId: input.variantId,
-      variantName: input.variantName,
+      variantId: selectedVariant?.id,
+      variantName: selectedVariant?.name ?? input.variantName,
       supplier: 'Inventario inicial sin proveedor',
       source: 'initial-load',
       purchasedAt: input.occurredAt,
@@ -2299,8 +2437,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     const movement: InventoryMovement = {
       id: movementRef.id,
       productId: input.productId,
-      variantId: input.variantId,
-      variantName: input.variantName,
+      variantId: selectedVariant?.id,
+      variantName: selectedVariant?.name ?? input.variantName,
       purchaseId: purchase.id,
       type: 'entry',
       reason: 'initial-load',
@@ -2313,12 +2451,12 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
 
     const batch = writeBatch(db);
     batch.set(doc(db, 'purchases', purchase.id), {
-      ...purchase,
+      ...serializePurchaseForFirestore(purchase),
       docType: 'legacy-line',
       purchasedAt: Timestamp.fromDate(new Date(input.occurredAt)),
     });
     batch.set(doc(db, 'purchase_items', purchase.id), {
-      ...purchase,
+      ...serializePurchaseForFirestore(purchase),
       purchaseId: purchase.id,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -2352,11 +2490,11 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         { productId: input.productId, quantity },
       ])
     );
-    if (input.variantId) {
+    if (selectedVariant) {
       const variantStockMap = buildVariantStockMap(products);
       const productVariantMap = variantStockMap.get(input.productId);
-      const currentVariantStock = productVariantMap?.get(input.variantId) ?? 0;
-      productVariantMap?.set(input.variantId, currentVariantStock + quantity);
+      const currentVariantStock = productVariantMap?.get(selectedVariant.id) ?? selectedVariant.stock ?? 0;
+      productVariantMap?.set(selectedVariant.id, currentVariantStock + quantity);
       applyVariantStockMapToBatch(batch, variantStockMap, products);
     }
 
@@ -2371,14 +2509,15 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   const createPurchaseBatch = async (
     input: RegisterPurchaseInput,
     existingBatchId?: string,
-    baseMovements: InventoryMovement[] = movements
+    baseMovements: InventoryMovement[] = movements,
+    baseProducts: Product[] = products
   ) => {
     if (input.items.length === 0) {
       throw new Error('Agrega al menos un producto a la compra.');
     }
 
     input.items.forEach((item) => {
-      const targetProduct = products.find((product) => product.id === item.productId);
+      const targetProduct = baseProducts.find((product) => product.id === item.productId);
       if (!targetProduct) {
         throw new Error('Uno de los productos de la compra no existe.');
       }
@@ -2452,12 +2591,12 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
 
       const movementRef = doc(collection(db, 'movements'));
       batch.set(doc(db, 'purchases', purchase.id), {
-        ...purchase,
+        ...serializePurchaseForFirestore(purchase),
         docType: 'legacy-line',
         purchasedAt: Timestamp.fromDate(new Date(input.purchasedAt)),
       });
       batch.set(doc(db, 'purchase_items', purchase.id), {
-        ...purchase,
+        ...serializePurchaseForFirestore(purchase),
         purchaseId: batchId,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -2498,8 +2637,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       stockDeltas.push({ productId: item.productId, quantity: quantityPurchased });
       batch.update(doc(db, 'products', item.productId), {
         salePrice:
-          item.variantId && getProductSaleMode(products.find((product) => product.id === item.productId)) === 'varianted'
-            ? products.find((product) => product.id === item.productId)?.salePrice ?? item.suggestedSalePrice
+          item.variantId && getProductSaleMode(baseProducts.find((product) => product.id === item.productId)) === 'varianted'
+            ? baseProducts.find((product) => product.id === item.productId)?.salePrice ?? item.suggestedSalePrice
             : item.suggestedSalePrice,
         updatedAt: serverTimestamp(),
       });
@@ -2513,10 +2652,10 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         stockDeltas
       )
     );
-    const variantStockMap = buildVariantStockMap(products);
+    const variantStockMap = buildVariantStockMap(baseProducts);
     normalizedItems.forEach((item) => {
       if (!item.variantId) return;
-      const targetProduct = products.find((product) => product.id === item.productId);
+      const targetProduct = baseProducts.find((product) => product.id === item.productId);
       const targetVariant = targetProduct ? getProductVariantById(targetProduct, item.variantId) : null;
       if (!targetVariant) return;
       const currentStock = variantStockMap.get(item.productId)?.get(item.variantId) ?? targetVariant.stock ?? 0;
@@ -2527,7 +2666,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         variantRecord.latestUnitCost = getVariantOrProductRealUnitCost(purchases, item.productId, item.variantId);
       }
     });
-    applyVariantStockMapToBatch(batch, variantStockMap, products);
+    applyVariantStockMapToBatch(batch, variantStockMap, baseProducts);
 
     await batch.commit();
 
@@ -2548,7 +2687,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     await batch.commit();
 
     const remainingMovements = movements.filter((movement) => movement.purchaseBatchId !== batchId);
-    return createPurchaseBatch(input, batchId, remainingMovements);
+    const projectedProducts = projectProductsWithoutPurchases(products, targetPurchases);
+    return createPurchaseBatch(input, batchId, remainingMovements, projectedProducts);
   };
 
   const updatePurchase = async (purchaseId: string, input: RegisterPurchaseInput) => {
@@ -2568,7 +2708,13 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     await batch.commit();
 
     const remainingMovements = movements.filter((movement) => movement.purchaseId !== purchaseId);
-    const [updatedPurchase] = await createPurchaseBatch(input, targetPurchase.purchaseBatchId, remainingMovements);
+    const projectedProducts = projectProductsWithoutPurchases(products, [targetPurchase]);
+    const [updatedPurchase] = await createPurchaseBatch(
+      input,
+      targetPurchase.purchaseBatchId,
+      remainingMovements,
+      projectedProducts
+    );
     return updatedPurchase;
   };
 
@@ -2589,6 +2735,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         removedMovements.map((movement) => movement.productId)
       )
     );
+    const projectedProducts = projectProductsWithoutPurchases(products, [targetPurchase]);
+    applyVariantStockMapToBatch(batch, buildVariantStockMap(projectedProducts), projectedProducts);
     await batch.commit();
   };
 
@@ -2609,6 +2757,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         removedMovements.map((movement) => movement.productId)
       )
     );
+    const projectedProducts = projectProductsWithoutPurchases(products, targetPurchases);
+    applyVariantStockMapToBatch(batch, buildVariantStockMap(projectedProducts), projectedProducts);
     await batch.commit();
   };
 
@@ -2644,11 +2794,6 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         throw new Error('La cantidad vendida debe ser mayor a cero.');
       }
 
-      const availableStock = getProductStock(baseMovements, item.productId);
-      if (quantity > availableStock) {
-        throw new Error(`La cantidad vendida supera el stock disponible de ${targetProduct.name}.`);
-      }
-
       let variantId: string | undefined;
       let variantName: string | undefined;
       if ((targetProduct.variants?.length ?? 0) > 0) {
@@ -2663,6 +2808,11 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         variantStockMap.get(targetProduct.id)?.set(selectedVariant.id, currentVariantStock - quantity);
         variantId = selectedVariant.id;
         variantName = selectedVariant.name;
+      } else {
+        const availableStock = getProductStock(baseMovements, item.productId);
+        if (quantity > availableStock) {
+          throw new Error(`La cantidad vendida supera el stock disponible de ${targetProduct.name}.`);
+        }
       }
 
       const realUnitCost = getVariantOrProductRealUnitCost(purchases, item.productId, variantId);
@@ -2952,11 +3102,15 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       if (quantity <= 0) {
         throw new Error('La cantidad vendida debe ser mayor a cero.');
       }
-      const realUnitCost = getProductRealUnitCost(purchases, item.productId);
       const selectedVariant = getProductVariantById(targetProduct, item.variantId);
       if ((targetProduct.variants?.length ?? 0) > 0 && !selectedVariant) {
         throw new Error(`Selecciona la opcion disponible de ${targetProduct.name}.`);
       }
+      const realUnitCost = getVariantOrProductRealUnitCost(
+        purchases,
+        item.productId,
+        selectedVariant?.id
+      );
       const lineItem: SaleLineItem = {
         productId: item.productId,
         variantId: selectedVariant?.id,
@@ -3368,6 +3522,205 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     return service;
   };
 
+  const createServiceVisit = async (input: CreateServiceVisitInput): Promise<ServiceVisit> => {
+    const customerName = input.customerName.trim();
+    const cueReference = input.cueReference.trim();
+    const scheduledAt = input.scheduledAt.trim();
+    const createdBy = input.createdBy.trim();
+
+    if (!customerName) {
+      throw new Error('Ingresa el nombre del cliente para agendar la visita.');
+    }
+    if (!cueReference) {
+      throw new Error('Ingresa la referencia del taco o servicio a visitar.');
+    }
+    if (!scheduledAt) {
+      throw new Error('Selecciona la fecha y hora de la visita.');
+    }
+    if (!createdBy) {
+      throw new Error('No se pudo identificar quien agenda la visita.');
+    }
+
+    const visitRef = doc(collection(db, 'service-visits'));
+    const now = new Date().toISOString();
+    const visit: ServiceVisit = {
+      id: visitRef.id,
+      status: 'scheduled',
+      customerName,
+      customerPhone: input.customerPhone?.trim() || undefined,
+      cueReference,
+      scheduledAt,
+      address: input.address?.trim() || undefined,
+      zone: input.zone?.trim() || undefined,
+      logisticsNotes: input.logisticsNotes?.trim() || '',
+      createdBy,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await setDoc(visitRef, {
+      ...visit,
+      customerPhone: visit.customerPhone ?? null,
+      address: visit.address ?? null,
+      zone: visit.zone ?? null,
+      assignedTechnicianId: null,
+      assignedTechnicianName: null,
+      assignedBy: null,
+      startedAt: null,
+      completedAt: null,
+      cancelledAt: null,
+      cancelledReason: null,
+      linkedServiceOrderId: null,
+      scheduledAt: Timestamp.fromDate(new Date(scheduledAt)),
+      createdAt: Timestamp.fromDate(new Date(now)),
+      updatedAt: Timestamp.fromDate(new Date(now)),
+    });
+
+    return visit;
+  };
+
+  const assignServiceVisit = async (
+    visitId: string,
+    input: AssignServiceVisitInput
+  ): Promise<ServiceVisit> => {
+    const visit = serviceVisits.find((item) => item.id === visitId);
+    if (!visit) {
+      throw new Error('No se encontro la visita a asignar.');
+    }
+    if (visit.status !== 'scheduled') {
+      throw new Error('Solo se pueden asignar visitas agendadas.');
+    }
+
+    const technicianId = input.technicianId.trim();
+    const technicianName = input.technicianName.trim();
+    const assignedBy = input.assignedBy.trim();
+    if (!technicianId || !technicianName) {
+      throw new Error('Selecciona el tecnico que atendera la visita.');
+    }
+    if (!assignedBy) {
+      throw new Error('No se pudo identificar quien realiza la asignacion.');
+    }
+
+    const updatedAt = new Date().toISOString();
+    await updateDoc(doc(db, 'service-visits', visitId), {
+      status: 'assigned',
+      assignedTechnicianId: technicianId,
+      assignedTechnicianName: technicianName,
+      assignedBy,
+      updatedAt: Timestamp.fromDate(new Date(updatedAt)),
+    });
+
+    return {
+      ...visit,
+      status: 'assigned',
+      assignedTechnicianId: technicianId,
+      assignedTechnicianName: technicianName,
+      assignedBy,
+      updatedAt,
+    };
+  };
+
+  const startServiceVisit = async (visitId: string): Promise<ServiceVisit> => {
+    const visit = serviceVisits.find((item) => item.id === visitId);
+    if (!visit) {
+      throw new Error('No se encontro la visita a iniciar.');
+    }
+    if (visit.status !== 'assigned') {
+      throw new Error('Solo se pueden iniciar visitas asignadas.');
+    }
+    if (!visit.assignedTechnicianId || !visit.assignedTechnicianName) {
+      throw new Error('La visita debe tener un tecnico asignado antes de iniciar.');
+    }
+    if (visit.linkedServiceOrderId) {
+      throw new Error('Esta visita ya tiene un servicio enlazado.');
+    }
+
+    const startedAt = new Date().toISOString();
+    await updateDoc(doc(db, 'service-visits', visitId), {
+      status: 'in_progress',
+      startedAt: Timestamp.fromDate(new Date(startedAt)),
+      updatedAt: Timestamp.fromDate(new Date(startedAt)),
+    });
+
+    return {
+      ...visit,
+      status: 'in_progress',
+      startedAt,
+      updatedAt: startedAt,
+    };
+  };
+
+  const completeServiceVisit = async (
+    visitId: string,
+    serviceOrderId: string
+  ): Promise<ServiceVisit> => {
+    const visit = serviceVisits.find((item) => item.id === visitId);
+    if (!visit) {
+      throw new Error('No se encontro la visita a completar.');
+    }
+    if (visit.status !== 'in_progress') {
+      throw new Error('Solo se pueden completar visitas en progreso.');
+    }
+    if (visit.linkedServiceOrderId) {
+      throw new Error('Esta visita ya tiene un servicio enlazado.');
+    }
+
+    const normalizedServiceOrderId = serviceOrderId.trim();
+    if (!normalizedServiceOrderId) {
+      throw new Error('Debes indicar el servicio enlazado para completar la visita.');
+    }
+
+    const completedAt = new Date().toISOString();
+    await updateDoc(doc(db, 'service-visits', visitId), {
+      status: 'completed',
+      linkedServiceOrderId: normalizedServiceOrderId,
+      completedAt: Timestamp.fromDate(new Date(completedAt)),
+      updatedAt: Timestamp.fromDate(new Date(completedAt)),
+    });
+
+    return {
+      ...visit,
+      status: 'completed',
+      linkedServiceOrderId: normalizedServiceOrderId,
+      completedAt,
+      updatedAt: completedAt,
+    };
+  };
+
+  const cancelServiceVisit = async (visitId: string, reason: string): Promise<ServiceVisit> => {
+    const visit = serviceVisits.find((item) => item.id === visitId);
+    if (!visit) {
+      throw new Error('No se encontro la visita a cancelar.');
+    }
+    if (!['scheduled', 'assigned', 'in_progress'].includes(visit.status)) {
+      throw new Error('Solo se pueden cancelar visitas activas.');
+    }
+    if (visit.linkedServiceOrderId) {
+      throw new Error('No puedes cancelar una visita que ya tiene un servicio enlazado.');
+    }
+
+    const cancelledReason = reason.trim();
+    if (!cancelledReason) {
+      throw new Error('Escribe el motivo de la cancelacion.');
+    }
+
+    const cancelledAt = new Date().toISOString();
+    await updateDoc(doc(db, 'service-visits', visitId), {
+      status: 'cancelled',
+      cancelledReason,
+      cancelledAt: Timestamp.fromDate(new Date(cancelledAt)),
+      updatedAt: Timestamp.fromDate(new Date(cancelledAt)),
+    });
+
+    return {
+      ...visit,
+      status: 'cancelled',
+      cancelledReason,
+      cancelledAt,
+      updatedAt: cancelledAt,
+    };
+  };
+
   const createAuthorizationRequest = async (input: CreateAuthorizationRequestInput) => {
     const trimmedReason = input.reason.trim();
     if (!trimmedReason) {
@@ -3505,6 +3858,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         purchases,
         sales,
         services,
+        serviceVisits,
         authorizationRequests,
         summary,
         latestMovements,
@@ -3536,6 +3890,11 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         registerSaleReturn,
         registerSaleReturns,
         registerService,
+        createServiceVisit,
+        assignServiceVisit,
+        startServiceVisit,
+        completeServiceVisit,
+        cancelServiceVisit,
         createAuthorizationRequest,
         reviewAuthorizationRequest,
         completeAuthorizationRequest,

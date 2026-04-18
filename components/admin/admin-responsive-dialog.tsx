@@ -52,13 +52,13 @@ export function AdminResponsiveDialog({
         <SheetContent
           side="bottom"
           className={cn(
-            'flex h-[100dvh] max-h-[100dvh] flex-col gap-0 overflow-hidden rounded-t-[24px] border-slate-200 bg-gradient-to-b from-white via-slate-50/75 to-slate-100/85 px-0 shadow-2xl',
+            'flex h-[100dvh] max-h-[100dvh] flex-col gap-0 overflow-hidden rounded-t-[24px] border-border bg-gradient-to-b from-background via-card to-background px-0 shadow-[0_24px_80px_rgba(15,23,42,0.18)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 dark:shadow-[0_24px_80px_rgba(2,6,23,0.45)]',
             mobileContentClassName
           )}
         >
-          <SheetHeader className={cn('shrink-0 border-b border-slate-200/80 px-3 pt-2.5 pb-2.5 text-left sm:px-4 sm:pt-4 sm:pb-3', headerClassName)}>
-            <div className="mx-auto mb-2.5 h-1.5 w-14 rounded-full bg-slate-300/80" />
-            <SheetTitle className="pr-10 text-[1rem] font-semibold tracking-[-0.01em] text-slate-950 sm:text-[1.05rem]">
+          <SheetHeader className={cn('shrink-0 border-b border-slate-200/80 px-3 pt-2.5 pb-2.5 text-left dark:border-slate-800 sm:px-4 sm:pt-4 sm:pb-3', headerClassName)}>
+            <div className="mx-auto mb-2.5 h-1.5 w-14 rounded-full bg-slate-300/80 dark:bg-slate-700/80" />
+            <SheetTitle className="pr-10 text-[1rem] font-semibold tracking-[-0.01em] text-slate-950 dark:text-slate-50 sm:text-[1.05rem]">
               {title}
             </SheetTitle>
           </SheetHeader>
@@ -66,7 +66,7 @@ export function AdminResponsiveDialog({
           {footer ? (
             <div
               className={cn(
-                'shrink-0 border-t border-slate-200/90 bg-white/90 px-2.5 py-2.5 shadow-[0_-8px_24px_rgba(15,23,42,0.06)] backdrop-blur supports-[padding:max(0px)]:pb-[max(0.65rem,env(safe-area-inset-bottom))] sm:px-4 sm:py-3',
+                'shrink-0 border-t border-border bg-background/90 px-2.5 py-2.5 shadow-[0_-8px_24px_rgba(15,23,42,0.06)] backdrop-blur supports-[padding:max(0px)]:pb-[max(0.65rem,env(safe-area-inset-bottom))] dark:border-slate-800 dark:bg-slate-950/90 dark:shadow-[0_-8px_24px_rgba(2,6,23,0.35)] sm:px-4 sm:py-3',
                 footerClassName
               )}
             >
@@ -82,12 +82,12 @@ export function AdminResponsiveDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className={cn(
-          'flex max-h-[92dvh] w-[calc(100vw-2rem)] max-w-[96vw] flex-col overflow-hidden rounded-[28px] border-slate-200 bg-gradient-to-b from-white via-slate-50/70 to-white px-0 shadow-[0_24px_80px_rgba(15,23,42,0.18)]',
+          'flex max-h-[92dvh] w-[calc(100vw-2rem)] max-w-[96vw] flex-col overflow-hidden rounded-[28px] border-border bg-gradient-to-b from-background via-card to-background px-0 shadow-[0_24px_80px_rgba(15,23,42,0.18)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 dark:shadow-[0_24px_80px_rgba(2,6,23,0.45)]',
           desktopContentClassName
         )}
       >
-        <DialogHeader className={cn('shrink-0 border-b border-slate-200/80 px-5 pt-6 pb-4 lg:px-6', headerClassName)}>
-          <DialogTitle className="pr-8 text-[1.15rem] font-semibold tracking-[-0.01em] text-slate-950">
+        <DialogHeader className={cn('shrink-0 border-b border-slate-200/80 px-5 pt-6 pb-4 dark:border-slate-800 lg:px-6', headerClassName)}>
+          <DialogTitle className="pr-8 text-[1.15rem] font-semibold tracking-[-0.01em] text-slate-950 dark:text-slate-50">
             {title}
           </DialogTitle>
           {description ? <DialogDescription>{description}</DialogDescription> : null}
@@ -96,7 +96,7 @@ export function AdminResponsiveDialog({
         {footer ? (
           <div
             className={cn(
-              'shrink-0 border-t border-slate-200/90 bg-white/90 px-5 py-3 shadow-[0_-8px_24px_rgba(15,23,42,0.05)] backdrop-blur lg:px-6',
+              'shrink-0 border-t border-border bg-background/90 px-5 py-3 shadow-[0_-8px_24px_rgba(15,23,42,0.05)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/90 dark:shadow-[0_-8px_24px_rgba(2,6,23,0.35)] lg:px-6',
               footerClassName
             )}
           >

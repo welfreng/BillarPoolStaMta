@@ -173,7 +173,7 @@ export function ServiceFormDialog({
             })}
             className="space-y-6"
           >
-            <div className="grid gap-4 rounded-3xl border border-slate-200 bg-white p-3.5 shadow-sm sm:grid-cols-2 sm:p-5">
+            <div className="grid gap-4 rounded-3xl border border-border bg-card/88 p-3.5 shadow-sm dark:border-slate-800 dark:bg-slate-950/70 dark:shadow-[0_18px_40px_rgba(2,6,23,0.22)] sm:grid-cols-2 sm:p-5">
               <FormField
                 control={form.control}
                 name="serviceType"
@@ -296,7 +296,7 @@ export function ServiceFormDialog({
               />
             </div>
 
-            <div className="grid gap-4 rounded-3xl border border-slate-200 bg-slate-50/60 p-3.5 lg:grid-cols-2 sm:p-5">
+            <div className="grid gap-4 rounded-3xl border border-border bg-muted/60 p-3.5 dark:border-slate-800 dark:bg-slate-900/60 lg:grid-cols-2 sm:p-5">
               {(values.serviceType === 'tip-installation' || values.serviceType === 'tip-ferrule-installation') && (
                 <FormField
                   control={form.control}
@@ -410,14 +410,14 @@ export function ServiceFormDialog({
                     control={form.control}
                     name="includeSuppressor"
                     render={({ field }) => (
-                      <FormItem className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-4">
+                      <FormItem className="rounded-2xl border border-border bg-card/88 p-3 dark:border-slate-800 dark:bg-slate-950/72 sm:p-4">
                         <div className="flex items-center gap-3">
                           <FormControl>
                             <Checkbox checked={field.value} onCheckedChange={(checked) => field.onChange(checked === true)} />
                           </FormControl>
                           <div>
                             <FormLabel>Agregar supresor</FormLabel>
-                            <p className="hidden text-sm text-slate-500 sm:block">Activalo si este trabajo tambien lleva supresor.</p>
+                            <p className="hidden text-sm text-muted-foreground sm:block">Activalo si este trabajo tambien lleva supresor.</p>
                           </div>
                         </div>
                       </FormItem>
@@ -454,7 +454,7 @@ export function ServiceFormDialog({
               )}
             </div>
 
-            <div className="grid gap-4 rounded-3xl border border-cyan-100 bg-cyan-50/70 p-3.5 lg:grid-cols-[1.1fr_0.9fr] sm:p-5">
+            <div className="grid gap-4 rounded-3xl border border-cyan-200/70 bg-cyan-50/70 p-3.5 dark:border-cyan-900/60 dark:bg-cyan-950/18 lg:grid-cols-[1.1fr_0.9fr] sm:p-5">
               <div className="space-y-3.5 sm:space-y-4">
                 <FormField
                   control={form.control}
@@ -499,21 +499,21 @@ export function ServiceFormDialog({
                 />
               </div>
 
-              <div className="rounded-3xl border border-cyan-100 bg-white p-3 sm:p-4">
-                <p className="text-sm font-semibold text-slate-950">Resumen del servicio</p>
+              <div className="rounded-3xl border border-border bg-card/88 p-3 dark:border-slate-800 dark:bg-slate-950/72 sm:p-4">
+                <p className="text-sm font-semibold text-foreground">Resumen del servicio</p>
                 <div className="mt-4 space-y-3">
                   {materialSummary.length > 0 ? (
                     materialSummary.map((item) => (
-                      <div key={item.productId} className="rounded-2xl bg-slate-50 px-3 py-2 text-sm">
-                        <p className="font-medium text-slate-900">{item.name}</p>
-                        <p className="text-slate-500">Stock: {formatNumber(item.stock)} uds</p>
+                      <div key={item.productId} className="rounded-2xl border border-border/70 bg-background/88 px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-900/60">
+                        <p className="font-medium text-foreground">{item.name}</p>
+                        <p className="text-muted-foreground">Stock: {formatNumber(item.stock)} uds</p>
                         {!hideFinancialSummary ? (
-                          <p className="text-slate-500">Costo real: {formatCurrency(item.unitCost)}</p>
+                          <p className="text-muted-foreground">Costo real: {formatCurrency(item.unitCost)}</p>
                         ) : null}
                       </div>
                     ))
                   ) : (
-                    <p className="hidden text-sm text-slate-500 sm:block">
+                    <p className="hidden text-sm text-muted-foreground sm:block">
                       {hideFinancialSummary
                         ? 'Selecciona los insumos para revisar disponibilidad y registrar el trabajo.'
                         : 'Selecciona los insumos para calcular el costo del trabajo.'}

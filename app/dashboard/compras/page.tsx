@@ -194,26 +194,26 @@ export default function ComprasPage() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 sm:gap-6">
-        <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-          <p className="text-sm text-slate-500">Valor total de la compra</p>
-          <p className="mt-3 text-3xl font-semibold text-slate-950">{formatCurrency(totalPurchaseValue)}</p>
-          <p className="mt-2 text-sm text-slate-500">
+        <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-[0_18px_40px_rgba(2,6,23,0.24)] sm:p-6">
+          <p className="text-sm text-slate-500 dark:text-slate-400">Valor total de la compra</p>
+          <p className="mt-3 text-3xl font-semibold text-slate-950 dark:text-slate-50">{formatCurrency(totalPurchaseValue)}</p>
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
             Suma del valor de compra de los productos, sin incluir envio.
           </p>
         </div>
-        <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-          <p className="text-sm text-slate-500">Inversion total</p>
-          <p className="mt-3 text-3xl font-semibold text-slate-950">{formatCurrency(totalInvestment)}</p>
-          <p className="mt-2 text-sm text-slate-500">
+        <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-[0_18px_40px_rgba(2,6,23,0.24)] sm:p-6">
+          <p className="text-sm text-slate-500 dark:text-slate-400">Inversion total</p>
+          <p className="mt-3 text-3xl font-semibold text-slate-950 dark:text-slate-50">{formatCurrency(totalInvestment)}</p>
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
             Suma de compra y envio prorrateado en las compras filtradas.
           </p>
         </div>
-        <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-          <p className="text-sm text-slate-500">Pedidos registrados</p>
-          <p className="mt-3 text-3xl font-semibold text-slate-950">
+        <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-[0_18px_40px_rgba(2,6,23,0.24)] sm:p-6">
+          <p className="text-sm text-slate-500 dark:text-slate-400">Pedidos registrados</p>
+          <p className="mt-3 text-3xl font-semibold text-slate-950 dark:text-slate-50">
             {formatNumber(groupedPurchases.length)}
           </p>
-          <p className="mt-2 text-sm text-slate-500">Cada pedido puede incluir varios productos del mismo proveedor.</p>
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Cada pedido puede incluir varios productos del mismo proveedor.</p>
         </div>
         <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm sm:col-span-2 sm:p-6 xl:col-span-1">
           <p className="text-sm text-emerald-800">Regla financiera activa</p>
@@ -226,7 +226,7 @@ export default function ComprasPage() {
         </div>
       </div>
 
-      <div className="min-w-0 space-y-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+      <div className="min-w-0 space-y-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-[0_18px_40px_rgba(2,6,23,0.24)] sm:p-6">
         <div className="relative max-w-md">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <Input
@@ -243,8 +243,8 @@ export default function ComprasPage() {
               <div key={group.key} className="overflow-hidden rounded-3xl border border-slate-200">
                 <div className="flex flex-col gap-4 bg-slate-50 px-4 py-4 sm:px-5 md:flex-row md:items-center md:justify-between">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-900">{group.supplier}</p>
-                    <p className="text-xs text-slate-500">
+                        <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{group.supplier}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
                       {new Date(group.purchasedAt).toLocaleDateString('es-CO')} · {group.items.length} productos
                     </p>
                     {group.source === 'initial-load' ? (
@@ -254,8 +254,8 @@ export default function ComprasPage() {
                     ) : null}
                   </div>
                   <div className="flex flex-wrap gap-3 text-sm">
-                    <div className="rounded-2xl bg-white px-3 py-2 text-slate-600">
-                      Valor compra: <span className="font-semibold text-slate-900">{formatCurrency(group.totalPurchaseValue)}</span>
+                    <div className="rounded-2xl bg-white px-3 py-2 text-slate-600 dark:bg-slate-900/80 dark:text-slate-300">
+                      Valor compra: <span className="font-semibold text-slate-900 dark:text-slate-100">{formatCurrency(group.totalPurchaseValue)}</span>
                     </div>
                     <div className="rounded-2xl bg-white px-3 py-2 text-slate-600">
                       Envio total: <span className="font-semibold text-slate-900">{formatCurrency(group.totalShipping)}</span>
@@ -327,7 +327,7 @@ export default function ComprasPage() {
                         <TableHead>Costo unitario real</TableHead>
                         <TableHead>Precio sugerido</TableHead>
                         <TableHead>Utilidad</TableHead>
-                        <TableHead className="sticky right-0 z-10 bg-slate-50/95 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
+                        <TableHead className="sticky right-0 z-10 bg-slate-50/95 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)] dark:bg-slate-900/95 dark:shadow-[-12px_0_16px_-16px_rgba(2,6,23,0.65)]">
                           Acciones
                         </TableHead>
                       </TableRow>
@@ -365,7 +365,7 @@ export default function ComprasPage() {
                             <TableCell>{formatCurrency(purchase.realUnitCost)}</TableCell>
                             <TableCell>{formatCurrency(currentSuggestedSalePrice)}</TableCell>
                             <TableCell>{formatCurrency(unitProfit)}</TableCell>
-                            <TableCell className="sticky right-0 bg-white/95 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
+                            <TableCell className="sticky right-0 bg-[rgba(248,250,252,0.96)] text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.22)] backdrop-blur dark:bg-slate-950/95 dark:shadow-[-12px_0_16px_-16px_rgba(2,6,23,0.65)]">
                               <ResponsiveRowActions
                                 actions={[
                                   {
@@ -392,7 +392,7 @@ export default function ComprasPage() {
             ))}
           </div>
         ) : (
-          <Empty className="border border-dashed border-slate-200 bg-slate-50/70">
+          <Empty className="border border-dashed border-slate-200 bg-slate-50/70 dark:border-slate-800 dark:bg-slate-900/60">
             <EmptyHeader>
               <EmptyMedia variant="icon">
                 <ReceiptText className="h-5 w-5" />

@@ -275,6 +275,7 @@ export function PurchaseFormDialog({
       shouldDirty: true,
     });
   }, [form, selectedSupplier]);
+
   const totalPurchaseValue = values.items.reduce(
     (sum, item) => sum + ((Number(item.purchaseUnitValue) || 0) * (Number(item.presentationQuantity) || 0)),
     0
@@ -351,6 +352,14 @@ export function PurchaseFormDialog({
     excludeIndex?: number | null
   ) =>
     values.items.findIndex((item, index) => index !== (excludeIndex ?? null) && isSamePurchaseLine(item, line));
+  const getPurchaseVariantSuggestedSalePrice = (product?: Product, variantId?: string) => {
+    if (!product) return 0;
+    const selectedVariant = variantId ? product.variants?.find((variant) => variant.id === variantId) : undefined;
+    if (selectedVariant && typeof selectedVariant.salePrice === 'number' && Number.isFinite(selectedVariant.salePrice)) {
+      return Number(selectedVariant.salePrice);
+    }
+    return Number(product.salePrice ?? 0);
+  };
   const firstAvailableSiblingVariants = firstItemProduct ? getAvailableVariantOptions(firstItemProduct.id) : [];
   const draftAvailableVariantOptions = draftProduct
     ? getAvailableVariantOptions(draftProduct.id, editingLineIndex ?? undefined)
@@ -362,6 +371,33 @@ export function PurchaseFormDialog({
           (variant) => variant.id === currentEditingItem.variantId || draftAvailableVariantOptions.some((item) => item.id === variant.id)
         )
       : draftAvailableVariantOptions;
+  useEffect(() => {
+    if (!firstItemProduct) return;
+
+    const currentVariantId = values.items[0]?.variantId ?? '';
+    const hasVariants = (firstItemProduct.variants?.length ?? 0) > 0;
+    const resolvedVariantId =
+      hasVariants && currentVariantId
+        ? currentVariantId
+        : getAvailableVariantOptions(firstItemProduct.id, 0)[0]?.id ?? '';
+    const nextSuggestedSalePrice = getPurchaseVariantSuggestedSalePrice(firstItemProduct, resolvedVariantId);
+    const currentSuggestedSalePrice = Number(values.items[0]?.suggestedSalePrice ?? 0);
+
+    if (hasVariants && resolvedVariantId && currentVariantId !== resolvedVariantId) {
+      form.setValue('items.0.variantId', resolvedVariantId, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+    }
+
+    if (currentSuggestedSalePrice !== nextSuggestedSalePrice) {
+      form.setValue('items.0.suggestedSalePrice', nextSuggestedSalePrice, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+    }
+  }, [firstItemProduct, form, values.items]);
+
   const buildDraftLineForProduct = (productId: string, excludeIndex?: number) => {
     const product = products.find((candidate) => candidate.id === productId);
     const firstAvailableVariant = product ? getAvailableVariantOptions(product.id, excludeIndex)[0] : undefined;
@@ -370,11 +406,42 @@ export function PurchaseFormDialog({
       variantId: firstAvailableVariant?.id ?? '',
       presentationQuantity: '',
       purchaseUnitValue: '',
-      suggestedSalePrice: String(firstAvailableVariant?.salePrice ?? product?.salePrice ?? ''),
+      suggestedSalePrice: String(getPurchaseVariantSuggestedSalePrice(product, firstAvailableVariant?.id)),
     };
   };
 
   const isLockedVariantFlow = Boolean(lockedDraftProductId) && editingLineIndex === null;
+
+  useEffect(() => {
+    if (!draftProduct) return;
+
+    const currentVariantId = draftLine.variantId;
+    const hasVariants = (draftProduct.variants?.length ?? 0) > 0;
+    const variantPool = draftSelectableVariantOptions.length > 0 ? draftSelectableVariantOptions : draftVariantOptions;
+    const resolvedVariantId =
+      hasVariants && currentVariantId
+        ? currentVariantId
+        : variantPool[0]?.id ?? '';
+    const nextSuggestedSalePrice = getPurchaseVariantSuggestedSalePrice(draftProduct, resolvedVariantId);
+    const currentSuggestedSalePrice = Number(draftLine.suggestedSalePrice ?? 0);
+
+    if ((hasVariants && currentVariantId !== resolvedVariantId) || currentSuggestedSalePrice !== nextSuggestedSalePrice) {
+      setDraftLine((current) => {
+        const nextVariantId = hasVariants ? resolvedVariantId : '';
+        const nextSuggestedPrice = String(nextSuggestedSalePrice || '');
+
+        if (current.variantId === nextVariantId && current.suggestedSalePrice === nextSuggestedPrice) {
+          return current;
+        }
+
+        return {
+          ...current,
+          variantId: nextVariantId,
+          suggestedSalePrice: nextSuggestedPrice,
+        };
+      });
+    }
+  }, [draftLine.suggestedSalePrice, draftLine.variantId, draftProduct, draftSelectableVariantOptions, draftVariantOptions]);
 
   const openNewLineDialog = (
     preferredProductId?: string,
@@ -456,29 +523,20 @@ export function PurchaseFormDialog({
       editingLineIndex === null
         ? [...values.items, normalizedDraftLine]
         : values.items.map((item, index) => (index === editingLineIndex ? normalizedDraftLine : item));
-    replace(
-      nextItems.map((item) =>
-        item.productId === normalizedDraftLine.productId
-          ? {
-              ...item,
-              purchaseUnitValue: normalizedDraftLine.purchaseUnitValue,
-              suggestedSalePrice: normalizedDraftLine.suggestedSalePrice,
-            }
-          : item
-      )
-    );
+    replace(nextItems);
 
     if (continueWithSameProduct && editingLineIndex === null) {
       const nextAvailableVariants = getAvailableVariantOptions(draftLine.productId).filter(
         (variant) => variant.id !== normalizedDraftLine.variantId
       );
         if (nextAvailableVariants.length > 0) {
+          const nextSuggestedSalePrice = getPurchaseVariantSuggestedSalePrice(draftProduct, nextAvailableVariants[0]?.id);
           setDraftLine({
             productId: draftLine.productId,
             variantId: nextAvailableVariants[0]?.id ?? '',
             presentationQuantity: '',
             purchaseUnitValue: String(normalizedDraftLine.purchaseUnitValue),
-            suggestedSalePrice: String(normalizedDraftLine.suggestedSalePrice),
+            suggestedSalePrice: String(nextSuggestedSalePrice || ''),
           });
           setLockedDraftProductId(draftLine.productId);
           setLineError('');
@@ -527,13 +585,12 @@ export function PurchaseFormDialog({
     }));
   };
 
-  const syncProductPricesInForm = (productId: string, purchaseUnitValue: number, suggestedSalePrice: number) => {
+  const syncProductPurchaseValueInForm = (productId: string, purchaseUnitValue: number) => {
     const nextItems = form.getValues('items').map((item) =>
       item.productId === productId
         ? {
             ...item,
             purchaseUnitValue,
-            suggestedSalePrice,
           }
         : item
     );
@@ -603,7 +660,7 @@ export function PurchaseFormDialog({
               title="Datos generales de la compra"
               description="Selecciona o escribe el proveedor, define la fecha y luego registra el envio total del pedido."
               defaultOpen
-              className="rounded-3xl border border-slate-200 bg-slate-50/60 p-3 sm:p-6"
+              className="rounded-3xl border border-border bg-muted/60 p-3 dark:border-slate-800 dark:bg-slate-900/55 sm:p-6"
             >
                 <div className="grid gap-4">
                   <FormField
@@ -653,16 +710,16 @@ export function PurchaseFormDialog({
                       </FormItem>
                     )}
                   />
-                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3.5 sm:p-5">
+                  <div className="rounded-2xl border border-amber-200/80 bg-amber-50/75 p-3.5 dark:border-amber-900/60 dark:bg-amber-950/22 sm:p-5">
                     <FormField
                       control={form.control}
                       name="shippingValueTotal"
                       render={({ field }) => (
                         <FormItem className="min-w-0">
-                          <FormLabel className="text-amber-950">Valor total de envio</FormLabel>
+                          <FormLabel className="text-amber-950 dark:text-amber-100">Valor total de envio</FormLabel>
                           <FormControl>
                             <Input
-                              className="min-w-0 h-12 border-amber-300 bg-white text-lg font-semibold"
+                              className="min-w-0 h-12 border-amber-300 bg-background/92 text-lg font-semibold dark:bg-slate-950/72"
                               type="number"
                               min="0"
                               step="0.01"
@@ -681,21 +738,21 @@ export function PurchaseFormDialog({
               value="purchase-items"
               title="Productos de la compra"
               defaultOpen
-              className="min-w-0 rounded-3xl border border-slate-200 bg-slate-50/60 p-3 sm:p-5 lg:p-6"
+              className="min-w-0 rounded-3xl border border-border bg-muted/60 p-3 dark:border-slate-800 dark:bg-slate-900/55 sm:p-5 lg:p-6"
               contentClassName="space-y-3.5 sm:space-y-5"
             >
 
               {fields.length <= 1 ? (
-                  <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+                  <div className="rounded-2xl border border-border bg-card/88 p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950/72 sm:p-4">
                   <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full bg-slate-100 px-2 text-xs font-semibold text-slate-700">
+                      <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full bg-muted px-2 text-xs font-semibold text-slate-700 dark:bg-slate-900 dark:text-slate-200">
                         #1
                       </span>
-                      <p className="text-sm font-medium text-slate-900">Producto principal</p>
+                      <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Producto principal</p>
                     </div>
                     {firstItemProduct ? (
-                      <span className="rounded-full bg-cyan-50 px-3 py-1 text-xs font-medium text-cyan-800">
+                      <span className="rounded-full bg-cyan-50/85 px-3 py-1 text-xs font-medium text-cyan-800 dark:bg-cyan-950/25 dark:text-cyan-200">
                         Compra activa
                       </span>
                     ) : null}
@@ -715,11 +772,12 @@ export function PurchaseFormDialog({
                                 field.onChange(value);
                                 resetPack12Normalization(fields[0]?.id ?? 'primary-line');
                                 const product = products.find((item) => item.id === value);
-                                form.setValue('items.0.variantId', '', {
+                                const firstVariantId = product ? getAvailableVariantOptions(product.id, 0)[0]?.id ?? '' : '';
+                                form.setValue('items.0.variantId', firstVariantId, {
                                   shouldValidate: true,
                                 });
                                 if (product) {
-                                  form.setValue('items.0.suggestedSalePrice', product.salePrice, {
+                                  form.setValue('items.0.suggestedSalePrice', getPurchaseVariantSuggestedSalePrice(product, firstVariantId), {
                                     shouldValidate: true,
                                   });
                                 }
@@ -749,12 +807,13 @@ export function PurchaseFormDialog({
                               value={field.value}
                               onValueChange={(value) => {
                                 field.onChange(value);
-                                const variant = firstItemVariantOptions.find((item) => item.id === value);
-                                if (variant?.salePrice !== undefined) {
-                                  form.setValue('items.0.suggestedSalePrice', Number(variant.salePrice), {
+                                form.setValue(
+                                  'items.0.suggestedSalePrice',
+                                  getPurchaseVariantSuggestedSalePrice(firstItemProduct, value),
+                                  {
                                     shouldValidate: true,
-                                  });
-                                }
+                                  }
+                                );
                               }}
                             >
                                 <FormControl>
@@ -819,11 +878,7 @@ export function PurchaseFormDialog({
                                   field.onChange(event);
                                   resetPack12Normalization(fields[0]?.id ?? 'primary-line');
                                   if (firstItem.productId) {
-                                    syncProductPricesInForm(
-                                      firstItem.productId,
-                                      Number(event.target.value) || 0,
-                                      Number(form.getValues('items.0.suggestedSalePrice')) || 0
-                                    );
+                                    syncProductPurchaseValueInForm(firstItem.productId, Number(event.target.value) || 0);
                                   }
                                 }}
                                 onBlur={() => {
@@ -849,16 +904,7 @@ export function PurchaseFormDialog({
                                 min="0"
                                 step="0.01"
                                 {...field}
-                                onChange={(event) => {
-                                  field.onChange(event);
-                                  if (firstItem.productId) {
-                                    syncProductPricesInForm(
-                                      firstItem.productId,
-                                      Number(form.getValues('items.0.purchaseUnitValue')) || 0,
-                                      Number(event.target.value) || 0
-                                    );
-                                  }
-                                }}
+                                onChange={(event) => field.onChange(event)}
                               />
                             </FormControl>
                             <FormMessage />
@@ -868,37 +914,37 @@ export function PurchaseFormDialog({
                     </div>
 
                     <div className="grid gap-2 sm:grid-cols-3 sm:gap-3">
-                      <div className="rounded-2xl bg-slate-50 p-2.5 sm:p-4">
-                        <p className="text-xs text-slate-500">
+                      <div className="rounded-2xl border border-border/70 bg-background/86 dark:border-slate-800 dark:bg-slate-950/60 p-2.5 sm:p-4">
+                        <p className="text-xs text-muted-foreground">
                           {firstItemIsPack12 ? 'Cantidad convertida a paquetes' : 'Cantidad comprada'}
                         </p>
-                        <p className="mt-1 font-semibold text-slate-900">
+                        <p className="mt-1 font-semibold text-foreground">
                           {formatNumber(firstPreview?.quantityPurchased ?? 0)} articulos
                         </p>
                       </div>
-                      <div className="rounded-2xl bg-slate-50 p-2.5 sm:p-4">
-                        <p className="text-xs text-slate-500">Valor total compra</p>
-                        <p className="mt-1 font-semibold text-slate-900">
+                      <div className="rounded-2xl border border-border/70 bg-background/86 dark:border-slate-800 dark:bg-slate-950/60 p-2.5 sm:p-4">
+                        <p className="text-xs text-muted-foreground">Valor total compra</p>
+                        <p className="mt-1 font-semibold text-foreground">
                           {formatCurrency(firstPreview?.purchaseValueTotal ?? 0)}
                         </p>
                       </div>
-                      <div className="rounded-2xl bg-slate-50 p-2.5 sm:p-4">
-                        <p className="text-xs text-slate-500">Envio asignado</p>
-                        <p className="mt-1 font-semibold text-slate-900">
+                      <div className="rounded-2xl border border-border/70 bg-background/86 dark:border-slate-800 dark:bg-slate-950/60 p-2.5 sm:p-4">
+                        <p className="text-xs text-muted-foreground">Envio asignado</p>
+                        <p className="mt-1 font-semibold text-foreground">
                           {formatCurrency(firstPreview?.shippingShare ?? 0)}
                         </p>
                       </div>
                     </div>
 
                     {firstItemProduct ? (
-                      <div className="mt-4 space-y-2 rounded-2xl bg-slate-50 px-3 py-2.5 text-sm text-slate-600 sm:space-y-3">
+                      <div className="mt-4 space-y-2 rounded-2xl bg-background/86 px-3 py-2.5 text-sm text-slate-600 dark:bg-slate-950/60 dark:text-slate-300 sm:space-y-3">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <span className="truncate">{firstItemProduct.name} - {firstItemProduct.brand || 'Sin marca'}</span>
-                          <span className="font-medium text-slate-900">Total linea: {formatCurrency(firstPreview?.purchaseValueTotal ?? 0)}</span>
+                          <span className="font-medium text-foreground">Total linea: {formatCurrency(firstPreview?.purchaseValueTotal ?? 0)}</span>
                         </div>
                         {firstItemVariantOptions.length > 0 ? (
-                          <div className="flex flex-col gap-2 border-t border-slate-200 pt-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-                            <p className="text-xs text-slate-500">
+                          <div className="flex flex-col gap-2 border-t border-border pt-3 dark:border-slate-800 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                            <p className="text-xs text-muted-foreground">
                               {firstAvailableSiblingVariants.length > 0
                                 ? `Quedan ${formatNumber(firstAvailableSiblingVariants.length)} variantes disponibles para este producto.`
                                 : 'Todas las variantes de este producto ya fueron agregadas.'}
@@ -908,12 +954,11 @@ export function PurchaseFormDialog({
                                 type="button"
                                 variant="outline"
                                 size="sm"
-                                className="w-full rounded-xl bg-white sm:w-auto"
+                                className="w-full rounded-xl bg-card/88 sm:w-auto"
                                 disabled={!firstLineCanSeedVariants}
                                 onClick={() =>
                                   openNewLineDialog(firstItemProduct.id, true, {
                                     purchaseUnitValue: Number(firstItem.purchaseUnitValue) || 0,
-                                    suggestedSalePrice: Number(firstItem.suggestedSalePrice) || 0,
                                   })
                                 }
                               >
@@ -948,10 +993,10 @@ export function PurchaseFormDialog({
                       (Number(values.items[index]?.purchaseUnitValue) || 0) > 0 &&
                       (Number(values.items[index]?.suggestedSalePrice) || 0) > 0;
                     return (
-                      <div key={field.id} className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+                      <div key={field.id} className="rounded-2xl border border-border bg-card/88 p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950/72 sm:p-4">
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                           <div className="min-w-0 space-y-1">
-                            <p className="font-medium text-slate-900">
+                            <p className="font-medium text-slate-900 dark:text-slate-100">
                               {selectedProduct?.name ?? 'Producto'} x {formatNumber(preview?.quantityPurchased ?? 0)}
                             </p>
                             {selectedVariant ? (
@@ -982,7 +1027,6 @@ export function PurchaseFormDialog({
                                 onClick={() =>
                                   openNewLineDialog(selectedProduct.id, true, {
                                     purchaseUnitValue: Number(values.items[index]?.purchaseUnitValue) || 0,
-                                    suggestedSalePrice: Number(values.items[index]?.suggestedSalePrice) || 0,
                                   })
                                 }
                               >
@@ -1005,7 +1049,7 @@ export function PurchaseFormDialog({
                   })}
                 </div>
               ) : (
-                <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-8 text-center text-sm text-slate-500">
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-card/88 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-400">
                   Si la compra tiene mas de un producto, usa `Agregar producto` para sumarlo a la lista.
                 </div>
               )}
@@ -1020,7 +1064,7 @@ export function PurchaseFormDialog({
                 <Button
                   type="button"
                   variant="outline"
-                  className="w-full rounded-xl bg-white sm:hidden"
+                  className="w-full rounded-xl bg-card/88 sm:hidden"
                   onClick={() => openNewLineDialog()}
                 >
                   <PlusCircle className="mr-2 h-4 w-4" />
@@ -1029,21 +1073,21 @@ export function PurchaseFormDialog({
                 <Button
                   type="button"
                   variant="outline"
-                  className="rounded-xl bg-white max-sm:hidden"
+                  className="rounded-xl bg-card/88 max-sm:hidden"
                   onClick={() => openNewLineDialog()}
                 >
                   <PlusCircle className="mr-2 h-4 w-4" />
                   Agregar producto
                 </Button>
 
-                <div className="flex flex-col gap-2 rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-col gap-2 rounded-2xl border border-emerald-200/80 bg-emerald-50/75 px-4 py-3 dark:border-emerald-900/60 dark:bg-emerald-950/22 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="text-sm font-medium text-emerald-950">Total acumulado de la compra</p>
-                    <p className="text-xs text-emerald-800">
+                    <p className="text-sm font-medium text-emerald-950 dark:text-emerald-100">Total acumulado de la compra</p>
+                    <p className="text-xs text-emerald-800 dark:text-emerald-200/80">
                       {formatNumber(totalPurchasedUnits)} unidades en {formatNumber(fields.length)} lineas
                     </p>
                   </div>
-                  <p className="text-lg font-semibold text-emerald-950">{formatCurrency(totalPurchaseValue)}</p>
+                  <p className="text-lg font-semibold text-emerald-950 dark:text-emerald-100">{formatCurrency(totalPurchaseValue)}</p>
                 </div>
               </div>
             </AdminMobileSection>
@@ -1093,9 +1137,9 @@ export function PurchaseFormDialog({
           className="space-y-4"
         >
           {isLockedVariantFlow && draftProduct ? (
-            <div className="rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-cyan-800">Producto fijo</p>
-              <p className="mt-1 text-sm font-semibold text-cyan-950">
+            <div className="rounded-2xl border border-cyan-200/80 bg-cyan-50/80 px-4 py-3 dark:border-cyan-900/60 dark:bg-cyan-950/22">
+              <p className="text-xs font-medium uppercase tracking-wide text-cyan-800 dark:text-cyan-200">Producto fijo</p>
+              <p className="mt-1 text-sm font-semibold text-cyan-950 dark:text-cyan-100">
                 {draftProduct.name} {draftProduct.brand ? `- ${draftProduct.brand}` : ''}
               </p>
             </div>
@@ -1130,12 +1174,10 @@ export function PurchaseFormDialog({
               <Select
                 value={draftLine.variantId}
                 onValueChange={(value) => {
-                  const variant = draftVariantOptions.find((item) => item.id === value);
                   setDraftLine((current) => ({
                     ...current,
                     variantId: value,
-                    suggestedSalePrice:
-                      variant?.salePrice !== undefined ? String(variant.salePrice) : current.suggestedSalePrice,
+                    suggestedSalePrice: String(getPurchaseVariantSuggestedSalePrice(draftProduct, value)),
                   }));
                   setLineError('');
                 }}
@@ -1151,7 +1193,7 @@ export function PurchaseFormDialog({
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-muted-foreground">
                 {draftSelectableVariantOptions.length > 0
                   ? 'Solo se muestran variantes que aun no han sido agregadas a esta compra.'
                   : 'Todas las variantes de este producto ya fueron agregadas a la compra.'}
@@ -1240,29 +1282,29 @@ export function PurchaseFormDialog({
           ) : null}
 
           <div className="grid gap-2.5 sm:grid-cols-3 sm:gap-3">
-            <div className="rounded-2xl bg-slate-50 p-3 sm:p-4">
-              <p className="text-xs text-slate-500">{isDraftPack12 ? 'Cantidad convertida' : 'Cantidad comprada'}</p>
-              <p className="mt-1 font-semibold text-slate-900">{formatNumber(draftQuantity)} articulos</p>
+            <div className="rounded-2xl border border-border/70 bg-background/86 p-3 dark:border-slate-800 dark:bg-slate-950/60 sm:p-4">
+              <p className="text-xs text-muted-foreground">{isDraftPack12 ? 'Cantidad convertida' : 'Cantidad comprada'}</p>
+              <p className="mt-1 font-semibold text-foreground">{formatNumber(draftQuantity)} articulos</p>
             </div>
-            <div className="rounded-2xl bg-slate-50 p-3 sm:p-4">
-              <p className="text-xs text-slate-500">Valor total compra</p>
-              <p className="mt-1 font-semibold text-slate-900">{formatCurrency(draftPurchaseValueTotal)}</p>
+            <div className="rounded-2xl border border-border/70 bg-background/86 p-3 dark:border-slate-800 dark:bg-slate-950/60 sm:p-4">
+              <p className="text-xs text-muted-foreground">Valor total compra</p>
+              <p className="mt-1 font-semibold text-foreground">{formatCurrency(draftPurchaseValueTotal)}</p>
             </div>
-            <div className="rounded-2xl bg-slate-50 p-3 sm:p-4">
-              <p className="text-xs text-slate-500">Envio estimado</p>
-              <p className="mt-1 font-semibold text-slate-900">
+            <div className="rounded-2xl border border-border/70 bg-background/86 p-3 dark:border-slate-800 dark:bg-slate-950/60 sm:p-4">
+              <p className="text-xs text-muted-foreground">Envio estimado</p>
+              <p className="mt-1 font-semibold text-foreground">
                 {formatCurrency((Number(values.shippingValueTotal) || 0) * (draftQuantity > 0 && totalPurchasedUnits > 0 ? draftQuantity / (editingLineIndex === null ? totalPurchasedUnits + draftQuantity : Math.max(totalPurchasedUnits - (Number(values.items[editingLineIndex]?.presentationQuantity) || 0) + draftQuantity, draftQuantity)) : 0))}
               </p>
             </div>
           </div>
 
           {lineError ? (
-            <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
+            <p className="rounded-xl border border-red-200/80 bg-red-50/80 px-3 py-2 text-sm font-medium text-red-700 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-200">
               {lineError}
             </p>
           ) : null}
           {isLockedVariantFlow ? (
-            <p className="rounded-xl border border-cyan-200 bg-cyan-50 px-3 py-2 text-sm text-cyan-800">
+            <p className="rounded-xl border border-cyan-200/80 bg-cyan-50/80 px-3 py-2 text-sm text-cyan-800 dark:border-cyan-900/60 dark:bg-cyan-950/22 dark:text-cyan-200">
               Esta variante usa automaticamente el mismo valor unitario y el mismo precio sugerido del producto base.
             </p>
           ) : null}

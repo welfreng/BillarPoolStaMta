@@ -249,23 +249,23 @@ export default function DashboardPage() {
           tone="danger"
         />
         {role === 'admin' ? (
-          <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
+          <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 shadow-sm dark:border-amber-900/70 dark:bg-[linear-gradient(180deg,rgba(120,53,15,0.34)_0%,rgba(146,64,14,0.22)_100%)]">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm text-amber-800">Autorizaciones pendientes</p>
-                <p className="mt-2 text-3xl font-semibold text-amber-950">
+                <p className="text-sm text-amber-800 dark:text-amber-200">Autorizaciones pendientes</p>
+                <p className="mt-2 text-3xl font-semibold text-amber-950 dark:text-amber-50">
                   {formatNumber(pendingAuthorizationRequests.length)}
                 </p>
-                <p className="mt-2 text-sm text-amber-900">
+                <p className="mt-2 text-sm text-amber-900 dark:text-amber-100/90">
                   Revisa solicitudes de edicion o devolucion enviadas por vendedores.
                 </p>
               </div>
-              <div className="rounded-2xl bg-white/80 p-3 text-amber-800">
+              <div className="rounded-2xl bg-white/80 p-3 text-amber-800 dark:bg-slate-950/50 dark:text-amber-200">
                 <ShieldCheck className="h-5 w-5" />
               </div>
             </div>
             <Link href="/dashboard/autorizaciones" className="mt-4 inline-flex">
-              <Button variant="outline" className="rounded-2xl border-amber-300 bg-white text-amber-900 hover:bg-amber-100">
+              <Button variant="outline" className="rounded-2xl border-amber-300 bg-white text-amber-900 hover:bg-amber-100 dark:border-amber-800 dark:bg-slate-950/70 dark:text-amber-100 dark:hover:bg-slate-900">
                 Ver solicitudes
               </Button>
             </Link>
@@ -273,17 +273,17 @@ export default function DashboardPage() {
         ) : null}
       </section>
 
-      <section className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-6 shadow-[0_18px_45px_rgba(15,23,42,0.07)]">
+      <section className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-6 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-[linear-gradient(180deg,rgba(2,6,23,0.92)_0%,rgba(15,23,42,0.88)_100%)] dark:shadow-[0_20px_48px_rgba(2,6,23,0.28)]">
         <div className="mb-5 flex items-center gap-3">
-          <div className="rounded-2xl bg-cyan-50 p-3">
+          <div className="rounded-2xl bg-cyan-50 p-3 dark:bg-cyan-950/40">
             <ShoppingCart className="h-5 w-5 text-cyan-700" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-slate-950">Busqueda rapida para vender</h2>
-            <p className="text-sm text-slate-500">
+            <h2 className="text-lg font-semibold text-slate-950 dark:text-slate-50">Busqueda rapida para vender</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               Escribe el producto, revisa el precio y abre la venta desde este panel.
             </p>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               Cuando un producto tenga variantes, el valor mostrado es referencia y el precio final sale de la combinacion elegida.
             </p>
           </div>
@@ -291,8 +291,8 @@ export default function DashboardPage() {
 
         <div className="relative max-w-2xl">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <Input
-            value={productQuery}
+            <Input
+              value={productQuery}
             onChange={(event) => setProductQuery(event.target.value)}
             onKeyDown={(event) => {
               if (event.key !== 'Enter') return;
@@ -302,34 +302,34 @@ export default function DashboardPage() {
               setOpenSaleDialog(true);
             }}
             placeholder="Buscar producto por nombre, marca o categoria"
-            className="rounded-2xl border-slate-200 bg-white/90 pl-9 shadow-sm"
-          />
+              className="rounded-2xl border-slate-200 bg-white/90 pl-9 shadow-sm dark:border-slate-700 dark:bg-slate-900/75 dark:text-slate-100"
+            />
         </div>
 
         <div className="mt-5 grid gap-3 lg:grid-cols-2">
           {quickResults.map((product) => (
             <div
               key={product.id}
-              className="flex items-center justify-between gap-4 rounded-[22px] border border-cyan-100 bg-[linear-gradient(180deg,rgba(236,254,255,0.96)_0%,rgba(207,250,254,0.58)_100%)] p-4 shadow-sm"
+              className="flex items-center justify-between gap-4 rounded-[22px] border border-cyan-100 bg-[linear-gradient(180deg,rgba(236,254,255,0.96)_0%,rgba(207,250,254,0.58)_100%)] p-4 shadow-sm dark:border-cyan-900/60 dark:bg-[linear-gradient(180deg,rgba(8,47,73,0.46)_0%,rgba(14,116,144,0.18)_100%)]"
             >
               <div className="min-w-0">
-                <p className="truncate font-medium text-slate-900">{product.name}</p>
+                <p className="truncate font-medium text-slate-900 dark:text-slate-100">{product.name}</p>
                 {getVariantAvailabilitySummary(product) ? (
-                  <p className="mt-1 text-xs font-medium text-cyan-700">
+                  <p className="mt-1 text-xs font-medium text-cyan-700 dark:text-cyan-200">
                     {getVariantAvailabilitySummary(product)}
                   </p>
                 ) : null}
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-slate-500 dark:text-slate-400">
                   {product.brand} · {product.category}
                 </p>
-                <p className="mt-2 text-sm text-slate-600">
-                  Stock: <span className="font-medium text-slate-900">{formatNumber(product.stock)}</span>
+                <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                  Stock: <span className="font-medium text-slate-900 dark:text-slate-100">{formatNumber(product.stock)}</span>
                 </p>
-                <p className="text-sm text-slate-600">
-                  Precio de venta: <span className="font-semibold text-emerald-700">{getProductSalePriceSummary(product)}</span>
+                <p className="text-sm text-slate-600 dark:text-slate-300">
+                  Precio de venta: <span className="font-semibold text-emerald-700 dark:text-emerald-300">{getProductSalePriceSummary(product)}</span>
                 </p>
                 {(product.variants?.length ?? 0) > 0 ? (
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     El precio final se define segun la variante elegida en la venta.
                   </p>
                 ) : null}
@@ -346,7 +346,7 @@ export default function DashboardPage() {
             </div>
           ))}
           {quickResults.length === 0 && (
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 lg:col-span-2">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300 lg:col-span-2">
               No encontramos productos disponibles con esa busqueda.
             </div>
           )}
@@ -354,14 +354,14 @@ export default function DashboardPage() {
       </section>
 
       <section className="grid gap-6 xl:grid-cols-2">
-        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-6 shadow-[0_18px_45px_rgba(15,23,42,0.07)]">
+        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-6 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-[linear-gradient(180deg,rgba(2,6,23,0.92)_0%,rgba(15,23,42,0.88)_100%)] dark:shadow-[0_20px_48px_rgba(2,6,23,0.28)]">
           <div className="mb-6 flex items-center gap-3">
-            <div className="rounded-2xl bg-emerald-50 p-3">
+            <div className="rounded-2xl bg-emerald-50 p-3 dark:bg-emerald-950/40">
               <PackageCheck className="h-5 w-5 text-emerald-700" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-slate-950">Disponibles para vender</h2>
-              <p className="text-sm text-slate-500">Productos con stock y su valor de venta actual.</p>
+              <h2 className="text-lg font-semibold text-slate-950 dark:text-slate-50">Disponibles para vender</h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Productos con stock y su valor de venta actual.</p>
             </div>
           </div>
 
@@ -369,38 +369,38 @@ export default function DashboardPage() {
             {availableProducts.slice(0, 12).map((product) => (
               <div
                 key={product.id}
-                className="flex items-center justify-between rounded-[22px] border border-emerald-100 bg-[linear-gradient(180deg,rgba(236,253,245,0.96)_0%,rgba(209,250,229,0.7)_100%)] p-4 shadow-sm"
+                className="flex items-center justify-between rounded-[22px] border border-emerald-100 bg-[linear-gradient(180deg,rgba(236,253,245,0.96)_0%,rgba(209,250,229,0.7)_100%)] p-4 shadow-sm dark:border-emerald-900/60 dark:bg-[linear-gradient(180deg,rgba(6,78,59,0.38)_0%,rgba(5,150,105,0.16)_100%)]"
               >
                 <div className="min-w-0">
-                  <p className="truncate font-medium text-slate-900">{product.name}</p>
-                  <p className="text-sm text-slate-500">{product.brand}</p>
-                  <p className="mt-1 text-sm font-medium text-emerald-800">
+                  <p className="truncate font-medium text-slate-900 dark:text-slate-100">{product.name}</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">{product.brand}</p>
+                  <p className="mt-1 text-sm font-medium text-emerald-800 dark:text-emerald-200">
                     {getProductSalePriceSummary(product)}
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm text-slate-500">Stock</p>
-                  <p className="text-lg font-semibold text-emerald-950">{formatNumber(product.stock)}</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Stock</p>
+                  <p className="text-lg font-semibold text-emerald-950 dark:text-emerald-50">{formatNumber(product.stock)}</p>
                 </div>
               </div>
             ))}
             {availableProducts.length === 0 && (
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300">
                 No hay productos disponibles para vender en este momento.
               </div>
             )}
           </div>
         </div>
 
-        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-6 shadow-[0_18px_45px_rgba(15,23,42,0.07)]">
+        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-6 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-[linear-gradient(180deg,rgba(2,6,23,0.92)_0%,rgba(15,23,42,0.88)_100%)] dark:shadow-[0_20px_48px_rgba(2,6,23,0.28)]">
           <div className="mb-6 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="rounded-2xl bg-rose-50 p-3">
+              <div className="rounded-2xl bg-rose-50 p-3 dark:bg-rose-950/40">
                 <CircleAlert className="h-5 w-5 text-rose-700" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-slate-950">Productos agotados</h2>
-                <p className="text-sm text-slate-500">Referencias agotadas con su ultimo precio de venta.</p>
+                <h2 className="text-lg font-semibold text-slate-950 dark:text-slate-50">Productos agotados</h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Referencias agotadas con su ultimo precio de venta.</p>
               </div>
             </div>
             {outProducts.length > 0 && (

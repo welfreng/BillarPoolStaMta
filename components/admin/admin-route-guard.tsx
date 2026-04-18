@@ -37,7 +37,7 @@ export function AdminRouteGuard({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen flex-col gap-4 bg-slate-100 p-6">
+      <div className="flex min-h-screen flex-col gap-4 bg-slate-100 p-6 dark:bg-slate-950">
         <Skeleton className="h-16 w-full rounded-2xl" />
         <div className="grid gap-4 md:grid-cols-4">
           <Skeleton className="h-32 rounded-2xl" />

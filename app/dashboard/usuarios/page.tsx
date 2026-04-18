@@ -178,46 +178,46 @@ export default function UsuariosPage() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
-          <p className="text-sm text-slate-500">Usuarios activos</p>
-          <p className="mt-2 text-3xl font-semibold text-slate-950">
+        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-[linear-gradient(180deg,rgba(2,6,23,0.92)_0%,rgba(15,23,42,0.88)_100%)] dark:shadow-[0_20px_48px_rgba(2,6,23,0.28)] sm:p-6">
+          <p className="text-sm text-slate-500 dark:text-slate-400">Usuarios activos</p>
+          <p className="mt-2 text-3xl font-semibold text-slate-950 dark:text-slate-50">
             {users.filter((user) => user.status === 'active').length}
           </p>
         </div>
-        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
-          <p className="text-sm text-slate-500">Administradores</p>
-          <p className="mt-2 text-3xl font-semibold text-slate-950">
+        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-[linear-gradient(180deg,rgba(2,6,23,0.92)_0%,rgba(15,23,42,0.88)_100%)] dark:shadow-[0_20px_48px_rgba(2,6,23,0.28)] sm:p-6">
+          <p className="text-sm text-slate-500 dark:text-slate-400">Administradores</p>
+          <p className="mt-2 text-3xl font-semibold text-slate-950 dark:text-slate-50">
             {users.filter((user) => user.role === 'admin').length}
           </p>
         </div>
-        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
-          <p className="text-sm text-slate-500">Usuarios de ventas</p>
-          <p className="mt-2 text-3xl font-semibold text-slate-950">
+        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-[linear-gradient(180deg,rgba(2,6,23,0.92)_0%,rgba(15,23,42,0.88)_100%)] dark:shadow-[0_20px_48px_rgba(2,6,23,0.28)] sm:p-6">
+          <p className="text-sm text-slate-500 dark:text-slate-400">Usuarios de ventas</p>
+          <p className="mt-2 text-3xl font-semibold text-slate-950 dark:text-slate-50">
             {users.filter((user) => user.role === 'sales').length}
           </p>
         </div>
-        <div className="rounded-[28px] border border-cyan-200 bg-[linear-gradient(180deg,rgba(236,254,255,0.98)_0%,rgba(207,250,254,0.82)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
-          <p className="text-sm text-cyan-800">Regla aplicada</p>
-          <p className="mt-2 text-lg font-semibold text-cyan-950">
+        <div className="rounded-[28px] border border-cyan-200 bg-[linear-gradient(180deg,rgba(236,254,255,0.98)_0%,rgba(207,250,254,0.82)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-cyan-900/70 dark:bg-[linear-gradient(180deg,rgba(8,47,73,0.52)_0%,rgba(14,116,144,0.24)_100%)] sm:p-6">
+          <p className="text-sm text-cyan-800 dark:text-cyan-200">Regla aplicada</p>
+          <p className="mt-2 text-lg font-semibold text-cyan-950 dark:text-cyan-50">
             Ventas solo ve dashboard y ventas
           </p>
         </div>
       </div>
 
-      <div className="min-w-0 space-y-4 rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
+      <div className="min-w-0 space-y-4 rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-[linear-gradient(180deg,rgba(2,6,23,0.92)_0%,rgba(15,23,42,0.88)_100%)] dark:shadow-[0_20px_48px_rgba(2,6,23,0.28)] sm:p-6">
         <div className="relative max-w-md">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <Input
             value={queryText}
             onChange={(event) => setQueryText(event.target.value)}
             placeholder="Buscar por nombre, email o rol"
-            className="rounded-2xl border-slate-200 bg-white/90 pl-9 shadow-sm"
+            className="rounded-2xl border-slate-200 bg-white/90 pl-9 shadow-sm dark:border-slate-700 dark:bg-slate-900/75 dark:text-slate-100"
           />
         </div>
 
         {filteredUsers.length > 0 ? (
           <div className="min-w-0">
-            <div className="mb-2 hidden text-xs text-slate-500 md:block">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
+            <div className="mb-2 hidden text-xs text-slate-500 dark:text-slate-400 md:block">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
             <div className="pb-2">
             <Table className="min-w-[760px]">
               <TableHeader>
@@ -227,7 +227,7 @@ export default function UsuariosPage() {
                   <TableHead>Rol</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Creado</TableHead>
-                  <TableHead className="sticky right-0 z-10 bg-[rgba(248,250,252,0.96)] text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.22)] backdrop-blur">
+                  <TableHead className="sticky right-0 z-10 bg-[rgba(248,250,252,0.96)] text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.22)] backdrop-blur dark:bg-slate-900/95 dark:shadow-[-12px_0_16px_-16px_rgba(2,6,23,0.65)]">
                     Acciones
                   </TableHead>
                 </TableRow>
@@ -247,8 +247,8 @@ export default function UsuariosPage() {
                   <TableRow key={item.id} title={rowHoverSummary}>
                     <TableCell>
                       <div>
-                        <p className="font-medium text-slate-900">{item.nombre}</p>
-                        <p className="text-xs text-slate-500">{item.email}</p>
+                        <p className="font-medium text-slate-900 dark:text-slate-100">{item.nombre}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">{item.email}</p>
                       </div>
                     </TableCell>
                     <TableCell>{item.telefono}</TableCell>
@@ -257,7 +257,7 @@ export default function UsuariosPage() {
                     </TableCell>
                     <TableCell>{item.status === 'active' ? 'Activo' : 'Inactivo'}</TableCell>
                     <TableCell>{new Date(item.createdAt).toLocaleDateString('es-CO')}</TableCell>
-                    <TableCell className="sticky right-0 bg-[rgba(248,250,252,0.96)] text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.22)] backdrop-blur">
+                    <TableCell className="sticky right-0 bg-[rgba(248,250,252,0.96)] text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.22)] backdrop-blur dark:bg-slate-950/95 dark:shadow-[-12px_0_16px_-16px_rgba(2,6,23,0.65)]">
                       <Button
                         type="button"
                         variant="outline"
@@ -277,7 +277,7 @@ export default function UsuariosPage() {
             </div>
           </div>
         ) : (
-          <Empty className="border border-dashed border-slate-200 bg-slate-50/70">
+          <Empty className="border border-dashed border-slate-200 bg-slate-50/70 dark:border-slate-800 dark:bg-slate-900/60">
             <EmptyHeader>
               <EmptyMedia variant="icon">
                 <UserCog className="h-5 w-5" />

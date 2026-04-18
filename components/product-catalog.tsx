@@ -44,6 +44,7 @@ interface CatalogProduct {
     name: string
     salePrice: number
     stock: number
+    status: "active" | "inactive"
     colorHex?: string
     image?: string
   }>
@@ -63,9 +64,10 @@ function mapCatalogProduct(documentId: string, data: DocumentData): CatalogProdu
           name: String(variant?.displayName ?? variant?.name ?? ""),
           salePrice: Number(variant?.salePrice ?? data.salePrice ?? 0),
           stock: Number(variant?.publicStock ?? variant?.stock ?? 0),
+          status: (variant?.status === "inactive" ? "inactive" : "active") as "active" | "inactive",
           colorHex: typeof variant?.colorHex === "string" ? String(variant.colorHex) : undefined,
         }))
-        .filter((variant: { name: string }) => variant.name)
+        .filter((variant) => Boolean(variant.name.trim()) && variant.status !== "inactive")
     : []
   const variantPrices = variants
     .map((variant) => variant.salePrice)
@@ -97,6 +99,20 @@ function mapCatalogProduct(documentId: string, data: DocumentData): CatalogProdu
     variantLabel: typeof data.variantLabel === "string" ? String(data.variantLabel) : undefined,
     variants,
   }
+}
+
+function hasVariantPricingRange(product: CatalogProduct) {
+  const prices = product.variants
+    .map((variant) => Number(variant.salePrice ?? 0))
+    .filter((price) => price > 0)
+
+  if (prices.length <= 1) return false
+  return Math.min(...prices) !== Math.max(...prices)
+}
+
+function getDefaultSelectedVariant(product: CatalogProduct | null) {
+  if (!product || product.variants.length === 0) return null
+  return product.variants.find((variant) => variant.stock > 0) ?? product.variants[0] ?? null
 }
 
 export default function ProductCatalog({
@@ -268,9 +284,10 @@ export default function ProductCatalog({
   const selectedProduct = visibleCatalogProducts.find((product) => product.id === selectedProductId) ?? null
   const selectedVariant =
     selectedProduct?.variants.find((variant) => variant.id === selectedVariantId) ??
-    selectedProduct?.variants[0] ??
+    getDefaultSelectedVariant(selectedProduct) ??
     null
   const selectedProductImage = selectedVariant?.image || selectedProduct?.image || defaultImage
+  const selectedVariantIsAvailable = selectedVariant ? selectedVariant.stock > 0 : (selectedProduct?.publicStock ?? 0) > 0
   useEffect(() => {
     if (!selectedProduct) {
       setSelectedVariantId("")
@@ -283,7 +300,7 @@ export default function ProductCatalog({
     setSelectedVariantId((current) =>
       selectedProduct.variants.some((variant) => variant.id === current)
         ? current
-        : selectedProduct.variants[0]?.id ?? ""
+        : getDefaultSelectedVariant(selectedProduct)?.id ?? ""
     )
   }, [selectedProduct])
   const selectedCategoryLabel =
@@ -521,6 +538,11 @@ export default function ProductCatalog({
                       <div className="flex items-center justify-between rounded-2xl bg-[#0a2472]/5 px-2.5 py-2">
                         <div>
                           <p className="text-[11px] uppercase tracking-wide text-slate-500">Precio</p>
+                          {product.variants.length > 0 ? (
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                              {hasVariantPricingRange(product) ? "Desde" : "Variante"}
+                            </p>
+                          ) : null}
                           <p className="text-sm font-bold text-[#0a2472] sm:text-base">
                             {product.salePrice > 0 ? formatCurrency(product.salePrice) : "Consultar"}
                           </p>
@@ -675,6 +697,11 @@ export default function ProductCatalog({
                             <div className="flex items-center justify-between rounded-2xl bg-[#0a2472]/5 px-2.5 py-2">
                               <div>
                                 <p className="text-[11px] uppercase tracking-wide text-slate-500">Precio</p>
+                                {product.variants.length > 0 ? (
+                                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                    {hasVariantPricingRange(product) ? "Desde" : "Variante"}
+                                  </p>
+                                ) : null}
                                 <p className="text-sm font-bold text-[#0a2472] sm:text-base">
                                   {product.salePrice > 0 ? formatCurrency(product.salePrice) : "Consultar"}
                                 </p>
@@ -782,13 +809,16 @@ export default function ProductCatalog({
                     </div>
                     <div className="rounded-2xl bg-[#0a2472]/5 px-4 py-3">
                       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                        Precio sugerido
+                        {selectedProduct.variants.length > 0 ? "Precio de la variante" : "Precio sugerido"}
                       </p>
                       <p className="mt-1 text-2xl font-bold text-[#0a2472]">
                         {(selectedVariant?.salePrice ?? selectedProduct.salePrice) > 0
                           ? formatCurrency(selectedVariant?.salePrice ?? selectedProduct.salePrice)
                           : "Consultar"}
                       </p>
+                      {selectedProduct.variants.length > 0 && hasVariantPricingRange(selectedProduct) ? (
+                        <p className="mt-1 text-xs text-slate-500">El listado muestra un precio desde; aqui ves el valor de la variante elegida.</p>
+                      ) : null}
                     </div>
                   </div>
 
@@ -805,14 +835,23 @@ export default function ProductCatalog({
                           <button
                             key={variant.id}
                             type="button"
-                            onClick={() => setSelectedVariantId(variant.id)}
+                            onClick={() => {
+                              if (variant.stock <= 0) return
+                              setSelectedVariantId(variant.id)
+                            }}
+                            disabled={variant.stock <= 0}
                             className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium transition ${
                               (selectedVariant?.id ?? selectedProduct.variants[0]?.id) === variant.id
                                 ? "border-[#0a2472] bg-[#0a2472] text-white"
-                                : "border-slate-200 bg-white text-slate-700"
+                                : variant.stock <= 0
+                                  ? "border-slate-200 bg-slate-100 text-slate-400"
+                                  : "border-slate-200 bg-white text-slate-700"
                             }`}
                           >
                             <span>{variant.name}</span>
+                            <span className="text-[10px] font-semibold uppercase tracking-[0.16em]">
+                              {variant.stock > 0 ? "Disponible" : "Agotada"}
+                            </span>
                             {variant.colorHex ? (
                               <span
                                 className="h-4 w-4 rounded-full border border-white/40"
@@ -836,6 +875,19 @@ export default function ProductCatalog({
                       <p className="text-xs text-slate-500">Categoria</p>
                       <p className="mt-1 font-medium text-slate-900">{selectedCategoryLabel}</p>
                     </div>
+                  </div>
+
+                  <div className="rounded-2xl bg-slate-50 p-4">
+                    <p className="text-xs text-slate-500">Disponibilidad</p>
+                    <p className={`mt-1 font-medium ${selectedVariantIsAvailable ? "text-emerald-700" : "text-rose-600"}`}>
+                      {selectedProduct.variants.length > 0
+                        ? selectedVariantIsAvailable
+                          ? `${selectedVariant?.stock ?? 0} disponibles en ${selectedVariant?.name ?? "la variante"}`
+                          : `${selectedVariant?.name ?? "Esta variante"} esta agotada`
+                        : selectedProduct.publicStock > 0
+                          ? "Disponible"
+                          : "Agotado"}
+                    </p>
                   </div>
 
                   {selectedProduct.subcategory ? (
@@ -862,10 +914,12 @@ export default function ProductCatalog({
                     href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#1a5632] px-5 py-4 text-base font-semibold text-white transition-colors hover:bg-[#1a5632]/90"
+                    className={`inline-flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-4 text-base font-semibold text-white transition-colors ${
+                      selectedVariantIsAvailable ? "bg-[#1a5632] hover:bg-[#1a5632]/90" : "bg-slate-400 pointer-events-none"
+                    }`}
                   >
                     <MessageCircle className="h-5 w-5" />
-                    Contactar por WhatsApp
+                    {selectedVariantIsAvailable ? "Contactar por WhatsApp" : "Variante agotada"}
                   </a>
                 </div>
               </div>

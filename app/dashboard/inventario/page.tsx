@@ -23,8 +23,9 @@ import {
   formatDateTime,
   formatNumber,
   getProductById,
-  getProductRealUnitCost,
-  getProductStock,
+  getOperationalProductRealUnitCost,
+  getOperationalProductSalePrice,
+  getOperationalProductStock,
   getStockAlert,
   getStockAlertLabel,
   getVariantOrProductRealUnitCost,
@@ -79,8 +80,8 @@ export default function InventarioPage() {
 
   const inventorySummary = useMemo(() => {
     return filteredProducts.map((product) => {
-      const stock = getProductStock(movements, product.id);
-      const realUnitCost = getProductRealUnitCost(purchases, product.id);
+      const stock = getOperationalProductStock(product, movements);
+      const realUnitCost = getOperationalProductRealUnitCost(product, purchases);
       const alert = getStockAlert(product, movements);
       return {
         product,
@@ -163,7 +164,7 @@ export default function InventarioPage() {
         }
       />
 
-      <div className="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+      <div className="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-[0_18px_40px_rgba(2,6,23,0.24)] sm:p-6">
         {isSalesUser ? (
           <>
             <div className="grid gap-3 sm:grid-cols-1 xl:grid-cols-[1.5fr_0.9fr]">
@@ -194,7 +195,7 @@ export default function InventarioPage() {
 
             {filteredProducts.length > 0 ? (
               <div className="min-w-0">
-                <div className="mb-2 hidden text-xs text-slate-500 md:block">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
+                <div className="mb-2 hidden text-xs text-slate-500 dark:text-slate-400 md:block">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
                 <div className="pb-2">
                   <Table className="min-w-[860px]">
                     <TableHeader>
@@ -204,45 +205,46 @@ export default function InventarioPage() {
                         <TableHead>Stock</TableHead>
                         <TableHead>Precio de venta</TableHead>
                         <TableHead>Estado</TableHead>
-                        <TableHead className="sticky right-0 z-10 bg-[rgba(248,250,252,0.96)] text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.22)] backdrop-blur">
+                        <TableHead className="sticky right-0 z-10 bg-[rgba(248,250,252,0.96)] text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.22)] backdrop-blur dark:bg-slate-900/95 dark:shadow-[-12px_0_16px_-16px_rgba(2,6,23,0.65)]">
                           Accion
                         </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                         {filteredProducts.map((product) => {
-                          const stock = getProductStock(movements, product.id);
+                          const stock = getOperationalProductStock(product, movements);
+                          const salePrice = getOperationalProductSalePrice(product);
                           const alert = getStockAlert(product, movements);
                           const rowHoverSummary = [
                             product.name,
                             `Marca: ${product.brand}`,
                             `Categoria: ${product.category} / ${product.subcategory}`,
                             `Stock: ${formatNumber(stock)}`,
-                            `Precio venta: ${formatCurrency(product.salePrice)}`,
+                            `Precio venta: ${formatCurrency(salePrice)}`,
                             `Estado: ${getStockAlertLabel(alert)}`,
                           ].join('\n');
                           return (
                             <TableRow key={product.id} title={rowHoverSummary}>
                               <TableCell>
                                 <div>
-                                  <p className="font-medium text-slate-900">{product.name}</p>
-                                <p className="text-xs text-slate-500">{product.brand}</p>
+                                  <p className="font-medium text-slate-900 dark:text-slate-100">{product.name}</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">{product.brand}</p>
                               </div>
                             </TableCell>
                             <TableCell>
                               <div>
                                 <p>{product.category}</p>
-                                <p className="text-xs text-slate-500">{product.subcategory}</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">{product.subcategory}</p>
                               </div>
                             </TableCell>
                             <TableCell>{formatNumber(stock)}</TableCell>
-                            <TableCell>{formatCurrency(product.salePrice)}</TableCell>
+                            <TableCell>{formatCurrency(salePrice)}</TableCell>
                             <TableCell>
                               <span className={alert === 'out' ? 'font-medium text-rose-700' : 'font-medium text-emerald-700'}>
                                 {getStockAlertLabel(alert)}
                               </span>
                             </TableCell>
-                            <TableCell className="sticky right-0 bg-[rgba(248,250,252,0.96)] text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.22)] backdrop-blur">
+                            <TableCell className="sticky right-0 bg-[rgba(248,250,252,0.96)] text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.22)] backdrop-blur dark:bg-slate-950/95 dark:shadow-[-12px_0_16px_-16px_rgba(2,6,23,0.65)]">
                               <Button
                                 type="button"
                                 className="rounded-xl"
@@ -263,7 +265,7 @@ export default function InventarioPage() {
                 </div>
               </div>
             ) : (
-              <Empty className="border border-dashed border-slate-200 bg-slate-50/70">
+              <Empty className="border border-dashed border-slate-200 bg-slate-50/70 dark:border-slate-800 dark:bg-slate-900/60">
                 <EmptyHeader>
                   <EmptyMedia variant="icon">
                     <ClipboardList className="h-5 w-5" />
@@ -278,17 +280,17 @@ export default function InventarioPage() {
           </>
         ) : (
           <Tabs value={adminTab} onValueChange={(value) => setAdminTab(value as 'movements' | 'stock')} className="space-y-4">
-            <TabsList className="grid h-auto w-full grid-cols-2 rounded-2xl border border-slate-200 bg-slate-100 p-1.5">
+            <TabsList className="grid h-auto w-full grid-cols-2 rounded-2xl border border-slate-200 bg-slate-100 p-1.5 dark:border-slate-800 dark:bg-slate-900/80">
               <TabsTrigger
                 value="movements"
-                className="min-h-12 rounded-xl border border-transparent text-sm font-semibold text-slate-600 data-[state=active]:border-cyan-200 data-[state=active]:bg-cyan-50 data-[state=active]:text-cyan-900 data-[state=active]:shadow-sm"
+                className="min-h-12 rounded-xl border border-transparent text-sm font-semibold text-slate-600 dark:text-slate-300 data-[state=active]:border-cyan-200 data-[state=active]:bg-cyan-50 data-[state=active]:text-cyan-900 data-[state=active]:shadow-sm dark:data-[state=active]:border-cyan-800 dark:data-[state=active]:bg-cyan-950/60 dark:data-[state=active]:text-cyan-100"
               >
                 <ClipboardList className="mr-2 h-4 w-4" />
                 Movimientos
               </TabsTrigger>
               <TabsTrigger
                 value="stock"
-                className="min-h-12 rounded-xl border border-transparent text-sm font-semibold text-slate-600 data-[state=active]:border-emerald-200 data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-900 data-[state=active]:shadow-sm"
+                className="min-h-12 rounded-xl border border-transparent text-sm font-semibold text-slate-600 dark:text-slate-300 data-[state=active]:border-emerald-200 data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-900 data-[state=active]:shadow-sm dark:data-[state=active]:border-emerald-800 dark:data-[state=active]:bg-emerald-950/60 dark:data-[state=active]:text-emerald-100"
               >
                 <Boxes className="mr-2 h-4 w-4" />
                 Stock actual
@@ -357,14 +359,14 @@ export default function InventarioPage() {
             <TabsContent value="movements" className="space-y-4">
               <div>
                 <p className="text-sm font-semibold text-slate-950">Historial de movimientos</p>
-                <p className="hidden text-sm text-slate-500 sm:block">
+                <p className="hidden text-sm text-slate-500 dark:text-slate-400 sm:block">
                   Entradas, salidas y ajustes para revisar lo que ha pasado en el inventario.
                 </p>
               </div>
 
               {filteredMovements.length > 0 ? (
                 <div className="min-w-0">
-                  <div className="mb-2 hidden text-xs text-slate-500 lg:block">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
+                  <div className="mb-2 hidden text-xs text-slate-500 dark:text-slate-400 lg:block">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
                   <div className="pb-2">
                   <Table className="min-w-[860px]">
                     <TableHeader>
@@ -376,7 +378,7 @@ export default function InventarioPage() {
                         <TableHead>Responsable</TableHead>
                         <TableHead>Valor</TableHead>
                         <TableHead>Fecha</TableHead>
-                        <TableHead className="sticky right-0 z-10 bg-[rgba(248,250,252,0.96)] text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.22)] backdrop-blur">
+                        <TableHead className="sticky right-0 z-10 bg-[rgba(248,250,252,0.96)] text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.22)] backdrop-blur dark:bg-slate-900/95 dark:shadow-[-12px_0_16px_-16px_rgba(2,6,23,0.65)]">
                           Detalle
                         </TableHead>
                       </TableRow>
@@ -433,8 +435,8 @@ export default function InventarioPage() {
                             >
                               <TableCell>
                                 <div>
-                                  <p className="font-medium text-slate-900">{product?.name}</p>
-                                <p className="text-xs text-slate-500">{product?.brand}</p>
+                                  <p className="font-medium text-slate-900 dark:text-slate-100">{product?.name}</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">{product?.brand}</p>
                               </div>
                             </TableCell>
                             <TableCell>{movementTypeLabels[movement.type]}</TableCell>
@@ -446,7 +448,7 @@ export default function InventarioPage() {
                               {isReturn ? (
                                 <div className="space-y-1">
                                   <MovementReasonBadge reason={movement.reason} />
-                                  <p className="text-xs text-amber-700">Producto devuelto al inventario</p>
+                                  <p className="text-xs text-amber-700 dark:text-amber-300">Producto devuelto al inventario</p>
                                 </div>
                               ) : (
                                 movementReasonLabels[movement.reason]
@@ -456,11 +458,11 @@ export default function InventarioPage() {
                             <TableCell>
                               <div>
                                 <p className={`font-semibold ${valueColorClass}`}>{formatCurrency(valueAmount)}</p>
-                                <p className="text-xs text-slate-500">{valueLabel}</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">{valueLabel}</p>
                               </div>
                             </TableCell>
                             <TableCell>{formatDateTime(movement.occurredAt)}</TableCell>
-                            <TableCell className="sticky right-0 bg-[rgba(248,250,252,0.96)] text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.22)] backdrop-blur">
+                            <TableCell className="sticky right-0 bg-[rgba(248,250,252,0.96)] text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.22)] backdrop-blur dark:bg-slate-950/95 dark:shadow-[-12px_0_16px_-16px_rgba(2,6,23,0.65)]">
                               {relatedSale ? (
                                 <Button
                                   type="button"
@@ -472,7 +474,7 @@ export default function InventarioPage() {
                                   <Eye className="h-4 w-4" />
                                 </Button>
                               ) : (
-                                <span className="text-xs text-slate-400">Sin detalle</span>
+                                <span className="text-xs text-slate-400 dark:text-slate-500">Sin detalle</span>
                               )}
                             </TableCell>
                           </TableRow>
@@ -483,7 +485,7 @@ export default function InventarioPage() {
                   </div>
                 </div>
               ) : (
-                <Empty className="border border-dashed border-slate-200 bg-slate-50/70">
+                <Empty className="border border-dashed border-slate-200 bg-slate-50/70 dark:border-slate-800 dark:bg-slate-900/60">
                   <EmptyHeader>
                     <EmptyMedia variant="icon">
                       <ClipboardList className="h-5 w-5" />
@@ -499,35 +501,35 @@ export default function InventarioPage() {
 
             <TabsContent value="stock" className="space-y-4">
               <div className="grid gap-4 md:grid-cols-3">
-                <div className="rounded-[24px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.94)_100%)] p-3.5 shadow-sm sm:p-4">
-                  <p className="text-sm text-slate-500">Unidades por producto</p>
-                  <p className="mt-2 text-2xl font-semibold text-slate-950">{formatNumber(totalInventoryUnits)}</p>
+                <div className="rounded-[24px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.94)_100%)] p-3.5 shadow-sm dark:border-slate-800 dark:bg-[linear-gradient(180deg,rgba(2,6,23,0.92)_0%,rgba(15,23,42,0.86)_100%)] dark:shadow-[0_16px_36px_rgba(2,6,23,0.24)] sm:p-4">
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Unidades por producto</p>
+                  <p className="mt-2 text-2xl font-semibold text-slate-950 dark:text-slate-50">{formatNumber(totalInventoryUnits)}</p>
                 </div>
-                <div className="rounded-[24px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.94)_100%)] p-3.5 shadow-sm sm:p-4">
-                  <p className="text-sm text-slate-500">Valor por producto</p>
-                  <p className="mt-2 text-2xl font-semibold text-slate-950">{formatCurrency(totalInventoryValue)}</p>
+                <div className="rounded-[24px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.94)_100%)] p-3.5 shadow-sm dark:border-slate-800 dark:bg-[linear-gradient(180deg,rgba(2,6,23,0.92)_0%,rgba(15,23,42,0.86)_100%)] dark:shadow-[0_16px_36px_rgba(2,6,23,0.24)] sm:p-4">
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Valor por producto</p>
+                  <p className="mt-2 text-2xl font-semibold text-slate-950 dark:text-slate-50">{formatCurrency(totalInventoryValue)}</p>
                 </div>
-                <div className="rounded-[24px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.94)_100%)] p-3.5 shadow-sm sm:p-4">
-                  <p className="text-sm text-slate-500">Productos agotados</p>
-                  <p className="mt-2 text-2xl font-semibold text-slate-950">{formatNumber(outOfStockCount)}</p>
+                <div className="rounded-[24px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.94)_100%)] p-3.5 shadow-sm dark:border-slate-800 dark:bg-[linear-gradient(180deg,rgba(2,6,23,0.92)_0%,rgba(15,23,42,0.86)_100%)] dark:shadow-[0_16px_36px_rgba(2,6,23,0.24)] sm:p-4">
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Productos agotados</p>
+                  <p className="mt-2 text-2xl font-semibold text-slate-950 dark:text-slate-50">{formatNumber(outOfStockCount)}</p>
                 </div>
-                <div className="rounded-[24px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.94)_100%)] p-3.5 shadow-sm sm:p-4">
-                  <p className="text-sm text-slate-500">Unidades por variante</p>
-                  <p className="mt-2 text-2xl font-semibold text-slate-950">{formatNumber(totalVariantUnits)}</p>
+                <div className="rounded-[24px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.94)_100%)] p-3.5 shadow-sm dark:border-slate-800 dark:bg-[linear-gradient(180deg,rgba(2,6,23,0.92)_0%,rgba(15,23,42,0.86)_100%)] dark:shadow-[0_16px_36px_rgba(2,6,23,0.24)] sm:p-4">
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Unidades por variante</p>
+                  <p className="mt-2 text-2xl font-semibold text-slate-950 dark:text-slate-50">{formatNumber(totalVariantUnits)}</p>
                 </div>
-                <div className="rounded-[24px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.94)_100%)] p-3.5 shadow-sm sm:p-4">
-                  <p className="text-sm text-slate-500">Valor por variante</p>
-                  <p className="mt-2 text-2xl font-semibold text-slate-950">{formatCurrency(totalVariantValue)}</p>
+                <div className="rounded-[24px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.94)_100%)] p-3.5 shadow-sm dark:border-slate-800 dark:bg-[linear-gradient(180deg,rgba(2,6,23,0.92)_0%,rgba(15,23,42,0.86)_100%)] dark:shadow-[0_16px_36px_rgba(2,6,23,0.24)] sm:p-4">
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Valor por variante</p>
+                  <p className="mt-2 text-2xl font-semibold text-slate-950 dark:text-slate-50">{formatCurrency(totalVariantValue)}</p>
                 </div>
-                <div className="rounded-[24px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.94)_100%)] p-3.5 shadow-sm sm:p-4">
-                  <p className="text-sm text-slate-500">Variantes agotadas</p>
-                  <p className="mt-2 text-2xl font-semibold text-slate-950">{formatNumber(outOfStockVariantCount)}</p>
+                <div className="rounded-[24px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.94)_100%)] p-3.5 shadow-sm dark:border-slate-800 dark:bg-[linear-gradient(180deg,rgba(2,6,23,0.92)_0%,rgba(15,23,42,0.86)_100%)] dark:shadow-[0_16px_36px_rgba(2,6,23,0.24)] sm:p-4">
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Variantes agotadas</p>
+                  <p className="mt-2 text-2xl font-semibold text-slate-950 dark:text-slate-50">{formatNumber(outOfStockVariantCount)}</p>
                 </div>
               </div>
 
               <div>
-                <p className="text-sm font-semibold text-slate-950">Stock actual por producto</p>
-                <p className="hidden text-sm text-slate-500 sm:block">
+                <p className="text-sm font-semibold text-slate-950 dark:text-slate-50">Stock actual por producto</p>
+                <p className="hidden text-sm text-slate-500 dark:text-slate-400 sm:block">
                   Existencias reales, costo unitario y valor estimado del inventario por producto.
                 </p>
               </div>
@@ -550,6 +552,7 @@ export default function InventarioPage() {
                     </TableHeader>
                     <TableBody>
                       {inventorySummary.map(({ product, stock, realUnitCost, inventoryValue, alert }) => {
+                        const salePrice = getOperationalProductSalePrice(product);
                         const rowHoverSummary = [
                           product.name,
                           `Marca: ${product.brand}`,
@@ -557,7 +560,7 @@ export default function InventarioPage() {
                           `Stock actual: ${formatNumber(stock)}`,
                           `Costo real: ${formatCurrency(realUnitCost)}`,
                           `Valor inventario: ${formatCurrency(inventoryValue)}`,
-                          `Precio venta: ${formatCurrency(product.salePrice)}`,
+                          `Precio venta: ${formatCurrency(salePrice)}`,
                           `Estado: ${getStockAlertLabel(alert)}`,
                         ].join('\n');
 
@@ -578,7 +581,7 @@ export default function InventarioPage() {
                           <TableCell>{formatNumber(stock)}</TableCell>
                           <TableCell>{formatCurrency(realUnitCost)}</TableCell>
                           <TableCell>{formatCurrency(inventoryValue)}</TableCell>
-                          <TableCell>{formatCurrency(product.salePrice)}</TableCell>
+                          <TableCell>{formatCurrency(salePrice)}</TableCell>
                           <TableCell>
                             <span className={alert === 'out' ? 'font-medium text-rose-700' : 'font-medium text-emerald-700'}>
                               {getStockAlertLabel(alert)}
@@ -704,7 +707,11 @@ export default function InventarioPage() {
                   ...values,
                   responsibleUser:
                     profile?.nombre?.trim() || user?.displayName || user?.email || values.responsibleUser,
-                  relatedUnitCost: getProductRealUnitCost(purchases, values.productId),
+                  relatedUnitCost: getVariantOrProductRealUnitCost(
+                    purchases,
+                    values.productId,
+                    values.variantId || undefined
+                  ),
                 });
                 setOpenDialog(false);
                 toast({

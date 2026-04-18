@@ -354,33 +354,33 @@ export function CatalogImageDialog({
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
-              <p className="text-xs text-slate-500">Productos visibles</p>
-              <p className="mt-1 text-2xl font-semibold text-slate-950">{summary.totalProducts}</p>
+            <div className="rounded-2xl border border-border bg-card/88 p-3 dark:border-slate-800 dark:bg-slate-950/72 sm:p-4">
+              <p className="text-xs text-muted-foreground">Productos visibles</p>
+              <p className="mt-1 text-2xl font-semibold text-foreground">{summary.totalProducts}</p>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
-              <p className="text-xs text-slate-500">Productos con variantes</p>
-              <p className="mt-1 text-2xl font-semibold text-slate-950">{summary.productsWithVariants}</p>
+            <div className="rounded-2xl border border-border bg-card/88 p-3 dark:border-slate-800 dark:bg-slate-950/72 sm:p-4">
+              <p className="text-xs text-muted-foreground">Productos con variantes</p>
+              <p className="mt-1 text-2xl font-semibold text-foreground">{summary.productsWithVariants}</p>
             </div>
-            <div className="rounded-2xl border border-cyan-200 bg-cyan-50 p-3 sm:p-4">
-              <p className="text-xs text-cyan-800">Variantes con foto web</p>
-              <p className="mt-1 text-2xl font-semibold text-cyan-950">{summary.variantsWithImage}</p>
+            <div className="rounded-2xl border border-cyan-200/80 bg-cyan-50/75 p-3 dark:border-cyan-900/60 dark:bg-cyan-950/20 sm:p-4">
+              <p className="text-xs text-cyan-800 dark:text-cyan-200/85">Variantes con foto web</p>
+              <p className="mt-1 text-2xl font-semibold text-cyan-950 dark:text-cyan-100">{summary.variantsWithImage}</p>
             </div>
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 sm:p-4">
-              <p className="text-xs text-amber-800">Variantes pendientes</p>
-              <p className="mt-1 text-2xl font-semibold text-amber-950">{summary.variantsPending}</p>
+            <div className="rounded-2xl border border-amber-200/80 bg-amber-50/75 p-3 dark:border-amber-900/60 dark:bg-amber-950/20 sm:p-4">
+              <p className="text-xs text-amber-800 dark:text-amber-200/85">Variantes pendientes</p>
+              <p className="mt-1 text-2xl font-semibold text-amber-950 dark:text-amber-100">{summary.variantsPending}</p>
             </div>
           </div>
 
-          <div className="hidden rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 sm:block">
+          <div className="hidden rounded-2xl border border-dashed border-border bg-muted/70 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300 sm:block">
             La imagen principal sigue siendo la base del producto. Solo sube imagen por variante cuando esa combinacion realmente necesite verse distinta en la web.
           </div>
 
           <div className="space-y-3.5 sm:space-y-4">
             {filteredItems.map((item) => (
-            <div key={item.id} className="rounded-[28px] border border-slate-200 bg-white p-3.5 shadow-sm lg:p-5">
+            <div key={item.id} className="rounded-[28px] border border-border bg-card/88 p-3.5 shadow-sm dark:border-slate-800 dark:bg-slate-950/72 lg:p-5">
               <div className="grid gap-4 xl:grid-cols-[180px_minmax(0,1fr)] xl:items-start xl:gap-5">
-                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-100">
+                <div className="overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-white via-slate-50 to-slate-100 dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
                   <div className="relative aspect-square w-full">
                     <Image
                       src={item.previewImage}
@@ -395,19 +395,19 @@ export function CatalogImageDialog({
                   <div className="space-y-2">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="truncate text-lg font-semibold text-slate-900">{item.name}</p>
-                        <p className="mt-1 text-sm text-slate-500">{item.brand || 'Sin marca registrada'}</p>
+                        <p className="truncate text-lg font-semibold text-foreground">{item.name}</p>
+                        <p className="mt-1 text-sm text-muted-foreground">{item.brand || 'Sin marca registrada'}</p>
                       </div>
-                      <p className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-medium text-slate-600">
+                      <p className="rounded-full bg-muted px-3 py-1 text-[11px] font-medium text-slate-600 dark:bg-slate-900 dark:text-slate-300">
                         ID: {item.id}
                       </p>
                     </div>
                     {item.variants.length > 0 ? (
                       <div className="flex flex-wrap gap-2">
-                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-700">
+                        <span className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-slate-700 dark:bg-slate-900 dark:text-slate-200">
                           {item.variants.length} variantes
                         </span>
-                        <span className="rounded-full bg-cyan-100 px-2.5 py-1 text-[11px] font-medium text-cyan-800">
+                        <span className="rounded-full bg-cyan-100 px-2.5 py-1 text-[11px] font-medium text-cyan-800 dark:bg-cyan-950/25 dark:text-cyan-200">
                           {
                             item.variants.filter((variant) =>
                               Boolean(overrides.byVariantKey[buildCatalogVariantImageKey(item.id, variant.id)])
@@ -416,7 +416,7 @@ export function CatalogImageDialog({
                         </span>
                       </div>
                     ) : null}
-                    <p className="hidden text-xs leading-5 text-slate-500 sm:block">
+                    <p className="hidden text-xs leading-5 text-muted-foreground sm:block">
                       {overrides.byProductId[item.id] ||
                       overrides.byProductName[normalizeCatalogImageName(item.name)]
                         ? 'Esta imagen esta activa en la web y puedes usarla como base del producto.'
@@ -501,11 +501,11 @@ export function CatalogImageDialog({
               </div>
 
               {item.variants.length > 0 ? (
-                <details className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:mt-5 sm:p-4">
-                  <summary className="cursor-pointer text-sm font-medium text-slate-900">
+                <details className="mt-4 rounded-2xl border border-border bg-muted/70 p-3 dark:border-slate-800 dark:bg-slate-900/60 sm:mt-5 sm:p-4">
+                  <summary className="cursor-pointer text-sm font-medium text-foreground">
                     Imagenes por variante ({item.variants.length})
                   </summary>
-                  <p className="mt-2 hidden text-xs text-slate-500 sm:block">
+                  <p className="mt-2 hidden text-xs text-muted-foreground sm:block">
                     Solo carga foto por variante cuando realmente la necesites en la web. Si no, se usa la imagen principal.
                   </p>
                   <div className="mt-4 space-y-3">
@@ -514,9 +514,9 @@ export function CatalogImageDialog({
                       return (
                         <div
                           key={variant.id}
-                          className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-3 md:grid-cols-[88px_minmax(0,1fr)_auto] md:items-center"
+                          className="grid gap-3 rounded-2xl border border-border bg-card/88 p-3 dark:border-slate-800 dark:bg-slate-950/72 md:grid-cols-[88px_minmax(0,1fr)_auto] md:items-center"
                         >
-                          <div className="relative aspect-square overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-100">
+                          <div className="relative aspect-square overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-white via-slate-50 to-slate-100 dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
                             <Image
                               src={variant.previewImage}
                               alt={`${item.name} ${variant.name}`}
@@ -529,16 +529,16 @@ export function CatalogImageDialog({
                             <div className="flex flex-wrap items-center gap-2">
                               {variant.colorHex ? (
                                 <span
-                                  className="h-4 w-4 rounded-full border border-slate-300"
+                                  className="h-4 w-4 rounded-full border border-slate-300 dark:border-slate-700"
                                   style={{ backgroundColor: variant.colorHex }}
                                 />
                               ) : null}
-                              <p className="truncate text-sm font-medium text-slate-900">{variant.name}</p>
-                              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">
+                              <p className="truncate text-sm font-medium text-foreground">{variant.name}</p>
+                              <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-slate-600 dark:bg-slate-900 dark:text-slate-300">
                                 {overrides.byVariantKey[variantKey] ? 'Foto web lista' : 'Usa imagen principal'}
                               </span>
                             </div>
-                            <p className="mt-1 text-xs text-slate-500">
+                            <p className="mt-1 text-xs text-muted-foreground">
                               Si subes una foto aqui, esta variante cambiara su imagen en la web. Si no, hereda la imagen principal.
                             </p>
                           </div>

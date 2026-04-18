@@ -54,9 +54,9 @@ function getVariantSummary(product: Product) {
   const variants = product.variants ?? [];
   if (variants.length === 0) return 'Sin variantes';
 
-  const outOfStock = variants.filter((variant) => Number(variant.stock ?? 0) <= 0).length;
-  return outOfStock > 0
-    ? `${variants.length} variantes · ${outOfStock} agotadas`
+  const inactiveCount = variants.filter((variant) => variant.status === 'inactive').length;
+  return inactiveCount > 0
+    ? `${variants.length} variantes · ${inactiveCount} inactivas`
     : `${variants.length} variantes`;
 }
 
@@ -240,8 +240,8 @@ export default function ProductosPage() {
     <div className="space-y-6">
       <SectionHeader
         eyebrow="Modulo CRUD"
-        title="Productos e inventario base"
-        description="Administra el catalogo del producto, su imagen, precio de venta y estado operativo."
+        title="Productos y catalogo base"
+        description="Administra el catalogo del producto, su imagen, precios y variantes. El stock se controla desde inventario y compras."
         actions={
           <Button
             onClick={() => {
@@ -256,7 +256,7 @@ export default function ProductosPage() {
       />
 
       <div className="grid gap-6 xl:grid-cols-[1.75fr_0.75fr]">
-        <div className="min-w-0 space-y-4 rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
+        <div className="min-w-0 space-y-4 rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-[linear-gradient(180deg,rgba(2,6,23,0.92)_0%,rgba(15,23,42,0.88)_100%)] dark:shadow-[0_20px_48px_rgba(2,6,23,0.28)] sm:p-6">
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <div className="relative sm:col-span-2 xl:col-span-2">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -267,7 +267,7 @@ export default function ProductosPage() {
                   setQuery(event.target.value);
                 }}
                 placeholder="Buscar por nombre, marca o categoria"
-                className="rounded-2xl border-slate-200 bg-white/90 pl-9 shadow-sm"
+                className="rounded-2xl border-slate-200 bg-white/90 pl-9 shadow-sm dark:border-slate-700 dark:bg-slate-900/75"
               />
             </div>
             <Select
@@ -315,18 +315,18 @@ export default function ProductosPage() {
                   {paginatedProducts.map((product) => (
                     <div
                       key={product.id}
-                      className="rounded-[22px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-sm"
+                      className="rounded-[22px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-sm dark:border-slate-800 dark:bg-[linear-gradient(180deg,rgba(2,6,23,0.92)_0%,rgba(15,23,42,0.86)_100%)]"
                       onClick={() => setSelectedProduct(product)}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="font-medium text-slate-900">{product.name}</p>
-                          <p className="mt-1 text-sm text-slate-500">{product.brand}</p>
-                          <p className="mt-1 text-sm text-slate-500">
+                          <p className="font-medium text-slate-900 dark:text-slate-100">{product.name}</p>
+                          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{product.brand}</p>
+                          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                             {getCategoryLabel(categories, product.category)} · {product.subcategory}
                           </p>
-                          <p className="mt-2 text-sm text-slate-600">{getVariantSummary(product)}</p>
-                          <p className="text-sm font-medium text-slate-900">{getVariantPriceSummary(product)}</p>
+                          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{getVariantSummary(product)}</p>
+                          <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{getVariantPriceSummary(product)}</p>
                           <div className="mt-2 flex items-center gap-2">
                             <ProductStatusBadge status={product.status} />
                             <span className={product.featured ? 'text-xs font-medium text-emerald-700' : 'text-xs text-slate-400'}>
@@ -367,7 +367,7 @@ export default function ProductosPage() {
                   ))}
                 </div>
 
-                <div className="mb-2 hidden text-xs text-slate-500 md:block">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
+                <div className="mb-2 hidden text-xs text-slate-500 dark:text-slate-400 md:block">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
                 <div className="hidden pb-2 md:block">
                 <Table className="min-w-[680px]">
                   <TableHeader>
@@ -378,7 +378,7 @@ export default function ProductosPage() {
                       <TableHead>Venta</TableHead>
                       <TableHead>Destacado</TableHead>
                       <TableHead>Estado</TableHead>
-                      <TableHead className="sticky right-0 z-10 bg-slate-50/95 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
+                      <TableHead className="sticky right-0 z-10 bg-slate-50/95 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)] dark:bg-slate-900/95 dark:shadow-[-12px_0_16px_-16px_rgba(2,6,23,0.65)]">
                         Acciones
                       </TableHead>
                     </TableRow>
@@ -404,25 +404,25 @@ export default function ProductosPage() {
                       >
                         <TableCell>
                           <div>
-                            <p className="font-medium text-slate-900">{product.name}</p>
-                            <p className="text-xs text-slate-500">{product.brand}</p>
+                            <p className="font-medium text-slate-900 dark:text-slate-100">{product.name}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">{product.brand}</p>
                           </div>
                         </TableCell>
                         <TableCell>
-                          <p className="text-sm text-slate-700">{getCategoryLabel(categories, product.category)}</p>
-                          <p className="text-xs text-slate-500">{product.subcategory}</p>
+                          <p className="text-sm text-slate-700 dark:text-slate-300">{getCategoryLabel(categories, product.category)}</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">{product.subcategory}</p>
                         </TableCell>
                         <TableCell>{getVariantSummary(product)}</TableCell>
                         <TableCell>{getVariantPriceSummary(product)}</TableCell>
                         <TableCell>
-                          <span className={product.featured ? 'font-medium text-emerald-700' : 'text-slate-400'}>
+                          <span className={product.featured ? 'font-medium text-emerald-700 dark:text-emerald-300' : 'text-slate-400 dark:text-slate-500'}>
                             {product.featured ? 'Si' : 'No'}
                           </span>
                         </TableCell>
                         <TableCell>
                           <ProductStatusBadge status={product.status} />
                         </TableCell>
-                        <TableCell className="sticky right-0 bg-white/95 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
+                        <TableCell className="sticky right-0 bg-[rgba(248,250,252,0.96)] text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.22)] backdrop-blur dark:bg-slate-950/95 dark:shadow-[-12px_0_16px_-16px_rgba(2,6,23,0.65)]">
                           <ResponsiveRowActions
                             actions={[
                               {
@@ -484,7 +484,7 @@ export default function ProductosPage() {
               </div>
             </>
           ) : (
-            <Empty className="border border-dashed border-slate-200 bg-slate-50/70">
+            <Empty className="border border-dashed border-slate-200 bg-slate-50/70 dark:border-slate-800 dark:bg-slate-900/60">
               <EmptyHeader>
                 <EmptyMedia variant="icon">
                   <Search className="h-5 w-5" />
@@ -498,10 +498,10 @@ export default function ProductosPage() {
           )}
         </div>
 
-        <aside className="min-w-0 rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6 xl:sticky xl:top-24 xl:self-start">
+        <aside className="min-w-0 rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-[linear-gradient(180deg,rgba(2,6,23,0.92)_0%,rgba(15,23,42,0.88)_100%)] dark:shadow-[0_20px_48px_rgba(2,6,23,0.28)] sm:p-6 xl:sticky xl:top-24 xl:self-start">
           {selectedProduct ? (
             <div className="space-y-5">
-              <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#f8fbff_0%,#eef4fb_100%)]">
+              <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#f8fbff_0%,#eef4fb_100%)] dark:border-slate-800 dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.92)_0%,rgba(15,23,42,0.72)_100%)]">
                 <div className="relative aspect-[16/10] w-full">
                   <Image
                     src={selectedProductPreviewImage}
@@ -515,71 +515,79 @@ export default function ProductosPage() {
               </div>
 
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-700">Vista del producto</p>
-                <h3 className="mt-2 text-2xl font-semibold tracking-[-0.02em] text-slate-950">{selectedProduct.name}</h3>
-                <p className="mt-3 text-sm leading-6 text-slate-500">{selectedProduct.description}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-700 dark:text-cyan-300">Vista del producto</p>
+                <h3 className="mt-2 text-2xl font-semibold tracking-[-0.02em] text-slate-950 dark:text-slate-50">{selectedProduct.name}</h3>
+                <p className="mt-3 text-sm leading-6 text-slate-500 dark:text-slate-400">{selectedProduct.description}</p>
               </div>
 
               <div className="grid gap-3">
                 <div className="grid gap-3 md:grid-cols-2">
-                  <div className="rounded-2xl bg-slate-50 p-4">
-                    <p className="text-xs text-slate-500">Categoria</p>
-                    <p className="mt-1 font-semibold text-slate-900">
+                  <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/70">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Categoria</p>
+                    <p className="mt-1 font-semibold text-slate-900 dark:text-slate-100">
                       {getCategoryLabel(categories, selectedProduct.category)}
                     </p>
-                    <p className="text-xs text-slate-500">{selectedProduct.subcategory}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">{selectedProduct.subcategory}</p>
                   </div>
-                  <div className="rounded-2xl bg-slate-50 p-4">
-                    <p className="text-xs text-slate-500">Marca</p>
-                    <p className="mt-1 font-semibold text-slate-900">{selectedProduct.brand}</p>
+                  <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/70">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Marca</p>
+                    <p className="mt-1 font-semibold text-slate-900 dark:text-slate-100">{selectedProduct.brand}</p>
                   </div>
                 </div>
-                <div className="rounded-2xl bg-slate-50 p-4">
-                  <p className="text-xs text-slate-500">Precio de venta</p>
-                  <p className="mt-1 font-semibold text-slate-900">
+                <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/70">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Precio de venta</p>
+                  <p className="mt-1 font-semibold text-slate-900 dark:text-slate-100">
                     {getVariantPriceSummary(selectedProduct)}
                   </p>
                 </div>
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-950 dark:border-amber-900/70 dark:bg-amber-950/30 dark:text-amber-100">
+                  <p className="text-xs font-medium uppercase tracking-wide text-amber-700 dark:text-amber-300">Stock operativo</p>
+                  <p className="mt-1 text-sm leading-6">
+                    El stock no se edita en catalogo. Usa Inventario para carga inicial y ajustes, o Compras para entradas reales.
+                  </p>
+                </div>
                 {(selectedProduct.variants?.length ?? 0) > 0 ? (
-                  <div className="rounded-2xl bg-slate-50 p-4">
-                    <p className="text-xs text-slate-500">Resumen de variantes</p>
-                    <p className="mt-1 font-semibold text-slate-900">{getVariantSummary(selectedProduct)}</p>
+                  <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/70">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Resumen de variantes</p>
+                    <p className="mt-1 font-semibold text-slate-900 dark:text-slate-100">{getVariantSummary(selectedProduct)}</p>
                   </div>
                 ) : null}
-                <div className="rounded-2xl bg-slate-50 p-4">
-                  <p className="text-xs text-slate-500">Producto destacado</p>
-                  <p className={`mt-1 font-semibold ${selectedProduct.featured ? 'text-emerald-700' : 'text-slate-600'}`}>
+                <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/70">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Producto destacado</p>
+                  <p className={`mt-1 font-semibold ${selectedProduct.featured ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-600 dark:text-slate-300'}`}>
                     {selectedProduct.featured ? 'Si, visible en portada' : 'No'}
                   </p>
                 </div>
                 {(selectedProduct.variants?.length ?? 0) > 0 ? (
-                  <div className="rounded-2xl bg-slate-50 p-4">
-                    <p className="text-xs text-slate-500">Detalle por variante</p>
+                  <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/70">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Catalogo por variante</p>
                     <div className="mt-3 space-y-2">
                       {(selectedProduct.variants ?? []).map((variant) => {
-                        const stock = Math.max(Number(variant.stock ?? 0), 0);
                         return (
                           <div
                             key={variant.id}
-                            className="rounded-2xl border border-slate-200 bg-white px-3 py-3"
+                            className="rounded-2xl border border-slate-200 bg-white px-3 py-3 dark:border-slate-700 dark:bg-slate-950/60"
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0">
-                                <p className="font-medium text-slate-900">
+                                <p className="font-medium text-slate-900 dark:text-slate-100">
                                   {variant.displayName ?? variant.name}
                                 </p>
-                                <p className="text-xs text-slate-500">
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
                                   {formatCurrency(Number(variant.salePrice ?? selectedProduct.salePrice ?? 0))}
                                 </p>
+                                {variant.sku ? (
+                                  <p className="text-xs text-slate-500 dark:text-slate-400">SKU: {variant.sku}</p>
+                                ) : null}
                               </div>
                               <span
                                 className={
-                                  stock <= 0
-                                    ? 'rounded-full bg-rose-100 px-2.5 py-1 text-xs font-medium text-rose-700'
+                                  variant.status === 'inactive'
+                                    ? 'rounded-full bg-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700'
                                     : 'rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700'
                                 }
                               >
-                                {stock <= 0 ? 'Agotada' : `${stock} uds`}
+                                {variant.status === 'inactive' ? 'Inactiva' : 'Activa'}
                               </span>
                             </div>
                           </div>
@@ -591,7 +599,7 @@ export default function ProductosPage() {
               </div>
             </div>
           ) : (
-            <Empty className="border border-dashed border-slate-200 bg-slate-50/70">
+            <Empty className="border border-dashed border-slate-200 bg-slate-50/70 dark:border-slate-800 dark:bg-slate-900/60">
               <EmptyHeader>
                 <EmptyMedia variant="icon">
                   <Eye className="h-5 w-5" />

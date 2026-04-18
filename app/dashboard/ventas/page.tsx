@@ -87,19 +87,19 @@ function getSalesRowHighlightClass(input: {
   rejectedReturnRequest: AuthorizationRequest | null;
 }) {
   if (input.rejectedReturnRequest || input.rejectedEditRequest) {
-    return 'bg-rose-50/90 hover:bg-rose-100/70';
+    return 'bg-rose-50/90 hover:bg-rose-100/70 dark:bg-rose-950/20 dark:hover:bg-rose-950/30';
   }
   if (input.pendingReturnRequest) {
-    return 'bg-amber-50/90 hover:bg-amber-100/70';
+    return 'bg-amber-50/90 hover:bg-amber-100/70 dark:bg-amber-950/20 dark:hover:bg-amber-950/30';
   }
   if (input.pendingEditRequest) {
-    return 'bg-cyan-50/90 hover:bg-cyan-100/70';
+    return 'bg-cyan-50/90 hover:bg-cyan-100/70 dark:bg-cyan-950/20 dark:hover:bg-cyan-950/30';
   }
   if (input.approvedReturnRequest) {
-    return 'bg-emerald-50/80 hover:bg-emerald-100/70';
+    return 'bg-emerald-50/80 hover:bg-emerald-100/70 dark:bg-emerald-950/20 dark:hover:bg-emerald-950/30';
   }
   if (input.approvedEditRequest) {
-    return 'bg-sky-50/80 hover:bg-sky-100/70';
+    return 'bg-sky-50/80 hover:bg-sky-100/70 dark:bg-sky-950/20 dark:hover:bg-sky-950/30';
   }
 
   return '';
@@ -266,20 +266,20 @@ export default function VentasPage() {
       />
 
       <div className={`grid gap-3.5 sm:gap-6 ${isSalesUser ? 'sm:grid-cols-1 lg:grid-cols-1' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
-        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-3.5 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
-          <p className="text-sm text-slate-500">Ventas registradas</p>
-          <p className="mt-3 text-3xl font-semibold text-slate-950">{formatNumber(filteredSales.length)}</p>
-          <p className="mt-2 text-sm text-slate-500">Historial de ventas del periodo visible.</p>
+        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-3.5 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-[linear-gradient(180deg,rgba(2,6,23,0.92)_0%,rgba(15,23,42,0.88)_100%)] dark:shadow-[0_20px_48px_rgba(2,6,23,0.28)] sm:p-6">
+          <p className="text-sm text-slate-500 dark:text-slate-400">Ventas registradas</p>
+          <p className="mt-3 text-3xl font-semibold text-slate-950 dark:text-slate-50">{formatNumber(filteredSales.length)}</p>
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Historial de ventas del periodo visible.</p>
         </div>
         {isSalesUser ? (
-          <div className="rounded-[28px] border border-amber-200 bg-[linear-gradient(180deg,rgba(255,251,235,0.98)_0%,rgba(254,243,199,0.82)_100%)] p-3.5 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
-            <p className="text-sm text-amber-800">Solicitudes de autorizacion</p>
-            <p className="mt-3 text-3xl font-semibold text-amber-950">{formatNumber(pendingAuthorizationsCount)}</p>
-            <p className="mt-2 text-sm text-amber-900">
+          <div className="rounded-[28px] border border-amber-200 bg-[linear-gradient(180deg,rgba(255,251,235,0.98)_0%,rgba(254,243,199,0.82)_100%)] p-3.5 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-amber-900/70 dark:bg-[linear-gradient(180deg,rgba(120,53,15,0.34)_0%,rgba(146,64,14,0.22)_100%)] sm:p-6">
+            <p className="text-sm text-amber-800 dark:text-amber-200">Solicitudes de autorizacion</p>
+            <p className="mt-3 text-3xl font-semibold text-amber-950 dark:text-amber-50">{formatNumber(pendingAuthorizationsCount)}</p>
+            <p className="mt-2 text-sm text-amber-900 dark:text-amber-100">
               Si necesitas editar o devolver una venta, primero envias la solicitud al administrador.
             </p>
             {approvedAuthorizationsCount > 0 ? (
-              <p className="mt-3 inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-800">
+                <p className="mt-3 inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200">
                 {formatNumber(approvedAuthorizationsCount)} autorizacion(es) aprobada(s) lista(s) para usar
               </p>
             ) : null}
@@ -287,35 +287,35 @@ export default function VentasPage() {
         ) : null}
         {!isSalesUser && (
           <>
-            <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-3.5 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
-              <p className="text-sm text-slate-500">Ingresos</p>
-              <p className="mt-3 text-3xl font-semibold text-slate-950">{formatCurrency(totals.totalRevenue)}</p>
-              <p className="mt-2 text-sm text-slate-500">Suma de las ventas filtradas.</p>
+            <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-3.5 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-[linear-gradient(180deg,rgba(2,6,23,0.92)_0%,rgba(15,23,42,0.88)_100%)] dark:shadow-[0_20px_48px_rgba(2,6,23,0.28)] sm:p-6">
+              <p className="text-sm text-slate-500 dark:text-slate-400">Ingresos</p>
+              <p className="mt-3 text-3xl font-semibold text-slate-950 dark:text-slate-50">{formatCurrency(totals.totalRevenue)}</p>
+              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Suma de las ventas filtradas.</p>
             </div>
-            <div className="rounded-[28px] border border-emerald-200 bg-[linear-gradient(180deg,rgba(236,253,245,0.98)_0%,rgba(209,250,229,0.82)_100%)] p-3.5 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:col-span-2 sm:p-6 lg:col-span-1">
-              <p className="text-sm text-emerald-800">Utilidad bruta</p>
-              <p className="mt-3 text-3xl font-semibold text-emerald-950">{formatCurrency(totals.totalProfit)}</p>
-              <p className="mt-2 text-sm text-emerald-900">Calculada contra el costo real del inventario.</p>
+            <div className="rounded-[28px] border border-emerald-200 bg-[linear-gradient(180deg,rgba(236,253,245,0.98)_0%,rgba(209,250,229,0.82)_100%)] p-3.5 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-emerald-900/70 dark:bg-[linear-gradient(180deg,rgba(6,78,59,0.38)_0%,rgba(5,150,105,0.2)_100%)] sm:col-span-2 sm:p-6 lg:col-span-1">
+              <p className="text-sm text-emerald-800 dark:text-emerald-200">Utilidad bruta</p>
+              <p className="mt-3 text-3xl font-semibold text-emerald-950 dark:text-emerald-50">{formatCurrency(totals.totalProfit)}</p>
+              <p className="mt-2 text-sm text-emerald-900 dark:text-emerald-100">Calculada contra el costo real del inventario.</p>
             </div>
           </>
         )}
       </div>
 
-      <div className="min-w-0 space-y-3.5 rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-3.5 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:space-y-4 sm:p-6">
+      <div className="min-w-0 space-y-3.5 rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-3.5 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-[linear-gradient(180deg,rgba(2,6,23,0.92)_0%,rgba(15,23,42,0.88)_100%)] dark:shadow-[0_20px_48px_rgba(2,6,23,0.28)] sm:space-y-4 sm:p-6">
         <div className="relative max-w-md">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Buscar por producto, cliente o nota"
-            className="rounded-2xl border-slate-200 bg-white/90 pl-9 shadow-sm"
+            className="rounded-2xl border-slate-200 bg-white/90 pl-9 shadow-sm dark:border-slate-700 dark:bg-slate-900/75 dark:text-slate-100"
           />
         </div>
 
         {filteredSales.length > 0 ? (
           <div className="min-w-0">
             <div className="mb-2 hidden items-center justify-between gap-3 text-xs text-slate-500 md:flex">
-              <p>Desliza la tabla hacia la derecha para ver todas las columnas.</p>
+              <p className="dark:text-slate-400">Desliza la tabla hacia la derecha para ver todas las columnas.</p>
               <p className="hidden sm:block">Scroll horizontal activo</p>
             </div>
             <div className="space-y-2.5 md:hidden">
@@ -384,13 +384,13 @@ export default function VentasPage() {
                   return (
                     <div
                       key={group.key}
-                      className="rounded-[22px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] px-3 py-3.5 shadow-sm"
+                      className="rounded-[22px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] px-3 py-3.5 shadow-sm dark:border-slate-800 dark:bg-[linear-gradient(180deg,rgba(2,6,23,0.92)_0%,rgba(15,23,42,0.86)_100%)]"
                       title={rowHoverSummary}
                     >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="line-clamp-2 text-sm font-medium leading-5 text-slate-900">{lineSummary || 'Venta registrada'}</p>
-                        <p className="mt-1 line-clamp-2 text-xs text-slate-500">
+                        <p className="line-clamp-2 text-sm font-medium leading-5 text-slate-900 dark:text-slate-100">{lineSummary || 'Venta registrada'}</p>
+                        <p className="mt-1 line-clamp-2 text-xs text-slate-500 dark:text-slate-400">
                           {[baseSale.customerName, serviceSummary ? `Servicio: ${serviceSummary}` : '']
                             .filter(Boolean)
                             .join(' · ')}
@@ -411,23 +411,23 @@ export default function VentasPage() {
                     </div>
 
                     <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                      <div className="rounded-xl bg-slate-50 px-3 py-2">
-                        <p className="text-slate-500">Cantidad</p>
-                        <p className="mt-1 font-medium text-slate-900">{formatNumber(totalQuantity)}</p>
+                      <div className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-900/70">
+                        <p className="text-slate-500 dark:text-slate-400">Cantidad</p>
+                        <p className="mt-1 font-medium text-slate-900 dark:text-slate-100">{formatNumber(totalQuantity)}</p>
                       </div>
-                      <div className="rounded-xl bg-slate-50 px-3 py-2">
-                        <p className="text-slate-500">Unitario</p>
-                        <p className="mt-1 font-medium text-slate-900">
+                      <div className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-900/70">
+                        <p className="text-slate-500 dark:text-slate-400">Unitario</p>
+                        <p className="mt-1 font-medium text-slate-900 dark:text-slate-100">
                           {integratedUnitPrice === null ? 'Varios' : formatCurrency(integratedUnitPrice)}
                         </p>
                       </div>
-                      <div className="rounded-xl bg-slate-50 px-3 py-2">
-                        <p className="text-slate-500">Total</p>
-                        <p className="mt-1 font-medium text-slate-900">{formatCurrency(netTotalSale)}</p>
+                      <div className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-900/70">
+                        <p className="text-slate-500 dark:text-slate-400">Total</p>
+                        <p className="mt-1 font-medium text-slate-900 dark:text-slate-100">{formatCurrency(netTotalSale)}</p>
                       </div>
-                      <div className="rounded-xl bg-slate-50 px-3 py-2">
-                        <p className="text-slate-500">{isSalesUser ? 'Fecha' : 'Utilidad'}</p>
-                        <p className="mt-1 font-medium text-slate-900">
+                      <div className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-900/70">
+                        <p className="text-slate-500 dark:text-slate-400">{isSalesUser ? 'Fecha' : 'Utilidad'}</p>
+                        <p className="mt-1 font-medium text-slate-900 dark:text-slate-100">
                           {isSalesUser ? formatDateTime(baseSale.soldAt) : formatCurrency(netProfit)}
                         </p>
                       </div>
@@ -442,9 +442,9 @@ export default function VentasPage() {
                 );
               })}
             </div>
-            <div className="hidden rounded-2xl border border-slate-200 bg-slate-50/60 p-2 md:block">
+            <div className="hidden rounded-2xl border border-slate-200 bg-slate-50/60 p-2 dark:border-slate-800 dark:bg-slate-900/40 md:block">
             <div className="overflow-x-scroll pb-3">
-              <Table className="min-w-[1020px] bg-white text-sm">
+              <Table className="min-w-[1020px] bg-white/90 text-sm dark:bg-slate-950/40">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[390px]">Producto</TableHead>
@@ -455,7 +455,7 @@ export default function VentasPage() {
                     {!isSalesUser && <TableHead>Utilidad</TableHead>}
                     <TableHead>Estado</TableHead>
                     <TableHead>Fecha</TableHead>
-                    <TableHead className="sticky right-0 z-10 bg-slate-50/95 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
+                    <TableHead className="sticky right-0 z-10 bg-slate-50/95 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)] dark:bg-slate-900/95 dark:shadow-[-12px_0_16px_-16px_rgba(2,6,23,0.65)]">
                       Acciones
                     </TableHead>
                   </TableRow>
@@ -573,8 +573,8 @@ export default function VentasPage() {
                       <TableRow key={group.key} className={salesRowHighlightClass}>
                         <TableCell className="max-w-[390px] py-2" title={rowHoverSummary}>
                           <div className="space-y-0.5">
-                            <p className="line-clamp-2 text-sm font-medium leading-5 text-slate-900">{lineSummary}</p>
-                            <p className="line-clamp-1 text-[11px] text-slate-500">
+                            <p className="line-clamp-2 text-sm font-medium leading-5 text-slate-900 dark:text-slate-100">{lineSummary}</p>
+                            <p className="line-clamp-1 text-[11px] text-slate-500 dark:text-slate-400">
                               {[
                                 `${formatNumber(group.sales.length)} linea(s)`,
                                 serviceSummary ? `Servicio: ${serviceSummary}` : '',
@@ -585,21 +585,21 @@ export default function VentasPage() {
                             </p>
                           </div>
                         </TableCell>
-                        <TableCell className="max-w-[150px] truncate py-2" title={rowHoverSummary}>{baseSale.customerName}</TableCell>
+                        <TableCell className="max-w-[150px] truncate py-2 text-slate-700 dark:text-slate-200" title={rowHoverSummary}>{baseSale.customerName}</TableCell>
                         <TableCell title={rowHoverSummary}>
                           <div>
-                            <p className="text-sm">{formatNumber(totalQuantity)}</p>
+                            <p className="text-sm text-slate-700 dark:text-slate-200">{formatNumber(totalQuantity)}</p>
                             {returnedQuantity > 0 ? (
                               <p className="text-xs text-amber-700">Devuelto: {formatNumber(returnedQuantity)}</p>
                             ) : null}
                           </div>
                         </TableCell>
-                        <TableCell className="py-2" title={rowHoverSummary}>{integratedUnitPrice === null ? 'Varios' : formatCurrency(integratedUnitPrice)}</TableCell>
-                        {!isSalesUser && <TableCell className="py-2" title={rowHoverSummary}>{formatCurrency(netTotalSale)}</TableCell>}
-                        {!isSalesUser && <TableCell className="py-2" title={rowHoverSummary}>{formatCurrency(netProfit)}</TableCell>}
-                        <TableCell className="py-2 text-xs" title={rowHoverSummary}>{returnStatus}</TableCell>
-                        <TableCell className="py-2 whitespace-nowrap text-xs" title={rowHoverSummary}>{formatDateTime(baseSale.soldAt)}</TableCell>
-                        <TableCell className="sticky right-0 bg-white/95 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
+                        <TableCell className="py-2 text-slate-700 dark:text-slate-200" title={rowHoverSummary}>{integratedUnitPrice === null ? 'Varios' : formatCurrency(integratedUnitPrice)}</TableCell>
+                        {!isSalesUser && <TableCell className="py-2 text-slate-700 dark:text-slate-200" title={rowHoverSummary}>{formatCurrency(netTotalSale)}</TableCell>}
+                        {!isSalesUser && <TableCell className="py-2 text-slate-700 dark:text-slate-200" title={rowHoverSummary}>{formatCurrency(netProfit)}</TableCell>}
+                        <TableCell className="py-2 text-xs text-slate-700 dark:text-slate-200" title={rowHoverSummary}>{returnStatus}</TableCell>
+                        <TableCell className="py-2 whitespace-nowrap text-xs text-slate-700 dark:text-slate-200" title={rowHoverSummary}>{formatDateTime(baseSale.soldAt)}</TableCell>
+                        <TableCell className="sticky right-0 bg-[rgba(248,250,252,0.96)] text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.22)] backdrop-blur dark:bg-slate-950/95 dark:shadow-[-12px_0_16px_-16px_rgba(2,6,23,0.65)]">
                           <div className="flex items-center justify-end gap-2">
                             <Button
                               type="button"
@@ -779,7 +779,7 @@ export default function VentasPage() {
             </div>
           </div>
         ) : (
-          <Empty className="border border-dashed border-slate-200 bg-slate-50/70">
+          <Empty className="border border-dashed border-slate-200 bg-slate-50/70 dark:border-slate-800 dark:bg-slate-900/60">
             <EmptyHeader>
               <EmptyMedia variant="icon">
                 <Receipt className="h-5 w-5" />
@@ -948,15 +948,15 @@ export default function VentasPage() {
 
           {authorizationDialogState ? (
             <div className="space-y-4">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs uppercase tracking-wide text-slate-500">Venta</p>
-                <p className="mt-1 font-medium text-slate-900">{authorizationDialogState.saleSummary}</p>
-                <p className="mt-3 text-xs uppercase tracking-wide text-slate-500">Cliente</p>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/70">
+                <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Venta</p>
+                <p className="mt-1 font-medium text-slate-900 dark:text-slate-100">{authorizationDialogState.saleSummary}</p>
+                <p className="mt-3 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Cliente</p>
                 <p className="mt-1 text-sm text-slate-700">{authorizationDialogState.customerName || 'Cliente'}</p>
               </div>
 
               <div className="space-y-2">
-                <p className="text-sm font-medium text-slate-900">Motivo de la solicitud</p>
+                <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Motivo de la solicitud</p>
                 <Textarea
                   value={authorizationReason}
                   onChange={(event) => setAuthorizationReason(event.target.value)}

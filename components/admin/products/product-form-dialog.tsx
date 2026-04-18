@@ -205,6 +205,12 @@ function collectAttributeOptions(
   });
 }
 
+function getVariantCatalogInventoryHint(hasVariants: boolean) {
+  return hasVariants
+    ? 'El stock real de cada variante se administra desde Inventario o Compras. Desde catalogo solo defines atributos, SKU, precio y estado.'
+    : 'El stock inicial y los ajustes no se registran desde productos. Usa Inventario para carga inicial o movimientos controlados.';
+}
+
 const productSchema = z
   .object({
     name: z.string().min(3, 'Ingresa el nombre del producto'),
@@ -635,6 +641,10 @@ export function ProductFormDialog({
       description: 'Ya puedes usarla en este producto.',
     });
   };
+  const stockManagementHint = useMemo(
+    () => getVariantCatalogInventoryHint(saleMode === 'varianted'),
+    [saleMode]
+  );
   useEffect(() => {
     if (!usesCompactVariantEditor) return;
 
@@ -1047,20 +1057,22 @@ export function ProductFormDialog({
     if (!currentRow) return fallbackOptions;
 
     return fallbackOptions.filter((option) => {
-      const isDuplicateWithinContext = currentVariants.some((variant, index) => {
-        if (index === rowIndex) return false;
+      const nextValues = normalizedAttributeDefinitions.map((_, comparisonIndex) =>
+        comparisonIndex === attributeIndex
+          ? option.trim().toLowerCase()
+          : (currentRow.attributeValues?.[comparisonIndex] ?? '').trim().toLowerCase()
+      );
+      const nextValuesAreComplete = nextValues.every(Boolean);
+      const isDuplicateWithinContext =
+        nextValuesAreComplete &&
+        currentVariants.some((variant, index) => {
+          if (index === rowIndex) return false;
 
-        return normalizedAttributeDefinitions.every((attribute, comparisonIndex) => {
-          const currentValue =
-            comparisonIndex === attributeIndex
-              ? option.trim().toLowerCase()
-              : (currentRow.attributeValues?.[comparisonIndex] ?? '').trim().toLowerCase();
-          const otherValue = (variant.attributeValues?.[comparisonIndex] ?? '').trim().toLowerCase();
-
-          if (!currentValue) return true;
-          return currentValue === otherValue;
+          const otherValues = normalizedAttributeDefinitions.map(
+            (_, comparisonIndex) => variant.attributeValues?.[comparisonIndex]?.trim().toLowerCase() ?? ''
+          );
+          return otherValues.every(Boolean) && otherValues.join('||') === nextValues.join('||');
         });
-      });
 
       const currentValue = (currentRow.attributeValues?.[attributeIndex] ?? '').trim().toLowerCase();
       return !isDuplicateWithinContext || currentValue === option.trim().toLowerCase();
@@ -1091,34 +1103,8 @@ export function ProductFormDialog({
       const attribute = normalizedAttributeDefinitions[attributeIndex];
       const baseOptions =
         compactAttributeControls.find((control) => control.key === attribute.key)?.options ?? [];
-      const virtualRowIndex = currentVariants.length;
-      const virtualVariants = [
-        ...currentVariants,
-        {
-          attributeValues: currentValues,
-        },
-      ] as Array<{ attributeValues?: string[] }>;
 
-      const filteredOptions = baseOptions.filter((option) => {
-        const optionSignature = virtualVariants.some((variant, index) => {
-          if (index === virtualRowIndex) return false;
-
-          return normalizedAttributeDefinitions.every((comparisonAttribute, comparisonIndex) => {
-            const currentValue =
-              comparisonIndex === attributeIndex
-                ? option.trim().toLowerCase()
-                : (currentValues[comparisonIndex] ?? '').trim().toLowerCase();
-            const otherValue = (variant.attributeValues?.[comparisonIndex] ?? '').trim().toLowerCase();
-
-            if (!currentValue) return true;
-            return comparisonAttribute.key ? currentValue === otherValue : false;
-          });
-        });
-
-        return !optionSignature;
-      });
-
-      for (const option of filteredOptions) {
+      for (const option of baseOptions) {
         const nextValues = [...currentValues];
         nextValues[attributeIndex] = option;
         const found = search(attributeIndex + 1, nextValues);
@@ -1293,9 +1279,12 @@ export function ProductFormDialog({
                       colorAttributeIndex >= 0
                         ? inferColorHex(variant.attributeValues[colorAttributeIndex] ?? '')
                         : '';
+                    const persistedVariant =
+                      initialProduct?.variants?.find((existingVariant) => existingVariant.id === variant.id) ?? null;
 
                     return {
                       ...variant,
+                      stock: Math.max(Number(persistedVariant?.stock ?? 0), 0),
                       colorHex: inferredHex || variant.colorHex || '',
                     };
                   }),
@@ -1320,7 +1309,7 @@ export function ProductFormDialog({
                   value="product-info"
                   title="Informacion del producto"
                   defaultOpen
-                  className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:p-3.5"
+                  className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950/70 sm:p-3.5"
                   headerClassName="mb-2 sm:mb-2.5"
                   contentClassName="space-y-3"
                 >
@@ -1473,10 +1462,13 @@ export function ProductFormDialog({
                       />
                     </div>
 
-                    <div className="space-y-3 rounded-2xl border border-slate-200/90 bg-white px-3 py-3 sm:px-3.5 sm:py-3.5">
+                    <div className="space-y-3 rounded-2xl border border-border bg-card/88 px-3 py-3 dark:border-slate-800 dark:bg-slate-950/70 sm:px-3.5 sm:py-3.5">
+                      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/70 dark:bg-amber-950/30 dark:text-amber-100">
+                        {stockManagementHint}
+                      </div>
                       {variantsDisabledForSelection ? (
-                        <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-700">
-                          <span className="font-semibold text-slate-900">
+                        <div className="rounded-2xl border border-border bg-muted/70 px-4 py-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300">
+                          <span className="font-semibold text-slate-900 dark:text-slate-100">
                             {selectedSubcategory || 'Esta presentacion'}
                           </span>{' '}
                           se maneja como producto simple y no muestra variantes disponibles.
@@ -1485,14 +1477,14 @@ export function ProductFormDialog({
                         <>
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div>
-                          <h4 className="text-sm font-semibold text-slate-900">Variantes disponibles</h4>
+                          <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Variantes disponibles</h4>
                         </div>
                         {variantTemplate && !isVariantTemplateApplied ? (
                           <Button
                             type="button"
                             variant="outline"
                             size="sm"
-                            className="rounded-xl bg-white max-sm:h-9"
+                            className="rounded-xl bg-card/88 dark:bg-slate-950/70 max-sm:h-9"
                             disabled={structureLocked}
                             onClick={applyVariantTemplate}
                           >
@@ -1503,13 +1495,13 @@ export function ProductFormDialog({
 
                       <div className="grid gap-2.5">
                         {structureLocked ? (
-                          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-100">
                             Este producto ya tiene historial y la estructura de variantes esta protegida.
                           </div>
                         ) : null}
 
                         {canReconfigureVirolaHistory ? (
-                          <div className="rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm text-cyan-900">
+                          <div className="rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm text-cyan-900 dark:border-cyan-900/60 dark:bg-cyan-950/20 dark:text-cyan-100">
                             El historial existente se reasignara a la variante que selecciones abajo.
                           </div>
                         ) : null}
@@ -1540,17 +1532,17 @@ export function ProductFormDialog({
                         </div>
 
                         {saleMode === 'varianted' ? (
-                          <div className="space-y-2 rounded-2xl bg-slate-50/55 p-2.5">
+                          <div className="space-y-2 rounded-2xl bg-slate-50/55 p-2.5 dark:bg-slate-900/55">
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                               <div className="min-w-0">
-                                <p className="text-sm font-semibold text-slate-900">Atributos de la variante</p>
+                                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Atributos de la variante</p>
                               </div>
                               {templateAllowsAttributeEditing ? (
                                 <Button
                                   type="button"
                                   variant="outline"
                                   size="sm"
-                                  className="h-9 w-full rounded-xl bg-white sm:h-10 sm:w-auto"
+                                  className="h-9 w-full rounded-xl bg-card/88 dark:bg-slate-950/70 sm:h-10 sm:w-auto"
                                   disabled={structureLocked}
                                   onClick={addManualVariantAttribute}
                                 >
@@ -1568,7 +1560,7 @@ export function ProductFormDialog({
                                     type="button"
                                     variant="outline"
                                     size="sm"
-                                    className="h-9 rounded-full bg-slate-50 px-3"
+                                    className="h-9 rounded-full bg-muted px-3 dark:bg-slate-900/70"
                                     disabled={
                                       structureLocked ||
                                       form
@@ -1588,9 +1580,9 @@ export function ProductFormDialog({
 
                             {attributeFields.length > 0 ? (
                               attributeFields.map((field, index) => (
-                                <div key={field.id} className="rounded-2xl border border-slate-200/90 bg-white p-2.5">
+                                <div key={field.id} className="rounded-2xl border border-border bg-card/88 p-2.5 dark:border-slate-800 dark:bg-slate-950/70">
                                   {!templateAllowsAttributeEditing ? (
-                                    <p className="text-sm font-semibold text-slate-900">
+                                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                                       {form.getValues(`variantAttributes.${index}.label`) || `Atributo ${index + 1}`}
                                     </p>
                                   ) : (
@@ -1620,7 +1612,7 @@ export function ProductFormDialog({
                                         type="button"
                                         variant="ghost"
                                         size="icon"
-                                        className="mt-0.5 h-9 w-9 shrink-0 self-end rounded-xl text-slate-500 hover:bg-slate-100 hover:text-rose-600 sm:self-auto"
+                                        className="mt-0.5 h-9 w-9 shrink-0 self-end rounded-xl text-slate-500 hover:bg-muted hover:text-rose-600 dark:text-slate-400 dark:hover:bg-slate-900 sm:self-auto"
                                         disabled={structureLocked}
                                         onClick={() => removeManualVariantAttribute(index)}
                                         aria-label="Eliminar atributo"
@@ -1632,7 +1624,7 @@ export function ProductFormDialog({
                                 </div>
                               ))
                             ) : templateAllowsAttributeEditing ? (
-                              <div className="hidden rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-3 text-sm text-slate-500 sm:block">
+                              <div className="hidden rounded-2xl border border-dashed border-slate-300 bg-card/88 px-4 py-3 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-400 sm:block">
                                 Empieza por definir al menos un atributo, por ejemplo `Color`, `Tamano` o `Presentacion`.
                               </div>
                             ) : null}
@@ -1646,40 +1638,45 @@ export function ProductFormDialog({
                         ) : null}
 
                         {canReconfigureVirolaHistory && saleMode === 'varianted' && variantFields.length > 0 ? (
-                          <FormField
-                            control={form.control}
-                            name="historyVariantName"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Historial previo</FormLabel>
-                                <Select value={field.value} onValueChange={field.onChange}>
-                                  <FormControl>
-                                    <SelectTrigger className="w-full">
-                                      <SelectValue placeholder="Selecciona la variante historica" />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    {variantFields.map((variantField, index) => {
-                                      const variantName =
-                                        form.getValues(`variants.${index}.name`) ||
-                                        form.getValues(`variants.${index}.attributeValues.0`) ||
-                                        `Variante ${index + 1}`;
-                                      return (
-                                        <SelectItem key={variantField.id} value={variantName}>
-                                          {variantName}
-                                        </SelectItem>
-                                      );
-                                    })}
-                                  </SelectContent>
-                                </Select>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
+                          <div className="space-y-3 rounded-2xl border border-border bg-muted/75 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+                            <FormField
+                              control={form.control}
+                              name="historyVariantName"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Historial previo</FormLabel>
+                                  <Select value={field.value} onValueChange={field.onChange}>
+                                    <FormControl>
+                                      <SelectTrigger className="w-full">
+                                        <SelectValue placeholder="Selecciona la variante historica" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {variantFields.map((variantField, index) => {
+                                        const variantName =
+                                          form.getValues(`variants.${index}.name`) ||
+                                          form.getValues(`variants.${index}.attributeValues.0`) ||
+                                          `Variante ${index + 1}`;
+                                        return (
+                                          <SelectItem key={variantField.id} value={variantName}>
+                                            {variantName}
+                                          </SelectItem>
+                                        );
+                                      })}
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">
+                              El stock historico se migrara a esta variante base. Cualquier carga inicial o redistribucion posterior debe hacerse desde Inventario.
+                            </p>
+                          </div>
                         ) : null}
 
                         {usesSingleAxisTemplate ? (
-                          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                          <div className="rounded-2xl border border-border bg-card/88 p-4 dark:border-slate-800 dark:bg-slate-950/72">
                             <div className="flex flex-col gap-3">
                               {availableSingleAxisOptions.length > 0 ? (
                                 <div className="flex flex-wrap gap-2">
@@ -1689,7 +1686,7 @@ export function ProductFormDialog({
                                       type="button"
                                       variant="outline"
                                       size="sm"
-                                      className="rounded-full bg-slate-50"
+                                      className="rounded-full bg-muted"
                                       disabled={structureLocked}
                                       onClick={() => appendSingleAxisVariant(option)}
                                     >
@@ -1767,6 +1764,7 @@ export function ProductFormDialog({
                             getRowAttributeOptions={getCompactRowAttributeOptions}
                             hiddenColumns={compactEditorConfig?.hiddenColumns}
                             manualRows={usesCompactManualRows}
+                            hideStockColumn
                           />
                         ) : null}
 
@@ -1793,15 +1791,14 @@ export function ProductFormDialog({
                               }
                             >
                               {usesSingleAxisTemplate ? (
-                                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                                <div className="overflow-hidden rounded-2xl border border-border bg-card/88 dark:border-slate-800 dark:bg-slate-950/72">
                                   <Table>
                                     <TableHeader>
-                                      <TableRow className="bg-slate-50 hover:bg-slate-50">
-                                        <TableHead className="h-9 px-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                      <TableRow className="bg-muted/80 hover:bg-muted/80">
+                                        <TableHead className="h-9 px-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                                           {singleAxisTemplate?.label ?? 'Variante'}
                                         </TableHead>
-                                        <TableHead className="h-9 w-[112px] px-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Cantidad</TableHead>
-                                        <TableHead className="h-9 w-[56px] px-2 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">Eliminar</TableHead>
+                                        <TableHead className="h-9 w-[56px] px-2 text-center text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Eliminar</TableHead>
                                       </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -1821,7 +1818,7 @@ export function ProductFormDialog({
                                                           placeholder={`Ej: ${attribute.label}`}
                                                           {...field}
                                                           disabled={structureLocked}
-                                                          className="h-8 rounded-md border-slate-200 bg-white px-2.5 text-sm font-semibold text-slate-900"
+                                                          className="h-8 rounded-md border-border bg-background/88 px-2.5 text-sm font-semibold text-slate-900 dark:border-slate-700 dark:bg-slate-900/72 dark:text-slate-100"
                                                           onChange={(event) => {
                                                             field.onChange(event);
                                                             if (hasColorAttribute && attribute.key === 'color') {
@@ -1841,32 +1838,12 @@ export function ProductFormDialog({
                                               ))}
                                             </div>
                                           </TableCell>
-                                          <TableCell className="px-3 py-2">
-                                            <FormField
-                                              control={form.control}
-                                              name={`variants.${index}.stock`}
-                                              render={({ field }) => (
-                                                <FormItem>
-                                                  <FormControl>
-                                                    <Input
-                                                      type="number"
-                                                      min="0"
-                                                      {...field}
-                                                      disabled={structureLocked}
-                                                      className="h-8 rounded-md px-2.5 text-sm"
-                                                    />
-                                                  </FormControl>
-                                                  <FormMessage />
-                                                </FormItem>
-                                              )}
-                                            />
-                                          </TableCell>
                                           <TableCell className="px-2 py-2 text-center">
                                             <Button
                                               type="button"
                                               variant="ghost"
                                               size="sm"
-                                              className="h-8 w-8 rounded-md p-0 text-slate-500 hover:bg-slate-100 hover:text-rose-600"
+                                              className="h-8 w-8 rounded-md p-0 text-slate-500 hover:bg-muted hover:text-rose-600 dark:text-slate-400 dark:hover:bg-slate-900"
                                               disabled={structureLocked}
                                               onClick={() => removeVariant(index)}
                                               aria-label="Eliminar variante"
@@ -1886,7 +1863,7 @@ export function ProductFormDialog({
                                   className={
                                     usesSingleAxisTemplate
                                       ? 'grid grid-cols-[minmax(0,1fr)_120px_64px] items-end gap-3 border-b border-slate-100 px-3 py-2 last:border-b-0'
-                                      : 'grid min-w-0 gap-3 rounded-2xl border border-slate-200 bg-white p-3'
+                                      : 'grid min-w-0 gap-3 rounded-2xl border border-border bg-card/88 p-3 dark:border-slate-800 dark:bg-slate-950/72'
                                   }
                                 >
                                 {normalizedAttributeDefinitions.length > 0 ? (
@@ -1934,25 +1911,6 @@ export function ProductFormDialog({
                                     ))}
                                     {usesSingleAxisTemplate ? (
                                       <>
-                                        <FormField
-                                          control={form.control}
-                                          name={`variants.${index}.stock`}
-                                          render={({ field }) => (
-                                            <FormItem>
-                                              {!usesSingleAxisTemplate ? <FormLabel>Cantidad</FormLabel> : null}
-                                              <FormControl>
-                                                <Input
-                                                  type="number"
-                                                  min="0"
-                                                  {...field}
-                                                  disabled={structureLocked}
-                                                  className="h-9 rounded-lg"
-                                                />
-                                              </FormControl>
-                                              <FormMessage />
-                                            </FormItem>
-                                          )}
-                                        />
                                         <div className="flex items-end">
                                           <Button
                                             type="button"
@@ -1972,7 +1930,7 @@ export function ProductFormDialog({
                                 ) : null}
 
                                 {!usesSingleAxisTemplate ? (
-                                  <div className="grid gap-2.5 sm:grid-cols-3 sm:gap-3">
+                                  <div className="grid gap-2.5 sm:grid-cols-2 sm:gap-3">
                                     <FormField
                                       control={form.control}
                                       name={`variants.${index}.salePrice`}
@@ -1986,19 +1944,6 @@ export function ProductFormDialog({
                                         </FormItem>
                                       )}
                                     />
-                                    <FormField
-                                      control={form.control}
-                                      name={`variants.${index}.stock`}
-                                      render={({ field }) => (
-                                          <FormItem className="min-w-0">
-                                            <FormLabel>Stock inicial</FormLabel>
-                                            <FormControl>
-                                            <Input type="number" min="0" {...field} disabled={structureLocked} />
-                                            </FormControl>
-                                            <FormMessage />
-                                          </FormItem>
-                                        )}
-                                      />
                                     <div className="flex items-end">
                                       <Button
                                         type="button"
@@ -2066,12 +2011,12 @@ export function ProductFormDialog({
                 <AdminMobileSection
                   value="product-commerce"
                   title="Configuracion comercial"
-                  className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:p-3.5"
+                  className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950/70 sm:p-3.5"
                   headerClassName="mb-2 sm:mb-2.5"
                 >
                   <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
                     {usesCompactVariantEditor && compactEditorConfig?.priceMode === 'global' ? (
-                      <div className="hidden rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-600 sm:block">
+                      <div className="hidden rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300 sm:block">
                         El precio de venta se controla desde el bloque de variantes.
                       </div>
                     ) : (
@@ -2119,13 +2064,13 @@ export function ProductFormDialog({
                       control={form.control}
                       name="featured"
                       render={({ field }) => (
-                        <FormItem className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3 sm:p-3.5">
+                        <FormItem className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-900/60 sm:p-3.5">
                           <div className="flex items-start gap-3">
                             <FormControl>
                               <Checkbox checked={field.value} onCheckedChange={(checked) => field.onChange(checked === true)} />
                             </FormControl>
                             <div>
-                              <FormLabel className="text-sm font-medium text-slate-950">Mostrar como producto destacado</FormLabel>
+                              <FormLabel className="text-sm font-medium text-slate-950 dark:text-slate-100">Mostrar como producto destacado</FormLabel>
                             </div>
                           </div>
                           <FormMessage />
@@ -2139,7 +2084,7 @@ export function ProductFormDialog({
                 <AdminMobileSection
                   value="product-image"
                   title="Imagen"
-                  className="space-y-3 rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-slate-100 p-3 shadow-sm sm:p-3.5"
+                  className="space-y-3 rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-slate-100 p-3 shadow-sm dark:border-slate-800 dark:bg-[linear-gradient(180deg,rgba(2,6,23,0.92)_0%,rgba(15,23,42,0.88)_100%)] sm:p-3.5"
                   defaultOpen
                 >
                 <FormField
@@ -2159,15 +2104,15 @@ export function ProductFormDialog({
                           <button
                             type="button"
                             onClick={() => imageInputRef.current?.click()}
-                            className="block min-h-[190px] w-full rounded-3xl border border-dashed border-slate-300 bg-white p-3.5 text-left transition hover:border-slate-400 hover:shadow-sm sm:min-h-[220px] sm:p-4"
+                            className="block min-h-[190px] w-full rounded-3xl border border-dashed border-slate-300 bg-card/88 p-3.5 text-left transition hover:border-slate-400 hover:shadow-sm dark:border-slate-700 dark:bg-slate-950/60 sm:min-h-[220px] sm:p-4"
                           >
                             <div>
-                              <p className="text-sm font-medium text-slate-700">Cargar imagen</p>
+                              <p className="text-sm font-medium text-slate-700 dark:text-slate-200">Cargar imagen</p>
                             </div>
                           </button>
-                          <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white">
-                            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-                              <p className="text-sm font-medium text-slate-700">Vista actual</p>
+                          <div className="overflow-hidden rounded-3xl border border-border bg-card/88 dark:border-slate-800 dark:bg-slate-950/70">
+                            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-800">
+                              <p className="text-sm font-medium text-slate-700 dark:text-slate-200">Vista actual</p>
                             </div>
                             <div className="relative mx-auto aspect-square w-full max-w-[240px] bg-gradient-to-br from-white via-slate-50 to-slate-100">
                               <Image

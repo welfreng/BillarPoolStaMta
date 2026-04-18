@@ -140,7 +140,30 @@ export function InitialStockDialog({
 }) {
   const initialStockFormId = useId();
   const form = useForm<InitialStockFormValues>({
-    resolver: zodResolver(initialStockSchema),
+    resolver: zodResolver(
+      z
+        .object({
+          productId: z.string().min(1, 'Selecciona un producto'),
+          variantId: z.string().default(''),
+          quantity: z.coerce.number().positive('La cantidad debe ser mayor a cero'),
+          estimatedUnitCost: z.coerce.number().min(0, 'El costo estimado no puede ser negativo'),
+          suggestedSalePrice: z.coerce.number().min(0, 'El precio de venta no puede ser negativo'),
+          occurredAt: z.string().min(1, 'Selecciona la fecha'),
+          notes: z.string().min(6, 'Agrega una nota breve sobre el origen del stock'),
+        })
+        .superRefine((values, ctx) => {
+          const selectedProduct = products.find((product) => product.id === values.productId);
+          if (!selectedProduct) return;
+
+          if ((selectedProduct.variants?.length ?? 0) > 0 && !values.variantId.trim()) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: 'Selecciona la variante para cargar inventario inicial.',
+              path: ['variantId'],
+            });
+          }
+        })
+    ),
     defaultValues,
   });
 
@@ -249,6 +272,9 @@ export function InitialStockDialog({
                         ))}
                       </SelectContent>
                     </Select>
+                    <p className="text-xs leading-5 text-slate-500">
+                      La carga inicial de productos con variantes debe registrarse sobre una variante especifica.
+                    </p>
                     <FormMessage />
                   </FormItem>
                 )}

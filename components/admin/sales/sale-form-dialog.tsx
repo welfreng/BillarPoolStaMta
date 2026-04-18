@@ -136,7 +136,7 @@ function SearchableSelect({
               event.stopPropagation();
             }}
           >
-            <CommandEmpty>{emptyLabel}</CommandEmpty>
+            <CommandEmpty className="text-slate-600 dark:text-slate-300">{emptyLabel}</CommandEmpty>
             <CommandGroup>
               {options.map((option) => (
                 <CommandItem
@@ -342,6 +342,42 @@ function getSuggestedSaleVariant(
   return variants.length === 1 ? variants[0] : null;
 }
 
+function getDefaultSaleVariant(
+  product: Product | null | undefined,
+  movements: InventoryMovement[]
+) {
+  return getSuggestedSaleVariant(product, movements) ?? getSelectableSaleVariants(product, movements)[0] ?? null;
+}
+
+function getInitialSaleUnitPrice(
+  product: Product | null | undefined,
+  movements: InventoryMovement[],
+  variantId?: string
+) {
+  if (!product) return 0;
+
+  const explicitVariantPrice =
+    variantId && product.variants?.find((variant) => variant.id === variantId)?.salePrice;
+  if (explicitVariantPrice !== undefined && explicitVariantPrice !== null) {
+    return Number(explicitVariantPrice);
+  }
+
+  const defaultVariant = getDefaultSaleVariant(product, movements);
+  if (defaultVariant?.salePrice !== undefined && defaultVariant?.salePrice !== null) {
+    return Number(defaultVariant.salePrice);
+  }
+
+  return getVariantSalePrice(product);
+}
+
+function getSaleUnitPriceForVariantSelection(
+  product: Product | null | undefined,
+  variantId?: string
+) {
+  if (!product) return 0;
+  return Number(getVariantSalePrice(product, variantId));
+}
+
 function normalizeGiftItems(
   items: SaleLineFormValue['giftItems'],
   products: Product[],
@@ -441,19 +477,19 @@ function SaleGiftSection({
   if (allowedCategories.length === 0) return null;
 
   return (
-    <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
+    <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/70 sm:p-4">
       <div className="flex flex-col gap-3">
         <div className="flex items-start gap-3">
-          <div className="rounded-xl bg-amber-50 p-2 text-amber-700">
+          <div className="rounded-xl bg-amber-50 p-2 text-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
             <Gift className="h-4 w-4" />
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-slate-900">Obsequio</p>
-            <p className="hidden text-sm text-slate-500 sm:block">{getGiftSelectionHelpText(allowedCategories)}</p>
+            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Obsequio</p>
+            <p className="hidden text-sm text-slate-500 dark:text-slate-400 sm:block">{getGiftSelectionHelpText(allowedCategories)}</p>
           </div>
         </div>
 
-        <label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2">
+        <label className="flex items-center gap-3 rounded-xl border border-border bg-card/88 px-3 py-2 dark:border-slate-700 dark:bg-slate-950/60">
           <Checkbox
             checked={enabled}
             onCheckedChange={(checked) => {
@@ -464,7 +500,7 @@ function SaleGiftSection({
               }
             }}
           />
-          <span className="text-sm font-medium text-slate-700">Incluir obsequio</span>
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Incluir obsequio</span>
         </label>
       </div>
 
@@ -475,7 +511,7 @@ function SaleGiftSection({
             const options = availableGiftOptionsByCategory[category];
 
             return (
-              <div key={category} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <div key={category} className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/60">
                 <div className="flex items-center gap-3">
                   <Checkbox
                     checked={Boolean(selectedProductId)}
@@ -488,7 +524,7 @@ function SaleGiftSection({
                       );
                     }}
                   />
-                  <span className="text-sm font-medium text-slate-900">{giftCategoryCopy[category].toggle}</span>
+                  <span className="text-sm font-medium text-slate-900 dark:text-slate-100">{giftCategoryCopy[category].toggle}</span>
                 </div>
 
                 <div className="mt-3">
@@ -499,7 +535,7 @@ function SaleGiftSection({
                     }
                     disabled={!selectedProductId || options.length === 0}
                   >
-                    <SelectTrigger className="h-10 w-full max-w-full bg-white">
+                    <SelectTrigger className="h-10 w-full max-w-full bg-card/88 dark:border-slate-700 dark:bg-slate-950/70 dark:text-slate-100">
                       <SelectValue placeholder={giftCategoryCopy[category].placeholder} />
                     </SelectTrigger>
                     <SelectContent>
@@ -531,21 +567,21 @@ function SaleServiceSection({
   const enabled = Boolean(serviceItem);
 
   return (
-    <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
+    <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/70 sm:p-4">
       <div className="flex flex-col gap-3">
         <div className="flex items-start gap-3">
-          <div className="rounded-xl bg-cyan-50 p-2 text-cyan-700">
+          <div className="rounded-xl bg-cyan-50 p-2 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-200">
             <Gift className="h-4 w-4" />
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-slate-900">Servicio asociado</p>
-            <p className="hidden text-sm text-slate-500 sm:block">
+            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Servicio asociado</p>
+            <p className="hidden text-sm text-slate-500 dark:text-slate-400 sm:block">
               Registra aqui la instalacion para medir por separado el ingreso y la utilidad del torno.
             </p>
           </div>
         </div>
 
-        <label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2">
+        <label className="flex items-center gap-3 rounded-xl border border-border bg-card/88 px-3 py-2 dark:border-slate-700 dark:bg-slate-950/60">
           <Checkbox
             checked={enabled}
             onCheckedChange={(checked) => {
@@ -556,7 +592,7 @@ function SaleServiceSection({
               });
             }}
           />
-          <span className="text-sm font-medium text-slate-700">Incluir instalacion</span>
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Incluir instalacion</span>
         </label>
       </div>
 
@@ -759,6 +795,7 @@ export function SaleFormDialog({
   const firstItemHasGiftSelection = hasSelectedGiftItems(firstItem.giftItems, products);
   const draftProduct = products.find((product) => product.id === draftLine.productId) ?? null;
   const draftVariantOptions = getSelectableSaleVariants(draftProduct, movements);
+  const draftSelectedVariant = draftVariantOptions.find((variant) => variant.id === draftLine.variantId) ?? null;
   const draftAllowedGiftCategories = draftProduct ? getAllowedSaleGiftCategories(draftProduct) : [];
   const draftCanHaveGift = draftAllowedGiftCategories.length > 0;
   const draftHasGiftSelection = hasSelectedGiftItems(draftLine.giftItems, products);
@@ -816,6 +853,31 @@ export function SaleFormDialog({
       setDraftGiftSectionEnabled(true);
     }
   }, [draftCanHaveGift, draftHasGiftSelection]);
+
+  useEffect(() => {
+    if (!draftLine.productId) return;
+
+    const product = products.find((item) => item.id === draftLine.productId);
+    if (!product) return;
+
+    const nextPrice = String(
+      draftSelectedVariant
+        ? Number(draftSelectedVariant.salePrice ?? getVariantSalePrice(product, draftSelectedVariant.id))
+        : getSaleUnitPriceForVariantSelection(product, draftLine.variantId || undefined)
+    );
+    if (draftLine.unitPrice === nextPrice) return;
+
+    setDraftLine((current) => {
+      if (current.productId !== draftLine.productId || current.variantId !== draftLine.variantId) {
+        return current;
+      }
+
+      return {
+        ...current,
+        unitPrice: nextPrice,
+      };
+    });
+  }, [draftLine.productId, draftLine.variantId, draftLine.unitPrice, draftSelectedVariant, products]);
 
   const openNewLineDialog = () => {
     setEditingLineIndex(null);
@@ -933,7 +995,7 @@ export function SaleFormDialog({
                 value="sale-customer"
                 title="Cliente y fecha"
                 defaultOpen
-                className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:p-6"
+                className="rounded-3xl border border-border bg-card/88 p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950/72 sm:p-6"
               >
               <div className="grid gap-4 sm:grid-cols-2 sm:items-start">
                 <FormField
@@ -1034,18 +1096,18 @@ export function SaleFormDialog({
                 title="Productos de la venta"
                 description="El primer producto se elige aqui. Usa `Agregar producto` solo cuando la venta tenga mas lineas."
                 defaultOpen
-                className="min-w-0 rounded-3xl border border-slate-200 bg-slate-50/60 p-3 sm:p-5 lg:p-6"
+                className="min-w-0 rounded-3xl border border-border bg-muted/60 p-3 dark:border-slate-800 dark:bg-slate-900/55 sm:p-5 lg:p-6"
                 contentClassName="space-y-3.5 sm:space-y-5"
               >
 
                 {fields.length <= 1 ? (
-                  <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+                  <div className="rounded-2xl border border-border bg-card/88 p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950/72 sm:p-4">
                   <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full bg-slate-100 px-2 text-xs font-semibold text-slate-700">
+                      <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full bg-muted px-2 text-xs font-semibold text-slate-700 dark:bg-slate-900 dark:text-slate-200">
                         #1
                       </span>
-                      <p className="text-sm font-medium text-slate-900">Producto principal</p>
+                      <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Producto principal</p>
                     </div>
                   </div>
 
@@ -1063,19 +1125,15 @@ export function SaleFormDialog({
                               onChange={(value) => {
                                 field.onChange(value);
                                 const product = products.find((item) => item.id === value);
-                                const suggestedVariant = getSuggestedSaleVariant(product, movements);
+                                const defaultVariant = getDefaultSaleVariant(product, movements);
                                 if (product) {
                                   form.setValue(
                                     'items.0.unitPrice',
-                                    suggestedVariant
-                                      ? Number(suggestedVariant.salePrice ?? getVariantSalePrice(product))
-                                      : (product.variants?.length ?? 0) > 0
-                                        ? 0
-                                        : getVariantSalePrice(product),
+                                    getInitialSaleUnitPrice(product, movements, defaultVariant?.id),
                                     { shouldValidate: true }
                                   );
                                 }
-                                form.setValue('items.0.variantId', suggestedVariant?.id ?? '', {
+                                form.setValue('items.0.variantId', defaultVariant?.id ?? '', {
                                   shouldValidate: true,
                                 });
                                 form.setValue(
@@ -1112,7 +1170,7 @@ export function SaleFormDialog({
                     />
 
                     {firstLineSummary?.product ? (
-                      <div className="sticky bottom-24 z-10 rounded-2xl border border-cyan-200 bg-cyan-50 px-3.5 py-3 shadow-sm md:static md:px-4 md:shadow-none">
+                      <div className="sticky bottom-24 z-10 rounded-2xl border border-cyan-200/70 bg-cyan-50/85 px-3.5 py-3 shadow-sm dark:border-cyan-900/60 dark:bg-cyan-950/22 md:static md:px-4 md:shadow-none">
                         <p className="text-xs font-semibold uppercase tracking-wide text-cyan-800">Stock disponible</p>
                         <p className="mt-1 text-lg font-semibold text-cyan-950">
                           {formatNumber(firstItemDisplayStock)} unidades
@@ -1148,7 +1206,7 @@ export function SaleFormDialog({
                             {firstItemVariantOptions.map((variant) => (
                               <span
                                 key={variant.id}
-                                className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-medium text-slate-700"
+                                className="inline-flex items-center gap-1.5 rounded-full bg-card/88 px-2.5 py-1 text-xs font-medium text-slate-700 dark:bg-slate-950/72 dark:text-slate-200"
                               >
                                 {variant.colorHex ? (
                                   <span
@@ -1172,12 +1230,11 @@ export function SaleFormDialog({
                                 value={field.value}
                                 onValueChange={(value) => {
                                   field.onChange(value);
-                                  const variant = firstItemVariantOptions.find((item) => item.id === value);
-                                  if (variant?.salePrice !== undefined) {
-                                    form.setValue('items.0.unitPrice', Number(variant.salePrice), {
-                                      shouldValidate: true,
-                                    });
-                                  }
+                                  form.setValue(
+                                    'items.0.unitPrice',
+                                    getSaleUnitPriceForVariantSelection(firstItemProduct, value),
+                                    { shouldValidate: true }
+                                  );
                                 }}
                               >
                                 <FormControl>
@@ -1263,7 +1320,7 @@ export function SaleFormDialog({
                         availableGiftOptionsByCategory={availableGiftOptionsByCategory}
                       />
                     ) : firstItem.productId ? (
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                      <div className="rounded-2xl border border-border bg-muted/70 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300">
                         Los obsequios no aplican para este producto.
                       </div>
                     ) : null}
@@ -1271,8 +1328,8 @@ export function SaleFormDialog({
                     </div>
 
                     {firstItemProduct ? (
-                      <aside className="hidden rounded-3xl border border-slate-200 bg-slate-50/70 p-4 lg:block">
-                        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                      <aside className="hidden rounded-3xl border border-border bg-muted/70 p-4 dark:border-slate-800 dark:bg-slate-900/60 lg:block">
+                        <div className="overflow-hidden rounded-2xl border border-border bg-card/88 dark:border-slate-800 dark:bg-slate-950/72">
                           <div className="relative aspect-[4/3] w-full">
                             <Image
                               src={firstItemProduct.image || SITE_LOGO}
@@ -1287,8 +1344,8 @@ export function SaleFormDialog({
 
                         <div className="mt-4 space-y-3">
                           <div>
-                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Vista del producto</p>
-                            <p className="mt-1 text-lg font-semibold text-slate-950">{firstItemProduct.name}</p>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Vista del producto</p>
+                            <p className="mt-1 text-lg font-semibold text-slate-950 dark:text-slate-100">{firstItemProduct.name}</p>
                             <p className="text-sm text-slate-500">{firstItemProduct.brand || 'Sin marca'}</p>
                           </div>
 
@@ -1322,9 +1379,9 @@ export function SaleFormDialog({
                           </div>
 
                           {firstItemSelectedVariant ? (
-                            <div className="rounded-2xl bg-white px-3 py-2.5 sm:px-4 sm:py-3">
-                              <p className="text-xs text-slate-500">{firstItemProduct.variantLabel || 'Variante'}</p>
-                              <p className="mt-1 flex items-center gap-2 font-medium text-slate-900">
+                            <div className="rounded-2xl bg-card/88 px-3 py-2.5 dark:bg-slate-950/72 sm:px-4 sm:py-3">
+                              <p className="text-xs text-slate-500 dark:text-slate-400">{firstItemProduct.variantLabel || 'Variante'}</p>
+                              <p className="mt-1 flex items-center gap-2 font-medium text-slate-900 dark:text-slate-100">
                                 {firstItemSelectedVariant.colorHex ? (
                                   <span
                                     className="h-4 w-4 rounded-full border border-slate-300"
@@ -1341,7 +1398,7 @@ export function SaleFormDialog({
                   </div>
 
                   {firstLineSummary?.product ? (
-                    <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-slate-50 px-3 py-2.5 text-sm text-slate-600">
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-muted/75 px-3 py-2.5 text-sm text-slate-600 dark:bg-slate-900/60 dark:text-slate-300">
                       <span className="truncate">{firstLineSummary.product.name} - {firstLineSummary.product.brand || 'Sin marca'}</span>
                       <span className="font-medium text-slate-900">
                         {firstLineSummary.selectedVariant ? `${firstLineSummary.selectedVariant.name} · ` : ''}
@@ -1357,10 +1414,10 @@ export function SaleFormDialog({
                     {fields.map((field, index) => {
                       const summary = saleSummaries[index];
                       return (
-                        <div key={field.id} className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+                        <div key={field.id} className="rounded-2xl border border-border bg-card/88 p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950/72 sm:p-4">
                           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div className="min-w-0 space-y-1">
-                              <p className="font-medium text-slate-900">
+                              <p className="font-medium text-slate-900 dark:text-slate-100">
                                 {summary.product?.name ?? 'Producto'} x {formatNumber(summary.quantity)}
                               </p>
                               <p className="text-sm text-slate-500">
@@ -1407,7 +1464,7 @@ export function SaleFormDialog({
                     })}
                   </div>
                 ) : (
-                  <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-8 text-center text-sm text-slate-500">
+                  <div className="rounded-2xl border border-dashed border-slate-300 bg-card/88 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-400">
                     Si la venta tiene mas de un producto, usa `Agregar producto` para sumarlo a la lista.
                   </div>
                 )}
@@ -1421,23 +1478,23 @@ export function SaleFormDialog({
                   <Button
                     type="button"
                     variant="outline"
-                    className="hidden w-full rounded-xl bg-white sm:inline-flex"
+                    className="hidden w-full rounded-xl bg-card/88 sm:inline-flex"
                     onClick={openNewLineDialog}
                   >
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Agregar producto
                   </Button>
 
-                  <div className="flex flex-col gap-2 rounded-2xl border border-emerald-100 bg-emerald-50/70 px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+                  <div className="flex flex-col gap-2 rounded-2xl border border-emerald-200/70 bg-emerald-50/75 px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4 dark:border-emerald-900/60 dark:bg-emerald-950/22">
                     <div>
-                      <p className="text-sm font-medium text-emerald-950">Total acumulado de la venta</p>
-                      <p className="text-xs text-emerald-800">
+                      <p className="text-sm font-medium text-emerald-950 dark:text-emerald-100">Total acumulado de la venta</p>
+                      <p className="text-xs text-emerald-800 dark:text-emerald-200/80">
                         {formatNumber(saleSummaries.reduce((sum, item) => sum + item.quantity, 0))} unidades en {
                           formatNumber(fields.length)
                         } lineas
                       </p>
                     </div>
-                    <p className="text-lg font-semibold text-emerald-950">{formatCurrency(totals.totalSale)}</p>
+                    <p className="text-lg font-semibold text-emerald-950 dark:text-emerald-100">{formatCurrency(totals.totalSale)}</p>
                   </div>
                 </div>
               </AdminMobileSection>
@@ -1445,7 +1502,7 @@ export function SaleFormDialog({
               <AdminMobileSection
                 value="sale-notes"
                 title="Notas"
-                className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:p-6"
+                className="rounded-3xl border border-border bg-card/88 p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950/72 sm:p-6"
               >
                 <FormField
                   control={form.control}
@@ -1466,34 +1523,34 @@ export function SaleFormDialog({
                 value="sale-summary"
                 title="Resumen de la venta"
                 defaultOpen
-                className="rounded-2xl border border-cyan-100 bg-cyan-50/70 p-3.5 sm:p-6"
+                className="rounded-2xl border border-cyan-200/70 bg-cyan-50/70 p-3.5 dark:border-cyan-900/60 dark:bg-cyan-950/18 sm:p-6"
               >
                 <div className={`mt-4 grid gap-3 ${hideFinancialSummary ? 'sm:grid-cols-1 lg:grid-cols-1' : 'sm:grid-cols-2 lg:grid-cols-5'}`}>
-                  <div className="rounded-2xl bg-white p-3 sm:p-4">
-                    <p className="text-xs text-slate-500">Unidades en venta</p>
-                    <p className="mt-1 font-semibold text-slate-900">
+                  <div className="rounded-2xl border border-border/70 bg-card/88 p-3 dark:border-slate-800 dark:bg-slate-950/68 sm:p-4">
+                    <p className="text-xs text-muted-foreground">Unidades en venta</p>
+                    <p className="mt-1 font-semibold text-foreground">
                       {formatNumber(saleSummaries.reduce((sum, item) => sum + item.quantity, 0))} uds
                     </p>
                   </div>
                   {!hideFinancialSummary && (
                     <>
-                      <div className="rounded-2xl bg-white p-3 sm:p-4">
-                        <p className="text-xs text-slate-500">Costo total productos</p>
-                        <p className="mt-1 font-semibold text-slate-900">
+                      <div className="rounded-2xl border border-border/70 bg-card/88 p-3 dark:border-slate-800 dark:bg-slate-950/68 sm:p-4">
+                        <p className="text-xs text-muted-foreground">Costo total productos</p>
+                        <p className="mt-1 font-semibold text-foreground">
                           {formatCurrency(saleSummaries.reduce((sum, item) => sum + item.totalCost, 0))}
                         </p>
                       </div>
-                      <div className="rounded-2xl bg-white p-3 sm:p-4">
-                        <p className="text-xs text-slate-500">Ingreso total</p>
-                        <p className="mt-1 font-semibold text-slate-900">{formatCurrency(totals.totalSale)}</p>
+                      <div className="rounded-2xl border border-border/70 bg-card/88 p-3 dark:border-slate-800 dark:bg-slate-950/68 sm:p-4">
+                        <p className="text-xs text-muted-foreground">Ingreso total</p>
+                        <p className="mt-1 font-semibold text-foreground">{formatCurrency(totals.totalSale)}</p>
                       </div>
-                      <div className="rounded-2xl bg-white p-3 sm:p-4">
-                        <p className="text-xs text-slate-500">Costo total obsequios</p>
-                        <p className="mt-1 font-semibold text-slate-900">{formatCurrency(totals.totalGiftCost)}</p>
+                      <div className="rounded-2xl border border-border/70 bg-card/88 p-3 dark:border-slate-800 dark:bg-slate-950/68 sm:p-4">
+                        <p className="text-xs text-muted-foreground">Costo total obsequios</p>
+                        <p className="mt-1 font-semibold text-foreground">{formatCurrency(totals.totalGiftCost)}</p>
                       </div>
-                      <div className="rounded-2xl bg-white p-3 sm:p-4">
-                        <p className="text-xs text-slate-500">Utilidad neta</p>
-                        <p className="mt-1 font-semibold text-slate-900">{formatCurrency(totals.grossProfit)}</p>
+                      <div className="rounded-2xl border border-emerald-200/70 bg-emerald-50/75 p-3 dark:border-emerald-900/60 dark:bg-emerald-950/22 sm:p-4">
+                        <p className="text-xs text-emerald-700 dark:text-emerald-100/75">Utilidad neta</p>
+                        <p className="mt-1 font-semibold text-emerald-900 dark:text-emerald-100">{formatCurrency(totals.grossProfit)}</p>
                       </div>
                     </>
                   )}
@@ -1534,22 +1591,13 @@ export function SaleFormDialog({
                 value={draftLine.productId}
                 onChange={(value) => {
                   const product = products.find((item) => item.id === value);
-                  const suggestedVariant = getSuggestedSaleVariant(product, movements);
+                  const defaultVariant = getDefaultSaleVariant(product, movements);
                     setDraftLine((current) => ({
                       ...current,
                       productId: value,
-                      variantId: suggestedVariant?.id ?? '',
+                      variantId: defaultVariant?.id ?? '',
                       quantity: current.quantity || '1',
-                      unitPrice:
-                        product?.salePrice !== undefined
-                          ? String(
-                              suggestedVariant
-                                ? Number(suggestedVariant.salePrice ?? getVariantSalePrice(product))
-                                : (product.variants?.length ?? 0) > 0
-                                  ? 0
-                                  : getVariantSalePrice(product)
-                            )
-                          : current.unitPrice,
+                      unitPrice: product ? String(getInitialSaleUnitPrice(product, movements, defaultVariant?.id)) : current.unitPrice,
                       serviceItems: supportsInstallationService(product) ? [createDefaultInstallationServiceItem()] : [],
                       giftItems:
                         product && getAllowedSaleGiftCategories(product).length > 0
@@ -1579,14 +1627,9 @@ export function SaleFormDialog({
                   <Select
                     value={draftLine.variantId}
                   onValueChange={(value) => {
-                      const variant = draftVariantOptions.find((item) => item.id === value);
                       setDraftLine((current) => ({
                         ...current,
                         variantId: value,
-                        unitPrice:
-                          variant?.salePrice !== undefined
-                            ? String(variant.salePrice)
-                            : current.unitPrice,
                       }));
                       setLineError('');
                     }}
@@ -1605,7 +1648,7 @@ export function SaleFormDialog({
                 </div>
               ) : null}
               {draftLine.productId ? (
-                <div className="sticky bottom-24 z-10 sm:col-span-2 rounded-2xl border border-cyan-200 bg-cyan-50 px-3.5 py-3 shadow-sm md:static md:px-4 md:shadow-none">
+                <div className="sticky bottom-24 z-10 sm:col-span-2 rounded-2xl border border-cyan-200/70 bg-cyan-50/85 px-3.5 py-3 shadow-sm dark:border-cyan-900/60 dark:bg-cyan-950/22 md:static md:px-4 md:shadow-none">
                   <p className="text-xs font-semibold uppercase tracking-wide text-cyan-800">Stock disponible</p>
                   <p className="mt-1 text-lg font-semibold text-cyan-950">
                     {formatNumber(
@@ -1683,7 +1726,7 @@ export function SaleFormDialog({
                 availableGiftOptionsByCategory={availableGiftOptionsByCategory}
               />
             ) : draftLine.productId ? (
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+              <div className="rounded-2xl border border-border bg-muted/70 px-4 py-3 text-sm text-muted-foreground dark:border-slate-800 dark:bg-slate-900/60">
                 Los obsequios no aplican para este producto.
               </div>
             ) : null}

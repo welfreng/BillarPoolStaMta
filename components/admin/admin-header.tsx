@@ -5,6 +5,7 @@ import { Bell, Search } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/components/auth-context';
+import { AdminThemeToggle } from '@/components/admin/admin-theme-toggle';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -157,12 +158,13 @@ export function AdminHeader() {
   };
 
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/72 shadow-[0_10px_30px_rgba(15,23,42,0.05)] backdrop-blur-2xl">
+    <header className="admin-glass sticky top-0 z-30 border-b backdrop-blur-2xl">
       <div className="flex flex-col gap-4 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-6">
         <div className="flex items-center gap-3">
+          <SidebarTrigger className="rounded-2xl border border-border bg-card/88 text-foreground shadow-sm hover:bg-muted md:hidden dark:border-slate-800 dark:bg-slate-950/78 dark:text-slate-100 dark:hover:bg-slate-900" />
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-700">Billar Pool Santa Marta</p>
-            <h1 className="text-2xl font-semibold tracking-[-0.02em] text-slate-950">{title}</h1>
+            <h1 className="text-2xl font-semibold tracking-[-0.02em] text-slate-950 dark:text-slate-50">{title}</h1>
           </div>
         </div>
 
@@ -183,25 +185,27 @@ export function AdminHeader() {
                 navigateToItem(filteredItems[0].href);
               }}
               placeholder="Buscar modulo o accion..."
-              className="rounded-2xl border-slate-200 bg-white/85 pl-9 shadow-sm"
+              className="rounded-2xl border-border bg-background/84 pl-9 shadow-sm dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-100 dark:placeholder:text-slate-400"
             />
             {isFocused && filteredItems.length > 0 ? (
-              <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-40 overflow-hidden rounded-[22px] border border-slate-200 bg-white/98 shadow-[0_24px_60px_rgba(15,23,42,0.14)]">
+              <div className="admin-glass-strong absolute left-0 right-0 top-[calc(100%+0.5rem)] z-40 overflow-hidden rounded-[22px] border">
                 {filteredItems.slice(0, 7).map((item) => (
                   <button
                     key={`${item.href}-${item.label}`}
                     type="button"
-                    className="flex w-full flex-col items-start gap-1 border-b border-slate-100 px-4 py-3 text-left last:border-b-0 hover:bg-slate-50/80"
+                    className="flex w-full flex-col items-start gap-1 border-b border-border/70 px-4 py-3 text-left last:border-b-0 hover:bg-muted/70 dark:border-slate-800 dark:hover:bg-slate-900/80"
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => navigateToItem(item.href)}
                   >
-                    <span className="text-sm font-medium text-slate-900">{item.label}</span>
-                    <span className="text-xs text-slate-500">{item.helper}</span>
+                    <span className="text-sm font-medium text-slate-900 dark:text-slate-100">{item.label}</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400">{item.helper}</span>
                   </button>
                 ))}
               </div>
             ) : null}
           </div>
+
+          <AdminThemeToggle />
 
           {role === 'admin' ? (
             <DropdownMenu
@@ -212,7 +216,7 @@ export function AdminHeader() {
               }}
             >
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" className="relative rounded-2xl border-slate-200 bg-white/90 shadow-sm self-start md:self-auto">
+                <Button variant="outline" size="icon" className="relative self-start rounded-2xl md:self-auto">
                   <Bell className="h-4 w-4" />
                   {unreadNotifications.length > 0 ? (
                     <span className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-rose-600 px-1.5 text-[10px] font-semibold text-white">
@@ -221,11 +225,11 @@ export function AdminHeader() {
                   ) : null}
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-[320px] rounded-[22px] border border-slate-200 bg-white/98 p-0 shadow-[0_24px_60px_rgba(15,23,42,0.14)]">
+              <DropdownMenuContent align="end" className="w-[320px] rounded-[22px] p-0">
                 <DropdownMenuLabel className="px-4 py-3">
                   <div>
-                    <p className="text-sm font-semibold text-slate-950">Notificaciones</p>
-                      <p className="text-xs font-normal text-slate-500">
+                    <p className="text-sm font-semibold text-slate-950 dark:text-slate-50">Notificaciones</p>
+                      <p className="text-xs font-normal text-slate-500 dark:text-slate-400">
                       Avisos cuando vendedores registran ventas, servicios o solicitudes.
                     </p>
                   </div>
@@ -237,23 +241,23 @@ export function AdminHeader() {
                       <button
                         key={notification.id}
                         type="button"
-                        className="flex w-full flex-col items-start gap-1 rounded-xl px-3 py-3 text-left hover:bg-slate-50"
+                        className="flex w-full flex-col items-start gap-1 rounded-xl px-3 py-3 text-left hover:bg-muted/70 dark:hover:bg-slate-900"
                         onClick={() => navigateToItem(notification.href)}
                       >
                         <div className="flex w-full items-start justify-between gap-3">
-                          <span className="text-sm font-medium text-slate-900">{notification.title}</span>
+                          <span className="text-sm font-medium text-slate-900 dark:text-slate-100">{notification.title}</span>
                           {!notification.read ? <span className="mt-1 h-2.5 w-2.5 rounded-full bg-cyan-500" /> : null}
                         </div>
-                        <span className="text-xs text-slate-500">{notification.message}</span>
-                        <span className="text-[11px] text-slate-400">
+                        <span className="text-xs text-slate-500 dark:text-slate-400">{notification.message}</span>
+                        <span className="text-[11px] text-slate-400 dark:text-slate-500">
                           {new Date(notification.createdAt).toLocaleString('es-CO')}
                         </span>
                       </button>
                     ))
                   ) : (
                     <div className="px-3 py-6 text-center">
-                      <p className="text-sm font-medium text-slate-900">Sin novedades</p>
-                      <p className="mt-1 text-xs text-slate-500">Aqui apareceran ventas y servicios registrados por vendedores.</p>
+                      <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Sin novedades</p>
+                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Aqui apareceran ventas y servicios registrados por vendedores.</p>
                     </div>
                   )}
                 </div>
@@ -261,18 +265,18 @@ export function AdminHeader() {
             </DropdownMenu>
           ) : null}
 
-          <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3 sm:flex-row sm:items-center">
+          <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card/86 px-3 py-3 dark:border-slate-800 dark:bg-slate-950/80 sm:flex-row sm:items-center">
             <Avatar className="h-10 w-10 rounded-xl">
-              <AvatarFallback className="rounded-2xl bg-slate-950 text-white">
+              <AvatarFallback className="rounded-2xl bg-primary text-primary-foreground dark:bg-slate-800">
                 {initials}
               </AvatarFallback>
             </Avatar>
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-slate-900">
+              <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
                 {user?.displayName ?? 'Administrador'}
               </p>
-              <p className="truncate text-xs text-slate-500">
-                {user?.email} · {role === 'sales' ? 'Rol ventas' : 'Rol administrador'}
+              <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                {[user?.email, role === 'sales' ? 'Rol ventas' : 'Rol administrador'].filter(Boolean).join(' · ')}
               </p>
             </div>
             <Button variant="outline" size="sm" onClick={logout} className="rounded-xl self-start sm:self-auto">

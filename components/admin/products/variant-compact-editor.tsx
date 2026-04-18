@@ -61,6 +61,7 @@ export function VariantCompactEditor({
   getRowAttributeOptions,
   hiddenColumns,
   manualRows,
+  hideStockColumn,
 }: {
   attributes: CompactAttributeControl[];
   rows: CompactVariantRow[];
@@ -83,17 +84,19 @@ export function VariantCompactEditor({
   getRowAttributeOptions?: (rowIndex: number, attributeKey: string, fallbackOptions: string[]) => string[];
   hiddenColumns?: Array<'sku' | 'status'>;
   manualRows?: boolean;
+  hideStockColumn?: boolean;
 }) {
   const [openAttributeKey, setOpenAttributeKey] = useState<string | null>(null);
   const [customValueDrafts, setCustomValueDrafts] = useState<Record<string, string>>({});
   const hiddenColumnSet = new Set(hiddenColumns ?? []);
   const showDeleteColumn = manualRows && Boolean(onRemoveRow);
+  const showStockColumn = !hideStockColumn;
 
   return (
     <div className="min-w-0 space-y-2.5">
       <div className="min-w-0 space-y-2.5 rounded-2xl bg-transparent p-0">
         {globalPrice ? (
-          <div className="rounded-2xl border border-slate-200/90 bg-white p-3">
+          <div className="rounded-2xl border border-border bg-card/88 p-3 dark:border-slate-800 dark:bg-slate-950/72">
             <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{globalPrice.label}</p>
             <div className="mt-2 max-w-full sm:max-w-[220px]">
               <Input
@@ -103,24 +106,24 @@ export function VariantCompactEditor({
                 value={globalPrice.value}
                 disabled={structureLocked}
                 onChange={(event) => globalPrice.onChange(Number(event.target.value || 0))}
-                className="bg-white"
+                className="bg-background/88"
               />
             </div>
           </div>
         ) : null}
 
         {manualRows ? (
-          <div className="flex min-w-0 flex-col gap-3 rounded-2xl border border-slate-200/90 bg-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+          <div className="flex min-w-0 flex-col gap-3 rounded-2xl border border-border bg-card/88 px-3 py-3 dark:border-slate-800 dark:bg-slate-950/72 sm:flex-row sm:items-center sm:justify-between sm:px-4">
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-slate-900">Variantes reales</p>
-              <p className="mt-1 hidden text-sm text-slate-600 sm:block">
+              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Variantes reales</p>
+              <p className="mt-1 hidden text-sm text-slate-600 dark:text-slate-400 sm:block">
                 Agrega solo las combinaciones que realmente existen en inventario.
               </p>
             </div>
             <Button
               type="button"
               variant="outline"
-              className="w-full rounded-xl bg-white sm:w-auto"
+              className="w-full rounded-xl bg-card/88 sm:w-auto"
               disabled={structureLocked}
               onClick={onAddRow}
             >
@@ -131,13 +134,13 @@ export function VariantCompactEditor({
           <div className="grid gap-3 md:grid-cols-2">
             {attributes.map((attribute) =>
               attribute.fixed ? (
-                <div key={attribute.key} className="min-w-0 rounded-2xl border border-slate-200/90 bg-white p-3">
+                <div key={attribute.key} className="min-w-0 rounded-2xl border border-border bg-card/88 p-3 dark:border-slate-800 dark:bg-slate-950/72">
                   <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{attribute.label}</p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {attribute.options.map((option) => (
                       <span
                         key={option}
-                        className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700"
+                        className="inline-flex items-center rounded-full border border-border bg-background/88 px-3 py-1 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900/72 dark:text-slate-200"
                       >
                         {option}
                       </span>
@@ -145,11 +148,11 @@ export function VariantCompactEditor({
                   </div>
                 </div>
               ) : (
-                <div key={attribute.key} className="min-w-0 rounded-2xl border border-slate-200/90 bg-white p-3">
+                <div key={attribute.key} className="min-w-0 rounded-2xl border border-border bg-card/88 p-3 dark:border-slate-800 dark:bg-slate-950/72">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                     <div>
                       <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{attribute.label}</p>
-                      <p className="mt-1 hidden text-sm text-slate-600 sm:block">
+                      <p className="mt-1 hidden text-sm text-slate-600 dark:text-slate-400 sm:block">
                         Selecciona los valores activos para regenerar la tabla sin duplicados.
                       </p>
                     </div>
@@ -161,7 +164,7 @@ export function VariantCompactEditor({
                         <Button
                           type="button"
                           variant="outline"
-                          className="rounded-xl bg-white"
+                          className="rounded-xl bg-card/88"
                           disabled={structureLocked}
                         >
                           Gestionar {attribute.label.toLowerCase()}
@@ -174,7 +177,7 @@ export function VariantCompactEditor({
                             <CommandEmpty className="px-3 py-4 text-left">
                               {attribute.allowCustom ? (
                                 <div className="space-y-2">
-                                  <p className="text-sm text-slate-600">Agrega un valor nuevo para este atributo.</p>
+                                  <p className="text-sm text-slate-600 dark:text-slate-300">Agrega un valor nuevo para este atributo.</p>
                                   <Input
                                     value={customValueDrafts[attribute.key] ?? ''}
                                     onChange={(event) =>
@@ -233,7 +236,7 @@ export function VariantCompactEditor({
                     {attribute.selectedValues.map((value) => (
                       <span
                         key={value}
-                        className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700"
+                        className="inline-flex items-center rounded-full border border-border bg-background/88 px-3 py-1 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900/72 dark:text-slate-200"
                       >
                         {value}
                       </span>
@@ -247,7 +250,7 @@ export function VariantCompactEditor({
 
       </div>
 
-      <div className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      <div className="min-w-0 overflow-hidden rounded-2xl border border-border bg-card/88 dark:border-slate-800 dark:bg-slate-950/72">
         <Table className={cn(manualRows ? 'min-w-[780px]' : 'min-w-[720px]')}>
           <TableHeader>
             <TableRow>
@@ -255,7 +258,7 @@ export function VariantCompactEditor({
                 <TableHead key={attribute.key}>{attribute.label}</TableHead>
               ))}
               {!globalPrice ? <TableHead>Precio</TableHead> : null}
-              <TableHead>Stock</TableHead>
+              {showStockColumn ? <TableHead>Stock</TableHead> : null}
               {!hiddenColumnSet.has('sku') ? <TableHead>SKU</TableHead> : null}
               {!hiddenColumnSet.has('status') ? <TableHead>Activa</TableHead> : null}
               {showDeleteColumn ? <TableHead className="w-[72px] text-right">Eliminar</TableHead> : null}
@@ -314,7 +317,7 @@ export function VariantCompactEditor({
                             disabled
                           />
                         ) : (
-                          <span className="text-sm text-slate-700">{row.values[attribute.key] ?? attribute.label}</span>
+                          <span className="text-sm text-slate-700 dark:text-slate-200">{row.values[attribute.key] ?? attribute.label}</span>
                         );
                       })()}
                     </TableCell>
@@ -337,21 +340,23 @@ export function VariantCompactEditor({
                       />
                     </TableCell>
                   ) : null}
-                  <TableCell className="align-top">
-                    <Input
-                      type="number"
-                      min="0"
-                      value={row.stock}
-                      disabled={structureLocked}
-                      onChange={(event) => onRowStockChange(index, Number(event.target.value || 0))}
-                      onFocus={(event) => {
-                        if (event.target.value === '0') {
-                          event.target.select();
-                        }
-                      }}
-                      className="w-full min-w-[5.75rem] sm:w-[96px]"
-                    />
-                  </TableCell>
+                  {showStockColumn ? (
+                    <TableCell className="align-top">
+                      <Input
+                        type="number"
+                        min="0"
+                        value={row.stock}
+                        disabled={structureLocked}
+                        onChange={(event) => onRowStockChange(index, Number(event.target.value || 0))}
+                        onFocus={(event) => {
+                          if (event.target.value === '0') {
+                            event.target.select();
+                          }
+                        }}
+                        className="w-full min-w-[5.75rem] sm:w-[96px]"
+                      />
+                    </TableCell>
+                  ) : null}
                   {!hiddenColumnSet.has('sku') ? (
                     <TableCell className="align-top">
                       <Input
@@ -371,7 +376,7 @@ export function VariantCompactEditor({
                           disabled={structureLocked}
                           onCheckedChange={(checked) => onRowStatusChange(index, checked ? 'active' : 'inactive')}
                         />
-                        <span className="text-xs font-medium text-slate-600">
+                        <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
                           {row.status === 'inactive' ? 'No' : 'Si'}
                         </span>
                       </div>
@@ -399,12 +404,12 @@ export function VariantCompactEditor({
                   colSpan={
                     attributes.length +
                     (globalPrice ? 0 : 1) +
-                    1 +
+                    (showStockColumn ? 1 : 0) +
                     (hiddenColumnSet.has('sku') ? 0 : 1) +
                     (hiddenColumnSet.has('status') ? 0 : 1) +
                     (showDeleteColumn ? 1 : 0)
                   }
-                  className="py-8 text-center text-sm text-slate-500"
+                  className="py-8 text-center text-sm text-slate-500 dark:text-slate-400"
                 >
                   Agrega una variante para empezar a cargar combinaciones reales.
                 </TableCell>

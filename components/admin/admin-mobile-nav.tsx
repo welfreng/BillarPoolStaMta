@@ -46,7 +46,7 @@ export function AdminMobileNav() {
 
   return (
     <>
-      <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200/80 bg-white/92 backdrop-blur-xl md:hidden">
+      <nav className="admin-glass fixed inset-x-0 bottom-0 z-20 border-t backdrop-blur-xl md:hidden">
         <div className="mx-auto grid max-w-xl grid-cols-5 gap-1 px-2 pb-[max(0.6rem,env(safe-area-inset-bottom))] pt-2">
           {primaryNavigation.map((item) => {
             const Icon = item.icon;
@@ -60,7 +60,7 @@ export function AdminMobileNav() {
                   'flex min-w-0 flex-col items-center justify-center gap-1 rounded-2xl px-2 py-2 text-center transition-all duration-200',
                   active
                     ? 'bg-[linear-gradient(135deg,#0a2472_0%,#12389b_100%)] text-white shadow-[0_14px_28px_rgba(10,36,114,0.22)]'
-                    : 'text-slate-500 hover:bg-slate-100/90'
+                    : 'text-slate-500 hover:bg-muted/80 dark:text-slate-400 dark:hover:bg-slate-900/80'
                 )}
               >
                 <Icon className="h-4 w-4 shrink-0" />
@@ -77,7 +77,7 @@ export function AdminMobileNav() {
                   'flex min-w-0 flex-col items-center justify-center gap-1 rounded-2xl px-2 py-2 text-center transition-all duration-200',
                   moreActive
                     ? 'bg-slate-950 text-white shadow-[0_14px_28px_rgba(15,23,42,0.18)]'
-                    : 'text-slate-500 hover:bg-slate-100/90'
+                    : 'text-slate-500 hover:bg-muted/80 dark:text-slate-400 dark:hover:bg-slate-900/80'
                 )}
               >
                 <MoreHorizontal className="h-4 w-4 shrink-0" />
@@ -86,10 +86,10 @@ export function AdminMobileNav() {
             </SheetTrigger>
             <SheetContent
               side="bottom"
-              className="rounded-t-[28px] border-slate-200 bg-white px-0 pb-[max(1rem,env(safe-area-inset-bottom))] pt-0 [&>button]:top-5 [&>button]:right-5"
+              className="rounded-t-[28px] border-border bg-card px-0 pb-[max(1rem,env(safe-area-inset-bottom))] pt-0 [&>button]:top-5 [&>button]:right-5"
             >
-              <SheetHeader className="border-b border-slate-200/80 px-5 pb-4 pt-5 text-left">
-                <div className="mx-auto mb-3 h-1.5 w-14 rounded-full bg-slate-200" />
+              <SheetHeader className="border-b border-border/80 px-5 pb-4 pt-5 text-left dark:border-slate-800">
+                <div className="mx-auto mb-3 h-1.5 w-14 rounded-full bg-slate-300 dark:bg-slate-700" />
                 <SheetTitle className="text-left text-lg text-slate-950">Mas modulos</SheetTitle>
                 <SheetDescription className="text-left text-slate-500">
                   Cambia de area sin subir hasta el encabezado.
@@ -111,13 +111,13 @@ export function AdminMobileNav() {
                           'flex items-center gap-3 rounded-2xl border px-4 py-3 transition-all duration-200',
                           active
                             ? 'border-[#12389b]/20 bg-[linear-gradient(135deg,rgba(10,36,114,0.08)_0%,rgba(15,118,110,0.06)_100%)] text-slate-950 shadow-sm'
-                            : 'border-slate-200 bg-slate-50/70 text-slate-700 hover:bg-white'
+                            : 'border-border bg-muted/60 text-slate-700 hover:bg-card dark:border-slate-800 dark:bg-slate-900/65 dark:text-slate-200 dark:hover:bg-slate-900'
                         )}
                       >
                         <div
                           className={cn(
                             'flex h-11 w-11 items-center justify-center rounded-2xl',
-                            active ? 'bg-[#12389b] text-white' : 'bg-white text-slate-600'
+                            active ? 'bg-[#12389b] text-white' : 'bg-card text-slate-600 dark:bg-slate-950 dark:text-slate-300'
                           )}
                         >
                           <Icon className="h-4 w-4" />
@@ -132,7 +132,7 @@ export function AdminMobileNav() {
                 </div>
 
                 {secondaryNavigation.length === 0 ? (
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-5 text-center">
+                  <div className="rounded-2xl border border-border bg-muted/65 px-4 py-5 text-center dark:border-slate-800 dark:bg-slate-900/65">
                     <Grid2x2 className="mx-auto h-5 w-5 text-slate-400" />
                     <p className="mt-2 text-sm font-medium text-slate-900">Todo a mano</p>
                     <p className="mt-1 text-xs text-slate-500">

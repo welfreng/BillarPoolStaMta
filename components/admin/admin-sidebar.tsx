@@ -61,7 +61,7 @@ export function AdminSidebar() {
 
       <SidebarContent className="px-2">
         <SidebarGroup>
-          <SidebarGroupLabel className="px-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Modulos</SidebarGroupLabel>
+          <SidebarGroupLabel className="px-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Modulos</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {visibleNavigation.map((item) => {
@@ -81,7 +81,7 @@ export function AdminSidebar() {
                         'h-auto rounded-2xl px-3 py-3 transition-all duration-200',
                         active
                           ? 'bg-[linear-gradient(135deg,#0a2472_0%,#12389b_100%)] text-white shadow-[0_16px_30px_rgba(10,36,114,0.24)] hover:text-white'
-                          : 'bg-transparent hover:bg-white/70 hover:shadow-sm'
+                          : 'bg-transparent text-slate-700 hover:bg-card/72 hover:text-slate-950 hover:shadow-sm dark:text-slate-200 dark:hover:bg-slate-900/80 dark:hover:text-slate-50'
                       )}
                     >
                       <Link
@@ -95,7 +95,7 @@ export function AdminSidebar() {
                         <Icon className="h-4 w-4" />
                         <span className="flex flex-col">
                           <span>{item.label}</span>
-                          <span className={cn('text-xs', active ? 'text-cyan-100/85' : 'text-slate-500')}>{item.helper}</span>
+                          <span className={cn('text-xs', active ? 'text-cyan-100/85' : 'text-slate-500 dark:text-slate-400')}>{item.helper}</span>
                         </span>
                       </Link>
                     </SidebarMenuButton>

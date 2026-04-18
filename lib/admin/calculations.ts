@@ -3,6 +3,7 @@ import type {
   DashboardSummary,
   InventoryMovement,
   Product,
+  ProductVariant,
   Purchase,
   Sale,
   ServiceOrder,
@@ -104,15 +105,72 @@ export function getVariantOrProductRealUnitCost(
   return getVariantRealUnitCost(purchases, productId, variantId);
 }
 
+function getActiveOperationalVariants(product: Product): ProductVariant[] {
+  const variants = product.variants ?? [];
+  const activeVariants = variants.filter((variant) => variant.status !== 'inactive');
+  return activeVariants.length > 0 ? activeVariants : variants;
+}
+
+export function getOperationalProductStock(product: Product, movements: InventoryMovement[]) {
+  if (getProductSaleMode(product) !== 'varianted') {
+    return getProductStock(movements, product.id);
+  }
+
+  return getActiveOperationalVariants(product).reduce(
+    (total, variant) => total + Math.max(Number(variant.stock ?? 0), 0),
+    0
+  );
+}
+
+export function getOperationalProductSalePrice(product: Product) {
+  if (getProductSaleMode(product) !== 'varianted') {
+    return Number(product.salePrice ?? 0);
+  }
+
+  const prices = getActiveOperationalVariants(product)
+    .map((variant) => Number(variant.salePrice ?? 0))
+    .filter((price) => price > 0)
+    .sort((left, right) => left - right);
+
+  // For varianted products, product.salePrice remains a summary/"desde" fallback.
+  return prices[0] ?? Number(product.salePrice ?? 0);
+}
+
+export function getOperationalProductRealUnitCost(product: Product, purchases: Purchase[]) {
+  if (getProductSaleMode(product) !== 'varianted') {
+    return getProductRealUnitCost(purchases, product.id);
+  }
+
+  const variants = getActiveOperationalVariants(product);
+  const totalStock = variants.reduce((sum, variant) => sum + Math.max(Number(variant.stock ?? 0), 0), 0);
+  if (totalStock <= 0) {
+    return Math.max(
+      ...variants.map((variant) => getVariantRealUnitCost(purchases, product.id, variant.id)),
+      0
+    );
+  }
+
+  const weightedCost = variants.reduce((sum, variant) => {
+    const stock = Math.max(Number(variant.stock ?? 0), 0);
+    const unitCost = getVariantRealUnitCost(purchases, product.id, variant.id);
+    return sum + unitCost * stock;
+  }, 0);
+
+  return roundCurrency(weightedCost / totalStock);
+}
+
 export function getProductProfitMargin(product: Product, purchases: Purchase[]) {
-  return calculateMargin(getProductRealUnitCost(purchases, product.id), product.salePrice);
+  return calculateMargin(
+    getOperationalProductRealUnitCost(product, purchases),
+    getOperationalProductSalePrice(product)
+  );
 }
 
 export function getStockAlert(
   product: Product,
   movements: InventoryMovement[]
 ): StockAlert {
-  return getProductStock(movements, product.id) <= 0 ? 'out' : 'healthy';
+  return getOperationalProductStock(product, movements) <= 0 ? 'out' : 'healthy';
 }
 
 export function getStockAlertLabel(alert: StockAlert) {
@@ -128,22 +186,15 @@ export function getDashboardSummary(
 ): DashboardSummary {
   const inventorySummary = products.reduce<DashboardSummary>(
     (summary, product) => {
-      const stock = getProductStock(movements, product.id);
-      const realUnitCost =
-        getProductSaleMode(product) === 'varianted'
-          ? Math.max(
-              ...(product.variants ?? []).map((variant) =>
-                getVariantRealUnitCost(purchases, product.id, variant.id)
-              ),
-              0
-            )
-          : getProductRealUnitCost(purchases, product.id);
+      const stock = getOperationalProductStock(product, movements);
+      const realUnitCost = getOperationalProductRealUnitCost(product, purchases);
+      const salePrice = getOperationalProductSalePrice(product);
 
       summary.totalProducts += 1;
       summary.totalStock += stock;
       summary.investedValue += realUnitCost * stock;
-      summary.estimatedSalesValue += product.salePrice * stock;
-      summary.projectedProfit += (product.salePrice - realUnitCost) * stock;
+      summary.estimatedSalesValue += salePrice * stock;
+      summary.projectedProfit += (salePrice - realUnitCost) * stock;
 
       const alert = getStockAlert(product, movements);
       if (alert === 'out') summary.outOfStockProducts += 1;

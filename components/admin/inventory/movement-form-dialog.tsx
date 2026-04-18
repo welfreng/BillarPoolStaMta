@@ -31,6 +31,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 
+const movementSchema = z.object({
+  productId: z.string().min(1, 'Selecciona un producto'),
+  variantId: z.string().default(''),
+  type: z.enum(['entry', 'exit', 'adjustment']),
+  reason: z.enum(['purchase', 'sale', 'gift', 'manual-adjustment', 'damage', 'initial-load', 'transfer']),
+  quantity: z.coerce.number().positive('La cantidad debe ser mayor a cero'),
+  notes: z.string().min(4, 'Agrega una observacion breve'),
+  responsibleUser: z.string().min(2, 'Ingresa el responsable'),
+});
+
 function SearchableSelect({
   value,
   onChange,
@@ -106,16 +116,6 @@ function SearchableSelect({
   );
 }
 
-const movementSchema = z.object({
-  productId: z.string().min(1, 'Selecciona un producto'),
-  variantId: z.string().default(''),
-  type: z.enum(['entry', 'exit', 'adjustment']),
-  reason: z.enum(['purchase', 'sale', 'gift', 'manual-adjustment', 'damage', 'initial-load', 'transfer']),
-  quantity: z.coerce.number().positive('La cantidad debe ser mayor a cero'),
-  notes: z.string().min(4, 'Agrega una observacion breve'),
-  responsibleUser: z.string().min(2, 'Ingresa el responsable'),
-});
-
 export type MovementFormValues = z.infer<typeof movementSchema>;
 
 const defaultValues: MovementFormValues = {
@@ -141,7 +141,21 @@ export function MovementFormDialog({
 }) {
   const movementFormId = useId();
   const form = useForm<MovementFormValues>({
-    resolver: zodResolver(movementSchema),
+    resolver: zodResolver(
+      movementSchema
+        .superRefine((values, ctx) => {
+          const selectedProduct = products.find((product) => product.id === values.productId);
+          if (!selectedProduct) return;
+
+          if ((selectedProduct.variants?.length ?? 0) > 0 && !values.variantId.trim()) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: 'Selecciona la variante para registrar este movimiento.',
+              path: ['variantId'],
+            });
+          }
+        })
+    ),
     defaultValues,
   });
   const selectedType = form.watch('type');
@@ -154,7 +168,7 @@ export function MovementFormDialog({
   );
 
   useEffect(() => {
-    const currentReason = form.getValues('reason');
+    const currentReason = form.getValues('reason') as MovementFormValues['reason'];
     if (!availableReasons.includes(currentReason)) {
       form.setValue('reason', availableReasons[0], { shouldValidate: true });
     }
@@ -235,6 +249,9 @@ export function MovementFormDialog({
                           ))}
                         </SelectContent>
                       </Select>
+                      <p className="text-xs leading-5 text-slate-500">
+                        Este producto maneja stock por variante. Debes elegir una antes de guardar.
+                      </p>
                       <FormMessage />
                     </FormItem>
                   )}

@@ -247,6 +247,36 @@ export type ServiceType =
   | 'tip-ferrule-installation'
   | 'extension-installation';
 
+export type ServiceVisitStatus =
+  | 'scheduled'
+  | 'assigned'
+  | 'in_progress'
+  | 'completed'
+  | 'cancelled';
+
+export interface ServiceVisit {
+  id: string;
+  status: ServiceVisitStatus;
+  customerName: string;
+  customerPhone?: string;
+  cueReference: string;
+  scheduledAt: string;
+  address?: string;
+  zone?: string;
+  logisticsNotes: string;
+  assignedTechnicianId?: string;
+  assignedTechnicianName?: string;
+  assignedBy?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  startedAt?: string;
+  completedAt?: string;
+  cancelledAt?: string;
+  cancelledReason?: string;
+  linkedServiceOrderId?: string;
+}
+
 export interface ServiceMaterialItem {
   productId: string;
   quantity: number;

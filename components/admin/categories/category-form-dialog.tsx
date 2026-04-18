@@ -104,7 +104,7 @@ export function CategoryFormDialog({
                       <select
                         value={field.value}
                         onChange={(event) => field.onChange(event.target.value)}
-                        className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+                        className="flex h-10 w-full rounded-xl border border-border bg-background/88 px-3 py-2 text-sm text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.04)] dark:border-slate-700 dark:bg-slate-900/72 dark:text-slate-100"
                       >
                         <option value="active">Activa</option>
                         <option value="inactive">Inactiva</option>

@@ -81,7 +81,7 @@ export function SearchableSelect({
             <CommandEmpty>
               {allowCreate && onCreate && query.trim() ? (
                 <div className="space-y-2 px-3 py-3 text-left">
-                  <p className="text-sm text-slate-600">{emptyLabel}</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-300">{emptyLabel}</p>
                   <Button
                     type="button"
                     size="sm"

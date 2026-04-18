@@ -181,12 +181,19 @@ export default function ReportesPage() {
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
             <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
               <PopoverTrigger asChild>
-                <Button type="button" variant="outline" className="w-full justify-between rounded-xl bg-white sm:w-[220px]">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full justify-between rounded-xl border-border bg-card/88 text-foreground dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-100 sm:w-[220px]"
+            >
                   <span className="truncate capitalize">{monthLabel}</span>
                   <CalendarDays className="ml-2 h-4 w-4 shrink-0" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto rounded-2xl p-0" align="start">
+              <PopoverContent
+                className="w-auto rounded-2xl border border-border bg-card/95 p-0 text-foreground shadow-xl dark:border-slate-800 dark:bg-slate-950"
+                align="start"
+              >
                 <Calendar
                   mode="single"
                   selected={selectedMonthDate}
@@ -214,165 +221,165 @@ export default function ReportesPage() {
         }
       />
 
-      <div className="rounded-[28px] border border-amber-200 bg-[linear-gradient(180deg,rgba(255,251,235,0.98)_0%,rgba(254,243,199,0.82)_100%)] p-4 text-sm text-amber-900 shadow-[0_18px_45px_rgba(15,23,42,0.07)]">
+      <div className="rounded-[28px] border border-amber-200 bg-[linear-gradient(180deg,rgba(255,251,235,0.98)_0%,rgba(254,243,199,0.82)_100%)] p-4 text-sm text-amber-900 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-amber-900/70 dark:bg-[linear-gradient(180deg,rgba(120,53,15,0.34)_0%,rgba(146,64,14,0.2)_100%)] dark:text-amber-100">
         El panel ya consolida ingresos, costos, utilidad y metodo de pago real del mes. El `estado` todavia se infiere desde devoluciones, asi que conviene leerlo como referencia operativa y no como auditoria final.
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
-          <p className="text-sm text-slate-500">Transacciones</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-950">{formatNumber(monthlyTotals.transactions)}</p>
-          <p className="mt-2 text-sm text-slate-500">Ventas consolidadas del periodo.</p>
+        <div className="rounded-[28px] border border-border bg-card/88 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-slate-950/72 dark:shadow-[0_20px_48px_rgba(2,6,23,0.28)] sm:p-6">
+          <p className="text-sm text-slate-500 dark:text-slate-400">Transacciones</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-950 dark:text-slate-50">{formatNumber(monthlyTotals.transactions)}</p>
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Ventas consolidadas del periodo.</p>
         </div>
-        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
-          <p className="text-sm text-slate-500">Ticket promedio</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-950">{formatCurrency(executiveSummary.averageTicket)}</p>
-          <p className="mt-2 text-sm text-slate-500">Ingreso promedio por transaccion.</p>
+        <div className="rounded-[28px] border border-border bg-card/88 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-slate-950/72 dark:shadow-[0_20px_48px_rgba(2,6,23,0.28)] sm:p-6">
+          <p className="text-sm text-slate-500 dark:text-slate-400">Ticket promedio</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-950 dark:text-slate-50">{formatCurrency(executiveSummary.averageTicket)}</p>
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Ingreso promedio por transaccion.</p>
         </div>
-        <div className="rounded-[28px] border border-cyan-200 bg-[linear-gradient(180deg,rgba(236,254,255,0.98)_0%,rgba(207,250,254,0.82)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
-          <p className="text-sm text-cyan-800">Ingreso total</p>
-          <p className="mt-2 text-2xl font-semibold text-cyan-950">{formatCurrency(monthlyTotals.totalRevenue)}</p>
-          <p className="mt-2 text-sm text-cyan-900">Ventas y servicios del periodo.</p>
+        <div className="rounded-[28px] border border-cyan-200 bg-[linear-gradient(180deg,rgba(236,254,255,0.98)_0%,rgba(207,250,254,0.82)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-cyan-900/70 dark:bg-[linear-gradient(180deg,rgba(8,47,73,0.52)_0%,rgba(14,116,144,0.24)_100%)] sm:p-6">
+          <p className="text-sm text-cyan-800 dark:text-cyan-200">Ingreso total</p>
+          <p className="mt-2 text-2xl font-semibold text-cyan-950 dark:text-cyan-50">{formatCurrency(monthlyTotals.totalRevenue)}</p>
+          <p className="mt-2 text-sm text-cyan-900 dark:text-cyan-100">Ventas y servicios del periodo.</p>
         </div>
-        <div className="rounded-[28px] border border-amber-200 bg-[linear-gradient(180deg,rgba(255,251,235,0.98)_0%,rgba(254,243,199,0.82)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
-          <p className="text-sm text-amber-800">Costo total</p>
-          <p className="mt-2 text-2xl font-semibold text-amber-950">{formatCurrency(monthlyTotals.totalCost)}</p>
-          <p className="mt-2 text-sm text-amber-900">Costo de productos y servicios.</p>
+        <div className="rounded-[28px] border border-amber-200 bg-[linear-gradient(180deg,rgba(255,251,235,0.98)_0%,rgba(254,243,199,0.82)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-amber-900/70 dark:bg-[linear-gradient(180deg,rgba(120,53,15,0.34)_0%,rgba(146,64,14,0.22)_100%)] sm:p-6">
+          <p className="text-sm text-amber-800 dark:text-amber-200">Costo total</p>
+          <p className="mt-2 text-2xl font-semibold text-amber-950 dark:text-amber-50">{formatCurrency(monthlyTotals.totalCost)}</p>
+          <p className="mt-2 text-sm text-amber-900 dark:text-amber-100">Costo de productos y servicios.</p>
         </div>
-        <div className="rounded-[28px] border border-emerald-200 bg-[linear-gradient(180deg,rgba(236,253,245,0.98)_0%,rgba(209,250,229,0.82)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
-          <p className="text-sm text-emerald-800">Utilidad total</p>
-          <p className="mt-2 text-2xl font-semibold text-emerald-950">{formatCurrency(monthlyTotals.totalProfit)}</p>
-          <p className="mt-2 text-sm text-emerald-900">Margen {executiveSummary.profitMargin.toFixed(1)}%.</p>
+        <div className="rounded-[28px] border border-emerald-200 bg-[linear-gradient(180deg,rgba(236,253,245,0.98)_0%,rgba(209,250,229,0.82)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-emerald-900/70 dark:bg-[linear-gradient(180deg,rgba(6,78,59,0.38)_0%,rgba(5,150,105,0.2)_100%)] sm:p-6">
+          <p className="text-sm text-emerald-800 dark:text-emerald-200">Utilidad total</p>
+          <p className="mt-2 text-2xl font-semibold text-emerald-950 dark:text-emerald-50">{formatCurrency(monthlyTotals.totalProfit)}</p>
+          <p className="mt-2 text-sm text-emerald-900 dark:text-emerald-100">Margen {executiveSummary.profitMargin.toFixed(1)}%.</p>
         </div>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
+        <div className="rounded-[28px] border border-border bg-card/88 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-slate-950/72 dark:shadow-[0_20px_48px_rgba(2,6,23,0.28)] sm:p-6">
           <div className="flex items-start gap-3">
-            <div className="rounded-2xl bg-cyan-100 p-2 text-cyan-700">
+            <div className="rounded-2xl bg-cyan-100 p-2 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-200">
               <Wallet className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-slate-950">Resumen ejecutivo</p>
-              <p className="text-sm text-slate-500">Lectura rapida del negocio para el mes seleccionado.</p>
+              <p className="text-sm font-semibold text-foreground">Resumen ejecutivo</p>
+              <p className="text-sm text-muted-foreground">Lectura rapida del negocio para el mes seleccionado.</p>
             </div>
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Items facturados</p>
-              <p className="mt-2 text-xl font-semibold text-slate-950">{formatNumber(dataset.detailRows.length)}</p>
+            <div className="rounded-2xl border border-border bg-muted/70 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Items facturados</p>
+              <p className="mt-2 text-xl font-semibold text-foreground">{formatNumber(dataset.detailRows.length)}</p>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Utilidad neta</p>
+            <div className="rounded-2xl border border-border bg-muted/70 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Utilidad neta</p>
               <p className="mt-2 text-xl font-semibold text-emerald-700">{formatCurrency(monthlyTotals.totalProfit)}</p>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Margen</p>
-              <p className="mt-2 text-xl font-semibold text-slate-950">{executiveSummary.profitMargin.toFixed(1)}%</p>
+            <div className="rounded-2xl border border-border bg-muted/70 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Margen</p>
+              <p className="mt-2 text-xl font-semibold text-foreground">{executiveSummary.profitMargin.toFixed(1)}%</p>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Servicios</p>
-              <p className="mt-2 text-xl font-semibold text-slate-950">{formatNumber(monthlyTotals.serviceCount)}</p>
+            <div className="rounded-2xl border border-border bg-muted/70 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Servicios</p>
+              <p className="mt-2 text-xl font-semibold text-foreground">{formatNumber(monthlyTotals.serviceCount)}</p>
             </div>
           </div>
         </div>
 
-        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
+        <div className="rounded-[28px] border border-border bg-card/88 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-slate-950/72 sm:p-6">
           <div className="flex items-start gap-3">
-            <div className="rounded-2xl bg-emerald-100 p-2 text-emerald-700">
+            <div className="rounded-2xl bg-emerald-100 p-2 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200">
               <TrendingUp className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-slate-950">Responsable destacado</p>
-              <p className="text-sm text-slate-500">Quien mas aporta en utilidad dentro del periodo.</p>
+              <p className="text-sm font-semibold text-foreground">Responsable destacado</p>
+              <p className="text-sm text-muted-foreground">Quien mas aporta en utilidad dentro del periodo.</p>
             </div>
           </div>
-          <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+          <div className="mt-4 rounded-2xl border border-border bg-muted/70 p-4 dark:border-slate-800 dark:bg-slate-900/60">
             {executiveSummary.topSeller ? (
               <>
-                <p className="text-lg font-semibold text-slate-950">{executiveSummary.topSeller.seller}</p>
-                <p className="mt-1 text-sm text-slate-500">{formatNumber(executiveSummary.topSeller.transactions)} transacciones</p>
+                <p className="text-lg font-semibold text-foreground">{executiveSummary.topSeller.seller}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{formatNumber(executiveSummary.topSeller.transactions)} transacciones</p>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                  <div className="rounded-xl bg-white px-3 py-2">
-                    <p className="text-xs uppercase tracking-[0.12em] text-slate-500">Ingreso</p>
-                    <p className="mt-1 font-semibold text-slate-950">{formatCurrency(executiveSummary.topSeller.revenue)}</p>
+                  <div className="rounded-xl border border-border bg-background/88 px-3 py-2 dark:border-slate-800 dark:bg-slate-950/60">
+                    <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Ingreso</p>
+                    <p className="mt-1 font-semibold text-foreground">{formatCurrency(executiveSummary.topSeller.revenue)}</p>
                   </div>
-                  <div className="rounded-xl bg-white px-3 py-2">
-                    <p className="text-xs uppercase tracking-[0.12em] text-slate-500">Utilidad</p>
+                  <div className="rounded-xl border border-border bg-background/88 px-3 py-2 dark:border-slate-800 dark:bg-slate-950/60">
+                    <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Utilidad</p>
                     <p className="mt-1 font-semibold text-emerald-700">{formatCurrency(executiveSummary.topSeller.profit)}</p>
                   </div>
                 </div>
               </>
             ) : (
-              <p className="text-sm text-slate-500">Aun no hay ventas suficientes para destacar un responsable.</p>
+              <p className="text-sm text-muted-foreground">Aun no hay ventas suficientes para destacar un responsable.</p>
             )}
           </div>
         </div>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-2">
-        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
+        <div className="rounded-[28px] border border-border bg-card/88 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-slate-950/72 sm:p-6">
           <div className="flex items-start gap-3">
-            <div className="rounded-2xl bg-slate-100 p-2 text-slate-700">
+            <div className="rounded-2xl bg-muted p-2 text-foreground dark:bg-slate-900/80 dark:text-slate-100">
               <ShoppingBag className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-slate-950">Linea de ventas</p>
-              <p className="text-sm text-slate-500">Comportamiento comercial de productos vendidos.</p>
+              <p className="text-sm font-semibold text-foreground">Linea de ventas</p>
+              <p className="text-sm text-muted-foreground">Comportamiento comercial de productos vendidos.</p>
             </div>
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Ingreso</p>
-              <p className="mt-2 text-xl font-semibold text-slate-950">{formatCurrency(executiveSummary.salesRevenue)}</p>
+            <div className="rounded-2xl border border-border bg-muted/70 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Ingreso</p>
+              <p className="mt-2 text-xl font-semibold text-foreground">{formatCurrency(executiveSummary.salesRevenue)}</p>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Utilidad</p>
+            <div className="rounded-2xl border border-border bg-muted/70 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Utilidad</p>
               <p className="mt-2 text-xl font-semibold text-emerald-700">{formatCurrency(executiveSummary.salesProfit)}</p>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Items</p>
-              <p className="mt-2 text-xl font-semibold text-slate-950">
+            <div className="rounded-2xl border border-border bg-muted/70 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Items</p>
+              <p className="mt-2 text-xl font-semibold text-foreground">
                 {formatNumber(dataset.detailRows.filter((row) => row.itemType === 'product').length)}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
+        <div className="rounded-[28px] border border-border bg-card/88 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-slate-950/72 sm:p-6">
           <div className="flex items-start gap-3">
-            <div className="rounded-2xl bg-cyan-100 p-2 text-cyan-700">
+            <div className="rounded-2xl bg-cyan-100 p-2 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-200">
               <Wrench className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-slate-950">Linea de servicios</p>
-              <p className="text-sm text-slate-500">Control del torno, materiales y utilidad del trabajo.</p>
+              <p className="text-sm font-semibold text-foreground">Linea de servicios</p>
+              <p className="text-sm text-muted-foreground">Control del torno, materiales y utilidad del trabajo.</p>
             </div>
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Ingreso</p>
-              <p className="mt-2 text-xl font-semibold text-slate-950">{formatCurrency(executiveSummary.serviceRevenue)}</p>
+            <div className="rounded-2xl border border-border bg-muted/70 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Ingreso</p>
+              <p className="mt-2 text-xl font-semibold text-foreground">{formatCurrency(executiveSummary.serviceRevenue)}</p>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Costo</p>
+            <div className="rounded-2xl border border-border bg-muted/70 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Costo</p>
               <p className="mt-2 text-xl font-semibold text-amber-700">{formatCurrency(executiveSummary.serviceCost)}</p>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Utilidad</p>
+            <div className="rounded-2xl border border-border bg-muted/70 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Utilidad</p>
               <p className="mt-2 text-xl font-semibold text-emerald-700">{formatCurrency(executiveSummary.serviceProfit)}</p>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
+      <div className="rounded-[28px] border border-border bg-card/88 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-slate-950/72 sm:p-6">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold text-slate-950">Resumen por venta</p>
-            <p className="text-sm text-slate-500">Cada fila consolida lo que compro el cliente en una misma transaccion.</p>
+            <p className="text-sm font-semibold text-foreground">Resumen por venta</p>
+            <p className="text-sm text-muted-foreground">Cada fila consolida lo que compro el cliente en una misma transaccion.</p>
           </div>
-          <p className="text-sm text-slate-500">{formatNumber(dataset.summaryRows.length)} registros</p>
+          <p className="text-sm text-muted-foreground">{formatNumber(dataset.summaryRows.length)} registros</p>
         </div>
 
         {dataset.summaryRows.length > 0 ? (
@@ -415,7 +422,7 @@ export default function ReportesPage() {
             </TableBody>
           </Table>
         ) : (
-          <Empty className="rounded-3xl border border-dashed border-slate-200 bg-slate-50/60 py-10">
+          <Empty className="rounded-3xl border border-dashed border-border bg-muted/60 py-10 dark:border-slate-800 dark:bg-slate-900/55">
             <EmptyHeader>
               <EmptyTitle>Sin ventas en este mes</EmptyTitle>
               <EmptyDescription>No se encontraron transacciones para el periodo seleccionado.</EmptyDescription>
@@ -424,13 +431,13 @@ export default function ReportesPage() {
         )}
       </div>
 
-      <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
+      <div className="rounded-[28px] border border-border bg-card/88 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-slate-950/72 sm:p-6">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold text-slate-950">Detalle por item vendido</p>
-            <p className="text-sm text-slate-500">Cada fila representa un producto o servicio con contexto completo de la venta.</p>
+            <p className="text-sm font-semibold text-foreground">Detalle por item vendido</p>
+            <p className="text-sm text-muted-foreground">Cada fila representa un producto o servicio con contexto completo de la venta.</p>
           </div>
-          <p className="text-sm text-slate-500">{formatNumber(dataset.detailRows.length)} filas</p>
+          <p className="text-sm text-muted-foreground">{formatNumber(dataset.detailRows.length)} filas</p>
         </div>
 
         {dataset.detailRows.length > 0 ? (
@@ -487,7 +494,7 @@ export default function ReportesPage() {
             </TableBody>
           </Table>
         ) : (
-          <Empty className="rounded-3xl border border-dashed border-slate-200 bg-slate-50/60 py-10">
+          <Empty className="rounded-3xl border border-dashed border-border bg-muted/60 py-10 dark:border-slate-800 dark:bg-slate-900/55">
             <EmptyHeader>
               <EmptyTitle>Sin items para mostrar</EmptyTitle>
               <EmptyDescription>No hay productos o servicios vendidos en el periodo seleccionado.</EmptyDescription>
@@ -497,50 +504,58 @@ export default function ReportesPage() {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-        <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
-          <p className="text-sm font-semibold text-slate-950">Productos mas vendidos</p>
-          <p className="mt-1 text-sm text-slate-500">Top del mes por unidades facturadas.</p>
+        <div className="rounded-[28px] border border-border bg-card/88 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-slate-950/72 sm:p-6">
+          <p className="text-sm font-semibold text-foreground">Productos mas vendidos</p>
+          <p className="mt-1 text-sm text-muted-foreground">Top del mes por unidades facturadas.</p>
           <div className="mt-4 space-y-3">
             {topProducts.length > 0 ? (
               topProducts.map((product) => (
-                <div key={product.productId} className="rounded-2xl bg-slate-50 px-4 py-3">
-                  <p className="font-medium text-slate-900">{product.name}</p>
-                  <p className="text-sm text-slate-500">{formatNumber(product.quantity)} unidades</p>
-                  <p className="text-sm text-slate-500">{formatCurrency(product.revenue)}</p>
+                <div
+                  key={product.productId}
+                  className="rounded-2xl border border-border bg-muted/70 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/60"
+                >
+                  <p className="font-medium text-foreground">{product.name}</p>
+                  <p className="text-sm text-muted-foreground">{formatNumber(product.quantity)} unidades</p>
+                  <p className="text-sm text-muted-foreground">{formatCurrency(product.revenue)}</p>
                 </div>
               ))
             ) : (
-              <p className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-500">Aun no hay productos vendidos en este periodo.</p>
+              <p className="rounded-2xl border border-border bg-muted/70 px-4 py-3 text-sm text-muted-foreground dark:border-slate-800 dark:bg-slate-900/60">
+                Aun no hay productos vendidos en este periodo.
+              </p>
             )}
           </div>
         </div>
 
         <div className="space-y-6">
-          <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
+          <div className="rounded-[28px] border border-border bg-card/88 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-slate-950/72 sm:p-6">
             <div className="flex items-center gap-3">
-              <div className="rounded-2xl bg-cyan-100 p-2 text-cyan-700">
+              <div className="rounded-2xl bg-cyan-100 p-2 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-200">
                 <Wrench className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-slate-950">Servicios del torno</p>
-                <p className="text-sm text-slate-500">{formatNumber(monthlyTotals.serviceCount)} items de servicio en el mes.</p>
+                <p className="text-sm font-semibold text-foreground">Servicios del torno</p>
+                <p className="text-sm text-muted-foreground">{formatNumber(monthlyTotals.serviceCount)} items de servicio en el mes.</p>
               </div>
             </div>
             <div className="mt-4 space-y-3">
               {monthServices.length > 0 ? (
                 monthServices.map((service) => (
-                  <div key={service.id} className="rounded-2xl bg-slate-50 px-4 py-3">
-                    <p className="font-medium text-slate-900">{serviceTypeLabels[service.serviceType]}</p>
-                    <p className="text-sm text-slate-500">{service.customerName} · {service.cueReference || 'Sin referencia'}</p>
-                    <p className="text-sm text-slate-500">
+                  <div
+                    key={service.id}
+                    className="rounded-2xl border border-border bg-muted/70 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/60"
+                  >
+                    <p className="font-medium text-foreground">{serviceTypeLabels[service.serviceType]}</p>
+                    <p className="text-sm text-muted-foreground">{service.customerName} · {service.cueReference || 'Sin referencia'}</p>
+                    <p className="text-sm text-muted-foreground">
                       {formatCurrency(service.totalRevenue)} ingreso · {formatCurrency(service.grossProfit)} utilidad
                     </p>
                   </div>
                 ))
               ) : (
-                <Empty className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 py-8">
+                <Empty className="rounded-2xl border border-dashed border-border bg-muted/60 py-8 dark:border-slate-800 dark:bg-slate-900/55">
                   <EmptyHeader>
-                    <EmptyMedia className="bg-cyan-100 text-cyan-700">
+                    <EmptyMedia className="bg-cyan-100 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-200">
                       <Wrench className="h-5 w-5" />
                     </EmptyMedia>
                     <EmptyTitle>Sin servicios en este mes</EmptyTitle>
@@ -553,9 +568,9 @@ export default function ReportesPage() {
         </div>
       </div>
 
-      <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6">
-        <p className="text-sm font-semibold text-slate-950">Materiales mas usados en servicios</p>
-        <p className="mt-1 text-sm text-slate-500">Te ayuda a ver que insumos del torno se estan consumiendo con mayor frecuencia.</p>
+      <div className="rounded-[28px] border border-border bg-card/88 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-slate-950/72 sm:p-6">
+        <p className="text-sm font-semibold text-foreground">Materiales mas usados en servicios</p>
+        <p className="mt-1 text-sm text-muted-foreground">Te ayuda a ver que insumos del torno se estan consumiendo con mayor frecuencia.</p>
         <div className="mt-4">
           {topServiceMaterials.length > 0 ? (
             <Table className="min-w-[540px]">
@@ -577,7 +592,9 @@ export default function ReportesPage() {
               </TableBody>
             </Table>
           ) : (
-            <p className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-500">Aun no hay consumo de materiales en servicios para este mes.</p>
+            <p className="rounded-2xl border border-border bg-muted/70 px-4 py-3 text-sm text-muted-foreground dark:border-slate-800 dark:bg-slate-900/60">
+              Aun no hay consumo de materiales en servicios para este mes.
+            </p>
           )}
         </div>
       </div>

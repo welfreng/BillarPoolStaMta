@@ -34,13 +34,13 @@ function getStatusLabel(status: AuthorizationRequest['status']) {
 function getStatusClasses(status: AuthorizationRequest['status']) {
   switch (status) {
     case 'approved':
-      return 'border-emerald-200 bg-emerald-50 text-emerald-800';
+      return 'border-emerald-200/80 bg-emerald-50/80 text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:text-emerald-200';
     case 'rejected':
-      return 'border-rose-200 bg-rose-50 text-rose-800';
+      return 'border-rose-200/80 bg-rose-50/80 text-rose-800 dark:border-rose-900/60 dark:bg-rose-950/20 dark:text-rose-200';
     case 'completed':
-      return 'border-slate-200 bg-slate-100 text-slate-700';
+      return 'border-border bg-muted/80 text-slate-700 dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-200';
     default:
-      return 'border-amber-200 bg-amber-50 text-amber-800';
+      return 'border-amber-200/80 bg-amber-50/80 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200';
   }
 }
 
@@ -69,9 +69,9 @@ export default function AutorizacionesPage() {
 
   if (role !== 'admin') {
     return (
-      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <p className="text-lg font-semibold text-slate-950">Acceso restringido</p>
-        <p className="mt-2 text-sm text-slate-500">
+      <div className="rounded-3xl border border-border bg-card/88 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950/72">
+        <p className="text-lg font-semibold text-foreground">Acceso restringido</p>
+        <p className="mt-2 text-sm text-muted-foreground">
           Solo el administrador puede revisar y aprobar solicitudes.
         </p>
       </div>
@@ -111,46 +111,46 @@ export default function AutorizacionesPage() {
       />
 
       <div className="grid gap-3.5 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
-        <div className="rounded-3xl border border-amber-200 bg-amber-50 p-3.5 shadow-sm sm:p-5">
+        <div className="rounded-3xl border border-amber-200/80 bg-amber-50/75 p-3.5 shadow-sm dark:border-amber-900/60 dark:bg-amber-950/20 sm:p-5">
           <div className="flex items-center gap-3">
-            <div className="rounded-2xl bg-white/80 p-3 text-amber-800">
+            <div className="rounded-2xl bg-background/80 p-3 text-amber-800 dark:bg-slate-950/55 dark:text-amber-200">
               <Clock3 className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-sm text-amber-800">Pendientes</p>
-              <p className="text-3xl font-semibold text-amber-950">{pendingCount}</p>
+              <p className="text-sm text-amber-800 dark:text-amber-200/85">Pendientes</p>
+              <p className="text-3xl font-semibold text-amber-950 dark:text-amber-100">{pendingCount}</p>
             </div>
           </div>
         </div>
-        <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-3.5 shadow-sm sm:p-5">
+        <div className="rounded-3xl border border-emerald-200/80 bg-emerald-50/75 p-3.5 shadow-sm dark:border-emerald-900/60 dark:bg-emerald-950/20 sm:p-5">
           <div className="flex items-center gap-3">
-            <div className="rounded-2xl bg-white/80 p-3 text-emerald-800">
+            <div className="rounded-2xl bg-background/80 p-3 text-emerald-800 dark:bg-slate-950/55 dark:text-emerald-200">
               <CheckCircle2 className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-sm text-emerald-800">Aprobadas</p>
-              <p className="text-3xl font-semibold text-emerald-950">{approvedCount}</p>
+              <p className="text-sm text-emerald-800 dark:text-emerald-200/85">Aprobadas</p>
+              <p className="text-3xl font-semibold text-emerald-950 dark:text-emerald-100">{approvedCount}</p>
             </div>
           </div>
         </div>
-        <div className="rounded-3xl border border-rose-200 bg-rose-50 p-3.5 shadow-sm sm:p-5">
+        <div className="rounded-3xl border border-rose-200/80 bg-rose-50/75 p-3.5 shadow-sm dark:border-rose-900/60 dark:bg-rose-950/20 sm:p-5">
           <div className="flex items-center gap-3">
-            <div className="rounded-2xl bg-white/80 p-3 text-rose-800">
+            <div className="rounded-2xl bg-background/80 p-3 text-rose-800 dark:bg-slate-950/55 dark:text-rose-200">
               <XCircle className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-sm text-rose-800">Rechazadas</p>
-              <p className="text-3xl font-semibold text-rose-950">{rejectedCount}</p>
+              <p className="text-sm text-rose-800 dark:text-rose-200/85">Rechazadas</p>
+              <p className="text-3xl font-semibold text-rose-950 dark:text-rose-100">{rejectedCount}</p>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="rounded-3xl border border-slate-200 bg-white p-3.5 shadow-sm sm:p-6">
+      <div className="rounded-3xl border border-border bg-card/88 p-3.5 shadow-sm dark:border-slate-800 dark:bg-slate-950/72 sm:p-6">
         <div className="flex flex-col gap-3.5 md:flex-row md:items-center md:justify-between md:gap-4">
           <div>
-            <h2 className="text-lg font-semibold text-slate-950">Bandeja de solicitudes</h2>
-            <p className="hidden text-sm text-slate-500 sm:block">
+            <h2 className="text-lg font-semibold text-foreground">Bandeja de solicitudes</h2>
+            <p className="hidden text-sm text-muted-foreground sm:block">
               Aqui revisas quien solicita editar o devolver una venta antes de autorizarla.
             </p>
           </div>
@@ -162,9 +162,9 @@ export default function AutorizacionesPage() {
           />
         </div>
 
-        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-2 sm:mt-5">
+        <div className="mt-4 rounded-2xl border border-border bg-muted/70 p-2 dark:border-slate-800 dark:bg-slate-900/60 sm:mt-5">
           <div className="pb-2">
-            <Table className="min-w-[980px] bg-white">
+            <Table className="min-w-[980px] bg-card/88 dark:bg-slate-950/60">
               <TableHeader>
                 <TableRow>
                   <TableHead>Solicitud</TableHead>
@@ -173,7 +173,7 @@ export default function AutorizacionesPage() {
                   <TableHead>Motivo</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Fecha</TableHead>
-                  <TableHead className="sticky right-0 z-10 bg-slate-50/95 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
+                  <TableHead className="sticky right-0 z-10 bg-muted/95 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)] dark:bg-slate-900/95 dark:shadow-[-12px_0_16px_-16px_rgba(2,6,23,0.65)]">
                     Acciones
                   </TableHead>
                 </TableRow>
@@ -193,14 +193,14 @@ export default function AutorizacionesPage() {
                   <TableRow key={request.id} title={rowHoverSummary}>
                     <TableCell>
                       <div>
-                        <p className="font-medium text-slate-900">{getRequestTypeLabel(request.requestType)}</p>
-                        <p className="text-xs text-slate-500">{request.saleSummary}</p>
+                        <p className="font-medium text-foreground">{getRequestTypeLabel(request.requestType)}</p>
+                        <p className="text-xs text-muted-foreground">{request.saleSummary}</p>
                       </div>
                     </TableCell>
                     <TableCell>{request.requestedBy}</TableCell>
                     <TableCell>{request.customerName || 'Cliente'}</TableCell>
                     <TableCell className="max-w-xs">
-                      <p className="line-clamp-2 text-sm text-slate-600">{request.reason}</p>
+                      <p className="line-clamp-2 text-sm text-slate-600 dark:text-slate-300">{request.reason}</p>
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className={getStatusClasses(request.status)}>
@@ -208,7 +208,7 @@ export default function AutorizacionesPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>{new Date(request.createdAt).toLocaleString('es-CO')}</TableCell>
-                    <TableCell className="sticky right-0 bg-white/95 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.35)]">
+                    <TableCell className="sticky right-0 bg-[rgba(241,245,249,0.96)] text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.22)] backdrop-blur dark:bg-slate-950/95 dark:shadow-[-12px_0_16px_-16px_rgba(2,6,23,0.65)]">
                       <Button
                         variant="ghost"
                         className="rounded-xl"
@@ -225,11 +225,11 @@ export default function AutorizacionesPage() {
                 {filteredRequests.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="py-12 text-center">
-                      <div className="flex flex-col items-center gap-2 text-slate-500">
-                        <div className="rounded-2xl bg-slate-100 p-3">
+                      <div className="flex flex-col items-center gap-2 text-slate-500 dark:text-slate-400">
+                        <div className="rounded-2xl bg-muted p-3 dark:bg-slate-900/80">
                           <ShieldCheck className="h-5 w-5" />
                         </div>
-                        <p className="font-medium text-slate-900">No hay solicitudes por revisar</p>
+                        <p className="font-medium text-foreground">No hay solicitudes por revisar</p>
                         <p className="text-sm">Cuando un vendedor solicite una autorizacion aparecera aqui.</p>
                       </div>
                     </TableCell>
@@ -256,7 +256,7 @@ export default function AutorizacionesPage() {
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
             <Button
               variant="outline"
-              className="w-full rounded-xl border-rose-200 text-rose-700 hover:bg-rose-50 sm:w-auto"
+              className="w-full rounded-xl border-rose-200 text-rose-700 hover:bg-rose-50 dark:border-rose-900/60 dark:text-rose-200 dark:hover:bg-rose-950/20 sm:w-auto"
               onClick={() => void handleReview('rejected')}
               disabled={!selectedRequest || selectedRequest.status !== 'pending'}
             >
@@ -274,36 +274,36 @@ export default function AutorizacionesPage() {
       >
           {selectedRequest ? (
             <div className="space-y-3.5 sm:space-y-4">
-              <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-2 sm:p-4">
+              <div className="grid gap-3 rounded-2xl border border-border bg-muted/70 p-3 dark:border-slate-800 dark:bg-slate-900/70 sm:grid-cols-2 sm:p-4">
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Tipo</p>
-                  <p className="mt-1 font-medium text-slate-900">
+                  <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Tipo</p>
+                  <p className="mt-1 font-medium text-slate-900 dark:text-slate-100">
                     {getRequestTypeLabel(selectedRequest.requestType)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Estado</p>
-                  <p className="mt-1 font-medium text-slate-900">{getStatusLabel(selectedRequest.status)}</p>
+                  <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Estado</p>
+                  <p className="mt-1 font-medium text-slate-900 dark:text-slate-100">{getStatusLabel(selectedRequest.status)}</p>
                 </div>
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Vendedor</p>
-                  <p className="mt-1 font-medium text-slate-900">{selectedRequest.requestedBy}</p>
+                  <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Vendedor</p>
+                  <p className="mt-1 font-medium text-slate-900 dark:text-slate-100">{selectedRequest.requestedBy}</p>
                 </div>
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Cliente</p>
-                  <p className="mt-1 font-medium text-slate-900">{selectedRequest.customerName || 'Cliente'}</p>
+                  <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Cliente</p>
+                  <p className="mt-1 font-medium text-slate-900 dark:text-slate-100">{selectedRequest.customerName || 'Cliente'}</p>
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-slate-200 p-3 sm:p-4">
-                <p className="text-xs uppercase tracking-wide text-slate-500">Venta</p>
-                <p className="mt-1 text-sm font-medium text-slate-900">{selectedRequest.saleSummary}</p>
-                <p className="mt-3 text-xs uppercase tracking-wide text-slate-500">Motivo enviado</p>
-                <p className="mt-1 text-sm text-slate-700">{selectedRequest.reason}</p>
+              <div className="rounded-2xl border border-border bg-card/72 p-3 dark:border-slate-800 dark:bg-slate-950/40 sm:p-4">
+                <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Venta</p>
+                <p className="mt-1 text-sm font-medium text-slate-900 dark:text-slate-100">{selectedRequest.saleSummary}</p>
+                <p className="mt-3 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Motivo enviado</p>
+                <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">{selectedRequest.reason}</p>
               </div>
 
               <div className="space-y-2">
-                <p className="text-sm font-medium text-slate-900">Nota del administrador</p>
+                <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Nota del administrador</p>
                 <Textarea
                   value={reviewNote}
                   onChange={(event) => setReviewNote(event.target.value)}
