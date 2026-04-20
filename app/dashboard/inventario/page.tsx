@@ -130,8 +130,6 @@ export default function InventarioPage() {
         ],
         customerPhone: '',
         customerName: '',
-        paymentMethod: 'efectivo',
-        paymentReference: '',
         notes: '',
       }
     : null;

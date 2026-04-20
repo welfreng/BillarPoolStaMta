@@ -1,0 +1,75 @@
+﻿{
+    "executedAt":  "2026-04-20T15:28:40.0341981-05:00",
+    "executeMode":  false,
+    "backupPath":  "C:\\Users\\HP\\Documents\\freeland\\BillarPoolStaMta\\cleanup-logs\\cleanup-backup-20260420-152820.json",
+    "preCounts":  {
+                      "products":  51,
+                      "product_variants":  105,
+                      "usuarios":  2,
+                      "purchases":  0,
+                      "purchase_items":  0,
+                      "sales":  0,
+                      "services":  0,
+                      "movements":  0,
+                      "inventory_movements":  0,
+                      "authorization-requests":  0,
+                      "admin-notifications":  0,
+                      "service-visits":  0
+                  },
+    "actions":  {
+                    "deleted":  {
+                                    "purchases":  0,
+                                    "purchase_items":  0,
+                                    "sales":  0,
+                                    "services":  0,
+                                    "movements":  0,
+                                    "inventory_movements":  0,
+                                    "authorization-requests":  0,
+                                    "admin-notifications":  0,
+                                    "service-visits":  0,
+                                    "target_product_variants":  0,
+                                    "target_products":  0
+                                },
+                    "updated":  {
+                                    "products":  0,
+                                    "product_variants":  0
+                                }
+                },
+    "postCounts":  {
+                       "products":  51,
+                       "product_variants":  105,
+                       "usuarios":  2,
+                       "purchases":  0,
+                       "purchase_items":  0,
+                       "sales":  0,
+                       "services":  0,
+                       "movements":  0,
+                       "inventory_movements":  0,
+                       "authorization-requests":  0,
+                       "admin-notifications":  0,
+                       "service-visits":  0
+                   },
+    "validations":  {
+                        "usersPreservedCount":  true,
+                        "usersPreservedIds":  [
+                                                  "1dzJe0e2pxWFLsBE9bCQbvrM6O33",
+                                                  "AJX7iR4WHZdp2tnxzKn7qPY9rzd2"
+                                              ],
+                        "targetProductsRemoved":  {
+                                                      "prueba 2":  true,
+                                                      "producto prueba":  true
+                                                  },
+                        "purchasesZero":  true,
+                        "purchaseItemsZero":  true,
+                        "salesZero":  true,
+                        "servicesZero":  true,
+                        "movementsZero":  true,
+                        "inventoryMovementsZero":  true,
+                        "authorizationRequestsZero":  true,
+                        "adminNotificationsZero":  true,
+                        "serviceVisitsZero":  true,
+                        "allProductPublicStockZero":  true,
+                        "allVariantDocsZeroed":  true,
+                        "allEmbeddedVariantsZeroed":  true
+                    }
+}

@@ -100,6 +100,10 @@ type UpdateSubcategoryInput = {
   status: ProductCategoryStatus;
 };
 
+// Keep sales payment fields disabled in UI/flow for now, but easy to re-enable later.
+const SALES_PAYMENT_FIELDS_ENABLED = false;
+const SERVICES_PAYMENT_FIELDS_ENABLED = false;
+
 interface RegisterMovementInput {
   productId: string;
   variantId?: string;
@@ -155,7 +159,7 @@ interface RegisterSaleInput {
   }>;
   customerName: string;
   customerPhone: string;
-  paymentMethod: string;
+  paymentMethod?: string;
   paymentReference?: string;
   notes: string;
   responsibleUser: string;
@@ -2773,13 +2777,14 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     }
 
     const normalizedCustomerPhone = input.customerPhone.trim();
-    const normalizedPaymentMethod = input.paymentMethod.trim();
-    const normalizedPaymentReference = input.paymentReference?.trim() ?? '';
+    const normalizedPaymentMethod = SALES_PAYMENT_FIELDS_ENABLED
+      ? input.paymentMethod?.trim() || 'efectivo'
+      : 'efectivo';
+    const normalizedPaymentReference = SALES_PAYMENT_FIELDS_ENABLED
+      ? input.paymentReference?.trim() ?? ''
+      : '';
     if (normalizedCustomerPhone && normalizedCustomerPhone.length < 7) {
       throw new Error('Ingresa un telefono valido o dejalo vacio.');
-    }
-    if (!normalizedPaymentMethod) {
-      throw new Error('Selecciona el metodo de pago.');
     }
 
     const variantStockMap = buildVariantStockMap(baseProducts);
@@ -3396,9 +3401,13 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     if ((Number(input.servicePrice) || 0) <= 0) {
       throw new Error('El valor del servicio debe ser mayor a cero.');
     }
-    const normalizedPaymentMethod = input.paymentMethod.trim();
-    const normalizedPaymentReference = input.paymentReference?.trim() ?? '';
-    if (!normalizedPaymentMethod) {
+    const normalizedPaymentMethod = SERVICES_PAYMENT_FIELDS_ENABLED
+      ? input.paymentMethod.trim()
+      : 'efectivo';
+    const normalizedPaymentReference = SERVICES_PAYMENT_FIELDS_ENABLED
+      ? input.paymentReference?.trim() ?? ''
+      : '';
+    if (SERVICES_PAYMENT_FIELDS_ENABLED && !normalizedPaymentMethod) {
       throw new Error('Selecciona el metodo de pago.');
     }
 

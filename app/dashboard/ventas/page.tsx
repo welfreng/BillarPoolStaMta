@@ -194,8 +194,6 @@ export default function VentasPage() {
         ),
         customerPhone: editingSale.customerPhone ?? '',
         customerName: editingSale.customerName,
-        paymentMethod: editingSale.paymentMethod || 'efectivo',
-        paymentReference: editingSale.paymentReference || '',
         notes: editingSale.notes,
       }
     : null;
@@ -813,6 +811,8 @@ export default function VentasPage() {
             const payload = {
               ...values,
               soldAt: new Date(values.soldAt).toISOString(),
+              paymentMethod: 'efectivo',
+              paymentReference: '',
               actorRole: role ?? 'admin',
               responsibleUser:
                 profile?.nombre?.trim() || user?.displayName || user?.email || 'Usuario de ventas',

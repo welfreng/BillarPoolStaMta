@@ -455,3 +455,37 @@ To learn about active projects for the CLI, visit https://firebase.google.com/do
 [info] +  Deploy complete! 
 [info] 
 [info] Project Console: https://console.firebase.google.com/project/billarpoolstamta-5d4ac/overview
+[debug] [2026-04-20T20:15:07.229Z] ----------------------------------------------------------------------
+[debug] [2026-04-20T20:15:07.234Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\HP\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\firebase-tools\lib\bin\firebase.js projects:list --json
+[debug] [2026-04-20T20:15:07.235Z] CLI Version:   15.15.0
+[debug] [2026-04-20T20:15:07.235Z] Platform:      win32
+[debug] [2026-04-20T20:15:07.236Z] Node Version:  v24.14.0
+[debug] [2026-04-20T20:15:07.236Z] Time:          Mon Apr 20 2026 15:15:07 GMT-0500 (hora estándar de Colombia)
+[debug] [2026-04-20T20:15:07.237Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-04-20T20:15:07.243Z] >>> [apiv2][query] GET https://firebase-public.firebaseio.com/cli.json [none]
+[debug] [2026-04-20T20:15:07.638Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-04-20T20:15:07.638Z] > authorizing via signed-in user (webnextwave@gmail.com)
+[debug] [2026-04-20T20:15:07.642Z] Checked if tokens are valid: false, expires at: 1776526920102
+[debug] [2026-04-20T20:15:07.643Z] Checked if tokens are valid: false, expires at: 1776526920102
+[debug] [2026-04-20T20:15:07.643Z] > refreshing access token with scopes: []
+[debug] [2026-04-20T20:15:07.645Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2026-04-20T20:15:07.645Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-04-20T20:15:08.129Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2026-04-20T20:15:08.130Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-04-20T20:15:08.147Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects pageSize=1000
+[debug] [2026-04-20T20:15:08.161Z] <<< [apiv2][status] GET https://firebase-public.firebaseio.com/cli.json 200
+[debug] [2026-04-20T20:15:08.161Z] <<< [apiv2][body] GET https://firebase-public.firebaseio.com/cli.json {"cloudBuildErrorAfter":1594252800000,"cloudBuildWarnAfter":1590019200000,"defaultNode10After":1594252800000,"minVersion":"3.0.5","node8DeploysDisabledAfter":1613390400000,"node8RuntimeDisabledAfter":1615809600000,"node8WarnAfter":1600128000000}
+[debug] [2026-04-20T20:15:08.765Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects 200
+[debug] [2026-04-20T20:15:08.766Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects [omitted]
+[info] ┌──────────────────────┬────────────────────────┬────────────────┬──────────────────────┐
+│ Project Display Name │ Project ID             │ Project Number │ Resource Location ID │
+├──────────────────────┼────────────────────────┼────────────────┼──────────────────────┤
+│ BillarPoolStaMta     │ billarpoolstamta-5d4ac │ 99743619101    │ [Not specified]      │
+├──────────────────────┼────────────────────────┼────────────────┼──────────────────────┤
+│ BillarStock          │ billarstock            │ 384216769514   │ [Not specified]      │
+├──────────────────────┼────────────────────────┼────────────────┼──────────────────────┤
+│ FlowTer              │ flowter-16c21          │ 495685919948   │ [Not specified]      │
+└──────────────────────┴────────────────────────┴────────────────┴──────────────────────┘
+[info] 
+[info] 3 project(s) total.
