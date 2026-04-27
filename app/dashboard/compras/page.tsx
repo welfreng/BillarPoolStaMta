@@ -90,6 +90,7 @@ export default function ComprasPage() {
   }, [filteredPurchases, suppliers]);
 
   const buildInitialValues = (groupItems: typeof filteredPurchases): PurchaseFormValues => ({
+    purchaseType: groupItems[0]?.purchaseType === 'international' ? 'international' : 'local',
     supplierId: groupItems[0]?.supplierId ?? '',
     supplier:
       suppliers.find((supplier) => supplier.id === groupItems[0]?.supplierId)?.name ??
@@ -97,6 +98,12 @@ export default function ComprasPage() {
       '',
     purchasedAt: new Date(groupItems[0]?.purchasedAt ?? new Date().toISOString()).toISOString().slice(0, 10),
     shippingValueTotal: groupItems.reduce((sum, item) => sum + item.shippingValueTotal, 0),
+    internationalVendorName: groupItems[0]?.internationalVendorName ?? '',
+    productsValueUsd: groupItems[0]?.productsValueUsd ?? 0,
+    shippingValueUsd: groupItems[0]?.shippingValueUsd ?? 0,
+    platformFeePercent: groupItems[0]?.platformFeePercent ?? 2.99,
+    usdToCopRate: groupItems[0]?.usdToCopRate ?? 0,
+    customsTaxCop: groupItems[0]?.customsTaxCop ?? 0,
     items: groupItems.map((item) => {
       const product = getProductById(products, item.productId);
       return {
@@ -104,6 +111,12 @@ export default function ComprasPage() {
         variantId: item.variantId ?? '',
         presentationQuantity: item.presentationQuantity,
         purchaseUnitValue: item.purchaseUnitValue,
+        purchaseUnitValueUsd:
+          item.purchaseUnitValueUsd && Number(item.purchaseUnitValueUsd) > 0
+            ? Number(item.purchaseUnitValueUsd)
+            : (groupItems[0]?.purchaseType === 'international' && Number(groupItems[0]?.usdToCopRate ?? 0) > 0)
+              ? Number((item.purchaseUnitValue / Number(groupItems[0]?.usdToCopRate ?? 1)).toFixed(6))
+              : 0,
         suggestedSalePrice: product?.salePrice ?? item.suggestedSalePrice,
       };
     }),

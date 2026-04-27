@@ -42,15 +42,41 @@ const purchaseLineSchema = z.object({
   variantId: z.string().default(''),
   presentationQuantity: z.coerce.number().positive('Cantidad invalida'),
   purchaseUnitValue: z.coerce.number().min(0),
+  purchaseUnitValueUsd: z.coerce.number().min(0),
   suggestedSalePrice: z.coerce.number().min(0),
 });
 
 const purchaseSchema = z.object({
+  purchaseType: z.enum(['local', 'international']).default('local'),
   supplierId: z.string().optional(),
   supplier: z.string().min(2, 'Ingresa el proveedor'),
   purchasedAt: z.string().min(1, 'Selecciona la fecha'),
   shippingValueTotal: z.coerce.number().min(0),
+  internationalVendorName: z.string().optional(),
+  productsValueUsd: z.coerce.number().min(0),
+  shippingValueUsd: z.coerce.number().min(0),
+  platformFeePercent: z.coerce.number().min(0),
+  usdToCopRate: z.coerce.number().min(0),
+  customsTaxCop: z.coerce.number().min(0),
   items: z.array(purchaseLineSchema).min(1, 'Agrega al menos un producto'),
+}).superRefine((value, context) => {
+  if (value.purchaseType !== 'international') return;
+
+  if ((value.usdToCopRate ?? 0) <= 0) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['usdToCopRate'],
+      message: 'Ingresa la TRM/tasa de cambio usada en la compra.',
+    });
+  }
+
+  if ((value.productsValueUsd ?? 0) + (value.shippingValueUsd ?? 0) <= 0) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['productsValueUsd'],
+      message: 'Ingresa al menos un valor en USD para productos o envio.',
+    });
+  }
 });
 
 export type PurchaseFormValues = z.infer<typeof purchaseSchema>;
@@ -60,6 +86,7 @@ type DraftPurchaseLine = {
   variantId: string;
   presentationQuantity: string;
   purchaseUnitValue: string;
+  purchaseUnitValueUsd: string;
   suggestedSalePrice: string;
 };
 
@@ -68,14 +95,22 @@ const defaultLine: PurchaseFormValues['items'][number] = {
   variantId: '',
   presentationQuantity: 1,
   purchaseUnitValue: 0,
+  purchaseUnitValueUsd: 0,
   suggestedSalePrice: 0,
 };
 
 const defaultValues: PurchaseFormValues = {
+  purchaseType: 'local',
   supplierId: '',
   supplier: '',
   purchasedAt: new Date().toISOString().slice(0, 10),
   shippingValueTotal: 0,
+  internationalVendorName: '',
+  productsValueUsd: 0,
+  shippingValueUsd: 0,
+  platformFeePercent: 2.99,
+  usdToCopRate: 0,
+  customsTaxCop: 0,
   items: [defaultLine],
 };
 
@@ -85,6 +120,7 @@ function createDefaultPurchaseLine(): DraftPurchaseLine {
     variantId: '',
     presentationQuantity: '',
     purchaseUnitValue: '',
+    purchaseUnitValueUsd: '',
     suggestedSalePrice: '',
   };
 }
@@ -96,6 +132,7 @@ function createDraftPurchaseLineFromValue(line?: PurchaseLineFormValue): DraftPu
     variantId: line.variantId ?? '',
     presentationQuantity: String(line.presentationQuantity ?? ''),
     purchaseUnitValue: String(line.purchaseUnitValue ?? ''),
+    purchaseUnitValueUsd: String(line.purchaseUnitValueUsd ?? ''),
     suggestedSalePrice: String(line.suggestedSalePrice ?? ''),
   };
 }
@@ -110,6 +147,10 @@ function isSamePurchaseLine(
   right: Pick<PurchaseLineFormValue, 'productId' | 'variantId'>
 ) {
   return left.productId === right.productId && (left.variantId || '') === (right.variantId || '');
+}
+
+function convertUsdToCop(usdValue: number, usdToCopRate: number) {
+  return Number((usdValue * usdToCopRate).toFixed(2));
 }
 
 function SearchableSelect({
@@ -236,6 +277,7 @@ export function PurchaseFormDialog({
   useEffect(() => {
     const nextValues = initialValues
       ? {
+          ...defaultValues,
           ...initialValues,
           items: initialValues.items.length > 0 ? initialValues.items : [defaultLine],
         }
@@ -253,17 +295,52 @@ export function PurchaseFormDialog({
     control: form.control,
     name: 'supplierId',
   });
+  const watchedPurchaseType = useWatch({
+    control: form.control,
+    name: 'purchaseType',
+  });
   const watchedShippingValueTotal = useWatch({
     control: form.control,
     name: 'shippingValueTotal',
+  });
+  const watchedInternationalVendorName = useWatch({
+    control: form.control,
+    name: 'internationalVendorName',
+  });
+  const watchedProductsValueUsd = useWatch({
+    control: form.control,
+    name: 'productsValueUsd',
+  });
+  const watchedShippingValueUsd = useWatch({
+    control: form.control,
+    name: 'shippingValueUsd',
+  });
+  const watchedPlatformFeePercent = useWatch({
+    control: form.control,
+    name: 'platformFeePercent',
+  });
+  const watchedUsdToCopRate = useWatch({
+    control: form.control,
+    name: 'usdToCopRate',
+  });
+  const watchedCustomsTaxCop = useWatch({
+    control: form.control,
+    name: 'customsTaxCop',
   });
   const watchedItems = useWatch({
     control: form.control,
     name: 'items',
   }) ?? defaultValues.items;
   const values = {
+    purchaseType: watchedPurchaseType,
     supplierId: watchedSupplierId,
     shippingValueTotal: watchedShippingValueTotal,
+    internationalVendorName: watchedInternationalVendorName,
+    productsValueUsd: watchedProductsValueUsd,
+    shippingValueUsd: watchedShippingValueUsd,
+    platformFeePercent: watchedPlatformFeePercent,
+    usdToCopRate: watchedUsdToCopRate,
+    customsTaxCop: watchedCustomsTaxCop,
     items: watchedItems,
   };
   const selectedSupplier = suppliers.find((supplier) => supplier.id === values.supplierId);
@@ -275,6 +352,61 @@ export function PurchaseFormDialog({
       shouldDirty: true,
     });
   }, [form, selectedSupplier]);
+
+  const lineProductsValueUsdTotal = values.items.reduce(
+    (sum, item) => sum + ((Number(item.purchaseUnitValueUsd) || 0) * (Number(item.presentationQuantity) || 0)),
+    0
+  );
+  const internationalSubtotalUsd = lineProductsValueUsdTotal + (Number(values.shippingValueUsd) || 0);
+  const internationalPlatformFeeUsd =
+    Number(((internationalSubtotalUsd * (Number(values.platformFeePercent) || 0)) / 100).toFixed(6));
+  const internationalChargesUsd = (Number(values.shippingValueUsd) || 0) + internationalPlatformFeeUsd;
+  const internationalChargesCop = Number(
+    (internationalChargesUsd * (Number(values.usdToCopRate) || 0)).toFixed(2)
+  );
+  const internationalShippingTotalCop = Number(
+    (internationalChargesCop + (Number(values.customsTaxCop) || 0)).toFixed(2)
+  );
+
+  useEffect(() => {
+    if (values.purchaseType !== 'international') return;
+    if ((Number(values.shippingValueTotal) || 0) === internationalShippingTotalCop) return;
+    form.setValue('shippingValueTotal', internationalShippingTotalCop, {
+      shouldValidate: true,
+      shouldDirty: true,
+    });
+  }, [form, internationalShippingTotalCop, values.purchaseType, values.shippingValueTotal]);
+
+  useEffect(() => {
+    if (values.purchaseType !== 'international') return;
+    if ((Number(values.productsValueUsd) || 0) === lineProductsValueUsdTotal) return;
+    form.setValue('productsValueUsd', Number(lineProductsValueUsdTotal.toFixed(6)), {
+      shouldValidate: true,
+      shouldDirty: true,
+    });
+  }, [form, lineProductsValueUsdTotal, values.productsValueUsd, values.purchaseType]);
+
+  useEffect(() => {
+    if (values.purchaseType !== 'international') return;
+    const normalizedRate = Number(values.usdToCopRate) || 0;
+    const formItems = form.getValues('items');
+    let hasChanges = false;
+    const nextItems = formItems.map((item) => {
+      const usdUnitValue = Number(item.purchaseUnitValueUsd) || 0;
+      const convertedCopValue = convertUsdToCop(usdUnitValue, normalizedRate);
+      if ((Number(item.purchaseUnitValue) || 0) === convertedCopValue) {
+        return item;
+      }
+      hasChanges = true;
+      return {
+        ...item,
+        purchaseUnitValue: convertedCopValue,
+      };
+    });
+    if (hasChanges) {
+      replace(nextItems);
+    }
+  }, [form, replace, values.purchaseType, values.usdToCopRate, values.items]);
 
   const totalPurchaseValue = values.items.reduce(
     (sum, item) => sum + ((Number(item.purchaseUnitValue) || 0) * (Number(item.presentationQuantity) || 0)),
@@ -333,7 +465,12 @@ export function PurchaseFormDialog({
   const draftVariantOptions = draftProduct?.variants ?? [];
   const isDraftPack12 = isPackOf12Product(draftProduct);
   const draftQuantity = Number(draftLine.presentationQuantity) || 0;
-  const draftPurchaseValueTotal = (Number(draftLine.purchaseUnitValue) || 0) * draftQuantity;
+  const normalizedUsdToCopRate = Number(values.usdToCopRate) || 0;
+  const draftPurchaseUnitValueCop =
+    values.purchaseType === 'international'
+      ? convertUsdToCop(Number(draftLine.purchaseUnitValueUsd) || 0, normalizedUsdToCopRate)
+      : Number(draftLine.purchaseUnitValue) || 0;
+  const draftPurchaseValueTotal = draftPurchaseUnitValueCop * draftQuantity;
   const getAvailableVariantOptions = (productId: string, excludeIndex?: number) => {
     const product = products.find((candidate) => candidate.id === productId);
     const productVariants = product?.variants ?? [];
@@ -406,6 +543,7 @@ export function PurchaseFormDialog({
       variantId: firstAvailableVariant?.id ?? '',
       presentationQuantity: '',
       purchaseUnitValue: '',
+      purchaseUnitValueUsd: '',
       suggestedSalePrice: String(getPurchaseVariantSuggestedSalePrice(product, firstAvailableVariant?.id)),
     };
   };
@@ -446,7 +584,7 @@ export function PurchaseFormDialog({
   const openNewLineDialog = (
     preferredProductId?: string,
     lockProduct = false,
-    priceSeed?: { purchaseUnitValue?: number; suggestedSalePrice?: number }
+    priceSeed?: { purchaseUnitValue?: number; purchaseUnitValueUsd?: number; suggestedSalePrice?: number }
   ) => {
     const preferredProduct = preferredProductId
       ? products.find((product) => product.id === preferredProductId)
@@ -458,6 +596,8 @@ export function PurchaseFormDialog({
             ...buildDraftLineForProduct(preferredProduct.id),
             purchaseUnitValue:
               priceSeed?.purchaseUnitValue !== undefined ? String(priceSeed.purchaseUnitValue) : '',
+            purchaseUnitValueUsd:
+              priceSeed?.purchaseUnitValueUsd !== undefined ? String(priceSeed.purchaseUnitValueUsd) : '',
             suggestedSalePrice:
               priceSeed?.suggestedSalePrice !== undefined
                 ? String(priceSeed.suggestedSalePrice)
@@ -487,8 +627,17 @@ export function PurchaseFormDialog({
       setLineError('La cantidad debe ser mayor a cero.');
       return;
     }
-    if ((Number(draftLine.purchaseUnitValue) || 0) <= 0) {
-      setLineError('Debes ingresar un valor unitario de compra mayor a cero.');
+    const normalizedDraftPurchaseUnitValue =
+      values.purchaseType === 'international'
+        ? convertUsdToCop(Number(draftLine.purchaseUnitValueUsd) || 0, Number(values.usdToCopRate) || 0)
+        : Number(draftLine.purchaseUnitValue) || 0;
+    const normalizedDraftPurchaseUnitValueUsd = Number(draftLine.purchaseUnitValueUsd) || 0;
+    if (normalizedDraftPurchaseUnitValue <= 0) {
+      setLineError(
+        values.purchaseType === 'international'
+          ? 'Debes ingresar un valor unitario en USD mayor a cero.'
+          : 'Debes ingresar un valor unitario de compra mayor a cero.'
+      );
       return;
     }
     if ((Number(draftLine.suggestedSalePrice) || 0) <= 0) {
@@ -500,7 +649,8 @@ export function PurchaseFormDialog({
       productId: draftLine.productId,
       variantId: draftLine.variantId,
       presentationQuantity: Number(draftLine.presentationQuantity) || 0,
-      purchaseUnitValue: Number(draftLine.purchaseUnitValue) || 0,
+      purchaseUnitValue: normalizedDraftPurchaseUnitValue,
+      purchaseUnitValueUsd: values.purchaseType === 'international' ? normalizedDraftPurchaseUnitValueUsd : 0,
       suggestedSalePrice: Number(draftLine.suggestedSalePrice) || 0,
     };
     const selectedProduct = products.find((product) => product.id === draftLine.productId);
@@ -536,6 +686,7 @@ export function PurchaseFormDialog({
             variantId: nextAvailableVariants[0]?.id ?? '',
             presentationQuantity: '',
             purchaseUnitValue: String(normalizedDraftLine.purchaseUnitValue),
+            purchaseUnitValueUsd: String(normalizedDraftLine.purchaseUnitValueUsd ?? ''),
             suggestedSalePrice: String(nextSuggestedSalePrice || ''),
           });
           setLockedDraftProductId(draftLine.productId);
@@ -585,12 +736,16 @@ export function PurchaseFormDialog({
     }));
   };
 
-  const syncProductPurchaseValueInForm = (productId: string, purchaseUnitValue: number) => {
+  const syncProductPurchaseValueInForm = (
+    productId: string,
+    valuesToSync: { purchaseUnitValue: number; purchaseUnitValueUsd?: number }
+  ) => {
     const nextItems = form.getValues('items').map((item) =>
       item.productId === productId
         ? {
             ...item,
-            purchaseUnitValue,
+            purchaseUnitValue: valuesToSync.purchaseUnitValue,
+            purchaseUnitValueUsd: valuesToSync.purchaseUnitValueUsd ?? item.purchaseUnitValueUsd,
           }
         : item
     );
@@ -605,7 +760,10 @@ export function PurchaseFormDialog({
     if (!isPackOf12Product(product)) return;
 
     const quantityEntered = Number(item.presentationQuantity) || 0;
-    const unitValueEntered = Number(item.purchaseUnitValue) || 0;
+    const unitValueEntered =
+      values.purchaseType === 'international'
+        ? Number(item.purchaseUnitValueUsd) || 0
+        : Number(item.purchaseUnitValue) || 0;
 
     if (quantityEntered < 12 || unitValueEntered <= 0) return;
 
@@ -613,10 +771,26 @@ export function PurchaseFormDialog({
       shouldValidate: true,
       shouldDirty: true,
     });
-    form.setValue(`items.${index}.purchaseUnitValue`, Number((unitValueEntered * 12).toFixed(2)), {
-      shouldValidate: true,
-      shouldDirty: true,
-    });
+    const normalizedUnitValue = Number((unitValueEntered * 12).toFixed(2));
+    if (values.purchaseType === 'international') {
+      form.setValue(`items.${index}.purchaseUnitValueUsd`, normalizedUnitValue, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+      form.setValue(
+        `items.${index}.purchaseUnitValue`,
+        convertUsdToCop(normalizedUnitValue, Number(values.usdToCopRate) || 0),
+        {
+          shouldValidate: true,
+          shouldDirty: true,
+        }
+      );
+    } else {
+      form.setValue(`items.${index}.purchaseUnitValue`, normalizedUnitValue, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+    }
     setPack12NormalizedByField((current) => ({
       ...current,
       [fieldId]: true,
@@ -624,7 +798,10 @@ export function PurchaseFormDialog({
   };
 
   const firstLineCanSeedVariants =
-    (Number(firstItem.purchaseUnitValue) || 0) > 0 && (Number(firstItem.suggestedSalePrice) || 0) > 0;
+    (values.purchaseType === 'international'
+      ? (Number(firstItem.purchaseUnitValueUsd) || 0) > 0
+      : (Number(firstItem.purchaseUnitValue) || 0) > 0) &&
+    (Number(firstItem.suggestedSalePrice) || 0) > 0;
 
   return (
     <>
@@ -649,7 +826,32 @@ export function PurchaseFormDialog({
           <form
             id={purchaseFormId}
             onSubmit={form.handleSubmit(async (submittedValues) => {
-              await onSubmit(submittedValues);
+              const isInternationalPurchase = submittedValues.purchaseType === 'international';
+              const normalizedRate = Number(submittedValues.usdToCopRate) || 0;
+              const normalizedValues: PurchaseFormValues = isInternationalPurchase
+                ? {
+                    ...submittedValues,
+                    shippingValueTotal: internationalShippingTotalCop,
+                    items: submittedValues.items.map((item) => ({
+                      ...item,
+                      purchaseUnitValueUsd: Number(item.purchaseUnitValueUsd) || 0,
+                      purchaseUnitValue: convertUsdToCop(Number(item.purchaseUnitValueUsd) || 0, normalizedRate),
+                    })),
+                  }
+                : {
+                    ...submittedValues,
+                    internationalVendorName: '',
+                    productsValueUsd: 0,
+                    shippingValueUsd: 0,
+                    platformFeePercent: 2.99,
+                    usdToCopRate: 0,
+                    customsTaxCop: 0,
+                    items: submittedValues.items.map((item) => ({
+                      ...item,
+                      purchaseUnitValueUsd: 0,
+                    })),
+                  };
+              await onSubmit(normalizedValues);
               form.reset(defaultValues);
             })}
             onKeyDown={moveFocusToNextField}
@@ -697,41 +899,193 @@ export function PurchaseFormDialog({
                 </div>
 
                 <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-                  <FormField
-                    control={form.control}
-                    name="purchasedAt"
-                    render={({ field }) => (
-                      <FormItem className="min-w-0">
-                        <FormLabel>Fecha de compra</FormLabel>
-                        <FormControl>
-                          <Input type="date" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <div className="rounded-2xl border border-amber-200/80 bg-amber-50/75 p-3.5 dark:border-amber-900/60 dark:bg-amber-950/22 sm:p-5">
+                  <div className="grid gap-4">
                     <FormField
                       control={form.control}
-                      name="shippingValueTotal"
+                      name="purchasedAt"
                       render={({ field }) => (
                         <FormItem className="min-w-0">
-                          <FormLabel className="text-amber-950 dark:text-amber-100">Valor total de envio</FormLabel>
+                          <FormLabel>Fecha de compra</FormLabel>
                           <FormControl>
-                            <Input
-                              className="min-w-0 h-12 border-amber-300 bg-background/92 text-lg font-semibold dark:bg-slate-950/72"
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              {...field}
-                            />
+                            <Input type="date" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="purchaseType"
+                      render={({ field }) => (
+                        <FormItem className="min-w-0">
+                          <FormLabel>Tipo de compra</FormLabel>
+                          <FormControl>
+                            <Select value={field.value} onValueChange={field.onChange}>
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Selecciona tipo de compra" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="local">Nacional / Local</SelectItem>
+                                <SelectItem value="international">Internacional (USD + tasa cambio)</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
                   </div>
+
+                  <div className="rounded-2xl border border-amber-200/80 bg-amber-50/75 p-3.5 dark:border-amber-900/60 dark:bg-amber-950/22 sm:p-5">
+                    <FormField
+                      control={form.control}
+                      name="shippingValueTotal"
+                      render={({ field }) => (
+                        <FormItem className="min-w-0">
+                          <FormLabel className="text-amber-950 dark:text-amber-100">
+                            Valor total de envio
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              className="min-w-0 h-12 border-amber-300 bg-background/92 text-lg font-semibold dark:bg-slate-950/72"
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              disabled={values.purchaseType === 'international'}
+                              {...field}
+                            />
+                          </FormControl>
+                          {values.purchaseType === 'international' ? (
+                            <p className="text-xs text-amber-800 dark:text-amber-200">
+                              Este valor se calcula automaticamente desde USD, comision, tasa y DIAN.
+                            </p>
+                          ) : null}
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 </div>
+
+                {values.purchaseType === 'international' ? (
+                  <div className="mt-4 space-y-4 rounded-2xl border border-cyan-200/80 bg-cyan-50/70 p-4 dark:border-cyan-900/60 dark:bg-cyan-950/20 sm:p-5">
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold text-cyan-950 dark:text-cyan-100">Liquidacion internacional de envio</p>
+                      <p className="text-xs text-cyan-800 dark:text-cyan-200/90">
+                        Funciona para Alibaba o cualquier proveedor del exterior.
+                      </p>
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <FormField
+                        control={form.control}
+                        name="internationalVendorName"
+                        render={({ field }) => (
+                          <FormItem className="min-w-0">
+                            <FormLabel>Proveedor/plataforma exterior (opcional)</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="Ej: Alibaba, 1688, proveedor directo..."
+                                {...field}
+                                value={field.value ?? ''}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="usdToCopRate"
+                        render={({ field }) => (
+                          <FormItem className="min-w-0">
+                            <FormLabel>TRM / tasa USD a COP</FormLabel>
+                            <FormControl>
+                              <Input type="number" min="0" step="0.01" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="productsValueUsd"
+                        render={({ field }) => (
+                          <FormItem className="min-w-0">
+                            <FormLabel>Valor de productos (USD, auto)</FormLabel>
+                            <FormControl>
+                              <Input type="number" min="0" step="0.01" {...field} disabled />
+                            </FormControl>
+                            <p className="text-xs text-muted-foreground">
+                              Se calcula automaticamente con las lineas en USD.
+                            </p>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="shippingValueUsd"
+                        render={({ field }) => (
+                          <FormItem className="min-w-0">
+                            <FormLabel>Envio internacional (USD)</FormLabel>
+                            <FormControl>
+                              <Input type="number" min="0" step="0.01" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="platformFeePercent"
+                        render={({ field }) => (
+                          <FormItem className="min-w-0">
+                            <FormLabel>Comision plataforma (%)</FormLabel>
+                            <FormControl>
+                              <Input type="number" min="0" step="0.01" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="customsTaxCop"
+                        render={({ field }) => (
+                          <FormItem className="min-w-0">
+                            <FormLabel>Impuestos DIAN/Aduana (COP)</FormLabel>
+                            <FormControl>
+                              <Input type="number" min="0" step="1" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid gap-2 sm:grid-cols-4">
+                      <div className="rounded-xl border border-cyan-200/70 bg-white/85 p-3 dark:border-cyan-900/60 dark:bg-slate-950/60">
+                        <p className="text-xs text-muted-foreground">Base compra USD</p>
+                        <p className="mt-1 font-semibold text-foreground">{formatNumber(internationalSubtotalUsd)} USD</p>
+                      </div>
+                      <div className="rounded-xl border border-cyan-200/70 bg-white/85 p-3 dark:border-cyan-900/60 dark:bg-slate-950/60">
+                        <p className="text-xs text-muted-foreground">Comision en USD</p>
+                        <p className="mt-1 font-semibold text-foreground">{formatNumber(internationalPlatformFeeUsd)} USD</p>
+                      </div>
+                      <div className="rounded-xl border border-cyan-200/70 bg-white/85 p-3 dark:border-cyan-900/60 dark:bg-slate-950/60">
+                        <p className="text-xs text-muted-foreground">Cargos convertidos (COP)</p>
+                        <p className="mt-1 font-semibold text-foreground">{formatCurrency(internationalChargesCop)}</p>
+                      </div>
+                      <div className="rounded-xl border border-cyan-200/70 bg-cyan-100/70 p-3 dark:border-cyan-900/60 dark:bg-cyan-950/40">
+                        <p className="text-xs text-cyan-900 dark:text-cyan-200">Envio total aplicado (COP)</p>
+                        <p className="mt-1 text-base font-semibold text-cyan-950 dark:text-cyan-100">
+                          {formatCurrency(internationalShippingTotalCop)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
             </AdminMobileSection>
 
             <AdminMobileSection
@@ -862,35 +1216,75 @@ export function PurchaseFormDialog({
                         )}
                       />
 
-                      <FormField
-                        control={form.control}
-                        name="items.0.purchaseUnitValue"
-                        render={({ field }) => (
-                          <FormItem className="min-w-0">
-                            <FormLabel>{firstItemIsPack12 ? 'Valor unitario por pieza' : 'Valor unitario de compra'}</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                {...field}
-                                onChange={(event) => {
-                                  field.onChange(event);
-                                  resetPack12Normalization(fields[0]?.id ?? 'primary-line');
-                                  if (firstItem.productId) {
-                                    syncProductPurchaseValueInForm(firstItem.productId, Number(event.target.value) || 0);
-                                  }
-                                }}
-                                onBlur={() => {
-                                  field.onBlur();
-                                  normalizePack12Line(0, fields[0]?.id ?? 'primary-line');
-                                }}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                      {values.purchaseType === 'international' ? (
+                        <FormField
+                          control={form.control}
+                          name="items.0.purchaseUnitValueUsd"
+                          render={({ field }) => (
+                            <FormItem className="min-w-0">
+                              <FormLabel>
+                                {firstItemIsPack12 ? 'Valor unitario por pieza (USD)' : 'Valor unitario de compra (USD)'}
+                              </FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  step="0.000001"
+                                  {...field}
+                                  onChange={(event) => {
+                                    field.onChange(event);
+                                    resetPack12Normalization(fields[0]?.id ?? 'primary-line');
+                                    if (firstItem.productId) {
+                                      const unitValueUsd = Number(event.target.value) || 0;
+                                      syncProductPurchaseValueInForm(firstItem.productId, {
+                                        purchaseUnitValueUsd: unitValueUsd,
+                                        purchaseUnitValue: convertUsdToCop(unitValueUsd, Number(values.usdToCopRate) || 0),
+                                      });
+                                    }
+                                  }}
+                                  onBlur={() => {
+                                    field.onBlur();
+                                    normalizePack12Line(0, fields[0]?.id ?? 'primary-line');
+                                  }}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      ) : (
+                        <FormField
+                          control={form.control}
+                          name="items.0.purchaseUnitValue"
+                          render={({ field }) => (
+                            <FormItem className="min-w-0">
+                              <FormLabel>{firstItemIsPack12 ? 'Valor unitario por pieza' : 'Valor unitario de compra'}</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  {...field}
+                                  onChange={(event) => {
+                                    field.onChange(event);
+                                    resetPack12Normalization(fields[0]?.id ?? 'primary-line');
+                                    if (firstItem.productId) {
+                                      syncProductPurchaseValueInForm(firstItem.productId, {
+                                        purchaseUnitValue: Number(event.target.value) || 0,
+                                      });
+                                    }
+                                  }}
+                                  onBlur={() => {
+                                    field.onBlur();
+                                    normalizePack12Line(0, fields[0]?.id ?? 'primary-line');
+                                  }}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
 
                       <FormField
                         control={form.control}
@@ -959,6 +1353,7 @@ export function PurchaseFormDialog({
                                 onClick={() =>
                                   openNewLineDialog(firstItemProduct.id, true, {
                                     purchaseUnitValue: Number(firstItem.purchaseUnitValue) || 0,
+                                    purchaseUnitValueUsd: Number(firstItem.purchaseUnitValueUsd) || 0,
                                   })
                                 }
                               >
@@ -990,7 +1385,9 @@ export function PurchaseFormDialog({
                     const isPack12 = isPackOf12Product(selectedProduct);
                     const availableSiblingVariants = selectedProduct ? getAvailableVariantOptions(selectedProduct.id, index) : [];
                     const canSeedSiblingVariants =
-                      (Number(values.items[index]?.purchaseUnitValue) || 0) > 0 &&
+                      (values.purchaseType === 'international'
+                        ? (Number(values.items[index]?.purchaseUnitValueUsd) || 0) > 0
+                        : (Number(values.items[index]?.purchaseUnitValue) || 0) > 0) &&
                       (Number(values.items[index]?.suggestedSalePrice) || 0) > 0;
                     return (
                       <div key={field.id} className="rounded-2xl border border-border bg-card/88 p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950/72 sm:p-4">
@@ -1004,6 +1401,9 @@ export function PurchaseFormDialog({
                             ) : null}
                             <p className="text-sm text-slate-500">
                               Valor unitario: {formatCurrency(values.items[index]?.purchaseUnitValue ?? 0)}
+                              {values.purchaseType === 'international'
+                                ? ` (${formatNumber(values.items[index]?.purchaseUnitValueUsd ?? 0)} USD)`
+                                : ''}
                             </p>
                             <p className="text-sm text-slate-500">
                               Precio sugerido: {formatCurrency(values.items[index]?.suggestedSalePrice ?? 0)}
@@ -1027,6 +1427,7 @@ export function PurchaseFormDialog({
                                 onClick={() =>
                                   openNewLineDialog(selectedProduct.id, true, {
                                     purchaseUnitValue: Number(values.items[index]?.purchaseUnitValue) || 0,
+                                    purchaseUnitValueUsd: Number(values.items[index]?.purchaseUnitValueUsd) || 0,
                                   })
                                 }
                               >
@@ -1102,7 +1503,7 @@ export function PurchaseFormDialog({
       description={
         isLockedVariantFlow
           ? 'Agrega otra variante del mismo producto usando los mismos valores de compra.'
-          : 'Selecciona el producto y define cantidad, valor de compra y precio sugerido.'
+          : `Selecciona el producto y define cantidad, valor de compra ${values.purchaseType === 'international' ? 'en USD' : 'en COP'} y precio sugerido.`
       }
       desktopContentClassName="max-w-xl"
       footer={
@@ -1219,12 +1620,22 @@ export function PurchaseFormDialog({
                   const product = products.find((item) => item.id === draftLine.productId);
                   if (!isPackOf12Product(product)) return;
                   const quantityEntered = Number(draftLine.presentationQuantity) || 0;
-                  const unitValueEntered = Number(draftLine.purchaseUnitValue) || 0;
+                  const unitValueEntered =
+                    values.purchaseType === 'international'
+                      ? Number(draftLine.purchaseUnitValueUsd) || 0
+                      : Number(draftLine.purchaseUnitValue) || 0;
                   if (quantityEntered < 12 || unitValueEntered <= 0) return;
                   setDraftLine((current) => ({
                     ...current,
                     presentationQuantity: String(Number((quantityEntered / 12).toFixed(2))),
-                    purchaseUnitValue: String(Number((unitValueEntered * 12).toFixed(2))),
+                    purchaseUnitValue:
+                      values.purchaseType === 'international'
+                        ? String(convertUsdToCop(Number((unitValueEntered * 12).toFixed(2)), Number(values.usdToCopRate) || 0))
+                        : String(Number((unitValueEntered * 12).toFixed(2))),
+                    purchaseUnitValueUsd:
+                      values.purchaseType === 'international'
+                        ? String(Number((unitValueEntered * 12).toFixed(2)))
+                        : current.purchaseUnitValueUsd,
                   }));
                 }}
               />
@@ -1232,32 +1643,61 @@ export function PurchaseFormDialog({
 
             {!isLockedVariantFlow ? (
               <div className="min-w-0 space-y-2">
-                <Label>{isDraftPack12 ? 'Valor unitario por pieza' : 'Valor unitario de compra'}</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={draftLine.purchaseUnitValue}
-                    onChange={(event) => {
-                      setDraftLine((current) => ({
-                        ...current,
-                        purchaseUnitValue: event.target.value,
-                      }));
-                      setLineError('');
-                    }}
-                    onBlur={() => {
-                      const product = products.find((item) => item.id === draftLine.productId);
-                      if (!isPackOf12Product(product)) return;
-                      const quantityEntered = Number(draftLine.presentationQuantity) || 0;
-                      const unitValueEntered = Number(draftLine.purchaseUnitValue) || 0;
-                      if (quantityEntered < 12 || unitValueEntered <= 0) return;
-                      setDraftLine((current) => ({
-                        ...current,
-                        presentationQuantity: String(Number((quantityEntered / 12).toFixed(2))),
-                        purchaseUnitValue: String(Number((unitValueEntered * 12).toFixed(2))),
-                      }));
-                    }}
-                  />
+                <Label>
+                  {isDraftPack12
+                    ? values.purchaseType === 'international'
+                      ? 'Valor unitario por pieza (USD)'
+                      : 'Valor unitario por pieza'
+                    : values.purchaseType === 'international'
+                      ? 'Valor unitario de compra (USD)'
+                      : 'Valor unitario de compra'}
+                </Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step={values.purchaseType === 'international' ? '0.000001' : '0.01'}
+                  value={values.purchaseType === 'international' ? draftLine.purchaseUnitValueUsd : draftLine.purchaseUnitValue}
+                  onChange={(event) => {
+                    setDraftLine((current) => ({
+                      ...current,
+                      purchaseUnitValue:
+                        values.purchaseType === 'international'
+                          ? String(convertUsdToCop(Number(event.target.value) || 0, Number(values.usdToCopRate) || 0))
+                          : event.target.value,
+                      purchaseUnitValueUsd:
+                        values.purchaseType === 'international' ? event.target.value : current.purchaseUnitValueUsd,
+                    }));
+                    setLineError('');
+                  }}
+                  onBlur={() => {
+                    const product = products.find((item) => item.id === draftLine.productId);
+                    if (!isPackOf12Product(product)) return;
+                    const quantityEntered = Number(draftLine.presentationQuantity) || 0;
+                    const unitValueEntered =
+                      values.purchaseType === 'international'
+                        ? Number(draftLine.purchaseUnitValueUsd) || 0
+                        : Number(draftLine.purchaseUnitValue) || 0;
+                    if (quantityEntered < 12 || unitValueEntered <= 0) return;
+                    const normalizedUnitValue = Number((unitValueEntered * 12).toFixed(2));
+                    setDraftLine((current) => ({
+                      ...current,
+                      presentationQuantity: String(Number((quantityEntered / 12).toFixed(2))),
+                      purchaseUnitValue:
+                        values.purchaseType === 'international'
+                          ? String(convertUsdToCop(normalizedUnitValue, Number(values.usdToCopRate) || 0))
+                          : String(normalizedUnitValue),
+                      purchaseUnitValueUsd:
+                        values.purchaseType === 'international'
+                          ? String(normalizedUnitValue)
+                          : current.purchaseUnitValueUsd,
+                    }));
+                  }}
+                />
+                {values.purchaseType === 'international' ? (
+                  <p className="text-xs text-muted-foreground">
+                    Convertido a COP: {formatCurrency(draftPurchaseUnitValueCop)}
+                  </p>
+                ) : null}
               </div>
             ) : null}
           </div>

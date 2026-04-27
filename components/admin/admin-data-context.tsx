@@ -121,12 +121,20 @@ interface RegisterPurchaseInput {
   supplier: string;
   purchasedAt: string;
   shippingValueTotal: number;
+  purchaseType?: 'local' | 'international';
+  internationalVendorName?: string;
+  productsValueUsd?: number;
+  shippingValueUsd?: number;
+  platformFeePercent?: number;
+  usdToCopRate?: number;
+  customsTaxCop?: number;
   items: Array<{
     productId: string;
     variantId?: string;
     variantName?: string;
     presentationQuantity: number;
     purchaseUnitValue: number;
+    purchaseUnitValueUsd?: number;
     suggestedSalePrice: number;
   }>;
 }
@@ -485,6 +493,16 @@ function serializePurchaseForFirestore(purchase: Purchase) {
     supplierId: purchase.supplierId ?? null,
     purchaseBatchId: purchase.purchaseBatchId ?? null,
     source: purchase.source ?? null,
+    purchaseUnitValueUsd: purchase.purchaseUnitValueUsd ?? null,
+    purchaseType: purchase.purchaseType ?? 'local',
+    internationalVendorName: purchase.internationalVendorName ?? null,
+    productsValueUsd: purchase.productsValueUsd ?? null,
+    shippingValueUsd: purchase.shippingValueUsd ?? null,
+    platformFeePercent: purchase.platformFeePercent ?? null,
+    platformFeeUsd: purchase.platformFeeUsd ?? null,
+    usdToCopRate: purchase.usdToCopRate ?? null,
+    customsTaxCop: purchase.customsTaxCop ?? null,
+    internationalChargesCop: purchase.internationalChargesCop ?? null,
     notes: purchase.notes ?? null,
   };
 }
@@ -648,6 +666,7 @@ function mapPurchaseDocument(documentId: string, data: DocumentData): Purchase {
     purchasedAt: normalizeDateValue(data.purchasedAt),
     presentationQuantity: Number(data.presentationQuantity ?? 0),
     purchaseUnitValue: Number(data.purchaseUnitValue ?? 0),
+    purchaseUnitValueUsd: Number(data.purchaseUnitValueUsd ?? 0),
     quantityPurchased: Number(data.quantityPurchased ?? 0),
     purchasePresentation:
       data.purchasePresentation === 'dozen' || data.purchasePresentation === 'box-12'
@@ -656,6 +675,15 @@ function mapPurchaseDocument(documentId: string, data: DocumentData): Purchase {
     conversionFactor: Number(data.conversionFactor ?? 1),
     purchaseValueTotal: Number(data.purchaseValueTotal ?? 0),
     shippingValueTotal: Number(data.shippingValueTotal ?? 0),
+    purchaseType: data.purchaseType === 'international' ? 'international' : 'local',
+    internationalVendorName: data.internationalVendorName ? String(data.internationalVendorName) : undefined,
+    productsValueUsd: Number(data.productsValueUsd ?? 0),
+    shippingValueUsd: Number(data.shippingValueUsd ?? 0),
+    platformFeePercent: Number(data.platformFeePercent ?? 0),
+    platformFeeUsd: Number(data.platformFeeUsd ?? 0),
+    usdToCopRate: Number(data.usdToCopRate ?? 0),
+    customsTaxCop: Number(data.customsTaxCop ?? 0),
+    internationalChargesCop: Number(data.internationalChargesCop ?? 0),
     totalInvestment: Number(data.totalInvestment ?? 0),
     realUnitCost: Number(data.realUnitCost ?? 0),
     suggestedSalePrice: Number(data.suggestedSalePrice ?? 0),
@@ -2526,18 +2554,37 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         throw new Error('Uno de los productos de la compra no existe.');
       }
     });
+    const isInternationalPurchase = input.purchaseType === 'international';
+    const normalizedUsdToCopRate = Number(input.usdToCopRate ?? 0);
+    if (isInternationalPurchase && normalizedUsdToCopRate <= 0) {
+      throw new Error('La compra internacional requiere una tasa USD a COP mayor a cero.');
+    }
 
     const normalizedItems = input.items.map((item) => ({
       ...item,
       presentationQuantity: Number(item.presentationQuantity || 0),
       purchaseUnitValue: Number(item.purchaseUnitValue || 0),
+      purchaseUnitValueUsd: Number(item.purchaseUnitValueUsd || 0),
       suggestedSalePrice: Number(item.suggestedSalePrice || 0),
     }));
+    const normalizedItemsWithConvertedPrice = normalizedItems.map((item) => ({
+      ...item,
+      purchaseUnitValue: isInternationalPurchase
+        ? Number(((Number(item.purchaseUnitValueUsd || 0) * normalizedUsdToCopRate)).toFixed(2))
+        : Number(item.purchaseUnitValue || 0),
+    }));
+    if (normalizedItemsWithConvertedPrice.some((item) => item.purchaseUnitValue <= 0)) {
+      throw new Error(
+        isInternationalPurchase
+          ? 'Cada linea internacional debe tener un valor unitario en USD mayor a cero.'
+          : 'Cada linea debe tener un valor unitario de compra mayor a cero.'
+      );
+    }
     const totalPurchasedUnits = normalizedItems.reduce(
       (total, item) => total + item.presentationQuantity,
       0
     );
-    const totalPurchaseValue = normalizedItems.reduce(
+    const totalPurchaseValue = normalizedItemsWithConvertedPrice.reduce(
       (total, item) => total + Number((item.purchaseUnitValue * item.presentationQuantity).toFixed(2)),
       0
     );
@@ -2546,7 +2593,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     const purchasesCreated: Purchase[] = [];
     const stockDeltas: Array<{ productId: string; quantity: number }> = [];
 
-    normalizedItems.forEach((item, index) => {
+    normalizedItemsWithConvertedPrice.forEach((item, index) => {
       const conversionFactor = 1;
       const quantityPurchased = item.presentationQuantity;
       const purchaseValueTotal = Number((item.purchaseUnitValue * item.presentationQuantity).toFixed(2));
@@ -2568,6 +2615,13 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         adjustedShippingShare,
         quantityPurchased
       );
+      const subtotalUsd = Number(input.productsValueUsd ?? 0) + Number(input.shippingValueUsd ?? 0);
+      const platformFeeUsd = Number(((subtotalUsd * Number(input.platformFeePercent ?? 0)) / 100).toFixed(6));
+      const internationalChargesCop = Number(
+        (
+          (Number(input.shippingValueUsd ?? 0) + platformFeeUsd) * Number(input.usdToCopRate ?? 0)
+        ).toFixed(2)
+      );
       const purchase: Purchase = {
         id: doc(collection(db, 'purchases')).id,
         purchaseId: batchId,
@@ -2580,11 +2634,21 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         purchasedAt: input.purchasedAt,
         presentationQuantity: item.presentationQuantity,
         purchaseUnitValue: item.purchaseUnitValue,
+        purchaseUnitValueUsd: isInternationalPurchase ? Number(item.purchaseUnitValueUsd ?? 0) : undefined,
         quantityPurchased,
         purchasePresentation: 'unit',
         conversionFactor,
         purchaseValueTotal,
         shippingValueTotal: adjustedShippingShare,
+        purchaseType: isInternationalPurchase ? 'international' : 'local',
+        internationalVendorName: isInternationalPurchase ? String(input.internationalVendorName ?? '') : undefined,
+        productsValueUsd: isInternationalPurchase ? Number(input.productsValueUsd ?? 0) : undefined,
+        shippingValueUsd: isInternationalPurchase ? Number(input.shippingValueUsd ?? 0) : undefined,
+        platformFeePercent: isInternationalPurchase ? Number(input.platformFeePercent ?? 0) : undefined,
+        platformFeeUsd: isInternationalPurchase ? platformFeeUsd : undefined,
+        usdToCopRate: isInternationalPurchase ? Number(input.usdToCopRate ?? 0) : undefined,
+        customsTaxCop: isInternationalPurchase ? Number(input.customsTaxCop ?? 0) : undefined,
+        internationalChargesCop: isInternationalPurchase ? internationalChargesCop : undefined,
         totalInvestment: totals.totalInvestment,
         realUnitCost: totals.realUnitCost,
         suggestedSalePrice: item.suggestedSalePrice,
