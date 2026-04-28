@@ -1933,7 +1933,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
           ? (product.variants ?? []).reduce((total, variant) => total + Math.max(Number(variant.stock ?? 0), 0), 0)
           : getProductStock(movements, product.id);
       const currentPublicStock = Math.max(Number(product.publicStock ?? 0), 0);
-      if (publicStock === currentPublicStock) {
+      const shouldForcePublicStatus = publicStock > 0;
+      if (publicStock === currentPublicStock && !shouldForcePublicStatus) {
         return;
       }
 
@@ -1941,6 +1942,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         doc(db, 'products', product.id),
         {
           publicStock,
+          ...(shouldForcePublicStatus ? { status: 'active' } : {}),
           updatedAt: serverTimestamp(),
         },
         { merge: true }
@@ -2708,6 +2710,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
           item.variantId && getProductSaleMode(baseProducts.find((product) => product.id === item.productId)) === 'varianted'
             ? baseProducts.find((product) => product.id === item.productId)?.salePrice ?? item.suggestedSalePrice
             : item.suggestedSalePrice,
+        // Keep purchased products publishable in public catalog query (status == active).
+        status: 'active',
         updatedAt: serverTimestamp(),
       });
     });

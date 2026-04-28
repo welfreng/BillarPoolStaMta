@@ -31,8 +31,8 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="es" className="scroll-smooth">
-      <body className={`${inter.variable} ${montserrat.variable} font-sans antialiased`}>
+    <html lang="es" className="scroll-smooth" suppressHydrationWarning>
+      <body suppressHydrationWarning className={`${inter.variable} ${montserrat.variable} font-sans antialiased`}>
         <AuthProvider>
           {children}
         </AuthProvider>

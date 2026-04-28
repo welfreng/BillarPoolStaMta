@@ -74,6 +74,11 @@ function mapCatalogProduct(documentId: string, data: DocumentData): CatalogProdu
     .filter((price) => price > 0)
     .sort((left, right) => left - right)
   const totalVariantStock = variants.reduce((total, variant) => total + Math.max(variant.stock, 0), 0)
+  const storedPublicStock = Math.max(Number(data.publicStock ?? 0), 0)
+  const resolvedPublicStock =
+    variants.length > 0
+      ? Math.max(totalVariantStock, storedPublicStock)
+      : storedPublicStock
 
   return {
     id: documentId,
@@ -85,7 +90,7 @@ function mapCatalogProduct(documentId: string, data: DocumentData): CatalogProdu
     brand: String(data.brand ?? ""),
     salePrice: variantPrices[0] ?? Number(data.salePrice ?? 0),
     featured: Boolean(data.featured ?? false),
-    publicStock: variants.length > 0 ? totalVariantStock : Number(data.publicStock ?? 0),
+    publicStock: resolvedPublicStock,
     status:
       data.status === "draft" || data.status === "archived" || data.status === "active"
         ? data.status
@@ -165,7 +170,8 @@ export default function ProductCatalog({
         if (!isMounted) return
 
         const nextProducts = sortProducts(
-          productsSnapshot.docs.map((snapshotItem) => mapCatalogProduct(snapshotItem.id, snapshotItem.data()))
+          productsSnapshot.docs
+            .map((snapshotItem) => mapCatalogProduct(snapshotItem.id, snapshotItem.data()))
         )
         const nextImageOverrides = extractCatalogImageOverrides(imagesSnapshot)
 
