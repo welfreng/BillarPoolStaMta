@@ -107,6 +107,7 @@ function getSalesRowHighlightClass(input: {
 
 export default function VentasPage() {
   const {
+    loading,
     sales,
     services,
     products,
@@ -208,6 +209,7 @@ export default function VentasPage() {
         .includes(query.toLowerCase());
     });
   }, [products, query, saleGroups]);
+  const normalizedQuery = query.trim();
 
   const totals = useMemo(
     () =>
@@ -310,7 +312,29 @@ export default function VentasPage() {
           />
         </div>
 
-        {filteredSales.length > 0 ? (
+        {!loading ? (
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            {normalizedQuery
+              ? `Ventas cargadas: ${formatNumber(saleGroups.length)}. Coincidencias con el filtro: ${formatNumber(filteredSales.length)}.`
+              : `Ventas cargadas desde Firestore: ${formatNumber(saleGroups.length)}.`}
+          </p>
+        ) : (
+          <p className="text-xs text-slate-500 dark:text-slate-400">Cargando ventas desde Firestore...</p>
+        )}
+
+        {loading ? (
+          <Empty className="border border-dashed border-slate-200 bg-slate-50/70 dark:border-slate-800 dark:bg-slate-900/60">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <Receipt className="h-5 w-5" />
+              </EmptyMedia>
+              <EmptyTitle>Cargando ventas</EmptyTitle>
+              <EmptyDescription>
+                Espera un momento mientras el panel consulta la coleccion `sales`.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        ) : filteredSales.length > 0 ? (
           <div className="min-w-0">
             <div className="mb-2 hidden items-center justify-between gap-3 text-xs text-slate-500 md:flex">
               <p className="dark:text-slate-400">Desliza la tabla hacia la derecha para ver todas las columnas.</p>
@@ -782,9 +806,11 @@ export default function VentasPage() {
               <EmptyMedia variant="icon">
                 <Receipt className="h-5 w-5" />
               </EmptyMedia>
-              <EmptyTitle>No hay ventas registradas</EmptyTitle>
+              <EmptyTitle>{normalizedQuery ? 'No hay ventas para ese filtro' : 'No hay ventas registradas'}</EmptyTitle>
               <EmptyDescription>
-                Registra la primera venta para empezar a llevar el control operativo del modulo.
+                {normalizedQuery
+                  ? 'Prueba con otro nombre de producto, cliente o nota para confirmar si el historial si existe.'
+                  : 'No se encontraron documentos en la coleccion `sales` o todavia no se ha registrado ninguna venta.'}
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
