@@ -126,7 +126,7 @@ export function AdminHeader() {
   }, [pathname]);
 
   useEffect(() => {
-    if (role !== 'admin') {
+    if (role !== 'admin' && role !== 'superadmin') {
       setNotifications([]);
     } else {
       const notificationsQuery = query(
@@ -207,7 +207,7 @@ export function AdminHeader() {
 
           <AdminThemeToggle />
 
-          {role === 'admin' ? (
+          {role === 'admin' || role === 'superadmin' ? (
             <DropdownMenu
               onOpenChange={(open) => {
                 if (open) {
@@ -276,7 +276,7 @@ export function AdminHeader() {
                 {user?.displayName ?? 'Administrador'}
               </p>
               <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-                {[user?.email, role === 'sales' ? 'Rol ventas' : 'Rol administrador'].filter(Boolean).join(' · ')}
+                {[user?.email, role === 'sales' ? 'Rol ventas' : role === 'superadmin' ? 'Rol superadmin' : 'Rol administrador'].filter(Boolean).join(' · ')}
               </p>
             </div>
             <Button variant="outline" size="sm" onClick={logout} className="rounded-xl self-start sm:self-auto">

@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { formatNumber, getProductById } from '@/lib/admin/calculations';
+import { getTodayDateInputValue } from '@/lib/admin/date-utils';
 import type { Product, Sale } from '@/lib/admin/types';
 
 const saleReturnLineSchema = z.object({
@@ -58,7 +59,7 @@ const saleReturnSchema = z
 export type SaleReturnFormValues = z.infer<typeof saleReturnSchema>;
 
 const defaultValues: SaleReturnFormValues = {
-  returnedAt: new Date().toISOString().slice(0, 10),
+  returnedAt: getTodayDateInputValue(),
   items: [],
   notes: '',
 };
@@ -111,7 +112,7 @@ export function SaleReturnDialog({
   useEffect(() => {
     if (!open) return;
     form.reset({
-      returnedAt: new Date().toISOString().slice(0, 10),
+      returnedAt: getTodayDateInputValue(),
       items: [],
       notes: '',
     });

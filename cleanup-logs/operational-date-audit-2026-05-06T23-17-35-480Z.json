@@ -1,0 +1,1578 @@
+{
+  "generatedAt": "2026-05-06T23:17:35.476Z",
+  "counts": {
+    "sales": 0,
+    "purchases": 78,
+    "services": 0,
+    "movements": 78,
+    "inventoryMovements": 78
+  },
+  "impactedSales": [],
+  "impactedPurchases": [
+    {
+      "id": "1FcfWgbmCY5UPSm5dAjQ",
+      "purchasedAt": "2026-04-28T00:00:00.000Z",
+      "purchaseBatchId": "cAFHl8YSHXNW99Tg0mTX",
+      "productId": "clA44uFiHsGOnAo5mNf7"
+    },
+    {
+      "id": "1Gz3I5QCZAzSWRFl40aM",
+      "purchasedAt": "2026-04-29T00:00:00.000Z",
+      "purchaseBatchId": "qman32Mu8Fw1BdbWgS73",
+      "productId": "39SkzXxiNiazI6LrVnsz"
+    },
+    {
+      "id": "1vG8L0e9KAgUSjs1xnYE",
+      "purchasedAt": "2026-05-05T00:00:00.000Z",
+      "purchaseBatchId": "nh6NAFm1shf91kPdeh4P",
+      "productId": "iVEAfvh2LyoqWdSAyTzH"
+    },
+    {
+      "id": "3Ap7ag5qvzOax6tawSSl",
+      "purchasedAt": "2026-04-29T00:00:00.000Z",
+      "purchaseBatchId": "qman32Mu8Fw1BdbWgS73",
+      "productId": "awpKte9eeUS3xXa24omD"
+    },
+    {
+      "id": "4Y86BSNgHB9UKncJYGlC",
+      "purchasedAt": "2026-04-28T00:00:00.000Z",
+      "purchaseBatchId": "8YFILSTAqIgHVLiLdg8p",
+      "productId": "WV7eisAn3LhK66AmFBj2"
+    },
+    {
+      "id": "6C4hz15VXSc5JJuRpi1m",
+      "purchasedAt": "2026-04-29T00:00:00.000Z",
+      "purchaseBatchId": "qman32Mu8Fw1BdbWgS73",
+      "productId": "SsHj9yzXJKLKhrgn2ozc"
+    },
+    {
+      "id": "6N4OCb9TbdJ6wquIsz0P",
+      "purchasedAt": "2026-04-29T00:00:00.000Z",
+      "purchaseBatchId": "qman32Mu8Fw1BdbWgS73",
+      "productId": "39SkzXxiNiazI6LrVnsz"
+    },
+    {
+      "id": "6TsHMV4zc0aCVEvqZp0k",
+      "purchasedAt": "2026-04-28T00:00:00.000Z",
+      "purchaseBatchId": "cAFHl8YSHXNW99Tg0mTX",
+      "productId": "nHr8hQDOWXWQtlNqaWkI"
+    },
+    {
+      "id": "8AUPwmQFe4NSnzXSLFOS",
+      "purchasedAt": "2026-04-29T00:00:00.000Z",
+      "purchaseBatchId": "qman32Mu8Fw1BdbWgS73",
+      "productId": "w8dVPiOAIBbbT8exqtSY"
+    },
+    {
+      "id": "9bWJQNCiPqrNuEOwjVFK",
+      "purchasedAt": "2026-04-29T00:00:00.000Z",
+      "purchaseBatchId": "qman32Mu8Fw1BdbWgS73",
+      "productId": "wEOreMpZsiokHgbsOMag"
+    },
+    {
+      "id": "AeYVz0gluTvqN1649a0D",
+      "purchasedAt": "2026-04-28T00:00:00.000Z",
+      "purchaseBatchId": "Rjuvnwi9SIJkHabwd005",
+      "productId": "6B5DxGVc7DkZzBoYJQa7"
+    },
+    {
+      "id": "AsyErvmFXNQS7gu6hmB4",
+      "purchasedAt": "2026-04-28T00:00:00.000Z",
+      "purchaseBatchId": "cAFHl8YSHXNW99Tg0mTX",
+      "productId": "nHr8hQDOWXWQtlNqaWkI"
+    },
+    {
+      "id": "B8v0t0jHvelGMYyPRuHA",
+      "purchasedAt": "2026-04-29T00:00:00.000Z",
+      "purchaseBatchId": "qman32Mu8Fw1BdbWgS73",
+      "productId": "1pWEHNCV6gRMj82k75pE"
+    },
+    {
+      "id": "ByR20RF0mBL1JcvjiAbF",
+      "purchasedAt": "2026-05-05T00:00:00.000Z",
+      "purchaseBatchId": "nh6NAFm1shf91kPdeh4P",
+      "productId": "iVEAfvh2LyoqWdSAyTzH"
+    },
+    {
+      "id": "CLvThkTzNEngQwYSLe2o",
+      "purchasedAt": "2026-05-06T00:00:00.000Z",
+      "purchaseBatchId": null,
+      "productId": "qHxsnZRNp6oqPWrIixYh"
+    },
+    {
+      "id": "DCCJGcgH0HVY4Lvwfp0w",
+      "purchasedAt": "2026-04-29T00:00:00.000Z",
+      "purchaseBatchId": "qman32Mu8Fw1BdbWgS73",
+      "productId": "awpKte9eeUS3xXa24omD"
+    },
+    {
+      "id": "GAqYHwOPHc9IbULV3flz",
+      "purchasedAt": "2026-04-28T00:00:00.000Z",
+      "purchaseBatchId": "cAFHl8YSHXNW99Tg0mTX",
+      "productId": "N8NE9ipNDl98SxYfQBgB"
+    },
+    {
+      "id": "GZkbufj4QcNXPXijL30r",
+      "purchasedAt": "2026-05-05T00:00:00.000Z",
+      "purchaseBatchId": "nh6NAFm1shf91kPdeh4P",
+      "productId": "zUZhBpjyesJLK4CZI3zo"
+    },
+    {
+      "id": "H72jhWOOni5Y1bwVNB77",
+      "purchasedAt": "2026-04-28T00:00:00.000Z",
+      "purchaseBatchId": "cAFHl8YSHXNW99Tg0mTX",
+      "productId": "7cmQATDNnR4mze64GGvh"
+    },
+    {
+      "id": "Hu05BFZFC6XmHQUzxXha",
+      "purchasedAt": "2026-04-29T00:00:00.000Z",
+      "purchaseBatchId": "qman32Mu8Fw1BdbWgS73",
+      "productId": "1pWEHNCV6gRMj82k75pE"
+    },
+    {
+      "id": "IjoVbHLuhHlieLyywvCk",
+      "purchasedAt": "2026-04-28T00:00:00.000Z",
+      "purchaseBatchId": "Rjuvnwi9SIJkHabwd005",
+      "productId": "6B5DxGVc7DkZzBoYJQa7"
+    },
+    {
+      "id": "Ivoz536PvTgRRzM18g26",
+      "purchasedAt": "2026-04-27T00:00:00.000Z",
+      "purchaseBatchId": "N5e2PFrQg3pe5cYAVUz1",
+      "productId": "9xNv3PE7exzvG8LI1RGD"
+    },
+    {
+      "id": "L9qwvyz0sN7QhnigE6uO",
+      "purchasedAt": "2026-04-28T00:00:00.000Z",
+      "purchaseBatchId": "Rjuvnwi9SIJkHabwd005",
+      "productId": "jxQrTTB8YzcMRkscY9Xz"
+    },
+    {
+      "id": "MnaE8XMBHHV2i54M9loX",
+      "purchasedAt": "2026-04-29T00:00:00.000Z",
+      "purchaseBatchId": "qman32Mu8Fw1BdbWgS73",
+      "productId": "w8dVPiOAIBbbT8exqtSY"
+    },
+    {
+      "id": "Mq4mhG6uzGNbaPfoEoS2",
+      "purchasedAt": "2026-04-28T00:00:00.000Z",
+      "purchaseBatchId": "Rjuvnwi9SIJkHabwd005",
+      "productId": "6B5DxGVc7DkZzBoYJQa7"
+    },
+    {
+      "id": "NL4P2WqveqT7z76N9ZKr",
+      "purchasedAt": "2026-04-28T00:00:00.000Z",
+      "purchaseBatchId": "Rjuvnwi9SIJkHabwd005",
+      "productId": "52rKKNgO3o6KRnCpqKnb"
+    },
+    {
+      "id": "O7B24Pdl5JCudlI9njHm",
+      "purchasedAt": "2026-04-27T00:00:00.000Z",
+      "purchaseBatchId": "N5e2PFrQg3pe5cYAVUz1",
+      "productId": "9xNv3PE7exzvG8LI1RGD"
+    },
+    {
+      "id": "OEK6L4vJe5Pv8M18T9tB",
+      "purchasedAt": "2026-04-29T00:00:00.000Z",
+      "purchaseBatchId": "qman32Mu8Fw1BdbWgS73",
+      "productId": "awpKte9eeUS3xXa24omD"
+    },
+    {
+      "id": "OfbhmbaplwK5Ywl9J0n8",
+      "purchasedAt": "2026-04-28T00:00:00.000Z",
+      "purchaseBatchId": "Rjuvnwi9SIJkHabwd005",
+      "productId": "52rKKNgO3o6KRnCpqKnb"
+    },
+    {
+      "id": "P4gKV4CevuVJhKuvNjjj",
+      "purchasedAt": "2026-04-29T00:00:00.000Z",
+      "purchaseBatchId": "qman32Mu8Fw1BdbWgS73",
+      "productId": "9D9AOSypuyQnGvZ8EFZM"
+    },
+    {
+      "id": "PNYwhv5CBYgkUafknJuo",
+      "purchasedAt": "2026-04-28T00:00:00.000Z",
+      "purchaseBatchId": "Rjuvnwi9SIJkHabwd005",
+      "productId": "6B5DxGVc7DkZzBoYJQa7"
+    },
+    {
+      "id": "PzZKMfnyjLHIXjUHkb0c",
+      "purchasedAt": "2026-04-28T00:00:00.000Z",
+      "purchaseBatchId": "cAFHl8YSHXNW99Tg0mTX",
+      "productId": "S9UREEv6JUn71evv2nKP"
+    },
+    {
+      "id": "RiK10EFGobYvynXliiSX",
+      "purchasedAt": "2026-04-28T00:00:00.000Z",
+      "purchaseBatchId": "Rjuvnwi9SIJkHabwd005",
+      "productId": "6B5DxGVc7DkZzBoYJQa7"
+    },
+    {
+      "id": "TE3fKQ4YVnlOfcFq0dOe",
+      "purchasedAt": "2026-04-29T00:00:00.000Z",
+      "purchaseBatchId": "qman32Mu8Fw1BdbWgS73",
+      "productId": "sj24JzIr9tDKfxIQN0Ve"
+    },
+    {
+      "id": "TXNRS4RObWjBTOgaXQe9",
+      "purchasedAt": "2026-04-28T00:00:00.000Z",
+      "purchaseBatchId": "Rjuvnwi9SIJkHabwd005",
+      "productId": "52rKKNgO3o6KRnCpqKnb"
+    },
+    {
+      "id": "U5yEgFTQaTIBBEH2tih5",
+      "purchasedAt": "2026-04-29T00:00:00.000Z",
+      "purchaseBatchId": "qman32Mu8Fw1BdbWgS73",
+      "productId": "wEOreMpZsiokHgbsOMag"
+    },
+    {
+      "id": "UFTHbamWAE9Tjt22Av0K",
+      "purchasedAt": "2026-04-28T00:00:00.000Z",
+      "purchaseBatchId": "Rjuvnwi9SIJkHabwd005",
+      "productId": "zbzZvxIs4SKjL8voXxRh"
+    },
+    {
+      "id": "UzAebbGUGYfk4EbGSHUO",
+      "purchasedAt": "2026-05-06T00:00:00.000Z",
+      "purchaseBatchId": null,
+      "productId": "qHxsnZRNp6oqPWrIixYh"
+    },
+    {
+      "id": "VEe1ZQWBPxLNWt3qmYfH",
+      "purchasedAt": "2026-04-28T00:00:00.000Z",
+      "purchaseBatchId": "8YFILSTAqIgHVLiLdg8p",
+      "productId": "Y9PcRbuarnHPqNG328PQ"
+    },
+    {
+      "id": "VZjcV0FglKFmYFsw0DBv",
+      "purchasedAt": "2026-04-29T00:00:00.000Z",
+      "purchaseBatchId": "qman32Mu8Fw1BdbWgS73",
+      "productId": "wEOreMpZsiokHgbsOMag"
+    },
+    {
+      "id": "VlghmmCwNKoS9ge3TP3w",
+      "purchasedAt": "2026-04-28T00:00:00.000Z",
+      "purchaseBatchId": "8YFILSTAqIgHVLiLdg8p",
+      "productId": "NuhllEQyWsAXzjiZMS6O"
+    },
+    {
+      "id": "WyKDTfCkHnokjfI8clqq",
+      "purchasedAt": "2026-04-29T00:00:00.000Z",
+      "purchaseBatchId": "qman32Mu8Fw1BdbWgS73",
+      "productId": "9D9AOSypuyQnGvZ8EFZM"
+    },
+    {
+      "id": "XXZM1Q8F4OTOLYxj5M60",
+      "purchasedAt": "2026-05-05T00:00:00.000Z",
+      "purchaseBatchId": "nh6NAFm1shf91kPdeh4P",
+      "productId": "iVEAfvh2LyoqWdSAyTzH"
+    },
+    {
+      "id": "Xr6UNzvspHmuL5P1mYGM",
+      "purchasedAt": "2026-04-29T00:00:00.000Z",
+      "purchaseBatchId": "qman32Mu8Fw1BdbWgS73",
+      "productId": "awpKte9eeUS3xXa24omD"
+    },
+    {
+      "id": "ZZzq1pHOmZ1HTJgiRHEb",
+      "purchasedAt": "2026-04-28T00:00:00.000Z",
+      "purchaseBatchId": "cAFHl8YSHXNW99Tg0mTX",
+      "productId": "csHryr5HoqX5Uw8YeZgM"
+    },
+    {
+      "id": "a62SOlwMXt0zARUjcIAf",
+      "purchasedAt": "2026-04-29T00:00:00.000Z",
+      "purchaseBatchId": "qman32Mu8Fw1BdbWgS73",
+      "productId": "w8dVPiOAIBbbT8exqtSY"
+    },
+    {
+      "id": "bXycFdwG76dgpDBa7mgM",
+      "purchasedAt": "2026-04-28T00:00:00.000Z",
+      "purchaseBatchId": "cAFHl8YSHXNW99Tg0mTX",
+      "productId": "5Yc10JP7JEseGqBedVhp"
+    },
+    {
+      "id": "cRnELABh2LbJIzYxNZOj",
+      "purchasedAt": "2026-04-29T00:00:00.000Z",
+      "purchaseBatchId": "qman32Mu8Fw1BdbWgS73",
+      "productId": "39SkzXxiNiazI6LrVnsz"
+    },
+    {
+      "id": "eSyvcAmVPROYJWdEEEZw",
+      "purchasedAt": "2026-04-27T00:00:00.000Z",
+      "purchaseBatchId": "N5e2PFrQg3pe5cYAVUz1",
+      "productId": "2FdDaxNt1LyKpasCeU8v"
+    },
+    {
+      "id": "egiePalUiMtsgrKbrXdg",
+      "purchasedAt": "2026-04-28T00:00:00.000Z",
+      "purchaseBatchId": "Rjuvnwi9SIJkHabwd005",
+      "productId": "NoPE1kzLcsSETMhOfobr"
+    },
+    {
+      "id": "fEfVek8KsEnJm0Jw3mG0",
+      "purchasedAt": "2026-04-28T00:00:00.000Z",
+      "purchaseBatchId": "cAFHl8YSHXNW99Tg0mTX",
+      "productId": "nHr8hQDOWXWQtlNqaWkI"
+    },
+    {
+      "id": "gIEstCqrYNLNoUwsxsF6",
+      "purchasedAt": "2026-04-28T00:00:00.000Z",
+      "purchaseBatchId": "cAFHl8YSHXNW99Tg0mTX",
+      "productId": "S9UREEv6JUn71evv2nKP"
+    },
+    {
+      "id": "gwo4is5mR3eYXL2rE1Ko",
+      "purchasedAt": "2026-04-28T00:00:00.000Z",
+      "purchaseBatchId": "cAFHl8YSHXNW99Tg0mTX",
+      "productId": "6oJSum6T3AN9bZiwocoB"
+    },
+    {
+      "id": "iu0hcGY79eX6J6tOERK9",
+      "purchasedAt": "2026-04-28T00:00:00.000Z",
+      "purchaseBatchId": "cAFHl8YSHXNW99Tg0mTX",
+      "productId": "OYj4ZTE5IK3JiNF3Xe36"
+    },
+    {
+      "id": "j2ZAJd3PQfMzor7xDL7P",
+      "purchasedAt": "2026-05-05T00:00:00.000Z",
+      "purchaseBatchId": "nh6NAFm1shf91kPdeh4P",
+      "productId": "iVEAfvh2LyoqWdSAyTzH"
+    },
+    {
+      "id": "ja4Vc8Qc0crXEB36ZOPz",
+      "purchasedAt": "2026-04-28T00:00:00.000Z",
+      "purchaseBatchId": "cAFHl8YSHXNW99Tg0mTX",
+      "productId": "S9UREEv6JUn71evv2nKP"
+    },
+    {
+      "id": "kFfVYiaakindiu8yWBGC",
+      "purchasedAt": "2026-04-28T00:00:00.000Z",
+      "purchaseBatchId": "Rjuvnwi9SIJkHabwd005",
+      "productId": "52rKKNgO3o6KRnCpqKnb"
+    },
+    {
+      "id": "nodZ6La6zKienANmSsjZ",
+      "purchasedAt": "2026-04-29T00:00:00.000Z",
+      "purchaseBatchId": "qman32Mu8Fw1BdbWgS73",
+      "productId": "w8dVPiOAIBbbT8exqtSY"
+    },
+    {
+      "id": "o5A3o33DXQ9yq2uPglLB",
+      "purchasedAt": "2026-04-29T00:00:00.000Z",
+      "purchaseBatchId": "qman32Mu8Fw1BdbWgS73",
+      "productId": "MfpEcJMs8riwKjR7dnAy"
+    },
+    {
+      "id": "oRCaryhEUmnalWGU9Pqq",
+      "purchasedAt": "2026-04-29T00:00:00.000Z",
+      "purchaseBatchId": "qman32Mu8Fw1BdbWgS73",
+      "productId": "1pWEHNCV6gRMj82k75pE"
+    },
+    {
+      "id": "obh1BzOGlYTweTzgCJcy",
+      "purchasedAt": "2026-04-28T00:00:00.000Z",
+      "purchaseBatchId": "Rjuvnwi9SIJkHabwd005",
+      "productId": "52rKKNgO3o6KRnCpqKnb"
+    },
+    {
+      "id": "qrna6ttbTqmSiShTlQMl",
+      "purchasedAt": "2026-05-06T00:00:00.000Z",
+      "purchaseBatchId": null,
+      "productId": "qHxsnZRNp6oqPWrIixYh"
+    },
+    {
+      "id": "skWTlixZgedw3SfMuHKq",
+      "purchasedAt": "2026-04-29T00:00:00.000Z",
+      "purchaseBatchId": "qman32Mu8Fw1BdbWgS73",
+      "productId": "1pWEHNCV6gRMj82k75pE"
+    },
+    {
+      "id": "tDXBUQ4uKJ6EKabqqAtp",
+      "purchasedAt": "2026-04-29T00:00:00.000Z",
+      "purchaseBatchId": "qman32Mu8Fw1BdbWgS73",
+      "productId": "9D9AOSypuyQnGvZ8EFZM"
+    },
+    {
+      "id": "uEfRgCQEWVrRmQ11qgnK",
+      "purchasedAt": "2026-05-05T00:00:00.000Z",
+      "purchaseBatchId": "nh6NAFm1shf91kPdeh4P",
+      "productId": "x1UiyPJHNFuxY8xN3Ihj"
+    },
+    {
+      "id": "uJ277gN1lVHAJ5TBZdNW",
+      "purchasedAt": "2026-04-29T00:00:00.000Z",
+      "purchaseBatchId": "qman32Mu8Fw1BdbWgS73",
+      "productId": "9D9AOSypuyQnGvZ8EFZM"
+    },
+    {
+      "id": "ucNyDXTi1AOQ0VZE96Hr",
+      "purchasedAt": "2026-04-28T00:00:00.000Z",
+      "purchaseBatchId": "cAFHl8YSHXNW99Tg0mTX",
+      "productId": "nHr8hQDOWXWQtlNqaWkI"
+    },
+    {
+      "id": "ucgS3grBgIJ2jSEmOEH5",
+      "purchasedAt": "2026-04-29T00:00:00.000Z",
+      "purchaseBatchId": "qman32Mu8Fw1BdbWgS73",
+      "productId": "awpKte9eeUS3xXa24omD"
+    },
+    {
+      "id": "uwBuDCfTNzxB9saLAI3C",
+      "purchasedAt": "2026-04-29T00:00:00.000Z",
+      "purchaseBatchId": "qman32Mu8Fw1BdbWgS73",
+      "productId": "w8dVPiOAIBbbT8exqtSY"
+    },
+    {
+      "id": "v0GzH4FvOUJEjkm9ICwR",
+      "purchasedAt": "2026-04-28T00:00:00.000Z",
+      "purchaseBatchId": "8YFILSTAqIgHVLiLdg8p",
+      "productId": "NuhllEQyWsAXzjiZMS6O"
+    },
+    {
+      "id": "v8YGTB56rKkoQWtTSnZP",
+      "purchasedAt": "2026-04-28T00:00:00.000Z",
+      "purchaseBatchId": "Rjuvnwi9SIJkHabwd005",
+      "productId": "dKe5Z1DphunEQs6ZuVJF"
+    },
+    {
+      "id": "vFEWdYrN9kpxEd30IL6H",
+      "purchasedAt": "2026-04-29T00:00:00.000Z",
+      "purchaseBatchId": "qman32Mu8Fw1BdbWgS73",
+      "productId": "1pWEHNCV6gRMj82k75pE"
+    },
+    {
+      "id": "vFoLhyxBiJ7szmKAGoiQ",
+      "purchasedAt": "2026-04-29T00:00:00.000Z",
+      "purchaseBatchId": "qman32Mu8Fw1BdbWgS73",
+      "productId": "w8dVPiOAIBbbT8exqtSY"
+    },
+    {
+      "id": "vNOkRe8nQj4keTYnAKLX",
+      "purchasedAt": "2026-04-29T00:00:00.000Z",
+      "purchaseBatchId": "qman32Mu8Fw1BdbWgS73",
+      "productId": "39SkzXxiNiazI6LrVnsz"
+    },
+    {
+      "id": "yO6TfzqeFd7Ea0FrPkMj",
+      "purchasedAt": "2026-04-28T00:00:00.000Z",
+      "purchaseBatchId": "Rjuvnwi9SIJkHabwd005",
+      "productId": "52rKKNgO3o6KRnCpqKnb"
+    },
+    {
+      "id": "ygtoRhhrq6kToHheKkVu",
+      "purchasedAt": "2026-04-29T00:00:00.000Z",
+      "purchaseBatchId": "qman32Mu8Fw1BdbWgS73",
+      "productId": "1pWEHNCV6gRMj82k75pE"
+    },
+    {
+      "id": "z52TMTmqfXFVrd44UIXU",
+      "purchasedAt": "2026-04-28T00:00:00.000Z",
+      "purchaseBatchId": "cAFHl8YSHXNW99Tg0mTX",
+      "productId": "B2b0In0VP7kP3jbD3yWC"
+    },
+    {
+      "id": "zrrN2IapMDwQC3aWiWrk",
+      "purchasedAt": "2026-04-29T00:00:00.000Z",
+      "purchaseBatchId": "qman32Mu8Fw1BdbWgS73",
+      "productId": "39SkzXxiNiazI6LrVnsz"
+    }
+  ],
+  "impactedServices": [],
+  "impactedMovements": [
+    {
+      "id": "09kWPoLkCayb5F3fZSIZ",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "uwBuDCfTNzxB9saLAI3C",
+      "reason": "purchase"
+    },
+    {
+      "id": "0pohk99VF1squAVZZS2A",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "ucgS3grBgIJ2jSEmOEH5",
+      "reason": "purchase"
+    },
+    {
+      "id": "1j1AzPB7k8hdacQoLGIo",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "U5yEgFTQaTIBBEH2tih5",
+      "reason": "purchase"
+    },
+    {
+      "id": "3pfQ2LCchsgMc6SjCLHA",
+      "occurredAt": "2026-05-06T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "CLvThkTzNEngQwYSLe2o",
+      "reason": "initial-load"
+    },
+    {
+      "id": "4kyUq8zh6pfC5stRes2H",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "cRnELABh2LbJIzYxNZOj",
+      "reason": "purchase"
+    },
+    {
+      "id": "5mDmGEO6jXtgkmpQ4Ryk",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "4Y86BSNgHB9UKncJYGlC",
+      "reason": "purchase"
+    },
+    {
+      "id": "5xLNVQDlWQYz9zTLZnd4",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "nodZ6La6zKienANmSsjZ",
+      "reason": "purchase"
+    },
+    {
+      "id": "60dLkDBDP0NQD816h6GW",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "Xr6UNzvspHmuL5P1mYGM",
+      "reason": "purchase"
+    },
+    {
+      "id": "6K11X2ium2nc7mCbRJxR",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "egiePalUiMtsgrKbrXdg",
+      "reason": "purchase"
+    },
+    {
+      "id": "6KHYIiRd8vzVzTSLyOoJ",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "gIEstCqrYNLNoUwsxsF6",
+      "reason": "purchase"
+    },
+    {
+      "id": "7az11jkOB28OpcqN8xyD",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "1Gz3I5QCZAzSWRFl40aM",
+      "reason": "purchase"
+    },
+    {
+      "id": "7bNua5wIrVjasYs74yoc",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "PzZKMfnyjLHIXjUHkb0c",
+      "reason": "purchase"
+    },
+    {
+      "id": "8PuXxqiKKFyBi3R4wxDM",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "AsyErvmFXNQS7gu6hmB4",
+      "reason": "purchase"
+    },
+    {
+      "id": "9vPBIXr6Zp2rzTKMwuOo",
+      "occurredAt": "2026-05-05T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "1vG8L0e9KAgUSjs1xnYE",
+      "reason": "purchase"
+    },
+    {
+      "id": "Ag2oWccD4xJfJ3dlUpED",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "NL4P2WqveqT7z76N9ZKr",
+      "reason": "purchase"
+    },
+    {
+      "id": "B0lVSlNUmvepW2PadqPe",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "Hu05BFZFC6XmHQUzxXha",
+      "reason": "purchase"
+    },
+    {
+      "id": "BlVN05QWQgek84t9IXKF",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "6C4hz15VXSc5JJuRpi1m",
+      "reason": "purchase"
+    },
+    {
+      "id": "CKqkcJXxkYIMaHOi6ixc",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "yO6TfzqeFd7Ea0FrPkMj",
+      "reason": "purchase"
+    },
+    {
+      "id": "CPvLOdaFRu3Xr6FrYGFK",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "OEK6L4vJe5Pv8M18T9tB",
+      "reason": "purchase"
+    },
+    {
+      "id": "DHR5xbu1HGrySbTB1iVL",
+      "occurredAt": "2026-04-27T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "O7B24Pdl5JCudlI9njHm",
+      "reason": "purchase"
+    },
+    {
+      "id": "DKaDJeO1QV6BbyIRkMqX",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "6TsHMV4zc0aCVEvqZp0k",
+      "reason": "purchase"
+    },
+    {
+      "id": "EP77esfMEqpa64nTxnxU",
+      "occurredAt": "2026-05-05T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "j2ZAJd3PQfMzor7xDL7P",
+      "reason": "purchase"
+    },
+    {
+      "id": "EVmtsvZY3ejPAld44S1P",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "B8v0t0jHvelGMYyPRuHA",
+      "reason": "purchase"
+    },
+    {
+      "id": "FSVO8OxNNVURQhijm5gg",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "3Ap7ag5qvzOax6tawSSl",
+      "reason": "purchase"
+    },
+    {
+      "id": "Fmjj90p6dEMB5YFUJXhc",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "a62SOlwMXt0zARUjcIAf",
+      "reason": "purchase"
+    },
+    {
+      "id": "KxdCbMiFHAZRkJr8g647",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "8AUPwmQFe4NSnzXSLFOS",
+      "reason": "purchase"
+    },
+    {
+      "id": "NK0re5ciQSQ7VWwLBNEZ",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "fEfVek8KsEnJm0Jw3mG0",
+      "reason": "purchase"
+    },
+    {
+      "id": "NgO9mQ3ppaZI0seR92jn",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "ucNyDXTi1AOQ0VZE96Hr",
+      "reason": "purchase"
+    },
+    {
+      "id": "NklSWBY0nTcco5dfzGWO",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "1FcfWgbmCY5UPSm5dAjQ",
+      "reason": "purchase"
+    },
+    {
+      "id": "NwuPG2s3Mr1P8USc4isS",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "VZjcV0FglKFmYFsw0DBv",
+      "reason": "purchase"
+    },
+    {
+      "id": "OG1tickuGgkj3DDcCzmR",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "WyKDTfCkHnokjfI8clqq",
+      "reason": "purchase"
+    },
+    {
+      "id": "Q3dYsm1wondWBmyPTDOG",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "kFfVYiaakindiu8yWBGC",
+      "reason": "purchase"
+    },
+    {
+      "id": "QJf7GwNUs1IIMLlWYnIc",
+      "occurredAt": "2026-04-27T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "Ivoz536PvTgRRzM18g26",
+      "reason": "purchase"
+    },
+    {
+      "id": "QVjHq7KHcWV0McI8Fh1I",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "obh1BzOGlYTweTzgCJcy",
+      "reason": "purchase"
+    },
+    {
+      "id": "QWEJOQfRTc3wcMT4WicH",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "P4gKV4CevuVJhKuvNjjj",
+      "reason": "purchase"
+    },
+    {
+      "id": "RERlG0FNLFx0cNNKVdwu",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "6N4OCb9TbdJ6wquIsz0P",
+      "reason": "purchase"
+    },
+    {
+      "id": "SI2NWYHQYoLJGTaKaldG",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "skWTlixZgedw3SfMuHKq",
+      "reason": "purchase"
+    },
+    {
+      "id": "SVQiqtQMVMOvpKqQSKR2",
+      "occurredAt": "2026-05-06T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "qrna6ttbTqmSiShTlQMl",
+      "reason": "initial-load"
+    },
+    {
+      "id": "SbbYy8RYwUXI847egyx7",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "v0GzH4FvOUJEjkm9ICwR",
+      "reason": "purchase"
+    },
+    {
+      "id": "SqBLkjdYayYso4folgzM",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "Mq4mhG6uzGNbaPfoEoS2",
+      "reason": "purchase"
+    },
+    {
+      "id": "Ul3XxIQv0XJl8S1cVPBO",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "IjoVbHLuhHlieLyywvCk",
+      "reason": "purchase"
+    },
+    {
+      "id": "Vw7BPBrcZ7GZga9W9Odq",
+      "occurredAt": "2026-05-05T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "GZkbufj4QcNXPXijL30r",
+      "reason": "purchase"
+    },
+    {
+      "id": "Xms5pZlEJauFlkUbfZuQ",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "VEe1ZQWBPxLNWt3qmYfH",
+      "reason": "purchase"
+    },
+    {
+      "id": "XtpBoCIaiZ9RW2kOmXrE",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "L9qwvyz0sN7QhnigE6uO",
+      "reason": "purchase"
+    },
+    {
+      "id": "YDacEZUmZDe2ovI6ynHs",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "9bWJQNCiPqrNuEOwjVFK",
+      "reason": "purchase"
+    },
+    {
+      "id": "ZtmrYzKe77ol5sNUiX8B",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "tDXBUQ4uKJ6EKabqqAtp",
+      "reason": "purchase"
+    },
+    {
+      "id": "ap1oJbf150bniruFaq0T",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "bXycFdwG76dgpDBa7mgM",
+      "reason": "purchase"
+    },
+    {
+      "id": "bgsmqwsZfEkREFWyDkli",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "gwo4is5mR3eYXL2rE1Ko",
+      "reason": "purchase"
+    },
+    {
+      "id": "dTTS2tcFhyfvbbVSVL0F",
+      "occurredAt": "2026-05-06T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "UzAebbGUGYfk4EbGSHUO",
+      "reason": "initial-load"
+    },
+    {
+      "id": "eGPPKg0XAyld3SMvPCcT",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "ygtoRhhrq6kToHheKkVu",
+      "reason": "purchase"
+    },
+    {
+      "id": "eKzKrMVIHnpPCsXf95Ks",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "z52TMTmqfXFVrd44UIXU",
+      "reason": "purchase"
+    },
+    {
+      "id": "gOOgdxghYrGtM8w0HocB",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "GAqYHwOPHc9IbULV3flz",
+      "reason": "purchase"
+    },
+    {
+      "id": "gXNBsX8z4Pd7x77Kk9tf",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "AeYVz0gluTvqN1649a0D",
+      "reason": "purchase"
+    },
+    {
+      "id": "gZFpEiyfiVacVR5XdONl",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "iu0hcGY79eX6J6tOERK9",
+      "reason": "purchase"
+    },
+    {
+      "id": "h86hyFztARlhBjsL6fki",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "vFEWdYrN9kpxEd30IL6H",
+      "reason": "purchase"
+    },
+    {
+      "id": "hM7tDpxqaCNaRWD2Bt7f",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "OfbhmbaplwK5Ywl9J0n8",
+      "reason": "purchase"
+    },
+    {
+      "id": "hpu0MsuA760BdaaJLE24",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "ja4Vc8Qc0crXEB36ZOPz",
+      "reason": "purchase"
+    },
+    {
+      "id": "i1MnuXIh8lyBBjdRRzVX",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "v8YGTB56rKkoQWtTSnZP",
+      "reason": "purchase"
+    },
+    {
+      "id": "j4CMJGcSKeYNKm5Y9aPw",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "TXNRS4RObWjBTOgaXQe9",
+      "reason": "purchase"
+    },
+    {
+      "id": "kCMhoyxos9DvJFQ4uOk5",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "vFoLhyxBiJ7szmKAGoiQ",
+      "reason": "purchase"
+    },
+    {
+      "id": "kNZaRvsUn4OXsbq9bwBM",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "PNYwhv5CBYgkUafknJuo",
+      "reason": "purchase"
+    },
+    {
+      "id": "ld7kXdOzSC9mirNeXZus",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "H72jhWOOni5Y1bwVNB77",
+      "reason": "purchase"
+    },
+    {
+      "id": "lk2o8zcOw8txqO0pspCb",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "zrrN2IapMDwQC3aWiWrk",
+      "reason": "purchase"
+    },
+    {
+      "id": "m2FkfLYBiS7TqDyy0L0w",
+      "occurredAt": "2026-04-27T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "eSyvcAmVPROYJWdEEEZw",
+      "reason": "purchase"
+    },
+    {
+      "id": "mCA2WBSBWDp7PBR68ayf",
+      "occurredAt": "2026-05-05T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "XXZM1Q8F4OTOLYxj5M60",
+      "reason": "purchase"
+    },
+    {
+      "id": "mmHiNWmlItW70bSyyyIK",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "DCCJGcgH0HVY4Lvwfp0w",
+      "reason": "purchase"
+    },
+    {
+      "id": "qV0tTOUM86mlLBCLn4WM",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "ZZzq1pHOmZ1HTJgiRHEb",
+      "reason": "purchase"
+    },
+    {
+      "id": "qbsq8wcFqHmxZWUZweMG",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "VlghmmCwNKoS9ge3TP3w",
+      "reason": "purchase"
+    },
+    {
+      "id": "qyGnOrcVmF9P7FhziB1K",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "oRCaryhEUmnalWGU9Pqq",
+      "reason": "purchase"
+    },
+    {
+      "id": "sjPTJ7oLB2bDZZPK6m2A",
+      "occurredAt": "2026-05-05T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "uEfRgCQEWVrRmQ11qgnK",
+      "reason": "purchase"
+    },
+    {
+      "id": "tBtw8vyVXRdSIIGst8zm",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "UFTHbamWAE9Tjt22Av0K",
+      "reason": "purchase"
+    },
+    {
+      "id": "tCkKGlGgUnLfbpD0Qnwv",
+      "occurredAt": "2026-05-05T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "ByR20RF0mBL1JcvjiAbF",
+      "reason": "purchase"
+    },
+    {
+      "id": "vXuDv9jykb3AhcLugAgY",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "uJ277gN1lVHAJ5TBZdNW",
+      "reason": "purchase"
+    },
+    {
+      "id": "wuf5iIV2SHVKDD1x3iVs",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "vNOkRe8nQj4keTYnAKLX",
+      "reason": "purchase"
+    },
+    {
+      "id": "xAZ220OE9W6LeB6QODWX",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "RiK10EFGobYvynXliiSX",
+      "reason": "purchase"
+    },
+    {
+      "id": "xVatslbR1Zaq3eSefxfA",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "MnaE8XMBHHV2i54M9loX",
+      "reason": "purchase"
+    },
+    {
+      "id": "zWClYVwTcokOqTNvIEZK",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "TE3fKQ4YVnlOfcFq0dOe",
+      "reason": "purchase"
+    },
+    {
+      "id": "zqtQoVD5GXbyyhbiKHUB",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "o5A3o33DXQ9yq2uPglLB",
+      "reason": "purchase"
+    }
+  ],
+  "impactedInventoryMovements": [
+    {
+      "id": "09kWPoLkCayb5F3fZSIZ",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "uwBuDCfTNzxB9saLAI3C",
+      "reason": "purchase"
+    },
+    {
+      "id": "0pohk99VF1squAVZZS2A",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "ucgS3grBgIJ2jSEmOEH5",
+      "reason": "purchase"
+    },
+    {
+      "id": "1j1AzPB7k8hdacQoLGIo",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "U5yEgFTQaTIBBEH2tih5",
+      "reason": "purchase"
+    },
+    {
+      "id": "3pfQ2LCchsgMc6SjCLHA",
+      "occurredAt": "2026-05-06T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "CLvThkTzNEngQwYSLe2o",
+      "reason": "initial-load"
+    },
+    {
+      "id": "4kyUq8zh6pfC5stRes2H",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "cRnELABh2LbJIzYxNZOj",
+      "reason": "purchase"
+    },
+    {
+      "id": "5mDmGEO6jXtgkmpQ4Ryk",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "4Y86BSNgHB9UKncJYGlC",
+      "reason": "purchase"
+    },
+    {
+      "id": "5xLNVQDlWQYz9zTLZnd4",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "nodZ6La6zKienANmSsjZ",
+      "reason": "purchase"
+    },
+    {
+      "id": "60dLkDBDP0NQD816h6GW",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "Xr6UNzvspHmuL5P1mYGM",
+      "reason": "purchase"
+    },
+    {
+      "id": "6K11X2ium2nc7mCbRJxR",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "egiePalUiMtsgrKbrXdg",
+      "reason": "purchase"
+    },
+    {
+      "id": "6KHYIiRd8vzVzTSLyOoJ",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "gIEstCqrYNLNoUwsxsF6",
+      "reason": "purchase"
+    },
+    {
+      "id": "7az11jkOB28OpcqN8xyD",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "1Gz3I5QCZAzSWRFl40aM",
+      "reason": "purchase"
+    },
+    {
+      "id": "7bNua5wIrVjasYs74yoc",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "PzZKMfnyjLHIXjUHkb0c",
+      "reason": "purchase"
+    },
+    {
+      "id": "8PuXxqiKKFyBi3R4wxDM",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "AsyErvmFXNQS7gu6hmB4",
+      "reason": "purchase"
+    },
+    {
+      "id": "9vPBIXr6Zp2rzTKMwuOo",
+      "occurredAt": "2026-05-05T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "1vG8L0e9KAgUSjs1xnYE",
+      "reason": "purchase"
+    },
+    {
+      "id": "Ag2oWccD4xJfJ3dlUpED",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "NL4P2WqveqT7z76N9ZKr",
+      "reason": "purchase"
+    },
+    {
+      "id": "B0lVSlNUmvepW2PadqPe",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "Hu05BFZFC6XmHQUzxXha",
+      "reason": "purchase"
+    },
+    {
+      "id": "BlVN05QWQgek84t9IXKF",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "6C4hz15VXSc5JJuRpi1m",
+      "reason": "purchase"
+    },
+    {
+      "id": "CKqkcJXxkYIMaHOi6ixc",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "yO6TfzqeFd7Ea0FrPkMj",
+      "reason": "purchase"
+    },
+    {
+      "id": "CPvLOdaFRu3Xr6FrYGFK",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "OEK6L4vJe5Pv8M18T9tB",
+      "reason": "purchase"
+    },
+    {
+      "id": "DHR5xbu1HGrySbTB1iVL",
+      "occurredAt": "2026-04-27T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "O7B24Pdl5JCudlI9njHm",
+      "reason": "purchase"
+    },
+    {
+      "id": "DKaDJeO1QV6BbyIRkMqX",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "6TsHMV4zc0aCVEvqZp0k",
+      "reason": "purchase"
+    },
+    {
+      "id": "EP77esfMEqpa64nTxnxU",
+      "occurredAt": "2026-05-05T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "j2ZAJd3PQfMzor7xDL7P",
+      "reason": "purchase"
+    },
+    {
+      "id": "EVmtsvZY3ejPAld44S1P",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "B8v0t0jHvelGMYyPRuHA",
+      "reason": "purchase"
+    },
+    {
+      "id": "FSVO8OxNNVURQhijm5gg",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "3Ap7ag5qvzOax6tawSSl",
+      "reason": "purchase"
+    },
+    {
+      "id": "Fmjj90p6dEMB5YFUJXhc",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "a62SOlwMXt0zARUjcIAf",
+      "reason": "purchase"
+    },
+    {
+      "id": "KxdCbMiFHAZRkJr8g647",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "8AUPwmQFe4NSnzXSLFOS",
+      "reason": "purchase"
+    },
+    {
+      "id": "NK0re5ciQSQ7VWwLBNEZ",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "fEfVek8KsEnJm0Jw3mG0",
+      "reason": "purchase"
+    },
+    {
+      "id": "NgO9mQ3ppaZI0seR92jn",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "ucNyDXTi1AOQ0VZE96Hr",
+      "reason": "purchase"
+    },
+    {
+      "id": "NklSWBY0nTcco5dfzGWO",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "1FcfWgbmCY5UPSm5dAjQ",
+      "reason": "purchase"
+    },
+    {
+      "id": "NwuPG2s3Mr1P8USc4isS",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "VZjcV0FglKFmYFsw0DBv",
+      "reason": "purchase"
+    },
+    {
+      "id": "OG1tickuGgkj3DDcCzmR",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "WyKDTfCkHnokjfI8clqq",
+      "reason": "purchase"
+    },
+    {
+      "id": "Q3dYsm1wondWBmyPTDOG",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "kFfVYiaakindiu8yWBGC",
+      "reason": "purchase"
+    },
+    {
+      "id": "QJf7GwNUs1IIMLlWYnIc",
+      "occurredAt": "2026-04-27T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "Ivoz536PvTgRRzM18g26",
+      "reason": "purchase"
+    },
+    {
+      "id": "QVjHq7KHcWV0McI8Fh1I",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "obh1BzOGlYTweTzgCJcy",
+      "reason": "purchase"
+    },
+    {
+      "id": "QWEJOQfRTc3wcMT4WicH",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "P4gKV4CevuVJhKuvNjjj",
+      "reason": "purchase"
+    },
+    {
+      "id": "RERlG0FNLFx0cNNKVdwu",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "6N4OCb9TbdJ6wquIsz0P",
+      "reason": "purchase"
+    },
+    {
+      "id": "SI2NWYHQYoLJGTaKaldG",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "skWTlixZgedw3SfMuHKq",
+      "reason": "purchase"
+    },
+    {
+      "id": "SVQiqtQMVMOvpKqQSKR2",
+      "occurredAt": "2026-05-06T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "qrna6ttbTqmSiShTlQMl",
+      "reason": "initial-load"
+    },
+    {
+      "id": "SbbYy8RYwUXI847egyx7",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "v0GzH4FvOUJEjkm9ICwR",
+      "reason": "purchase"
+    },
+    {
+      "id": "SqBLkjdYayYso4folgzM",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "Mq4mhG6uzGNbaPfoEoS2",
+      "reason": "purchase"
+    },
+    {
+      "id": "Ul3XxIQv0XJl8S1cVPBO",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "IjoVbHLuhHlieLyywvCk",
+      "reason": "purchase"
+    },
+    {
+      "id": "Vw7BPBrcZ7GZga9W9Odq",
+      "occurredAt": "2026-05-05T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "GZkbufj4QcNXPXijL30r",
+      "reason": "purchase"
+    },
+    {
+      "id": "Xms5pZlEJauFlkUbfZuQ",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "VEe1ZQWBPxLNWt3qmYfH",
+      "reason": "purchase"
+    },
+    {
+      "id": "XtpBoCIaiZ9RW2kOmXrE",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "L9qwvyz0sN7QhnigE6uO",
+      "reason": "purchase"
+    },
+    {
+      "id": "YDacEZUmZDe2ovI6ynHs",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "9bWJQNCiPqrNuEOwjVFK",
+      "reason": "purchase"
+    },
+    {
+      "id": "ZtmrYzKe77ol5sNUiX8B",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "tDXBUQ4uKJ6EKabqqAtp",
+      "reason": "purchase"
+    },
+    {
+      "id": "ap1oJbf150bniruFaq0T",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "bXycFdwG76dgpDBa7mgM",
+      "reason": "purchase"
+    },
+    {
+      "id": "bgsmqwsZfEkREFWyDkli",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "gwo4is5mR3eYXL2rE1Ko",
+      "reason": "purchase"
+    },
+    {
+      "id": "dTTS2tcFhyfvbbVSVL0F",
+      "occurredAt": "2026-05-06T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "UzAebbGUGYfk4EbGSHUO",
+      "reason": "initial-load"
+    },
+    {
+      "id": "eGPPKg0XAyld3SMvPCcT",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "ygtoRhhrq6kToHheKkVu",
+      "reason": "purchase"
+    },
+    {
+      "id": "eKzKrMVIHnpPCsXf95Ks",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "z52TMTmqfXFVrd44UIXU",
+      "reason": "purchase"
+    },
+    {
+      "id": "gOOgdxghYrGtM8w0HocB",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "GAqYHwOPHc9IbULV3flz",
+      "reason": "purchase"
+    },
+    {
+      "id": "gXNBsX8z4Pd7x77Kk9tf",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "AeYVz0gluTvqN1649a0D",
+      "reason": "purchase"
+    },
+    {
+      "id": "gZFpEiyfiVacVR5XdONl",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "iu0hcGY79eX6J6tOERK9",
+      "reason": "purchase"
+    },
+    {
+      "id": "h86hyFztARlhBjsL6fki",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "vFEWdYrN9kpxEd30IL6H",
+      "reason": "purchase"
+    },
+    {
+      "id": "hM7tDpxqaCNaRWD2Bt7f",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "OfbhmbaplwK5Ywl9J0n8",
+      "reason": "purchase"
+    },
+    {
+      "id": "hpu0MsuA760BdaaJLE24",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "ja4Vc8Qc0crXEB36ZOPz",
+      "reason": "purchase"
+    },
+    {
+      "id": "i1MnuXIh8lyBBjdRRzVX",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "v8YGTB56rKkoQWtTSnZP",
+      "reason": "purchase"
+    },
+    {
+      "id": "j4CMJGcSKeYNKm5Y9aPw",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "TXNRS4RObWjBTOgaXQe9",
+      "reason": "purchase"
+    },
+    {
+      "id": "kCMhoyxos9DvJFQ4uOk5",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "vFoLhyxBiJ7szmKAGoiQ",
+      "reason": "purchase"
+    },
+    {
+      "id": "kNZaRvsUn4OXsbq9bwBM",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "PNYwhv5CBYgkUafknJuo",
+      "reason": "purchase"
+    },
+    {
+      "id": "ld7kXdOzSC9mirNeXZus",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "H72jhWOOni5Y1bwVNB77",
+      "reason": "purchase"
+    },
+    {
+      "id": "lk2o8zcOw8txqO0pspCb",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "zrrN2IapMDwQC3aWiWrk",
+      "reason": "purchase"
+    },
+    {
+      "id": "m2FkfLYBiS7TqDyy0L0w",
+      "occurredAt": "2026-04-27T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "eSyvcAmVPROYJWdEEEZw",
+      "reason": "purchase"
+    },
+    {
+      "id": "mCA2WBSBWDp7PBR68ayf",
+      "occurredAt": "2026-05-05T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "XXZM1Q8F4OTOLYxj5M60",
+      "reason": "purchase"
+    },
+    {
+      "id": "mmHiNWmlItW70bSyyyIK",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "DCCJGcgH0HVY4Lvwfp0w",
+      "reason": "purchase"
+    },
+    {
+      "id": "qV0tTOUM86mlLBCLn4WM",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "ZZzq1pHOmZ1HTJgiRHEb",
+      "reason": "purchase"
+    },
+    {
+      "id": "qbsq8wcFqHmxZWUZweMG",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "VlghmmCwNKoS9ge3TP3w",
+      "reason": "purchase"
+    },
+    {
+      "id": "qyGnOrcVmF9P7FhziB1K",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "oRCaryhEUmnalWGU9Pqq",
+      "reason": "purchase"
+    },
+    {
+      "id": "sjPTJ7oLB2bDZZPK6m2A",
+      "occurredAt": "2026-05-05T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "uEfRgCQEWVrRmQ11qgnK",
+      "reason": "purchase"
+    },
+    {
+      "id": "tBtw8vyVXRdSIIGst8zm",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "UFTHbamWAE9Tjt22Av0K",
+      "reason": "purchase"
+    },
+    {
+      "id": "tCkKGlGgUnLfbpD0Qnwv",
+      "occurredAt": "2026-05-05T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "ByR20RF0mBL1JcvjiAbF",
+      "reason": "purchase"
+    },
+    {
+      "id": "vXuDv9jykb3AhcLugAgY",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "uJ277gN1lVHAJ5TBZdNW",
+      "reason": "purchase"
+    },
+    {
+      "id": "wuf5iIV2SHVKDD1x3iVs",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "vNOkRe8nQj4keTYnAKLX",
+      "reason": "purchase"
+    },
+    {
+      "id": "xAZ220OE9W6LeB6QODWX",
+      "occurredAt": "2026-04-28T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "RiK10EFGobYvynXliiSX",
+      "reason": "purchase"
+    },
+    {
+      "id": "xVatslbR1Zaq3eSefxfA",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "MnaE8XMBHHV2i54M9loX",
+      "reason": "purchase"
+    },
+    {
+      "id": "zWClYVwTcokOqTNvIEZK",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "TE3fKQ4YVnlOfcFq0dOe",
+      "reason": "purchase"
+    },
+    {
+      "id": "zqtQoVD5GXbyyhbiKHUB",
+      "occurredAt": "2026-04-29T00:00:00.000Z",
+      "saleId": null,
+      "purchaseId": "o5A3o33DXQ9yq2uPglLB",
+      "reason": "purchase"
+    }
+  ]
+}

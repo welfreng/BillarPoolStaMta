@@ -876,7 +876,12 @@ function mapAuthorizationRequestDocument(documentId: string, data: DocumentData)
     saleSummary: String(data.saleSummary ?? ''),
     reason: String(data.reason ?? ''),
     requestedBy: String(data.requestedBy ?? 'Usuario de ventas'),
-    requestedByRole: data.requestedByRole === 'sales' ? 'sales' : 'admin',
+    requestedByRole:
+      data.requestedByRole === 'sales'
+        ? 'sales'
+        : data.requestedByRole === 'superadmin'
+          ? 'superadmin'
+          : 'admin',
     reviewedBy: String(data.reviewedBy ?? ''),
     reviewNote: String(data.reviewNote ?? ''),
     createdAt: normalizeDateValue(data.createdAt),

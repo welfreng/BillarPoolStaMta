@@ -35,6 +35,7 @@ import {
 } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { getTodayDateInputValue } from '@/lib/admin/date-utils';
 import { cn } from '@/lib/utils';
 
 const purchaseLineSchema = z.object({
@@ -103,7 +104,7 @@ const defaultValues: PurchaseFormValues = {
   purchaseType: 'local',
   supplierId: '',
   supplier: '',
-  purchasedAt: new Date().toISOString().slice(0, 10),
+  purchasedAt: getTodayDateInputValue(),
   shippingValueTotal: 0,
   internationalVendorName: '',
   productsValueUsd: 0,

@@ -1,0 +1,15 @@
+{
+  "generatedAt": "2026-05-06T23:19:30.405Z",
+  "counts": {
+    "sales": 0,
+    "purchases": 0,
+    "services": 0,
+    "movements": 0,
+    "inventoryMovements": 0
+  },
+  "impactedSales": [],
+  "impactedPurchases": [],
+  "impactedServices": [],
+  "impactedMovements": [],
+  "impactedInventoryMovements": []
+}

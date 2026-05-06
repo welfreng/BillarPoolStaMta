@@ -16,7 +16,7 @@ import {
   Wrench,
 } from 'lucide-react';
 
-export type AdminRole = 'admin' | 'sales' | null | undefined;
+export type AdminRole = 'superadmin' | 'admin' | 'sales' | null | undefined;
 
 export type AdminNavItem = {
   href: string;

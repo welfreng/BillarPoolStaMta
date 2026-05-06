@@ -67,12 +67,12 @@ export default function AutorizacionesPage() {
   const approvedCount = authorizationRequests.filter((request) => request.status === 'approved').length;
   const rejectedCount = authorizationRequests.filter((request) => request.status === 'rejected').length;
 
-  if (role !== 'admin') {
+  if (role !== 'admin' && role !== 'superadmin') {
     return (
       <div className="rounded-3xl border border-border bg-card/88 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950/72">
         <p className="text-lg font-semibold text-foreground">Acceso restringido</p>
         <p className="mt-2 text-sm text-muted-foreground">
-          Solo el administrador puede revisar y aprobar solicitudes.
+          Solo el administrador o superadmin puede revisar y aprobar solicitudes.
         </p>
       </div>
     );
@@ -85,7 +85,7 @@ export default function AutorizacionesPage() {
       await reviewAuthorizationRequest(selectedRequest.id, {
         status,
         reviewNote,
-        reviewedBy: profile?.nombre?.trim() || user?.displayName || user?.email || 'Administrador',
+        reviewedBy: profile?.nombre?.trim() || user?.displayName || user?.email || 'Superadmin',
       });
       toast({
         title: status === 'approved' ? 'Solicitud aprobada' : 'Solicitud rechazada',

@@ -1,0 +1,71 @@
+{
+  "generatedAt": "2026-05-06T23:15:13.262Z",
+  "mode": "execute",
+  "counts": {
+    "sales": 3,
+    "movements": 3,
+    "inventoryMovements": 3,
+    "services": 0
+  },
+  "impactedSales": [
+    {
+      "id": "3RhhRR19FzcRCkz5ps9Z",
+      "saleBatchId": "UpoDodydowvdIsSBrzvN",
+      "currentSoldAt": "2026-05-06T00:00:00.000Z",
+      "nextSoldAt": "2026-05-06T12:00:00.000Z"
+    },
+    {
+      "id": "dZqP8j8DkXzNMoWWWb9a",
+      "saleBatchId": "fvEctFXyjBxSY55JZG4h",
+      "currentSoldAt": "2026-05-06T00:00:00.000Z",
+      "nextSoldAt": "2026-05-06T12:00:00.000Z"
+    },
+    {
+      "id": "ekZAgd2YwL9gl3mVIGp2",
+      "saleBatchId": "fvEctFXyjBxSY55JZG4h",
+      "currentSoldAt": "2026-05-06T00:00:00.000Z",
+      "nextSoldAt": "2026-05-06T12:00:00.000Z"
+    }
+  ],
+  "impactedMovements": [
+    {
+      "id": "WxWfjUvfVpm6C8qTzn8R",
+      "saleId": "3RhhRR19FzcRCkz5ps9Z",
+      "currentOccurredAt": "2026-05-06T00:00:00.000Z",
+      "nextOccurredAt": "2026-05-06T12:00:00.000Z"
+    },
+    {
+      "id": "siEGP7RZRlGQZJbA33C0",
+      "saleId": "dZqP8j8DkXzNMoWWWb9a",
+      "currentOccurredAt": "2026-05-06T00:00:00.000Z",
+      "nextOccurredAt": "2026-05-06T12:00:00.000Z"
+    },
+    {
+      "id": "swOpsOmJsNjMasm5QvmX",
+      "saleId": "ekZAgd2YwL9gl3mVIGp2",
+      "currentOccurredAt": "2026-05-06T00:00:00.000Z",
+      "nextOccurredAt": "2026-05-06T12:00:00.000Z"
+    }
+  ],
+  "impactedInventoryMovements": [
+    {
+      "id": "WxWfjUvfVpm6C8qTzn8R",
+      "saleId": "3RhhRR19FzcRCkz5ps9Z",
+      "currentOccurredAt": "2026-05-06T00:00:00.000Z",
+      "nextOccurredAt": "2026-05-06T12:00:00.000Z"
+    },
+    {
+      "id": "siEGP7RZRlGQZJbA33C0",
+      "saleId": "dZqP8j8DkXzNMoWWWb9a",
+      "currentOccurredAt": "2026-05-06T00:00:00.000Z",
+      "nextOccurredAt": "2026-05-06T12:00:00.000Z"
+    },
+    {
+      "id": "swOpsOmJsNjMasm5QvmX",
+      "saleId": "ekZAgd2YwL9gl3mVIGp2",
+      "currentOccurredAt": "2026-05-06T00:00:00.000Z",
+      "nextOccurredAt": "2026-05-06T12:00:00.000Z"
+    }
+  ],
+  "impactedServices": []
+}

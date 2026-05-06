@@ -1,7 +1,7 @@
 export type ProductStatus = 'active' | 'draft' | 'archived';
 export type StockAlert = 'healthy' | 'out';
 export type PresentationKind = 'unit' | 'dozen' | 'box-12';
-export type UserRole = 'admin' | 'sales';
+export type UserRole = 'superadmin' | 'admin' | 'sales';
 export type MovementType = 'entry' | 'exit' | 'adjustment' | 'purchase';
 export type ProductSaleMode = 'simple' | 'varianted';
 export type VariantStatus = 'active' | 'inactive';
