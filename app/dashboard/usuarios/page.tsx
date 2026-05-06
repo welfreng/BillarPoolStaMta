@@ -142,14 +142,31 @@ export default function UsuariosPage() {
 
   const handleUpdateUser = async (userId: string, values: UpdateUserFormValues) => {
     await updateDoc(doc(db, 'usuarios', userId), {
+      nombre: values.nombre,
+      telefono: values.telefono,
       role: values.role,
       status: values.status,
       updatedAt: serverTimestamp(),
     });
 
+    setUsers((current) =>
+      current.map((item) =>
+        item.id === userId
+          ? {
+              ...item,
+              nombre: values.nombre,
+              telefono: values.telefono,
+              role: values.role,
+              status: values.status,
+              updatedAt: new Date().toISOString(),
+            }
+          : item
+      )
+    );
+
     toast({
       title: 'Usuario actualizado',
-      description: 'El rol y el estado fueron guardados.',
+      description: 'Se guardaron los datos editables del usuario.',
     });
     setOpenDialog(false);
     setEditingUser(undefined);

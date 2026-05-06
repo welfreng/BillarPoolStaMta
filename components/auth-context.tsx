@@ -122,6 +122,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       unsubscribeProfile = onSnapshot(
         doc(db, 'usuarios', currentUser.uid),
         (snapshot) => {
+          if (!snapshot.exists()) {
+            setProfile(null);
+            setLoading(false);
+            void performLogout('inactive-profile');
+            toast({
+              title: 'Acceso sin perfil valido',
+              description: 'Tu usuario ya no tiene un perfil activo en el sistema. Ingresa de nuevo o consulta al administrador.',
+              variant: 'destructive',
+            });
+            return;
+          }
+
           const data = snapshot.data();
           setProfile({
             id: currentUser.uid,
@@ -141,18 +153,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setLoading(false);
         },
         () => {
-          setProfile({
-            id: currentUser.uid,
-            uid: currentUser.uid,
-            nombre: currentUser.displayName ?? '',
-            email: currentUser.email ?? '',
-            telefono: '',
-            role: 'admin',
-            status: 'active',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          });
+          setProfile(null);
           setLoading(false);
+          void performLogout('inactive-profile');
+          toast({
+            title: 'No se pudo validar el perfil',
+            description: 'Se cerro la sesion por seguridad. Vuelve a ingresar o revisa el usuario en el panel.',
+            variant: 'destructive',
+          });
         }
       );
     });

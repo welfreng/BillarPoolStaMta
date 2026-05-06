@@ -13,6 +13,7 @@ import {
   FormField,
   FormItem,
   FormLabel,
+  FormDescription,
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -63,9 +64,11 @@ export function UserFormDialog({
   initialUser?: AppUserAccount;
   onSubmit: (values: CreateUserFormValues | UpdateUserFormValues) => Promise<void> | void;
 }) {
+  const dialogModeKey = initialUser?.id ?? 'new-user';
+  const isEditing = Boolean(initialUser);
   const userFormId = useId();
   const form = useForm<CreateUserFormValues | UpdateUserFormValues>({
-    resolver: zodResolver(initialUser ? updateUserSchema : createUserSchema),
+    resolver: zodResolver(isEditing ? updateUserSchema : createUserSchema),
     defaultValues,
   });
 
@@ -88,12 +91,13 @@ export function UserFormDialog({
 
   return (
     <AdminResponsiveDialog
+      key={dialogModeKey}
       open={open}
       onOpenChange={onOpenChange}
-      title={initialUser ? 'Editar usuario' : 'Nuevo usuario'}
+      title={isEditing ? 'Editar usuario' : 'Nuevo usuario'}
       description={
-        initialUser
-          ? 'Actualiza el rol y el estado del usuario.'
+        isEditing
+          ? 'Actualiza los datos operativos del usuario. El correo de acceso no se cambia desde aqui.'
           : 'Crea un usuario del sistema y asigna su rol de acceso.'
       }
       desktopContentClassName="lg:max-w-4xl"
@@ -103,7 +107,7 @@ export function UserFormDialog({
             Cancelar
           </Button>
           <Button form={userFormId} type="submit">
-            {initialUser ? 'Guardar cambios' : 'Crear usuario'}
+            {isEditing ? 'Guardar cambios' : 'Crear usuario'}
           </Button>
         </div>
       }
@@ -124,7 +128,7 @@ export function UserFormDialog({
                 <FormItem>
                   <FormLabel>Nombre</FormLabel>
                   <FormControl>
-                    <Input {...field} disabled={Boolean(initialUser)} />
+                    <Input {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -139,8 +143,13 @@ export function UserFormDialog({
                   <FormItem>
                     <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input type="email" {...field} disabled={Boolean(initialUser)} />
+                      <Input type="email" {...field} disabled={isEditing} />
                     </FormControl>
+                    {isEditing ? (
+                      <FormDescription>
+                        El email tambien pertenece a Firebase Auth. Para cambiarlo de forma segura hace falta un backend con privilegios de administrador.
+                      </FormDescription>
+                    ) : null}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -152,7 +161,7 @@ export function UserFormDialog({
                   <FormItem>
                     <FormLabel>Telefono</FormLabel>
                     <FormControl>
-                      <Input {...field} disabled={Boolean(initialUser)} />
+                      <Input {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -160,7 +169,7 @@ export function UserFormDialog({
               />
             </div>
 
-            {!initialUser && (
+            {!isEditing && (
               <div className="grid gap-4 md:grid-cols-2">
                 <FormField
                   control={form.control}

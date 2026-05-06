@@ -1928,10 +1928,41 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     const batch = writeBatch(db);
     let changedCount = 0;
     products.forEach((product) => {
-      const publicStock =
-        getProductSaleMode(product) === 'varianted'
-          ? (product.variants ?? []).reduce((total, variant) => total + Math.max(Number(variant.stock ?? 0), 0), 0)
-          : getProductStock(movements, product.id);
+      if (getProductSaleMode(product) === 'varianted') {
+        const variantStockMap = new Map(
+          (product.variants ?? []).map((variant) => [variant.id, Math.max(Number(variant.stock ?? 0), 0)])
+        );
+        const computedPublicStock = Array.from(variantStockMap.values()).reduce((total, stock) => total + stock, 0);
+        const currentPublicStock = Math.max(Number(product.publicStock ?? 0), 0);
+        const hasVariantPublicStockMismatch = (product.variants ?? []).some(
+          (variant) => Math.max(Number(variant.publicStock ?? 0), 0) !== Math.max(Number(variant.stock ?? 0), 0)
+        );
+        const shouldForcePublicStatus = computedPublicStock > 0;
+
+        if (computedPublicStock === currentPublicStock && !hasVariantPublicStockMismatch && !shouldForcePublicStatus) {
+          return;
+        }
+
+        applyVariantStockMapToBatch(
+          batch,
+          new Map([[product.id, variantStockMap]]),
+          products
+        );
+        if (shouldForcePublicStatus) {
+          batch.set(
+            doc(db, 'products', product.id),
+            {
+              status: 'active',
+              updatedAt: serverTimestamp(),
+            },
+            { merge: true }
+          );
+        }
+        changedCount += 1;
+        return;
+      }
+
+      const publicStock = getProductStock(movements, product.id);
       const currentPublicStock = Math.max(Number(product.publicStock ?? 0), 0);
       const shouldForcePublicStatus = publicStock > 0;
       if (publicStock === currentPublicStock && !shouldForcePublicStatus) {

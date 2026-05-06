@@ -74,11 +74,10 @@ function mapCatalogProduct(documentId: string, data: DocumentData): CatalogProdu
     .filter((price) => price > 0)
     .sort((left, right) => left - right)
   const totalVariantStock = variants.reduce((total, variant) => total + Math.max(variant.stock, 0), 0)
-  const storedPublicStock = Math.max(Number(data.publicStock ?? 0), 0)
-  const resolvedPublicStock =
-    variants.length > 0
-      ? Math.max(totalVariantStock, storedPublicStock)
-      : storedPublicStock
+  const storedPublicStock = Math.max(Number(data.publicStock ?? data.stock ?? data.stockOnHand ?? 0), 0)
+  // When a product has variants, the public catalog should trust the summed variant stock.
+  // This avoids stale product-level publicStock values from keeping exhausted items as "available".
+  const resolvedPublicStock = variants.length > 0 ? totalVariantStock : storedPublicStock
 
   return {
     id: documentId,
