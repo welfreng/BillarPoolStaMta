@@ -31,6 +31,7 @@ import { useAdminData } from '@/components/admin/admin-data-context';
 import { useAuth } from '@/components/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, formatDateTime, formatNumber, getProductById, getProductStock } from '@/lib/admin/calculations';
+import { toOperationalDateISOString } from '@/lib/admin/date-utils';
 import { getFriendlyFirestoreWriteErrorMessage } from '@/lib/firestore-write-retry';
 import { getSaleLineDisplayName } from '@/lib/admin/sale-line-display';
 import type { AuthorizationRequest, AuthorizationRequestType } from '@/lib/admin/types';
@@ -836,7 +837,7 @@ export default function VentasPage() {
           try {
             const payload = {
               ...values,
-              soldAt: new Date(values.soldAt).toISOString(),
+              soldAt: toOperationalDateISOString(values.soldAt),
               paymentMethod: 'efectivo',
               paymentReference: '',
               actorRole: role ?? 'admin',
@@ -916,7 +917,7 @@ export default function VentasPage() {
           if (!returningGroup) return;
           try {
             await registerSaleReturns({
-              returnedAt: new Date(values.returnedAt).toISOString(),
+              returnedAt: toOperationalDateISOString(values.returnedAt),
               items: values.items,
               notes: values.notes,
               responsibleUser:

@@ -10,6 +10,7 @@ import type {
   StockAlert,
 } from '@/lib/admin/types';
 import { getProductSaleMode, getVariantRealUnitCost } from '@/lib/admin/variant-helpers';
+import { formatOperationalDate, formatOperationalDateTime } from '@/lib/admin/date-utils';
 
 export function roundCurrency(value: number) {
   const normalizedValue = Number(value);
@@ -267,9 +268,9 @@ export function formatNumber(value: number) {
 }
 
 export function formatShortDate(value: string) {
-  return format(new Date(value), 'dd/MM/yyyy');
+  return formatOperationalDate(value);
 }
 
 export function formatDateTime(value: string) {
-  return format(new Date(value), 'dd/MM/yyyy HH:mm');
+  return formatOperationalDateTime(value);
 }

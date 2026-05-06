@@ -11,6 +11,7 @@ import { PurchaseFormDialog, type PurchaseFormValues } from '@/components/admin/
 import { ResponsiveRowActions } from '@/components/admin/shared/responsive-row-actions';
 import { useAdminData } from '@/components/admin/admin-data-context';
 import { calculateUnitProfit, formatCurrency, formatNumber, getProductById } from '@/lib/admin/calculations';
+import { getDateKeyInBogota, getTodayDateInputValue, toOperationalDateISOString } from '@/lib/admin/date-utils';
 import { getFriendlyFirestoreWriteErrorMessage } from '@/lib/firestore-write-retry';
 import { useToast } from '@/hooks/use-toast';
 
@@ -96,7 +97,7 @@ export default function ComprasPage() {
       suppliers.find((supplier) => supplier.id === groupItems[0]?.supplierId)?.name ??
       groupItems[0]?.supplier ??
       '',
-    purchasedAt: new Date(groupItems[0]?.purchasedAt ?? new Date().toISOString()).toISOString().slice(0, 10),
+    purchasedAt: groupItems[0]?.purchasedAt ? getDateKeyInBogota(groupItems[0].purchasedAt) : getTodayDateInputValue(),
     shippingValueTotal: groupItems.reduce((sum, item) => sum + item.shippingValueTotal, 0),
     internationalVendorName: groupItems[0]?.internationalVendorName ?? '',
     productsValueUsd: groupItems[0]?.productsValueUsd ?? 0,
@@ -432,7 +433,7 @@ export default function ComprasPage() {
           try {
             const payload = {
               ...values,
-              purchasedAt: new Date(values.purchasedAt).toISOString(),
+              purchasedAt: toOperationalDateISOString(values.purchasedAt),
             };
             const createdPurchases = editingPurchaseId
               ? [await updatePurchase(editingPurchaseId, payload)]

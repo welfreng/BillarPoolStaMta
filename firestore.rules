@@ -8,7 +8,16 @@ service cloud.firestore {
     function isAdmin() {
       return signedIn() &&
         exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.role == 'admin';
+        (
+          get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.role == 'admin' ||
+          get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.role == 'superadmin'
+        );
+    }
+
+    function isSuperAdmin() {
+      return signedIn() &&
+        exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.role == 'superadmin';
     }
 
     function isSales() {
@@ -26,7 +35,7 @@ service cloud.firestore {
       allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
       allow create: if signedIn() && (request.auth.uid == userId || isAdmin());
       allow update: if signedIn() && (request.auth.uid == userId || isAdmin());
-      allow delete: if isAdmin();
+      allow delete: if isSuperAdmin();
     }
 
     match /products/{productId} {

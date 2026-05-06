@@ -30,6 +30,7 @@ import {
   getStockAlertLabel,
   getVariantOrProductRealUnitCost,
 } from '@/lib/admin/calculations';
+import { getTodayDateInputValue, toOperationalDateISOString } from '@/lib/admin/date-utils';
 import { useToast } from '@/hooks/use-toast';
 import type { StockAlert } from '@/lib/admin/types';
 
@@ -117,7 +118,7 @@ export default function InventarioPage() {
   const outOfStockVariantCount = variantInventorySummary.filter((item) => item.alert === 'out').length;
   const initialSaleValues: SaleFormValues | null = selectedProductForSale
     ? {
-        soldAt: new Date().toISOString().slice(0, 10),
+        soldAt: getTodayDateInputValue(),
         items: [
           {
             productId: selectedProductForSale.id,
@@ -761,7 +762,7 @@ export default function InventarioPage() {
           try {
             await registerSale({
               ...values,
-              soldAt: new Date(values.soldAt).toISOString(),
+              soldAt: toOperationalDateISOString(values.soldAt),
               actorRole: role ?? 'sales',
               responsibleUser:
                 profile?.nombre?.trim() || user?.displayName || user?.email || 'Usuario de ventas',

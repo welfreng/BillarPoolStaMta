@@ -38,6 +38,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { formatCurrency, formatNumber, getProductStock, getVariantOrProductRealUnitCost } from '@/lib/admin/calculations';
+import { getTodayDateInputValue } from '@/lib/admin/date-utils';
 import { matchesProductCategoryFamily } from '@/lib/admin/category-rules';
 import {
   formatSaleGiftCategoryList,
@@ -727,7 +728,7 @@ function SaleServiceSection({
 }
 
 const defaultValues: SaleFormValues = {
-  soldAt: new Date().toISOString().slice(0, 10),
+  soldAt: getTodayDateInputValue(),
   items: [createDefaultLineItem()],
   customerPhone: '',
   customerName: 'Cliente mostrador',

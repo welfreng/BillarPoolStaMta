@@ -35,6 +35,7 @@ import {
   getProductStock,
   getStockAlert,
 } from '@/lib/admin/calculations';
+import { getDateKeyInBogota, getTodayDateInputValue, toOperationalDateISOString } from '@/lib/admin/date-utils';
 import { getFriendlyFirestoreWriteErrorMessage } from '@/lib/firestore-write-retry';
 import type { InventoryMovement, Product, ServiceOrder } from '@/lib/admin/types';
 import { cn } from '@/lib/utils';
@@ -74,18 +75,6 @@ function getSellableVariants(product: Product | null | undefined) {
   return (product.variants ?? []).filter(
     (variant) => variant.status !== 'inactive' && Number(variant.stock ?? 0) > 0
   );
-}
-
-function getDateKeyInBogota(value: string | Date) {
-  const parsed = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(parsed.getTime())) return '';
-
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: DASHBOARD_TIMEZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(parsed);
 }
 
 function formatLongDateInBogota(value: Date) {
@@ -635,7 +624,7 @@ export default function DashboardPage() {
 
   const initialSaleValues: SaleFormValues | null = selectedProduct
     ? {
-        soldAt: new Date().toISOString().slice(0, 10),
+        soldAt: getTodayDateInputValue(),
         items: [
           {
             productId: selectedProduct.id,
@@ -681,12 +670,14 @@ export default function DashboardPage() {
         setOpenSaleDialog(true);
       },
     },
-    ...(role === 'admin' || role === 'sales'
+    ...(role === 'admin' || role === 'superadmin' || role === 'sales'
       ? [{ href: '/dashboard/servicios', icon: Wrench, title: 'Registrar servicio' }]
       : []),
     ...(!isSalesUser ? [{ href: '/dashboard/compras', icon: Boxes, title: 'Nueva compra' }] : []),
     ...(!isSalesUser ? [{ href: '/dashboard/inventario', icon: Package, title: 'Inventario' }] : []),
-    ...(role === 'admin' ? [{ href: '/dashboard/autorizaciones', icon: ShieldCheck, title: 'Autorizaciones' }] : []),
+    ...(role === 'admin' || role === 'superadmin'
+      ? [{ href: '/dashboard/autorizaciones', icon: ShieldCheck, title: 'Autorizaciones' }]
+      : []),
     ...(!isSalesUser ? [{ href: '/dashboard/reportes', icon: ArrowUpRight, title: 'Reportes' }] : []),
   ];
 
@@ -1188,7 +1179,7 @@ export default function DashboardPage() {
           try {
             const createdSales = await registerSale({
               ...values,
-              soldAt: new Date(values.soldAt).toISOString(),
+              soldAt: toOperationalDateISOString(values.soldAt),
               actorRole: role ?? 'admin',
               items: values.items,
               responsibleUser:

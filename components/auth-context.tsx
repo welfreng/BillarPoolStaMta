@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { onAuthStateChanged, signOut, type User } from 'firebase/auth';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import type { AppUserAccount, UserRole } from '@/lib/admin/types';
 import { toast } from '@/hooks/use-toast';
@@ -18,6 +18,30 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 const LAST_ACTIVITY_KEY = 'billarpool:last-activity';
+const OWNER_EMAILS = (process.env.NEXT_PUBLIC_OWNER_EMAILS ?? 'welfreng@gmail.com')
+  .split(',')
+  .map((value) => value.trim().toLowerCase())
+  .filter(Boolean);
+
+function isOwnerEmail(email?: string | null) {
+  return email ? OWNER_EMAILS.includes(email.trim().toLowerCase()) : false;
+}
+
+function buildFallbackProfile(currentUser: User): AppUserAccount {
+  const now = new Date().toISOString();
+  const ownerUser = isOwnerEmail(currentUser.email);
+  return {
+    id: currentUser.uid,
+    uid: currentUser.uid,
+    nombre: currentUser.displayName ?? currentUser.email?.split('@')[0] ?? 'Administrador',
+    email: currentUser.email ?? '',
+    telefono: '',
+    role: ownerUser ? 'superadmin' : 'sales',
+    status: 'active',
+    createdAt: now,
+    updatedAt: now,
+  };
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -123,42 +147,89 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         doc(db, 'usuarios', currentUser.uid),
         (snapshot) => {
           if (!snapshot.exists()) {
-            setProfile(null);
+            const recoveredProfile = buildFallbackProfile(currentUser);
+            setProfile(recoveredProfile);
             setLoading(false);
-            void performLogout('inactive-profile');
-            toast({
-              title: 'Acceso sin perfil valido',
-              description: 'Tu usuario ya no tiene un perfil activo en el sistema. Ingresa de nuevo o consulta al administrador.',
-              variant: 'destructive',
-            });
+            void setDoc(
+              doc(db, 'usuarios', currentUser.uid),
+              {
+                uid: currentUser.uid,
+                nombre: recoveredProfile.nombre,
+                email: recoveredProfile.email,
+                telefono: recoveredProfile.telefono,
+                role: recoveredProfile.role,
+                status: recoveredProfile.status,
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+              },
+              { merge: true }
+            )
+              .then(() => {
+                toast({
+                  title: 'Perfil recuperado',
+                  description: 'Tu perfil administrativo fue reconstruido para que puedas volver a entrar al panel.',
+                });
+              })
+              .catch(() => {
+                toast({
+                  title: 'Perfil temporal recuperado',
+                  description: 'Pudimos mantener la sesion, pero revisa el usuario en el panel para confirmar sus datos.',
+                  variant: 'destructive',
+                });
+              });
             return;
           }
 
           const data = snapshot.data();
-          setProfile({
+          const ownerUser = isOwnerEmail(currentUser.email);
+          const nextProfile: AppUserAccount = {
             id: currentUser.uid,
             uid: currentUser.uid,
             nombre: String(data?.nombre ?? currentUser.displayName ?? ''),
             email: String(data?.email ?? currentUser.email ?? ''),
             telefono: String(data?.telefono ?? ''),
-            role: data?.role === 'sales' ? 'sales' : 'admin',
-            status: data?.status === 'inactive' ? 'inactive' : 'active',
+            role:
+              ownerUser
+                ? 'superadmin'
+                : data?.role === 'sales'
+                  ? 'sales'
+                  : data?.role === 'superadmin'
+                    ? 'superadmin'
+                    : 'admin',
+            status: ownerUser ? 'active' : data?.status === 'inactive' ? 'inactive' : 'active',
             createdAt: typeof data?.createdAt?.toDate === 'function'
               ? data.createdAt.toDate().toISOString()
               : new Date().toISOString(),
             updatedAt: typeof data?.updatedAt?.toDate === 'function'
               ? data.updatedAt.toDate().toISOString()
               : new Date().toISOString(),
-          });
+          };
+
+          setProfile(nextProfile);
           setLoading(false);
+
+          if (ownerUser && (data?.role !== 'superadmin' || data?.status !== 'active')) {
+            void setDoc(
+              doc(db, 'usuarios', currentUser.uid),
+              {
+                uid: currentUser.uid,
+                nombre: nextProfile.nombre,
+                email: nextProfile.email,
+                telefono: nextProfile.telefono,
+                role: 'superadmin',
+                status: 'active',
+                updatedAt: serverTimestamp(),
+              },
+              { merge: true }
+            );
+          }
         },
         () => {
-          setProfile(null);
+          setProfile(buildFallbackProfile(currentUser));
           setLoading(false);
-          void performLogout('inactive-profile');
           toast({
             title: 'No se pudo validar el perfil',
-            description: 'Se cerro la sesion por seguridad. Vuelve a ingresar o revisa el usuario en el panel.',
+            description: 'Se usara un perfil de recuperacion mientras Firestore vuelve a responder. Revisa luego el usuario en el panel.',
             variant: 'destructive',
           });
         }

@@ -28,6 +28,7 @@ import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { getTodayDateInputValue } from '@/lib/admin/date-utils';
 import { cn } from '@/lib/utils';
 
 const initialStockSchema = z.object({
@@ -48,7 +49,7 @@ const defaultValues: InitialStockFormValues = {
   quantity: 1,
   estimatedUnitCost: 0,
   suggestedSalePrice: 0,
-  occurredAt: new Date().toISOString().slice(0, 10),
+  occurredAt: getTodayDateInputValue(),
   notes: 'Inventario inicial sin soporte ni proveedor confirmado.',
 };
 

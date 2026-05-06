@@ -31,8 +31,20 @@ function getSecondaryAuth() {
   return getAuth(secondaryApp);
 }
 
+function normalizeUserRole(value: unknown): AppUserAccount['role'] {
+  if (value === 'sales') return 'sales';
+  if (value === 'superadmin') return 'superadmin';
+  return 'admin';
+}
+
+function getUserRoleLabel(role: AppUserAccount['role']) {
+  if (role === 'sales') return 'Ventas';
+  if (role === 'superadmin') return 'Superadmin';
+  return 'Administrador';
+}
+
 export default function UsuariosPage() {
-  const { role } = useAuth();
+  const { role, user } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
   const [users, setUsers] = useState<AppUserAccount[]>([]);
@@ -41,13 +53,13 @@ export default function UsuariosPage() {
   const [editingUser, setEditingUser] = useState<AppUserAccount | undefined>();
 
   useEffect(() => {
-    if (role && role !== 'admin') {
+    if (role && role !== 'admin' && role !== 'superadmin') {
       router.replace('/dashboard/ventas');
     }
   }, [role, router]);
 
   useEffect(() => {
-    if (role !== 'admin') return;
+    if (role !== 'admin' && role !== 'superadmin') return;
 
     const unsubscribe = onSnapshot(
       query(collection(db, 'usuarios'), orderBy('createdAt', 'desc')),
@@ -61,7 +73,7 @@ export default function UsuariosPage() {
               nombre: String(data.nombre ?? ''),
               email: String(data.email ?? ''),
               telefono: String(data.telefono ?? ''),
-              role: data.role === 'sales' ? 'sales' : 'admin',
+              role: normalizeUserRole(data.role),
               status: data.status === 'inactive' ? 'inactive' : 'active',
               createdAt: normalizeDateValue(data.createdAt),
               updatedAt: normalizeDateValue(data.updatedAt),
@@ -89,6 +101,7 @@ export default function UsuariosPage() {
         .includes(queryText.toLowerCase())
     );
   }, [queryText, users]);
+  const isSuperadminUser = role === 'superadmin';
 
   const handleCreateUser = async (values: CreateUserFormValues) => {
     const secondaryAuth = getSecondaryAuth();
@@ -164,15 +177,40 @@ export default function UsuariosPage() {
       )
     );
 
+    if (isSuperadminUser && values.password?.trim()) {
+      const currentUser = await user?.getIdToken();
+      if (!currentUser) {
+        throw new Error('No se pudo validar la sesion actual para cambiar la contrasena.');
+      }
+
+      const response = await fetch(`/api/admin/users/${userId}/password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${currentUser}`,
+        },
+        body: JSON.stringify({
+          newPassword: values.password.trim(),
+        }),
+      });
+
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(payload?.error ?? 'No se pudo actualizar la contrasena del usuario.');
+      }
+    }
+
     toast({
       title: 'Usuario actualizado',
-      description: 'Se guardaron los datos editables del usuario.',
+      description: isSuperadminUser && values.password?.trim()
+        ? 'Se guardaron los datos y la nueva contrasena del usuario.'
+        : 'Se guardaron los datos editables del usuario.',
     });
     setOpenDialog(false);
     setEditingUser(undefined);
   };
 
-  if (role && role !== 'admin') return null;
+  if (role && role !== 'admin' && role !== 'superadmin') return null;
 
   return (
     <div className="space-y-6">
@@ -208,15 +246,15 @@ export default function UsuariosPage() {
           </p>
         </div>
         <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-[linear-gradient(180deg,rgba(2,6,23,0.92)_0%,rgba(15,23,42,0.88)_100%)] dark:shadow-[0_20px_48px_rgba(2,6,23,0.28)] sm:p-6">
-          <p className="text-sm text-slate-500 dark:text-slate-400">Usuarios de ventas</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Superadmins</p>
           <p className="mt-2 text-3xl font-semibold text-slate-950 dark:text-slate-50">
-            {users.filter((user) => user.role === 'sales').length}
+            {users.filter((user) => user.role === 'superadmin').length}
           </p>
         </div>
         <div className="rounded-[28px] border border-cyan-200 bg-[linear-gradient(180deg,rgba(236,254,255,0.98)_0%,rgba(207,250,254,0.82)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-cyan-900/70 dark:bg-[linear-gradient(180deg,rgba(8,47,73,0.52)_0%,rgba(14,116,144,0.24)_100%)] sm:p-6">
-          <p className="text-sm text-cyan-800 dark:text-cyan-200">Regla aplicada</p>
+          <p className="text-sm text-cyan-800 dark:text-cyan-200">Usuarios de ventas</p>
           <p className="mt-2 text-lg font-semibold text-cyan-950 dark:text-cyan-50">
-            Ventas solo ve dashboard y ventas
+            {users.filter((user) => user.role === 'sales').length}
           </p>
         </div>
       </div>
@@ -251,7 +289,7 @@ export default function UsuariosPage() {
               </TableHeader>
               <TableBody>
                 {filteredUsers.map((item) => {
-                  const roleLabel = item.role === 'sales' ? 'Ventas' : 'Administrador';
+                  const roleLabel = getUserRoleLabel(item.role);
                   const rowHoverSummary = [
                     item.nombre,
                     `Correo: ${item.email}`,
@@ -315,6 +353,8 @@ export default function UsuariosPage() {
           if (!nextOpen) setEditingUser(undefined);
         }}
         initialUser={editingUser}
+        canManagePasswords={isSuperadminUser}
+        canAssignSuperadmin={isSuperadminUser}
         onSubmit={async (values) => {
           if (editingUser) {
             await handleUpdateUser(editingUser.id, values as UpdateUserFormValues);

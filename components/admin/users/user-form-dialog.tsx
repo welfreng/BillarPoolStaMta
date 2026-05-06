@@ -23,7 +23,7 @@ const userBaseSchema = z.object({
   nombre: z.string().min(2, 'Ingresa el nombre'),
   email: z.string().email('Email invalido'),
   telefono: z.string().min(7, 'Ingresa un telefono valido'),
-  role: z.enum(['admin', 'sales']),
+  role: z.enum(['superadmin', 'admin', 'sales']),
   status: z.enum(['active', 'inactive']),
 });
 
@@ -38,6 +38,25 @@ const createUserSchema = userBaseSchema.extend({
 const updateUserSchema = userBaseSchema.extend({
   password: z.string().optional(),
   confirmPassword: z.string().optional(),
+}).superRefine((values, context) => {
+  const hasPassword = Boolean(values.password?.trim() || values.confirmPassword?.trim());
+  if (!hasPassword) return;
+
+  if ((values.password?.length ?? 0) < 6) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'La contrasena debe tener al menos 6 caracteres',
+      path: ['password'],
+    });
+  }
+
+  if ((values.password ?? '') !== (values.confirmPassword ?? '')) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Las contrasenas no coinciden',
+      path: ['confirmPassword'],
+    });
+  }
 });
 
 export type CreateUserFormValues = z.infer<typeof createUserSchema>;
@@ -57,11 +76,15 @@ export function UserFormDialog({
   open,
   onOpenChange,
   initialUser,
+  canManagePasswords = false,
+  canAssignSuperadmin = false,
   onSubmit,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialUser?: AppUserAccount;
+  canManagePasswords?: boolean;
+  canAssignSuperadmin?: boolean;
   onSubmit: (values: CreateUserFormValues | UpdateUserFormValues) => Promise<void> | void;
 }) {
   const dialogModeKey = initialUser?.id ?? 'new-user';
@@ -200,6 +223,40 @@ export function UserFormDialog({
               </div>
             )}
 
+            {isEditing && canManagePasswords ? (
+              <div className="grid gap-4 rounded-2xl border border-amber-200 bg-amber-50/70 p-4 md:grid-cols-2 dark:border-amber-900/40 dark:bg-amber-950/20">
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nueva contrasena</FormLabel>
+                      <FormControl>
+                        <Input type="password" {...field} value={field.value ?? ''} />
+                      </FormControl>
+                      <FormDescription>
+                        Solo un superadmin puede cambiar la contrasena de otro perfil.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="confirmPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Confirmar nueva contrasena</FormLabel>
+                      <FormControl>
+                        <Input type="password" {...field} value={field.value ?? ''} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            ) : null}
+
             <div className="grid gap-4 md:grid-cols-2">
               <FormField
                 control={form.control}
@@ -214,6 +271,7 @@ export function UserFormDialog({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
+                        {canAssignSuperadmin ? <SelectItem value="superadmin">Superadmin</SelectItem> : null}
                         <SelectItem value="admin">Administrador</SelectItem>
                         <SelectItem value="sales">Ventas</SelectItem>
                       </SelectContent>
