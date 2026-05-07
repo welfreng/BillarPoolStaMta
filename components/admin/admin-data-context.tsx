@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -1261,6 +1262,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   const [services, setServices] = useState<ServiceOrder[]>(initialServices);
   const [serviceVisits, setServiceVisits] = useState<ServiceVisit[]>([]);
   const [authorizationRequests, setAuthorizationRequests] = useState<AuthorizationRequest[]>([]);
+  const publicStockAutoSyncInFlightRef = useRef(false);
 
   const queueAdminNotification = (
     batch: ReturnType<typeof writeBatch>,
@@ -1474,6 +1476,35 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         productId,
         getPublicStockFromMovements(projectedMovements, productId),
       ])
+    );
+  };
+
+  const buildForwardPublicStockMap = (
+    sourceProducts: Product[],
+    touchedProductIds: string[],
+    addedMovements: Array<{ productId: string; quantity: number }> = []
+  ) => {
+    const uniqueProductIds = Array.from(new Set(touchedProductIds.filter(Boolean)));
+    const deltasByProductId = new Map<string, number>();
+
+    addedMovements.forEach((movement) => {
+      if (!movement.productId) return;
+      deltasByProductId.set(
+        movement.productId,
+        Number(deltasByProductId.get(movement.productId) ?? 0) + Number(movement.quantity ?? 0)
+      );
+    });
+
+    return new Map(
+      uniqueProductIds.map((productId) => {
+        const product = sourceProducts.find((item) => item.id === productId);
+        const currentPublicStock = Math.max(
+          Number(product?.publicStock ?? product?.stock ?? product?.stockOnHand ?? 0),
+          0
+        );
+        const delta = Number(deltasByProductId.get(productId) ?? 0);
+        return [productId, Math.max(currentPublicStock + delta, 0)];
+      })
     );
   };
 
@@ -2086,6 +2117,49 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     return changedCount;
   };
 
+  useEffect(() => {
+    if (loading) return;
+    if (products.length === 0) return;
+    if (publicStockAutoSyncInFlightRef.current) return;
+
+    const hasMismatch = products.some((product) => {
+      if (getProductSaleMode(product) === 'varianted') {
+        const computedVariantStock = (product.variants ?? []).reduce(
+          (total, variant) => total + Math.max(Number(variant.stock ?? 0), 0),
+          0
+        );
+        const hasVariantPublicStockMismatch = (product.variants ?? []).some(
+          (variant) =>
+            Math.max(Number(variant.publicStock ?? variant.stock ?? 0), 0) !==
+            Math.max(Number(variant.stock ?? 0), 0)
+        );
+
+        return (
+          Math.max(Number(product.publicStock ?? 0), 0) !== computedVariantStock ||
+          hasVariantPublicStockMismatch ||
+          (computedVariantStock > 0 && product.status !== 'active')
+        );
+      }
+
+      const computedMovementStock = getProductStock(movements, product.id);
+      return (
+        Math.max(Number(product.publicStock ?? 0), 0) !== computedMovementStock ||
+        (computedMovementStock > 0 && product.status !== 'active')
+      );
+    });
+
+    if (!hasMismatch) return;
+
+    publicStockAutoSyncInFlightRef.current = true;
+    void syncPublicProductStocks()
+      .catch((error) => {
+        console.error('Error reconciliando stock publico automaticamente:', error);
+      })
+      .finally(() => {
+        publicStockAutoSyncInFlightRef.current = false;
+      });
+  }, [loading, movements, products]);
+
   const createProduct = async (input: NewProductInput) => {
     const createdAt = new Date().toISOString();
     const productRef = doc(collection(db, 'products'));
@@ -2529,7 +2603,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     });
     applyPublicStockMapToBatch(
       batch,
-      buildPublicStockMap(movements, [input.productId], [
+      buildForwardPublicStockMap(products, [input.productId], [
         { productId: input.productId, quantity: normalizedQuantity },
       ])
     );
@@ -2649,7 +2723,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
 
     applyPublicStockMapToBatch(
       batch,
-      buildPublicStockMap(movements, [input.productId], [
+      buildForwardPublicStockMap(products, [input.productId], [
         { productId: input.productId, quantity },
       ])
     );
@@ -2814,8 +2888,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
 
     applyPublicStockMapToBatch(
       batch,
-      buildPublicStockMap(
-        movements,
+      buildForwardPublicStockMap(
+        products,
         [input.productId],
         stockDeltas
       )
@@ -3010,8 +3084,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
 
     applyPublicStockMapToBatch(
       batch,
-      buildPublicStockMap(
-        baseMovements,
+      buildForwardPublicStockMap(
+        baseProducts,
         stockDeltas.map((item) => item.productId),
         stockDeltas
       )
@@ -3396,8 +3470,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
 
     applyPublicStockMapToBatch(
       batch,
-      buildPublicStockMap(
-        baseMovements,
+      buildForwardPublicStockMap(
+        baseProducts,
         stockDeltas.map((item) => item.productId),
         stockDeltas
       )
@@ -3617,7 +3691,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     });
     applyPublicStockMapToBatch(
       batch,
-      buildPublicStockMap(movements, [sale.productId], [
+      buildForwardPublicStockMap(products, [sale.productId], [
         { productId: sale.productId, quantity: Math.abs(input.quantity) },
       ])
     );
@@ -3734,8 +3808,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
 
     applyPublicStockMapToBatch(
       batch,
-      buildPublicStockMap(
-        movements,
+      buildForwardPublicStockMap(
+        products,
         stockDeltas.map((item) => item.productId),
         stockDeltas
       )
@@ -3906,8 +3980,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
 
     applyPublicStockMapToBatch(
       batch,
-      buildPublicStockMap(
-        baseMovements,
+      buildForwardPublicStockMap(
+        baseProducts,
         stockDeltas.map((item) => item.productId),
         stockDeltas
       )
