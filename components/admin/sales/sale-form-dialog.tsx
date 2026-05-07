@@ -5,7 +5,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Check, ChevronsUpDown, Gift, MinusCircle, Pencil, PlusCircle } from 'lucide-react';
+import { Gift, MinusCircle, Pencil, PlusCircle } from 'lucide-react';
 import { AdminMobileSection } from '@/components/admin/admin-mobile-section';
 import { AdminResponsiveDialog } from '@/components/admin/admin-responsive-dialog';
 import { Button } from '@/components/ui/button';
@@ -21,21 +21,13 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Textarea } from '@/components/ui/textarea';
 import { formatCurrency, formatNumber, getProductStock, getVariantOrProductRealUnitCost } from '@/lib/admin/calculations';
 import { getTodayDateInputValue } from '@/lib/admin/date-utils';
@@ -76,89 +68,6 @@ const saleLineItemSchema = z.object({
   serviceItems: z.array(saleServiceItemSchema).default([]),
   giftItems: z.array(saleGiftItemSchema).default([]),
 });
-
-function SearchableSelect({
-  value,
-  onChange,
-  placeholder,
-  searchPlaceholder,
-  emptyLabel,
-  options,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  placeholder: string;
-  searchPlaceholder: string;
-  emptyLabel: string;
-  options: Array<{ value: string; label: string }>;
-}) {
-  const [open, setOpen] = useState(false);
-  const listRef = useRef<HTMLDivElement | null>(null);
-  const selectedOption = options.find((option) => option.value === value);
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          role="combobox"
-          className="w-full min-w-0 justify-between overflow-hidden px-3 font-normal"
-        >
-          <span className="truncate text-left">
-            {selectedOption ? selectedOption.label : placeholder}
-          </span>
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent
-        className="w-[min(var(--radix-popover-trigger-width),calc(100vw-2rem))] min-w-[min(280px,calc(100vw-2rem))] p-0"
-        align="start"
-        side="bottom"
-        sideOffset={8}
-        avoidCollisions={false}
-      >
-        <Command>
-          <CommandInput placeholder={searchPlaceholder} />
-          <CommandList
-            ref={listRef}
-            onWheelCapture={(event) => {
-              const element = listRef.current;
-              if (!element) return;
-              element.scrollTop += event.deltaY;
-              event.preventDefault();
-              event.stopPropagation();
-            }}
-            onWheel={(event) => {
-              const element = listRef.current;
-              if (!element) return;
-              element.scrollTop += event.deltaY;
-              event.preventDefault();
-              event.stopPropagation();
-            }}
-          >
-            <CommandEmpty className="text-slate-600 dark:text-slate-300">{emptyLabel}</CommandEmpty>
-            <CommandGroup>
-              {options.map((option) => (
-                <CommandItem
-                  key={option.value}
-                  value={`${option.label} ${option.value}`}
-                  onSelect={() => {
-                    onChange(option.value);
-                    setOpen(false);
-                  }}
-                >
-                  <Check className={cn('mr-2 h-4 w-4', value === option.value ? 'opacity-100' : 'opacity-0')} />
-                  <span className="truncate">{option.label}</span>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  );
-}
 
 const saleSchema = z
   .object({
@@ -844,6 +753,8 @@ export function SaleFormDialog({
   initialValues,
   mode = initialValues ? 'edit' : 'create',
   hideFinancialSummary = false,
+  canEditUnitPrice = true,
+  unitPriceHelpText,
   onSubmit,
 }: {
   open: boolean;
@@ -854,6 +765,8 @@ export function SaleFormDialog({
   initialValues?: SaleFormValues | null;
   mode?: 'create' | 'edit';
   hideFinancialSummary?: boolean;
+  canEditUnitPrice?: boolean;
+  unitPriceHelpText?: string;
   onSubmit: (values: SaleFormValues) => Promise<void> | void;
 }) {
   const saleFormId = useId();
@@ -878,6 +791,75 @@ export function SaleFormDialog({
   const isSubmitting = form.formState.isSubmitting;
 
   const values = form.watch();
+  const discountSummary = useMemo(() => {
+    const lines = values.items
+      .map((item, index) => {
+        const product = products.find((productItem) => productItem.id === item.productId);
+        if (!product) return null;
+        const suggestedUnitPrice = item.variantId
+          ? Number(
+              product.variants?.find((variant) => variant.id === item.variantId)?.salePrice ??
+                product.salePrice ??
+                0
+            )
+          : Number(product.salePrice ?? 0);
+        const requestedUnitPrice = Number(item.unitPrice ?? 0);
+        const unitDiscount = suggestedUnitPrice - requestedUnitPrice;
+        if (unitDiscount <= 0) return null;
+
+        return {
+          key: `${item.productId}-${item.variantId ?? index}`,
+          lineNumber: index + 1,
+          productName: product.name,
+          quantity: Number(item.quantity ?? 0),
+          suggestedUnitPrice,
+          requestedUnitPrice,
+          lineDiscount: unitDiscount * Number(item.quantity ?? 0),
+        };
+      })
+      .filter(
+        (
+          item
+        ): item is {
+          key: string;
+          lineNumber: number;
+          productName: string;
+          quantity: number;
+          suggestedUnitPrice: number;
+          requestedUnitPrice: number;
+          lineDiscount: number;
+        } => Boolean(item)
+      );
+
+    return {
+      lines,
+      totalDiscount: lines.reduce((sum, line) => sum + line.lineDiscount, 0),
+    };
+  }, [products, values.items]);
+
+  const draftDiscountPreview = useMemo(() => {
+    if (!draftLine.productId) return null;
+    const product = products.find((productItem) => productItem.id === draftLine.productId);
+    if (!product) return null;
+    const suggestedUnitPrice = draftLine.variantId
+      ? Number(
+          product.variants?.find((variant) => variant.id === draftLine.variantId)?.salePrice ??
+            product.salePrice ??
+            0
+        )
+      : Number(product.salePrice ?? 0);
+    const requestedUnitPrice = Number(draftLine.unitPrice ?? 0);
+    const quantity = Number(draftLine.quantity ?? 0);
+    const unitDiscount = suggestedUnitPrice - requestedUnitPrice;
+    if (unitDiscount <= 0 || quantity <= 0) return null;
+
+    return {
+      suggestedUnitPrice,
+      requestedUnitPrice,
+      totalDiscount: unitDiscount * quantity,
+    };
+  }, [draftLine.productId, draftLine.quantity, draftLine.unitPrice, draftLine.variantId, products]);
+
   const firstItem = values.items[0] ?? createDefaultLineItem();
   const normalizedCustomerPhone = values.customerPhone?.trim() ?? '';
 
@@ -1045,10 +1027,11 @@ export function SaleFormDialog({
         ? Number(draftSelectedVariant.salePrice ?? getVariantSalePrice(product, draftSelectedVariant.id))
         : getSaleUnitPriceForVariantSelection(product, draftLine.variantId || undefined)
     );
-    if (draftLine.unitPrice === nextPrice) return;
-
     setDraftLine((current) => {
       if (current.productId !== draftLine.productId || current.variantId !== draftLine.variantId) {
+        return current;
+      }
+      if (current.unitPrice === nextPrice) {
         return current;
       }
 
@@ -1057,7 +1040,7 @@ export function SaleFormDialog({
         unitPrice: nextPrice,
       };
     });
-  }, [draftLine.productId, draftLine.variantId, draftLine.unitPrice, draftSelectedVariant, products]);
+  }, [draftLine.productId, draftLine.variantId, draftSelectedVariant, products]);
 
   const openNewLineDialog = () => {
     setEditingLineIndex(null);
@@ -1335,6 +1318,7 @@ export function SaleFormDialog({
                               placeholder="Selecciona producto"
                               searchPlaceholder="Buscar producto..."
                               emptyLabel="No se encontraron productos."
+                              recentStorageKey="sales-products"
                               options={products.map((product) => ({
                                 value: product.id,
                                 label: `${product.name} - ${product.brand}`,
@@ -1499,13 +1483,45 @@ export function SaleFormDialog({
                           <FormItem className="min-w-0">
                             <FormLabel>Precio unidad</FormLabel>
                             <FormControl>
-                              <Input type="number" min="0" step="0.01" {...field} />
+                              <Input type="number" min="0" step="0.01" {...field} disabled={!canEditUnitPrice} />
                             </FormControl>
+                            {unitPriceHelpText ? <p className="text-xs text-muted-foreground">{unitPriceHelpText}</p> : null}
+                            {!canEditUnitPrice ? (
+                              <p className="text-xs text-muted-foreground">
+                                Solo `admin` o `superadmin` pueden modificar el precio manualmente.
+                              </p>
+                            ) : null}
                             <FormMessage />
                           </FormItem>
                         )}
                       />
                     </div>
+
+                    {discountSummary.lines.length > 0 ? (
+                      <div className="rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm dark:border-amber-900/60 dark:bg-amber-950/20">
+                        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                          <p className="font-medium text-amber-900 dark:text-amber-100">Resumen de descuento solicitado</p>
+                          <p className="font-semibold text-amber-900 dark:text-amber-100">
+                            Total descontado: {formatCurrency(discountSummary.totalDiscount)}
+                          </p>
+                        </div>
+                        <div className="mt-3 space-y-2">
+                          {discountSummary.lines.map((line) => (
+                            <div key={line.key} className="rounded-xl bg-white/70 px-3 py-2 dark:bg-slate-950/40">
+                              <p className="font-medium text-slate-900 dark:text-slate-100">
+                                Linea {line.lineNumber}: {line.productName}
+                              </p>
+                              <p className="text-xs text-slate-600 dark:text-slate-300">
+                                {formatNumber(line.quantity)} uds · normal {formatCurrency(line.suggestedUnitPrice)} · solicitado {formatCurrency(line.requestedUnitPrice)}
+                              </p>
+                              <p className="mt-1 text-xs font-medium text-amber-800 dark:text-amber-200">
+                                Descuento linea: {formatCurrency(line.lineDiscount)}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
 
                     {supportsInstallationService(firstItemProduct) ? (
                       <SaleServiceSection
@@ -1802,9 +1818,9 @@ export function SaleFormDialog({
           >
             <div className="space-y-2">
               <Label>Producto</Label>
-              <SearchableSelect
-                value={draftLine.productId}
-                onChange={(value) => {
+                <SearchableSelect
+                  value={draftLine.productId}
+                  onChange={(value) => {
                   const product = products.find((item) => item.id === value);
                   const defaultVariant = getDefaultSaleVariant(product, movements, {
                     usedVariantIds: getUsedVariantIdsForProduct(values.items, value, editingLineIndex),
@@ -1831,13 +1847,14 @@ export function SaleFormDialog({
                     }));
                   setLineError('');
                 }}
-                placeholder="Selecciona producto"
-                searchPlaceholder="Buscar producto..."
-                emptyLabel="No se encontraron productos."
-                options={products.map((product) => ({
-                  value: product.id,
-                  label: `${product.name} - ${product.brand}`,
-                }))}
+                  placeholder="Selecciona producto"
+                  searchPlaceholder="Buscar producto..."
+                  emptyLabel="No se encontraron productos."
+                  recentStorageKey="sales-products"
+                  options={products.map((product) => ({
+                    value: product.id,
+                    label: `${product.name} - ${product.brand}`,
+                  }))}
               />
             </div>
 
@@ -1946,13 +1963,34 @@ export function SaleFormDialog({
                   min="0"
                   step="0.01"
                   value={draftLine.unitPrice}
+                  disabled={!canEditUnitPrice}
                   onChange={(event) => {
                     setDraftLine((current) => ({ ...current, unitPrice: event.target.value }));
                     setLineError('');
                   }}
                 />
+                {unitPriceHelpText ? <p className="text-xs text-muted-foreground">{unitPriceHelpText}</p> : null}
+                {!canEditUnitPrice ? (
+                  <p className="text-xs text-muted-foreground">
+                    El precio manual requiere permiso de `admin` o `superadmin`.
+                  </p>
+                ) : null}
               </div>
             </div>
+
+            {draftDiscountPreview ? (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm dark:border-amber-900/60 dark:bg-amber-950/20">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="font-medium text-amber-900 dark:text-amber-100">Descuento en esta linea</p>
+                  <p className="font-semibold text-amber-900 dark:text-amber-100">
+                    Total: {formatCurrency(draftDiscountPreview.totalDiscount)}
+                  </p>
+                </div>
+                <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">
+                  Normal {formatCurrency(draftDiscountPreview.suggestedUnitPrice)} · solicitado {formatCurrency(draftDiscountPreview.requestedUnitPrice)}
+                </p>
+              </div>
+            ) : null}
 
             {supportsInstallationService(draftProduct) ? (
               <SaleServiceSection

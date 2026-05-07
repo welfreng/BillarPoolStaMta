@@ -257,6 +257,7 @@ interface CreateAuthorizationRequestInput {
   reason: string;
   requestedBy: string;
   requestedByRole: UserRole;
+  draftSalePayload?: AuthorizationRequest['draftSalePayload'];
 }
 
 interface ReviewAuthorizationRequestInput {
@@ -894,7 +895,12 @@ function mapAuthorizationRequestDocument(documentId: string, data: DocumentData)
     id: documentId,
     saleId: String(data.saleId ?? ''),
     saleBatchId: String(data.saleBatchId ?? data.saleId ?? ''),
-    requestType: data.requestType === 'sale-return' ? 'sale-return' : 'sale-edit',
+    requestType:
+      data.requestType === 'sale-return'
+        ? 'sale-return'
+        : data.requestType === 'sale-discount'
+          ? 'sale-discount'
+          : 'sale-edit',
     status:
       data.status === 'approved' ||
       data.status === 'rejected' ||
@@ -913,6 +919,56 @@ function mapAuthorizationRequestDocument(documentId: string, data: DocumentData)
           : 'admin',
     reviewedBy: String(data.reviewedBy ?? ''),
     reviewNote: String(data.reviewNote ?? ''),
+    draftSalePayload: data.draftSalePayload
+      ? {
+          soldAt: String(data.draftSalePayload.soldAt ?? ''),
+          items: Array.isArray(data.draftSalePayload.items)
+            ? data.draftSalePayload.items.map((item: DocumentData) => ({
+                productId: String(item?.productId ?? ''),
+                variantId: item?.variantId ? String(item.variantId) : undefined,
+                variantName: item?.variantName ? String(item.variantName) : undefined,
+                quantity: Number(item?.quantity ?? 0),
+                unitPrice: Number(item?.unitPrice ?? 0),
+                serviceItems: Array.isArray(item?.serviceItems)
+                  ? item.serviceItems.map((serviceItem: DocumentData) => ({
+                      serviceType:
+                        serviceItem?.serviceType === 'tip-ferrule-installation' ||
+                        serviceItem?.serviceType === 'extension-installation'
+                          ? serviceItem.serviceType
+                          : 'tip-installation',
+                      serviceCategory: String(serviceItem?.serviceCategory ?? 'torno'),
+                      price: Number(serviceItem?.price ?? 0),
+                      cost: Number(serviceItem?.cost ?? 0),
+                      cueReference: String(serviceItem?.cueReference ?? ''),
+                      notes: String(serviceItem?.notes ?? ''),
+                    }))
+                  : [],
+                giftItems: Array.isArray(item?.giftItems)
+                  ? item.giftItems.map((giftItem: DocumentData) => ({
+                      productId: String(giftItem?.productId ?? ''),
+                      quantity: Number(giftItem?.quantity ?? 0),
+                    }))
+                  : [],
+              }))
+            : [],
+          customerName: String(data.draftSalePayload.customerName ?? ''),
+          customerPhone: String(data.draftSalePayload.customerPhone ?? ''),
+          paymentMethod: data.draftSalePayload.paymentMethod
+            ? String(data.draftSalePayload.paymentMethod)
+            : undefined,
+          paymentReference: data.draftSalePayload.paymentReference
+            ? String(data.draftSalePayload.paymentReference)
+            : undefined,
+          notes: String(data.draftSalePayload.notes ?? ''),
+          responsibleUser: String(data.draftSalePayload.responsibleUser ?? 'Usuario de ventas'),
+          actorRole:
+            data.draftSalePayload.actorRole === 'superadmin'
+              ? 'superadmin'
+              : data.draftSalePayload.actorRole === 'admin'
+                ? 'admin'
+                : 'sales',
+        }
+      : undefined,
     createdAt: normalizeDateValue(data.createdAt),
     updatedAt: normalizeDateValue(data.updatedAt),
     reviewedAt: data.reviewedAt ? normalizeDateValue(data.reviewedAt) : undefined,
@@ -1430,6 +1486,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         doc(db, 'products', productId),
         {
           publicStock,
+          ...(publicStock > 0 ? { status: 'active' } : {}),
           updatedAt: serverTimestamp(),
         },
         { merge: true }
@@ -1475,6 +1532,9 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
             (total, variant) => total + Math.max(Number(variant.stock ?? 0), 0),
             0
           ),
+          ...(productVariantPayload.some((variant) => Math.max(Number(variant.stock ?? 0), 0) > 0)
+            ? { status: 'active' }
+            : {}),
           updatedAt: serverTimestamp(),
         },
         { merge: true }
@@ -4154,6 +4214,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       requestedByRole: input.requestedByRole,
       reviewedBy: '',
       reviewNote: '',
+      draftSalePayload: input.draftSalePayload,
       createdAt,
       updatedAt: createdAt,
     };
@@ -4161,6 +4222,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     const batch = writeBatch(db);
     batch.set(requestRef, {
       ...request,
+      draftSalePayload: request.draftSalePayload ?? null,
       createdAt: Timestamp.fromDate(new Date(createdAt)),
       updatedAt: Timestamp.fromDate(new Date(createdAt)),
     });
@@ -4169,6 +4231,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       title:
         input.requestType === 'sale-return'
           ? 'Solicitud de devolucion'
+          : input.requestType === 'sale-discount'
+            ? 'Solicitud de descuento'
           : 'Solicitud de edicion de venta',
       message: `${input.requestedBy} solicito autorizacion para ${input.customerName || 'cliente'}.`,
       href: '/dashboard/autorizaciones',

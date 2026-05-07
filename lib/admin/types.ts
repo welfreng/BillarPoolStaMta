@@ -230,7 +230,32 @@ export interface Sale {
   responsibleUser: string;
 }
 
-export type AuthorizationRequestType = 'sale-edit' | 'sale-return';
+export type AuthorizationDraftSaleLine = {
+  productId: string;
+  variantId?: string;
+  variantName?: string;
+  quantity: number;
+  unitPrice: number;
+  serviceItems?: SaleServiceItem[];
+  giftItems?: Array<{
+    productId: string;
+    quantity: number;
+  }>;
+};
+
+export interface AuthorizationDraftSalePayload {
+  soldAt: string;
+  items: AuthorizationDraftSaleLine[];
+  customerName: string;
+  customerPhone: string;
+  paymentMethod?: string;
+  paymentReference?: string;
+  notes: string;
+  responsibleUser: string;
+  actorRole?: UserRole;
+}
+
+export type AuthorizationRequestType = 'sale-edit' | 'sale-return' | 'sale-discount';
 export type AuthorizationRequestStatus = 'pending' | 'approved' | 'rejected' | 'completed';
 
 export interface AuthorizationRequest {
@@ -246,6 +271,7 @@ export interface AuthorizationRequest {
   requestedByRole: UserRole;
   reviewedBy: string;
   reviewNote: string;
+  draftSalePayload?: AuthorizationDraftSalePayload;
   createdAt: string;
   updatedAt: string;
   reviewedAt?: string;
