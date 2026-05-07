@@ -154,8 +154,17 @@ export default function UsuariosPage() {
   };
 
   const handleUpdateUser = async (userId: string, values: UpdateUserFormValues) => {
+    const previousUser = users.find((item) => item.id === userId);
+    if (!previousUser) {
+      throw new Error('No se encontro el usuario a actualizar.');
+    }
+
+    const normalizedEmail = values.email.trim().toLowerCase();
+    const emailChanged = normalizedEmail !== previousUser.email.trim().toLowerCase();
+
     await updateDoc(doc(db, 'usuarios', userId), {
       nombre: values.nombre,
+      email: values.email,
       telefono: values.telefono,
       role: values.role,
       status: values.status,
@@ -168,6 +177,7 @@ export default function UsuariosPage() {
           ? {
               ...item,
               nombre: values.nombre,
+              email: values.email,
               telefono: values.telefono,
               role: values.role,
               status: values.status,
@@ -176,6 +186,29 @@ export default function UsuariosPage() {
           : item
       )
     );
+
+    if (isSuperadminUser && emailChanged) {
+      const currentUser = await user?.getIdToken();
+      if (!currentUser) {
+        throw new Error('No se pudo validar la sesion actual para cambiar el correo.');
+      }
+
+      const response = await fetch(`/api/admin/users/${userId}/email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${currentUser}`,
+        },
+        body: JSON.stringify({
+          newEmail: values.email.trim(),
+        }),
+      });
+
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(payload?.error ?? 'No se pudo actualizar el correo del usuario.');
+      }
+    }
 
     if (isSuperadminUser && values.password?.trim()) {
       const currentUser = await user?.getIdToken();
@@ -202,9 +235,10 @@ export default function UsuariosPage() {
 
     toast({
       title: 'Usuario actualizado',
-      description: isSuperadminUser && values.password?.trim()
-        ? 'Se guardaron los datos y la nueva contrasena del usuario.'
-        : 'Se guardaron los datos editables del usuario.',
+      description:
+        isSuperadminUser && (values.password?.trim() || emailChanged)
+          ? `Se guardaron los datos${emailChanged ? ', el nuevo correo' : ''}${values.password?.trim() ? `${emailChanged ? ' y' : ','} la nueva contrasena` : ''} del usuario.`
+          : 'Se guardaron los datos editables del usuario.',
     });
     setOpenDialog(false);
     setEditingUser(undefined);
@@ -354,6 +388,7 @@ export default function UsuariosPage() {
         }}
         initialUser={editingUser}
         canManagePasswords={isSuperadminUser}
+        canManageEmails={isSuperadminUser}
         canAssignSuperadmin={isSuperadminUser}
         onSubmit={async (values) => {
           if (editingUser) {
