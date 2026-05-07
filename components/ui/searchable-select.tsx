@@ -161,15 +161,16 @@ export function SearchableSelect({
   };
 
   const commandContent = (
-    <Command>
-      <div className="border-b">
-        <CommandInput
-          ref={inputRef}
-          placeholder={searchPlaceholder}
-          value={query}
-          onValueChange={setQuery}
-        />
-        <div className="flex items-center justify-between gap-2 px-3 py-2 text-xs text-muted-foreground">
+    <Command className="h-full w-full min-w-0">
+        <div className="w-full min-w-0 border-b">
+          <CommandInput
+            ref={inputRef}
+            className={cn('min-w-0', isMobile ? 'text-[14px]' : '')}
+            placeholder={searchPlaceholder}
+            value={query}
+            onValueChange={setQuery}
+          />
+        <div className="flex w-full min-w-0 items-center justify-between gap-2 px-3 py-2 text-xs text-muted-foreground">
           <span>
             {filteredOptions.length === options.length
               ? `${options.length} opcion(es)`
@@ -191,7 +192,7 @@ export function SearchableSelect({
       </div>
       <CommandList
         className={cn(
-          'max-h-[min(60vh,24rem)] overscroll-contain touch-pan-y',
+          'w-full min-w-0 max-h-[min(60vh,24rem)] overscroll-contain touch-pan-y',
           isMobile ? 'max-h-[calc(100dvh-10rem)]' : 'max-h-[min(15rem,42vh)]'
         )}
         ref={listRef}
@@ -218,31 +219,47 @@ export function SearchableSelect({
         </CommandEmpty>
         {frequentOptions.length > 0 && !normalizedQuery ? (
           <CommandGroup heading="Frecuentes">
-            {frequentOptions.map((option) => (
-              <CommandItem
-                key={`recent-${option.value}`}
-                value={`${option.label} ${option.value}`}
-                onSelect={() => {
-                  handleSelect(option.value);
-                }}
+          {frequentOptions.map((option) => (
+            <CommandItem
+              key={`recent-${option.value}`}
+              value={`${option.label} ${option.value}`}
+              className={cn(isMobile ? 'items-start py-2.5' : '')}
+              onSelect={() => {
+                handleSelect(option.value);
+              }}
+            >
+              <Check className={cn('mr-2 h-4 w-4', value === option.value ? 'opacity-100' : 'opacity-0')} />
+              <span
+                className={cn(
+                  'min-w-0 flex-1',
+                  isMobile ? 'line-clamp-2 text-[13px] leading-4 whitespace-normal break-words' : 'truncate'
+                )}
               >
-                <Check className={cn('mr-2 h-4 w-4', value === option.value ? 'opacity-100' : 'opacity-0')} />
-                <span className="truncate">{option.label}</span>
-              </CommandItem>
-            ))}
-          </CommandGroup>
+                {option.label}
+              </span>
+            </CommandItem>
+          ))}
+        </CommandGroup>
         ) : null}
         <CommandGroup>
           {filteredOptions.map((option) => (
             <CommandItem
               key={option.value}
               value={`${option.label} ${option.value}`}
+              className={cn(isMobile ? 'items-start py-2.5' : '')}
               onSelect={() => {
                 handleSelect(option.value);
               }}
             >
               <Check className={cn('mr-2 h-4 w-4', value === option.value ? 'opacity-100' : 'opacity-0')} />
-              <span className="truncate">{option.label}</span>
+              <span
+                className={cn(
+                  'min-w-0 flex-1',
+                  isMobile ? 'line-clamp-2 text-[13px] leading-4 whitespace-normal break-words' : 'truncate'
+                )}
+              >
+                {option.label}
+              </span>
             </CommandItem>
           ))}
         </CommandGroup>
@@ -267,11 +284,26 @@ export function SearchableSelect({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogContent className="flex h-[100dvh] max-w-full translate-x-0 translate-y-0 rounded-none border-0 p-0 sm:max-w-full [&>button]:top-3 [&>button]:right-3" style={{ top: 0, left: 0 }}>
-            <DialogHeader className="border-b px-4 py-3 text-left">
-              <DialogTitle className="text-base">{placeholder}</DialogTitle>
+          <DialogContent
+            showCloseButton={false}
+            className="inset-0 left-0 top-0 !flex h-[100dvh] !h-[100dvh] w-screen !w-screen max-w-none !max-w-none translate-x-0 !translate-x-0 translate-y-0 !translate-y-0 flex-col items-stretch rounded-none !rounded-none border-0 p-0"
+          >
+            <DialogHeader className="w-full min-w-0 border-b px-4 py-3 text-left">
+              <div className="flex items-center justify-between gap-3">
+                <DialogTitle className="min-w-0 flex-1 truncate text-[15px] font-semibold">{placeholder}</DialogTitle>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 shrink-0 rounded-xl"
+                  onClick={() => setOpen(false)}
+                >
+                  <X className="h-4 w-4" />
+                  <span className="sr-only">Cerrar</span>
+                </Button>
+              </div>
             </DialogHeader>
-            <div className="flex-1 overflow-hidden p-0">
+            <div className="min-h-0 w-full min-w-0 flex-1 overflow-hidden p-0">
               {commandContent}
             </div>
           </DialogContent>
