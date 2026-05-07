@@ -1486,6 +1486,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         doc(db, 'products', productId),
         {
           publicStock,
+          ...(publicStock > 0 ? { status: 'active' } : {}),
           updatedAt: serverTimestamp(),
         },
         { merge: true }
@@ -1531,6 +1532,9 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
             (total, variant) => total + Math.max(Number(variant.stock ?? 0), 0),
             0
           ),
+          ...(productVariantPayload.some((variant) => Math.max(Number(variant.stock ?? 0), 0) > 0)
+            ? { status: 'active' }
+            : {}),
           updatedAt: serverTimestamp(),
         },
         { merge: true }
