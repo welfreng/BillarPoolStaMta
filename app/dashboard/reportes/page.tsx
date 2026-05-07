@@ -2,14 +2,23 @@
 
 import { useMemo, useState } from 'react';
 import { CalendarDays, FileText, ShoppingBag, TrendingUp, Wallet, Wrench } from 'lucide-react';
+import { Bar, BarChart, CartesianGrid, Line, LineChart, XAxis } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
+import {
+  ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from '@/components/ui/chart';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { SectionHeader } from '@/components/admin/shared/section-header';
 import { useAdminData } from '@/components/admin/admin-data-context';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { formatCurrency, formatNumber, getProductById } from '@/lib/admin/calculations';
+import { formatCurrency, formatNumber, getOperationalProductStock, getProductById } from '@/lib/admin/calculations';
 import { serviceTypeLabels } from '@/lib/admin/catalogs';
 import {
   buildSalesReportDataset,
@@ -18,9 +27,29 @@ import {
 import { useToast } from '@/hooks/use-toast';
 
 const currentMonth = new Date().toISOString().slice(0, 7);
+const LOW_STOCK_ALERT_THRESHOLD = 5;
+const reportChartConfig = {
+  revenue: { label: 'Ventas', color: '#0891b2' },
+  profit: { label: 'Utilidad', color: '#059669' },
+  quantity: { label: 'Unidades', color: '#f59e0b' },
+} satisfies ChartConfig;
+
+function shiftMonthValue(monthValue: string, offset: number) {
+  const [year, month] = monthValue.split('-').map(Number);
+  const shifted = new Date(Date.UTC(year, (month || 1) - 1 + offset, 1));
+  return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+function formatMonthAxisLabel(monthValue: string) {
+  const [year, month] = monthValue.split('-').map(Number);
+  return new Intl.DateTimeFormat('es-CO', {
+    month: 'short',
+    timeZone: 'America/Bogota',
+  }).format(new Date(Date.UTC(year, (month || 1) - 1, 1)));
+}
 
 export default function ReportesPage() {
-  const { products, sales, services } = useAdminData();
+  const { products, sales, services, movements } = useAdminData();
   const { toast } = useToast();
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
   const [calendarOpen, setCalendarOpen] = useState(false);
@@ -115,6 +144,160 @@ export default function ReportesPage() {
       .sort((a, b) => b.quantity - a.quantity)
       .slice(0, 8);
   }, [dataset.detailRows, products]);
+
+  const monthlyTrend = useMemo(() => {
+    const monthValues = Array.from({ length: 6 }, (_, index) => shiftMonthValue(selectedMonth, index - 5));
+    return monthValues.map((monthValue) => {
+      const monthRows = buildSalesReportDataset({
+        products,
+        sales,
+        services,
+        selectedMonth: monthValue,
+      });
+      const revenue = monthRows.summaryRows.reduce((sum, row) => sum + row.totalRevenue, 0);
+      const cost = monthRows.summaryRows.reduce((sum, row) => sum + row.totalCost, 0);
+      const profit = monthRows.summaryRows.reduce((sum, row) => sum + row.totalProfit, 0);
+      const quantity = monthRows.summaryRows.reduce((sum, row) => sum + row.totalQuantity, 0);
+
+      return {
+        monthValue,
+        label: formatMonthAxisLabel(monthValue),
+        revenue,
+        cost,
+        profit,
+        quantity,
+      };
+    });
+  }, [products, sales, selectedMonth, services]);
+
+  const topProductsChartData = useMemo(
+    () =>
+      topProducts.map((product) => ({
+        name: product.name.length > 22 ? `${product.name.slice(0, 22)}…` : product.name,
+        fullName: product.name,
+        quantity: product.quantity,
+        revenue: product.revenue,
+      })),
+    [topProducts]
+  );
+
+  const topBrands = useMemo(() => {
+    const totals = new Map<string, { quantity: number; revenue: number; profit: number }>();
+
+    dataset.detailRows
+      .filter((row) => row.itemType === 'product')
+      .forEach((row) => {
+        const brand = getProductById(products, row.reference)?.brand?.trim() || 'Sin marca';
+        const current = totals.get(brand) ?? { quantity: 0, revenue: 0, profit: 0 };
+        current.quantity += row.quantity;
+        current.revenue += row.subtotal;
+        current.profit += row.utility;
+        totals.set(brand, current);
+      });
+
+    return Array.from(totals.entries())
+      .map(([brand, totalsByBrand]) => ({
+        brand,
+        quantity: totalsByBrand.quantity,
+        revenue: totalsByBrand.revenue,
+        profit: totalsByBrand.profit,
+      }))
+      .sort((a, b) => b.quantity - a.quantity || b.revenue - a.revenue)
+      .slice(0, 8);
+  }, [dataset.detailRows, products]);
+
+  const topCategories = useMemo(() => {
+    const totals = new Map<string, { quantity: number; revenue: number; profit: number }>();
+
+    dataset.detailRows
+      .filter((row) => row.itemType === 'product')
+      .forEach((row) => {
+        const category = row.category?.trim() || 'Sin categoria';
+        const current = totals.get(category) ?? { quantity: 0, revenue: 0, profit: 0 };
+        current.quantity += row.quantity;
+        current.revenue += row.subtotal;
+        current.profit += row.utility;
+        totals.set(category, current);
+      });
+
+    return Array.from(totals.entries())
+      .map(([category, totalsByCategory]) => ({
+        category,
+        quantity: totalsByCategory.quantity,
+        revenue: totalsByCategory.revenue,
+        profit: totalsByCategory.profit,
+      }))
+      .sort((a, b) => b.quantity - a.quantity || b.revenue - a.revenue)
+      .slice(0, 8);
+  }, [dataset.detailRows]);
+
+  const purchaseAlerts = useMemo(() => {
+    return topProducts
+      .map((product) => {
+        const productRecord = getProductById(products, product.productId);
+        const currentStock = productRecord ? getOperationalProductStock(productRecord, movements) : 0;
+        const monthlyDemand = Math.max(product.quantity, 0);
+        const coverageRatio = monthlyDemand > 0 ? currentStock / monthlyDemand : currentStock;
+
+        return {
+          productId: product.productId,
+          name: product.name,
+          monthlyDemand,
+          currentStock,
+          revenue: product.revenue,
+          brand: productRecord?.brand?.trim() || 'Sin marca',
+          category: productRecord?.category?.trim() || 'Sin categoria',
+          priority:
+            currentStock <= 0
+              ? 'critical'
+              : currentStock <= LOW_STOCK_ALERT_THRESHOLD || coverageRatio < 0.5
+                ? 'high'
+                : coverageRatio <= 1
+                  ? 'medium'
+                  : 'ok',
+          coverageLabel:
+            currentStock <= 0
+              ? 'Sin cobertura'
+              : coverageRatio < 0.5
+                ? 'Menos de medio mes'
+                : coverageRatio <= 1
+                  ? 'Menos de un mes'
+                  : `${coverageRatio.toFixed(1)} meses aprox.`,
+        };
+      })
+      .filter((item) => item.priority !== 'ok')
+      .sort((left, right) => {
+        const priorityWeight = { critical: 0, high: 1, medium: 2 } as const;
+        return (
+          priorityWeight[left.priority as keyof typeof priorityWeight] -
+            priorityWeight[right.priority as keyof typeof priorityWeight] ||
+          right.monthlyDemand - left.monthlyDemand
+        );
+      })
+      .slice(0, 8);
+  }, [movements, products, topProducts]);
+
+  const brandRestockAlerts = useMemo(() => {
+    const brandDemandMap = new Map<string, { units: number; riskyUnits: number; references: number }>();
+
+    purchaseAlerts.forEach((alert) => {
+      const current = brandDemandMap.get(alert.brand) ?? { units: 0, riskyUnits: 0, references: 0 };
+      current.units += alert.monthlyDemand;
+      current.riskyUnits += alert.currentStock;
+      current.references += 1;
+      brandDemandMap.set(alert.brand, current);
+    });
+
+    return Array.from(brandDemandMap.entries())
+      .map(([brand, totals]) => ({
+        brand,
+        units: totals.units,
+        riskyUnits: totals.riskyUnits,
+        references: totals.references,
+      }))
+      .sort((a, b) => b.units - a.units)
+      .slice(0, 5);
+  }, [purchaseAlerts]);
 
   const topServiceMaterials = useMemo(() => {
     const totals = new Map<string, { quantity: number; cost: number }>();
@@ -373,6 +556,87 @@ export default function ReportesPage() {
         </div>
       </div>
 
+      <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+        <div className="rounded-[28px] border border-border bg-card/88 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-slate-950/72 sm:p-6">
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Tendencia mensual</p>
+              <p className="text-sm text-muted-foreground">Comparativo de ventas y utilidad de los ultimos 6 meses.</p>
+            </div>
+            <p className="text-sm text-muted-foreground">Corte en {monthLabel}</p>
+          </div>
+          <ChartContainer config={reportChartConfig} className="h-[320px] w-full">
+            <LineChart data={monthlyTrend} margin={{ left: 12, right: 12, top: 8 }}>
+              <CartesianGrid vertical={false} />
+              <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={10} />
+              <ChartTooltip
+                content={
+                  <ChartTooltipContent
+                    formatter={(value, name) => {
+                      const numericValue = Number(value ?? 0);
+                      const label = name === 'profit' ? 'Utilidad' : 'Ventas';
+                      return (
+                        <div className="flex min-w-[160px] items-center justify-between gap-3">
+                          <span>{label}</span>
+                          <span className="font-medium text-foreground">{formatCurrency(numericValue)}</span>
+                        </div>
+                      );
+                    }}
+                    labelFormatter={(_, payload) => payload?.[0]?.payload?.monthValue ?? ''}
+                  />
+                }
+              />
+              <ChartLegend content={<ChartLegendContent />} />
+              <Line type="monotone" dataKey="revenue" stroke="var(--color-revenue)" strokeWidth={3} dot={false} />
+              <Line type="monotone" dataKey="profit" stroke="var(--color-profit)" strokeWidth={3} dot={false} />
+            </LineChart>
+          </ChartContainer>
+        </div>
+
+        <div className="rounded-[28px] border border-border bg-card/88 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-slate-950/72 sm:p-6">
+          <div className="mb-4">
+            <p className="text-sm font-semibold text-foreground">Top productos del mes</p>
+            <p className="text-sm text-muted-foreground">Grafica rapida de lo mas vendido por unidades.</p>
+          </div>
+          {topProductsChartData.length > 0 ? (
+            <ChartContainer config={reportChartConfig} className="h-[320px] w-full">
+              <BarChart data={topProductsChartData} layout="vertical" margin={{ left: 8, right: 8, top: 8, bottom: 8 }}>
+                <CartesianGrid horizontal={false} />
+                <XAxis type="number" hide />
+                <ChartTooltip
+                  cursor={false}
+                  content={
+                    <ChartTooltipContent
+                      hideLabel
+                      formatter={(value, name, item) => {
+                        const numericValue = Number(value ?? 0);
+                        const payload = item?.payload as { fullName?: string } | undefined;
+                        return (
+                          <div className="grid gap-1">
+                            <span className="font-medium text-foreground">{payload?.fullName ?? 'Producto'}</span>
+                            <div className="flex min-w-[150px] items-center justify-between gap-3">
+                              <span>{name === 'quantity' ? 'Unidades' : 'Ventas'}</span>
+                              <span className="font-medium text-foreground">
+                                {name === 'quantity' ? formatNumber(numericValue) : formatCurrency(numericValue)}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      }}
+                    />
+                  }
+                />
+                <Bar dataKey="quantity" fill="var(--color-quantity)" radius={10} />
+              </BarChart>
+            </ChartContainer>
+          ) : (
+            <p className="rounded-2xl border border-border bg-muted/70 px-4 py-3 text-sm text-muted-foreground dark:border-slate-800 dark:bg-slate-900/60">
+              Aun no hay productos vendidos en este periodo para graficar.
+            </p>
+          )}
+        </div>
+      </div>
+
       <div className="rounded-[28px] border border-border bg-card/88 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-slate-950/72 sm:p-6">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
@@ -529,6 +793,31 @@ export default function ReportesPage() {
 
         <div className="space-y-6">
           <div className="rounded-[28px] border border-border bg-card/88 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-slate-950/72 sm:p-6">
+            <p className="text-sm font-semibold text-foreground">Marcas que mas venden</p>
+            <p className="mt-1 text-sm text-muted-foreground">Te ayuda a decidir que marca reponer, empujar o negociar mejor.</p>
+            <div className="mt-4 space-y-3">
+              {topBrands.length > 0 ? (
+                topBrands.map((brand) => (
+                  <div
+                    key={brand.brand}
+                    className="rounded-2xl border border-border bg-muted/70 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/60"
+                  >
+                    <p className="font-medium text-foreground">{brand.brand}</p>
+                    <p className="text-sm text-muted-foreground">{formatNumber(brand.quantity)} unidades</p>
+                    <p className="text-sm text-muted-foreground">
+                      {formatCurrency(brand.revenue)} venta · {formatCurrency(brand.profit)} utilidad
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <p className="rounded-2xl border border-border bg-muted/70 px-4 py-3 text-sm text-muted-foreground dark:border-slate-800 dark:bg-slate-900/60">
+                  Aun no hay marcas con ventas en este periodo.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-[28px] border border-border bg-card/88 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-slate-950/72 sm:p-6">
             <div className="flex items-center gap-3">
               <div className="rounded-2xl bg-cyan-100 p-2 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-200">
                 <Wrench className="h-5 w-5" />
@@ -545,7 +834,7 @@ export default function ReportesPage() {
                     key={service.id}
                     className="rounded-2xl border border-border bg-muted/70 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/60"
                   >
-                    <p className="font-medium text-foreground">{serviceTypeLabels[service.serviceType]}</p>
+                    <p className="font-medium text-foreground">{service.serviceLabel?.trim() || serviceTypeLabels[service.serviceType]}</p>
                     <p className="text-sm text-muted-foreground">{service.customerName} · {service.cueReference || 'Sin referencia'}</p>
                     <p className="text-sm text-muted-foreground">
                       {formatCurrency(service.totalRevenue)} ingreso · {formatCurrency(service.grossProfit)} utilidad
@@ -564,6 +853,114 @@ export default function ReportesPage() {
                 </Empty>
               )}
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-[28px] border border-border bg-card/88 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-slate-950/72 sm:p-6">
+        <p className="text-sm font-semibold text-foreground">Categorias que mas rotan</p>
+        <p className="mt-1 text-sm text-muted-foreground">Sirve para entender que familia de producto sostiene mas movimiento en el mes.</p>
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {topCategories.length > 0 ? (
+            topCategories.map((category) => (
+              <div
+                key={category.category}
+                className="rounded-2xl border border-border bg-muted/70 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/60"
+              >
+                <p className="font-medium text-foreground">{category.category}</p>
+                <p className="text-sm text-muted-foreground">{formatNumber(category.quantity)} unidades</p>
+                <p className="text-sm text-muted-foreground">{formatCurrency(category.revenue)} venta</p>
+                <p className="text-sm text-emerald-700">{formatCurrency(category.profit)} utilidad</p>
+              </div>
+            ))
+          ) : (
+            <p className="rounded-2xl border border-border bg-muted/70 px-4 py-3 text-sm text-muted-foreground dark:border-slate-800 dark:bg-slate-900/60 md:col-span-2 xl:col-span-4">
+              Aun no hay categorias con ventas en este periodo.
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+        <div className="rounded-[28px] border border-border bg-card/88 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-slate-950/72 sm:p-6">
+          <p className="text-sm font-semibold text-foreground">Alertas de compra</p>
+          <p className="mt-1 text-sm text-muted-foreground">Cruza lo mas vendido del mes contra el stock actual para priorizar reposicion.</p>
+          <div className="mt-4 space-y-3">
+            {purchaseAlerts.length > 0 ? (
+              purchaseAlerts.map((alert) => (
+                <div
+                  key={alert.productId}
+                  className="rounded-2xl border border-border bg-muted/70 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/60"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-medium text-foreground">{alert.name}</p>
+                      <p className="text-sm text-muted-foreground">{alert.brand} · {alert.category}</p>
+                    </div>
+                    <span
+                      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
+                        alert.priority === 'critical'
+                          ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-200'
+                          : alert.priority === 'high'
+                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200'
+                            : 'bg-cyan-100 text-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-200'
+                      }`}
+                    >
+                      {alert.priority === 'critical'
+                        ? 'Urgente'
+                        : alert.priority === 'high'
+                          ? 'Alta'
+                          : 'Media'}
+                    </span>
+                  </div>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                    <div className="rounded-xl border border-border bg-background/88 px-3 py-2 dark:border-slate-800 dark:bg-slate-950/60">
+                      <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Vendio mes</p>
+                      <p className="mt-1 font-semibold text-foreground">{formatNumber(alert.monthlyDemand)} uds</p>
+                    </div>
+                    <div className="rounded-xl border border-border bg-background/88 px-3 py-2 dark:border-slate-800 dark:bg-slate-950/60">
+                      <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Stock actual</p>
+                      <p className="mt-1 font-semibold text-foreground">{formatNumber(alert.currentStock)} uds</p>
+                    </div>
+                    <div className="rounded-xl border border-border bg-background/88 px-3 py-2 dark:border-slate-800 dark:bg-slate-950/60">
+                      <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Cobertura</p>
+                      <p className="mt-1 font-semibold text-foreground">{alert.coverageLabel}</p>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p className="rounded-2xl border border-border bg-muted/70 px-4 py-3 text-sm text-muted-foreground dark:border-slate-800 dark:bg-slate-900/60">
+                No hay alertas de compra para este periodo. El stock actual cubre lo mas vendido del mes.
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-[28px] border border-border bg-card/88 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-slate-950/72 sm:p-6">
+          <p className="text-sm font-semibold text-foreground">Marcas con riesgo de reposicion</p>
+          <p className="mt-1 text-sm text-muted-foreground">Te ayuda a negociar compras donde mas se te puede frenar la venta.</p>
+          <div className="mt-4 space-y-3">
+            {brandRestockAlerts.length > 0 ? (
+              brandRestockAlerts.map((brand) => (
+                <div
+                  key={brand.brand}
+                  className="rounded-2xl border border-border bg-muted/70 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/60"
+                >
+                  <p className="font-medium text-foreground">{brand.brand}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {formatNumber(brand.references)} referencia(s) comprometidas
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {formatNumber(brand.units)} uds vendidas en alertas · {formatNumber(brand.riskyUnits)} uds disponibles
+                  </p>
+                </div>
+              ))
+            ) : (
+              <p className="rounded-2xl border border-border bg-muted/70 px-4 py-3 text-sm text-muted-foreground dark:border-slate-800 dark:bg-slate-900/60">
+                Aun no hay marcas comprometidas para reponer en este periodo.
+              </p>
+            )}
           </div>
         </div>
       </div>
