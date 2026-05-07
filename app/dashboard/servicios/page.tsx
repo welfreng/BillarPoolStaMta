@@ -1,9 +1,10 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Plus, Search, Wrench } from 'lucide-react';
+import { Pencil, Plus, Search, Wrench } from 'lucide-react';
 import { SectionHeader } from '@/components/admin/shared/section-header';
 import { ServiceFormDialog, type ServiceFormValues } from '@/components/admin/services/service-form-dialog';
+import { filterProductsByCategoryFamily } from '@/lib/admin/category-rules';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,20 +18,60 @@ import { serviceTypeLabels } from '@/lib/admin/catalogs';
 const currentMonth = new Date().toISOString().slice(0, 7);
 
 export default function ServiciosPage() {
-  const { services, products, purchases, movements, registerService } = useAdminData();
+  const { services, products, purchases, movements, registerService, updateService } = useAdminData();
   const { profile, role, user } = useAuth();
   const { toast } = useToast();
   const [openDialog, setOpenDialog] = useState(false);
+  const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const isSalesUser = role === 'sales';
+  const canEditServices = role === 'admin' || role === 'superadmin';
+  const getServiceDisplayLabel = (service: (typeof services)[number]) =>
+    service.serviceLabel?.trim() || serviceTypeLabels[service.serviceType];
+  const editableService = services.find((service) => service.id === editingServiceId) ?? null;
+  const tipProductIds = new Set(filterProductsByCategoryFamily(products, 'casquillos').map((product) => product.id));
+  const ferruleProductIds = new Set(filterProductsByCategoryFamily(products, 'virolas').map((product) => product.id));
+  const suppressorProductIds = new Set(filterProductsByCategoryFamily(products, 'supresores').map((product) => product.id));
+  const extensionProductIds = new Set(filterProductsByCategoryFamily(products, 'extensiones').map((product) => product.id));
+  const bumperProductIds = new Set(filterProductsByCategoryFamily(products, 'parachoques').map((product) => product.id));
+
+  const editingInitialValues: ServiceFormValues | undefined = editableService
+    ? {
+        serviceType: editableService.serviceType,
+        serviceLabel: editableService.serviceLabel ?? '',
+        serviceCategory: editableService.serviceCategory ?? 'torno',
+        performedAt: editableService.performedAt.slice(0, 10),
+        customerName: editableService.customerName,
+        cueReference: editableService.cueReference,
+        paymentMethod: editableService.paymentMethod ?? 'efectivo',
+        paymentReference: editableService.paymentReference ?? '',
+        servicePrice: editableService.totalRevenue,
+        serviceCost: Number(editableService.totalOperationalCost ?? 0),
+        tipProductId: editableService.materials.find((item) => tipProductIds.has(item.productId))?.productId ?? '',
+        tipVariantId: editableService.materials.find((item) => tipProductIds.has(item.productId))?.variantId ?? '',
+        ferruleProductId: editableService.materials.find((item) => ferruleProductIds.has(item.productId))?.productId ?? '',
+        ferruleVariantId: editableService.materials.find((item) => ferruleProductIds.has(item.productId))?.variantId ?? '',
+        suppressorProductId: editableService.materials.find((item) => suppressorProductIds.has(item.productId))?.productId ?? '',
+        suppressorVariantId: editableService.materials.find((item) => suppressorProductIds.has(item.productId))?.variantId ?? '',
+        includeSuppressor: editableService.materials.some((item) => suppressorProductIds.has(item.productId)),
+        extensionProductId: editableService.materials.find((item) => extensionProductIds.has(item.productId))?.productId ?? '',
+        extensionVariantId: editableService.materials.find((item) => extensionProductIds.has(item.productId))?.variantId ?? '',
+        bumperProductId: editableService.materials.find((item) => bumperProductIds.has(item.productId))?.productId ?? '',
+        bumperVariantId: editableService.materials.find((item) => bumperProductIds.has(item.productId))?.variantId ?? '',
+        notes: editableService.notes ?? '',
+      }
+    : undefined;
 
   const filteredServices = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return services.filter((service) => {
       const materialNames = service.materials
-        .map((item) => getProductById(products, item.productId)?.name ?? '')
+        .map((item) => {
+          const productName = getProductById(products, item.productId)?.name ?? '';
+          return item.variantName ? `${productName} ${item.variantName}`.trim() : productName;
+        })
         .join(' ');
-      const content = `${serviceTypeLabels[service.serviceType]} ${service.customerName} ${service.cueReference} ${service.notes} ${materialNames}`.toLowerCase();
+      const content = `${getServiceDisplayLabel(service)} ${service.customerName} ${service.cueReference} ${service.notes} ${materialNames}`.toLowerCase();
       return !normalizedQuery || content.includes(normalizedQuery);
     });
   }, [products, query, services]);
@@ -54,7 +95,8 @@ export default function ServiciosPage() {
   const buildMaterialChips = (service: (typeof filteredServices)[number]) =>
     service.materials.map((item) => {
       const product = getProductById(products, item.productId);
-      return `${product?.name ?? 'Producto'} x${formatNumber(item.quantity)}`;
+      const variantSuffix = item.variantName ? ` - ${item.variantName}` : '';
+      return `${product?.name ?? 'Producto'}${variantSuffix} x${formatNumber(item.quantity)}`;
     });
 
   const buildMaterialMeta = (service: (typeof filteredServices)[number]) => {
@@ -153,7 +195,7 @@ export default function ServiciosPage() {
                   const materialCost = Number(service.totalMaterialCost ?? 0);
                   const totalCost = Number(service.totalCost ?? materialCost + operationalCost);
                   const rowHoverSummary = [
-                    serviceTypeLabels[service.serviceType],
+                    getServiceDisplayLabel(service),
                     `Cliente: ${service.customerName}`,
                     `Referencia: ${service.cueReference}`,
                     `Categoria: ${service.serviceCategory || 'General'}`,
@@ -176,10 +218,26 @@ export default function ServiciosPage() {
                     >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="font-medium text-slate-900 dark:text-slate-100">{serviceTypeLabels[service.serviceType]}</p>
+                        <p className="font-medium text-slate-900 dark:text-slate-100">{getServiceDisplayLabel(service)}</p>
                         <p className="truncate text-sm text-slate-500 dark:text-slate-400">{service.cueReference}</p>
                       </div>
-                      <p className="shrink-0 text-sm font-semibold text-slate-900 dark:text-slate-100">{formatCurrency(service.totalRevenue)}</p>
+                      <div className="flex shrink-0 items-start gap-2">
+                        <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{formatCurrency(service.totalRevenue)}</p>
+                        {canEditServices && service.source !== 'sale-addon' ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 rounded-xl px-2.5"
+                            onClick={() => {
+                              setEditingServiceId(service.id);
+                              setOpenDialog(true);
+                            }}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        ) : null}
+                      </div>
                     </div>
                     <div className="mt-3 space-y-1.5 text-sm text-slate-600">
                       <p><span className="font-medium text-slate-800">Cliente:</span> {service.customerName}</p>
@@ -234,7 +292,7 @@ export default function ServiciosPage() {
                     const materialCost = Number(service.totalMaterialCost ?? 0);
                     const totalCost = Number(service.totalCost ?? materialCost + operationalCost);
                     const rowHoverSummary = [
-                      serviceTypeLabels[service.serviceType],
+                      getServiceDisplayLabel(service),
                       `Cliente: ${service.customerName}`,
                       `Responsable: ${service.responsibleUser}`,
                       `Referencia: ${service.cueReference}`,
@@ -255,7 +313,7 @@ export default function ServiciosPage() {
                       <TableRow key={service.id} title={rowHoverSummary}>
                         <TableCell className={isSalesUser ? 'align-top' : undefined}>
                         <div>
-                          <p className="font-medium text-slate-900">{serviceTypeLabels[service.serviceType]}</p>
+                          <p className="font-medium text-slate-900">{getServiceDisplayLabel(service)}</p>
                           <p className="text-xs text-slate-500">{service.cueReference}</p>
                         </div>
                       </TableCell>
@@ -302,7 +360,23 @@ export default function ServiciosPage() {
                         <TableCell className="font-medium text-emerald-700">{formatCurrency(service.grossProfit)}</TableCell>
                       ) : null}
                       <TableCell className={isSalesUser ? 'align-top whitespace-nowrap' : undefined}>
-                        {formatDateTime(service.performedAt)}
+                        <div className="flex items-center justify-between gap-2">
+                          <span>{formatDateTime(service.performedAt)}</span>
+                          {canEditServices && service.source !== 'sale-addon' ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 rounded-xl px-2"
+                              onClick={() => {
+                                setEditingServiceId(service.id);
+                                setOpenDialog(true);
+                              }}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                          ) : null}
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -329,30 +403,75 @@ export default function ServiciosPage() {
 
       <ServiceFormDialog
         open={openDialog}
-        onOpenChange={setOpenDialog}
+        onOpenChange={(nextOpen) => {
+          setOpenDialog(nextOpen);
+          if (!nextOpen) {
+            setEditingServiceId(null);
+          }
+        }}
         products={products}
         purchases={purchases}
         movements={movements}
         hideFinancialSummary={isSalesUser}
+        initialValues={editingInitialValues}
+        submitLabel={editableService ? 'Guardar cambios' : 'Guardar servicio'}
         onSubmit={async (values: ServiceFormValues) => {
+          const resolveVariantName = (productId: string, variantId?: string) =>
+            products.find((product) => product.id === productId)?.variants?.find((variant) => variant.id === variantId)?.name;
+          const needsTip = values.serviceType === 'tip-installation' || values.serviceType === 'tip-ferrule-installation';
+          const needsFerrule = values.serviceType === 'ferrule-installation' || values.serviceType === 'tip-ferrule-installation';
+          const needsExtension = values.serviceType === 'extension-installation';
+          const allowsSuppressor = needsTip || needsFerrule;
           const materials = [
-            values.tipProductId ? { productId: values.tipProductId, quantity: 1 } : null,
-            values.serviceType === 'tip-ferrule-installation' && values.ferruleProductId
-              ? { productId: values.ferruleProductId, quantity: 1 }
+            needsTip && values.tipProductId
+              ? {
+                  productId: values.tipProductId,
+                  variantId: values.tipVariantId || undefined,
+                  variantName: resolveVariantName(values.tipProductId, values.tipVariantId || undefined),
+                  quantity: 1,
+                }
               : null,
-            values.includeSuppressor && values.suppressorProductId
-              ? { productId: values.suppressorProductId, quantity: 1 }
+            needsFerrule && values.ferruleProductId
+              ? {
+                  productId: values.ferruleProductId,
+                  variantId: values.ferruleVariantId || undefined,
+                  variantName: resolveVariantName(values.ferruleProductId, values.ferruleVariantId || undefined),
+                  quantity: 1,
+                }
               : null,
-            values.serviceType === 'extension-installation' && values.extensionProductId
-              ? { productId: values.extensionProductId, quantity: 1 }
+            allowsSuppressor && values.includeSuppressor && values.suppressorProductId
+              ? {
+                  productId: values.suppressorProductId,
+                  variantId: values.suppressorVariantId || undefined,
+                  variantName: resolveVariantName(values.suppressorProductId, values.suppressorVariantId || undefined),
+                  quantity: 1,
+                }
               : null,
-            values.serviceType === 'extension-installation' && values.bumperProductId
-              ? { productId: values.bumperProductId, quantity: 1 }
+            needsExtension && values.extensionProductId
+              ? {
+                  productId: values.extensionProductId,
+                  variantId: values.extensionVariantId || undefined,
+                  variantName: resolveVariantName(values.extensionProductId, values.extensionVariantId || undefined),
+                  quantity: 1,
+                }
               : null,
-          ].filter((item): item is { productId: string; quantity: number } => Boolean(item));
+            needsExtension && values.bumperProductId
+              ? {
+                  productId: values.bumperProductId,
+                  variantId: values.bumperVariantId || undefined,
+                  variantName: resolveVariantName(values.bumperProductId, values.bumperVariantId || undefined),
+                  quantity: 1,
+                }
+              : null,
+          ].filter(
+            (
+              item
+            ): item is { productId: string; variantId?: string; variantName?: string; quantity: number } => Boolean(item)
+          );
 
-          await registerService({
+          const payload = {
             serviceType: values.serviceType,
+            serviceLabel: values.serviceLabel,
             serviceCategory: values.serviceCategory,
             performedAt: values.performedAt,
             customerName: values.customerName,
@@ -369,12 +488,21 @@ export default function ServiciosPage() {
               user?.displayName?.trim() ||
               user?.email?.trim() ||
               'Administrador',
-          });
+          };
+
+          if (editableService) {
+            await updateService(editableService.id, payload);
+          } else {
+            await registerService(payload);
+          }
 
           setOpenDialog(false);
+          setEditingServiceId(null);
           toast({
-            title: 'Servicio registrado',
-            description: 'El trabajo del torno se guardo y el inventario ya fue descontado.',
+            title: editableService ? 'Servicio actualizado' : 'Servicio registrado',
+            description: editableService
+              ? 'Los cambios del servicio ya quedaron aplicados y el inventario fue recalculado.'
+              : 'El trabajo del torno se guardo y el inventario ya fue descontado.',
           });
         }}
       />

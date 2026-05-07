@@ -672,11 +672,21 @@ export function SaleDetailsDialog({
                             {service.cueReference || 'Sin referencia'}
                           </p>
                           <p className="text-sm text-muted-foreground">
-                            Tipo: {service.serviceType === 'tip-installation'
-                              ? 'Instalacion de casquillo'
-                              : service.serviceType === 'tip-ferrule-installation'
-                                ? 'Instalacion de casquillo y virola'
-                                : 'Instalacion de extension'}
+                            Tipo: {service.serviceLabel?.trim()
+                              ? service.serviceLabel
+                              : service.serviceType === 'tip-installation'
+                                ? 'Instalacion de casquillo'
+                                : service.serviceType === 'ferrule-installation'
+                                  ? 'Instalacion de virola'
+                                  : service.serviceType === 'tip-ferrule-installation'
+                                    ? 'Instalacion de casquillo y virola'
+                                    : service.serviceType === 'shaft-reduction'
+                                      ? 'Rebajada de flecha'
+                                      : service.serviceType === 'shaft-straightening'
+                                        ? 'Enderezada de flecha'
+                                        : service.serviceType === 'custom-turning'
+                                          ? 'Trabajo personalizado de torno'
+                                          : 'Instalacion de extension'}
                           </p>
                         </div>
                         <div className="text-left sm:text-right">

@@ -181,15 +181,23 @@ function formatMonthLabel(monthValue: string) {
 }
 
 function getServiceLabel(service: ServiceOrder) {
-  if (service.serviceCategory?.trim()) return service.serviceCategory.trim();
+  if (service.serviceLabel?.trim()) return service.serviceLabel.trim();
 
   switch (service.serviceType) {
     case 'tip-installation':
       return 'Instalacion de suela';
+    case 'ferrule-installation':
+      return 'Instalacion de virola';
     case 'tip-ferrule-installation':
       return 'Suela y ferrule';
     case 'extension-installation':
       return 'Instalacion de extension';
+    case 'shaft-reduction':
+      return 'Rebajada de flecha';
+    case 'shaft-straightening':
+      return 'Enderezada de flecha';
+    case 'custom-turning':
+      return 'Trabajo personalizado de torno';
     default:
       return 'Servicio';
   }

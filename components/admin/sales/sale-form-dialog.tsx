@@ -224,11 +224,11 @@ const saleSchema = z
           });
         }
 
-        if (giftItem.quantity !== 1) {
+        if (giftItem.quantity > item.quantity) {
           context.addIssue({
             code: z.ZodIssueCode.custom,
             path: ['items', index, 'giftItems', giftIndex, 'quantity'],
-            message: 'Cada obsequio debe llevar cantidad 1',
+            message: 'La cantidad del obsequio no puede superar la cantidad vendida en la linea',
           });
         }
 
@@ -443,12 +443,25 @@ function getSaleUnitPriceForVariantSelection(
   return Number(getVariantSalePrice(product, variantId));
 }
 
+function getNormalizedGiftQuantity(value: number | string | undefined, maxQuantity: number, fallback = 1) {
+  const safeMax = Math.max(Math.trunc(Number(maxQuantity) || 0), 1);
+  const normalized = Math.trunc(Number(value) || 0);
+  if (normalized <= 0) return Math.min(fallback, safeMax);
+  return Math.min(normalized, safeMax);
+}
+
 function normalizeGiftItems(
   items: SaleLineFormValue['giftItems'],
   products: Product[],
-  _movements: InventoryMovement[]
+  _movements: InventoryMovement[],
+  options?: {
+    defaultQuantity?: number;
+    maxQuantity?: number;
+  }
 ) {
   const seenCategories = new Set<string>();
+  const maxQuantity = Math.max(Math.trunc(Number(options?.maxQuantity ?? options?.defaultQuantity ?? 1) || 0), 1);
+  const defaultQuantity = getNormalizedGiftQuantity(options?.defaultQuantity ?? 1, maxQuantity, 1);
 
   const normalizedItems = items.reduce<SaleLineFormValue['giftItems']>((accumulator, item) => {
     const productId = item.productId?.trim();
@@ -461,7 +474,10 @@ function normalizeGiftItems(
     if (seenCategories.has(categoryKey)) return accumulator;
 
     seenCategories.add(categoryKey);
-    accumulator.push({ productId, quantity: 1 });
+    accumulator.push({
+      productId,
+      quantity: getNormalizedGiftQuantity(item.quantity, maxQuantity, defaultQuantity),
+    });
     return accumulator;
   }, []);
 
@@ -488,7 +504,20 @@ function hasSelectedGiftItems(items: SaleLineFormValue['giftItems'], products: P
   });
 }
 
-function setGiftSelectionByCategory<T extends { giftItems: SaleLineFormValue['giftItems'] }>(
+function getGiftQuantityByCategory(
+  items: SaleLineFormValue['giftItems'],
+  products: Product[],
+  category: SaleGiftCategory
+) {
+  return (
+    items.find((item) => {
+      const product = products.find((current) => current.id === item.productId);
+      return product ? getSaleGiftCategoryKey(product) === category : false;
+    })?.quantity ?? 0
+  );
+}
+
+function setGiftSelectionByCategory<T extends { giftItems: SaleLineFormValue['giftItems']; quantity?: number | string }>(
   line: T,
   products: Product[],
   movements: InventoryMovement[],
@@ -496,28 +525,66 @@ function setGiftSelectionByCategory<T extends { giftItems: SaleLineFormValue['gi
   productId: string,
   enabled: boolean
 ): T {
+  const maxQuantity = Math.max(Math.trunc(Number(line.quantity ?? 0) || 0), 1);
+  const preservedQuantity = getGiftQuantityByCategory(line.giftItems, products, category);
   const nextItems = normalizeGiftItems(
     line.giftItems.filter((item) => {
       const product = products.find((current) => current.id === item.productId);
       return product ? getSaleGiftCategoryKey(product) !== category : true;
     }),
     products,
-    movements
+    movements,
+    { defaultQuantity: maxQuantity, maxQuantity }
   );
 
   if (enabled && productId) {
-    nextItems.push({ productId, quantity: 1 });
+    nextItems.push({
+      productId,
+      quantity: getNormalizedGiftQuantity(preservedQuantity, maxQuantity, maxQuantity),
+    });
   }
 
   return {
     ...line,
-    giftItems: nextItems,
+    giftItems: normalizeGiftItems(nextItems, products, movements, {
+      defaultQuantity: maxQuantity,
+      maxQuantity,
+    }),
+  };
+}
+
+function setGiftQuantityByCategory<T extends { giftItems: SaleLineFormValue['giftItems']; quantity?: number | string }>(
+  line: T,
+  products: Product[],
+  movements: InventoryMovement[],
+  category: SaleGiftCategory,
+  quantity: number | string
+): T {
+  const selectedProductId = getGiftProductIdByCategory(line.giftItems, products, category);
+  if (!selectedProductId) return line;
+
+  const maxQuantity = Math.max(Math.trunc(Number(line.quantity ?? 0) || 0), 1);
+  const nextItems = line.giftItems.map((item) => {
+    const product = products.find((current) => current.id === item.productId);
+    if (!product || getSaleGiftCategoryKey(product) !== category) return item;
+    return {
+      ...item,
+      quantity: getNormalizedGiftQuantity(quantity, maxQuantity, item.quantity || maxQuantity),
+    };
+  });
+
+  return {
+    ...line,
+    giftItems: normalizeGiftItems(nextItems, products, movements, {
+      defaultQuantity: maxQuantity,
+      maxQuantity,
+    }),
   };
 }
 
 function getGiftSelectionHelpText(categories: SaleGiftCategory[]) {
   if (categories.length === 0) return 'Este producto no maneja obsequios.';
-  return `Puedes incluir ${formatSaleGiftCategoryList(categories)}. Cada opcion se descuenta solo si la marcas.`;
+  return `Puedes incluir ${formatSaleGiftCategoryList(categories)}. Ajusta la cantidad del obsequio segun las unidades vendidas en esa linea.`;
 }
 
 function SaleGiftSection({
@@ -532,7 +599,7 @@ function SaleGiftSection({
 }: {
   enabled: boolean;
   onEnabledChange: (enabled: boolean) => void;
-  line: { giftItems: SaleLineFormValue['giftItems'] };
+  line: { giftItems: SaleLineFormValue['giftItems']; quantity?: number | string };
   onLineChange: (nextLine: { giftItems: SaleLineFormValue['giftItems'] }) => void;
   products: Product[];
   movements: InventoryMovement[];
@@ -540,6 +607,8 @@ function SaleGiftSection({
   availableGiftOptionsByCategory: Record<SaleGiftCategory, Product[]>;
 }) {
   if (allowedCategories.length === 0) return null;
+  const soldQuantity = Math.max(Math.trunc(Number(line.quantity ?? 0) || 0), 0);
+  const selectedGiftQuantity = line.giftItems.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
 
   return (
     <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/70 sm:p-4">
@@ -570,10 +639,17 @@ function SaleGiftSection({
       </div>
 
       {enabled ? (
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="space-y-3">
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 py-2 text-sm text-emerald-900 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-100">
+            {formatNumber(soldQuantity)} vendido(s) en esta linea / {formatNumber(selectedGiftQuantity)} obsequio(s) seleccionado(s)
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2">
           {allowedCategories.map((category) => {
             const selectedProductId = getGiftProductIdByCategory(line.giftItems, products, category);
+            const selectedQuantity = getGiftQuantityByCategory(line.giftItems, products, category);
             const options = availableGiftOptionsByCategory[category];
+            const maxQuantity = Math.max(Math.trunc(Number(line.quantity ?? 0) || 0), 1);
 
             return (
               <div key={category} className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/60">
@@ -612,9 +688,33 @@ function SaleGiftSection({
                     </SelectContent>
                   </Select>
                 </div>
+
+                {selectedProductId ? (
+                  <div className="mt-3 space-y-2">
+                    <Label>Cantidad obsequio</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      max={maxQuantity}
+                      value={selectedQuantity || maxQuantity}
+                      onChange={(event) =>
+                        onLineChange(
+                          setGiftQuantityByCategory(line, products, movements, category, event.target.value)
+                        )
+                      }
+                    />
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Maximo {formatNumber(maxQuantity)} por esta linea.
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Al activarlo se sugiere {formatNumber(maxQuantity)} por defecto, pero puedes bajarlo si no todos llevan obsequio.
+                    </p>
+                  </div>
+                ) : null}
               </div>
             );
           })}
+          </div>
         </div>
       ) : null}
     </div>
@@ -775,6 +875,7 @@ export function SaleFormDialog({
   const [lineError, setLineError] = useState<string>('');
   const [firstItemGiftSectionEnabled, setFirstItemGiftSectionEnabled] = useState(false);
   const [draftGiftSectionEnabled, setDraftGiftSectionEnabled] = useState(false);
+  const isSubmitting = form.formState.isSubmitting;
 
   const values = form.watch();
   const firstItem = values.items[0] ?? createDefaultLineItem();
@@ -899,7 +1000,10 @@ export function SaleFormDialog({
             initialValues.items.length > 0
               ? initialValues.items.map((item) => ({
                   ...item,
-                  giftItems: normalizeGiftItems(item.giftItems, products, movements),
+                  giftItems: normalizeGiftItems(item.giftItems, products, movements, {
+                    defaultQuantity: Number(item.quantity) || 1,
+                    maxQuantity: Number(item.quantity) || 1,
+                  }),
                 }))
               : [createDefaultLineItem()],
         }
@@ -986,7 +1090,10 @@ export function SaleFormDialog({
         serviceCategory: item.serviceCategory?.trim() ?? 'torno',
         notes: item.notes?.trim() ?? '',
       })),
-      giftItems: normalizeGiftItems(draftLine.giftItems, products, movements),
+      giftItems: normalizeGiftItems(draftLine.giftItems, products, movements, {
+        defaultQuantity: Number(draftLine.quantity) || 1,
+        maxQuantity: Number(draftLine.quantity) || 1,
+      }),
     };
 
     if (!normalizedDraftLine.productId) {
@@ -1016,7 +1123,10 @@ export function SaleFormDialog({
     }
     if (normalizedDraftLine.giftItems.length > 0) {
       const invalidGift = normalizedDraftLine.giftItems.find(
-        (giftItem) => !giftItem.productId || Number(giftItem.quantity) !== 1
+        (giftItem) =>
+          !giftItem.productId ||
+          (Number(giftItem.quantity) || 0) <= 0 ||
+          Number(giftItem.quantity) > normalizedDraftLine.quantity
       );
       if (invalidGift) {
         setLineError('Revisa los obsequios de esta linea.');
@@ -1055,16 +1165,28 @@ export function SaleFormDialog({
         desktopContentClassName="lg:max-w-4xl"
         footer={
           <div className="grid gap-2 sm:flex sm:items-center sm:justify-between">
-            <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={openNewLineDialog}>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full sm:w-auto"
+              onClick={openNewLineDialog}
+              disabled={isSubmitting}
+            >
               <PlusCircle className="mr-2 h-4 w-4" />
               Agregar producto
             </Button>
             <div className="grid grid-cols-2 gap-2 sm:flex">
-              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => onOpenChange(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full sm:w-auto"
+                onClick={() => onOpenChange(false)}
+                disabled={isSubmitting}
+              >
                 Cancelar
               </Button>
-              <Button form={saleFormId} type="submit" className="w-full sm:w-auto">
-                {isEditingSale ? 'Actualizar venta' : 'Registrar venta'}
+              <Button form={saleFormId} type="submit" className="w-full sm:w-auto" disabled={isSubmitting}>
+                {isSubmitting ? 'Guardando...' : isEditingSale ? 'Actualizar venta' : 'Registrar venta'}
               </Button>
             </div>
           </div>
@@ -1197,7 +1319,11 @@ export function SaleFormDialog({
                                     ? normalizeGiftItems(
                                         form.getValues('items.0.giftItems').filter((giftItem) => giftItem.productId !== value),
                                         products,
-                                        movements
+                                        movements,
+                                        {
+                                          defaultQuantity: Number(form.getValues('items.0.quantity')) || 1,
+                                          maxQuantity: Number(form.getValues('items.0.quantity')) || 1,
+                                        }
                                       )
                                     : [];
                                 form.setValue(
@@ -1346,6 +1472,19 @@ export function SaleFormDialog({
                                 min="1"
                                 max={Math.max(firstItemDisplayStock, 1)}
                                 {...field}
+                                onChange={(event) => {
+                                  field.onChange(event);
+                                  const nextQuantity = Math.max(Math.trunc(Number(event.target.value || 0)), 1);
+                                  const currentLine = form.getValues('items.0');
+                                  form.setValue(
+                                    'items.0.giftItems',
+                                    normalizeGiftItems(currentLine.giftItems, products, movements, {
+                                      defaultQuantity: nextQuantity,
+                                      maxQuantity: nextQuantity,
+                                    }),
+                                    { shouldValidate: true }
+                                  );
+                                }}
                               />
                             </FormControl>
                             <FormMessage />
@@ -1682,7 +1821,11 @@ export function SaleFormDialog({
                           ? normalizeGiftItems(
                               current.giftItems.filter((giftItem) => giftItem.productId !== value),
                               products,
-                              movements
+                              movements,
+                              {
+                                defaultQuantity: Number(current.quantity) || 1,
+                                maxQuantity: Number(current.quantity) || 1,
+                              }
                             )
                           : [],
                     }));
@@ -1780,7 +1923,17 @@ export function SaleFormDialog({
                   )}
                   value={draftLine.quantity}
                   onChange={(event) => {
-                    setDraftLine((current) => ({ ...current, quantity: event.target.value }));
+                    setDraftLine((current) => {
+                      const nextQuantity = Math.max(Math.trunc(Number(event.target.value || 0)), 1);
+                      return {
+                        ...current,
+                        quantity: event.target.value,
+                        giftItems: normalizeGiftItems(current.giftItems, products, movements, {
+                          defaultQuantity: nextQuantity,
+                          maxQuantity: nextQuantity,
+                        }),
+                      };
+                    });
                     setLineError('');
                   }}
                 />

@@ -254,8 +254,12 @@ export interface AuthorizationRequest {
 
 export type ServiceType =
   | 'tip-installation'
+  | 'ferrule-installation'
   | 'tip-ferrule-installation'
-  | 'extension-installation';
+  | 'extension-installation'
+  | 'shaft-reduction'
+  | 'shaft-straightening'
+  | 'custom-turning';
 
 export type ServiceVisitStatus =
   | 'scheduled'
@@ -289,6 +293,8 @@ export interface ServiceVisit {
 
 export interface ServiceMaterialItem {
   productId: string;
+  variantId?: string;
+  variantName?: string;
   quantity: number;
   unitCost: number;
   totalCost: number;
@@ -297,6 +303,7 @@ export interface ServiceMaterialItem {
 export interface ServiceOrder {
   id: string;
   serviceType: ServiceType;
+  serviceLabel?: string;
   serviceCategory?: string;
   source?: 'standalone' | 'sale-addon';
   saleId?: string;

@@ -111,8 +111,12 @@ export const movementReasonsByType = {
 
 export const serviceTypeLabels = {
   'tip-installation': 'Instalacion de casquillo',
+  'ferrule-installation': 'Instalacion de virola',
   'tip-ferrule-installation': 'Instalacion de casquillo y virola',
   'extension-installation': 'Instalacion de extension',
+  'shaft-reduction': 'Rebajada de flecha',
+  'shaft-straightening': 'Enderezada de flecha',
+  'custom-turning': 'Trabajo personalizado de torno',
 } as const;
 
 export const availableBrands = [

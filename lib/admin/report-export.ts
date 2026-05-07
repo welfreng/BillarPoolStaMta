@@ -212,7 +212,7 @@ export function buildSalesReportDataset(input: {
         saleStatus,
         saleTotal: saleTotals.netRevenue + serviceRevenue,
         itemType: 'service',
-        itemName: serviceTypeLabels[service.serviceType],
+        itemName: service.serviceLabel?.trim() || serviceTypeLabels[service.serviceType],
         category: 'servicios',
         subcategory: service.serviceCategory ?? '',
         variant: '',

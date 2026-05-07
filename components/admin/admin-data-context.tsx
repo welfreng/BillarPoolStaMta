@@ -208,6 +208,7 @@ interface RegisterSaleReturnBatchInput {
 
 interface RegisterServiceInput {
   serviceType: ServiceType;
+  serviceLabel?: string;
   serviceCategory?: string;
   performedAt: string;
   customerName: string;
@@ -218,6 +219,8 @@ interface RegisterServiceInput {
   serviceCost?: number;
   materials: Array<{
     productId: string;
+    variantId?: string;
+    variantName?: string;
     quantity: number;
   }>;
   notes: string;
@@ -371,6 +374,7 @@ interface AdminDataContextValue {
   registerSaleReturn: (input: RegisterSaleReturnInput) => Promise<Sale>;
   registerSaleReturns: (input: RegisterSaleReturnBatchInput) => Promise<Sale[]>;
   registerService: (input: RegisterServiceInput) => Promise<ServiceOrder>;
+  updateService: (serviceId: string, input: RegisterServiceInput) => Promise<ServiceOrder>;
   createServiceVisit: (input: CreateServiceVisitInput) => Promise<ServiceVisit>;
   assignServiceVisit: (visitId: string, input: AssignServiceVisitInput) => Promise<ServiceVisit>;
   startServiceVisit: (visitId: string) => Promise<ServiceVisit>;
@@ -457,6 +461,9 @@ function buildSaleGiftItems(
     if (giftQuantity <= 0) {
       throw new Error(`La cantidad del obsequio debe ser mayor a cero para ${targetProduct.name}.`);
     }
+    if (giftQuantity > Math.max(Number(item.quantity ?? 0), 0)) {
+      throw new Error(`La cantidad del obsequio no puede superar la cantidad vendida de ${targetProduct.name}.`);
+    }
 
     const giftedProduct = products.find((product) => product.id === giftProductId);
     if (!giftedProduct) {
@@ -472,9 +479,6 @@ function buildSaleGiftItems(
       throw new Error(
         `Para ${targetProduct.name} solo aplica ${formatSaleGiftCategoryList(allowedGiftCategories)} como obsequio.`
       );
-    }
-    if (giftQuantity !== 1) {
-      throw new Error(`Cada obsequio para ${targetProduct.name} debe tener cantidad 1.`);
     }
     if (seenGiftCategories.has(giftCategoryKey)) {
       throw new Error(`No repitas el mismo tipo de obsequio para ${targetProduct.name}.`);
@@ -800,6 +804,8 @@ function mapServiceDocument(documentId: string, data: DocumentData): ServiceOrde
     ? data.materials
         .map((item) => ({
           productId: String(item?.productId ?? ''),
+          variantId: item?.variantId ? String(item.variantId) : undefined,
+          variantName: item?.variantName ? String(item.variantName) : undefined,
           quantity: Number(item?.quantity ?? 0),
           unitCost: Number(item?.unitCost ?? 0),
           totalCost: Number(item?.totalCost ?? 0),
@@ -817,10 +823,15 @@ function mapServiceDocument(documentId: string, data: DocumentData): ServiceOrde
     id: documentId,
     serviceType:
       data.serviceType === 'tip-installation' ||
+      data.serviceType === 'ferrule-installation' ||
       data.serviceType === 'tip-ferrule-installation' ||
-      data.serviceType === 'extension-installation'
+      data.serviceType === 'extension-installation' ||
+      data.serviceType === 'shaft-reduction' ||
+      data.serviceType === 'shaft-straightening' ||
+      data.serviceType === 'custom-turning'
         ? data.serviceType
         : 'tip-installation',
+    serviceLabel: data.serviceLabel ? String(data.serviceLabel) : undefined,
     serviceCategory: data.serviceCategory ? String(data.serviceCategory) : undefined,
     source: data.source === 'sale-addon' ? 'sale-addon' : 'standalone',
     saleId: data.saleId ? String(data.saleId) : undefined,
@@ -2552,10 +2563,14 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     });
     batch.set(doc(db, 'movements', movement.id), {
       ...movement,
+      variantId: movement.variantId ?? null,
+      variantName: movement.variantName ?? null,
       occurredAt: Timestamp.fromDate(new Date(input.occurredAt)),
     });
     batch.set(doc(db, 'inventory_movements', movement.id), {
       ...movement,
+      variantId: movement.variantId ?? null,
+      variantName: movement.variantName ?? null,
       sourceType: 'initial-load',
       sourceId: purchase.id,
       occurredAt: Timestamp.fromDate(new Date(input.occurredAt)),
@@ -2702,10 +2717,14 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       });
       batch.set(doc(db, 'movements', movement.id), {
         ...movement,
+        variantId: movement.variantId ?? null,
+        variantName: movement.variantName ?? null,
         occurredAt: Timestamp.fromDate(new Date(input.occurredAt)),
       });
       batch.set(doc(db, 'inventory_movements', movement.id), {
         ...movement,
+        variantId: movement.variantId ?? null,
+        variantName: movement.variantName ?? null,
         sourceType: 'initial-load',
         sourceId: batchId,
         occurredAt: Timestamp.fromDate(new Date(input.occurredAt)),
@@ -3678,7 +3697,12 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     return updatedSales;
   };
 
-  const registerService = async (input: RegisterServiceInput) => {
+  const registerServiceInternal = async (
+    input: RegisterServiceInput,
+    baseMovements: InventoryMovement[] = movements,
+    baseProducts: Product[] = products,
+    options?: { serviceId?: string }
+  ) => {
     if ((Number(input.servicePrice) || 0) <= 0) {
       throw new Error('El valor del servicio debe ser mayor a cero.');
     }
@@ -3697,9 +3721,10 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       throw new Error('Agrega materiales o un costo para registrar el servicio.');
     }
 
-    const materialMap = new Map<string, number>();
+    const materialMap = new Map<string, { productId: string; variantId?: string; variantName?: string; quantity: number }>();
     input.materials.forEach((item) => {
       const productId = item.productId?.trim();
+      const variantId = item.variantId?.trim() || undefined;
       const quantity = Math.max(Number(item.quantity ?? 0), 0);
       if (!productId) {
         throw new Error('Selecciona todos los productos usados en el servicio.');
@@ -3707,30 +3732,48 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       if (quantity <= 0) {
         throw new Error('La cantidad de cada producto consumido debe ser mayor a cero.');
       }
-      materialMap.set(productId, (materialMap.get(productId) ?? 0) + quantity);
+      const materialKey = `${productId}::${variantId ?? ''}`;
+      const current = materialMap.get(materialKey);
+      materialMap.set(materialKey, {
+        productId,
+        variantId,
+        variantName: item.variantName?.trim() || undefined,
+        quantity: (current?.quantity ?? 0) + quantity,
+      });
     });
 
-    const materials: ServiceMaterialItem[] = Array.from(materialMap.entries()).map(([productId, quantity]) => {
-      const product = products.find((item) => item.id === productId);
+    const materials: ServiceMaterialItem[] = Array.from(materialMap.values()).map(({ productId, variantId, variantName, quantity }) => {
+      const product = baseProducts.find((item) => item.id === productId);
       if (!product) {
         throw new Error('Uno de los productos del servicio no existe en el inventario.');
       }
 
-      const availableStock = getProductStock(movements, productId);
-      if (quantity > availableStock) {
-        throw new Error(`La cantidad usada supera el stock disponible de ${product.name}.`);
+      const selectedVariant = variantId ? getProductVariantById(product, variantId) : null;
+      if (getProductSaleMode(product) === 'varianted' && !selectedVariant) {
+        throw new Error(`Selecciona una variante valida para ${product.name} en el servicio.`);
       }
 
-      const unitCost = getProductRealUnitCost(purchases, productId);
+      const availableStock = selectedVariant
+        ? getProductVariantStock(product, selectedVariant.id, baseMovements)
+        : getProductStock(baseMovements, productId);
+      if (quantity > availableStock) {
+        throw new Error(
+          `La cantidad usada supera el stock disponible de ${selectedVariant ? `${product.name} - ${selectedVariant.name}` : product.name}.`
+        );
+      }
+
+      const unitCost = getVariantOrProductRealUnitCost(purchases, productId, selectedVariant?.id);
       return {
         productId,
+        variantId: selectedVariant?.id,
+        variantName: selectedVariant?.name ?? variantName,
         quantity,
         unitCost,
         totalCost: quantity * unitCost,
       };
     });
 
-    const serviceRef = doc(collection(db, 'services'));
+    const serviceRef = options?.serviceId ? doc(db, 'services', options.serviceId) : doc(collection(db, 'services'));
     const totalMaterialCost = materials.reduce((sum, item) => sum + item.totalCost, 0);
     const totalRevenue = Number(input.servicePrice) || 0;
     const totalCost = totalMaterialCost + directServiceCost;
@@ -3738,6 +3781,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     const service: ServiceOrder = {
       id: serviceRef.id,
       serviceType: input.serviceType,
+      serviceLabel: input.serviceLabel?.trim() || undefined,
       serviceCategory: input.serviceCategory?.trim() || undefined,
       source: input.source === 'sale-addon' ? 'sale-addon' : 'standalone',
       saleId: input.saleId?.trim() || undefined,
@@ -3761,6 +3805,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     const batch = writeBatch(db);
     batch.set(doc(db, 'services', service.id), {
       ...service,
+      serviceLabel: service.serviceLabel ?? null,
       serviceCategory: service.serviceCategory ?? null,
       source: service.source ?? 'standalone',
       saleId: service.saleId ?? null,
@@ -3771,12 +3816,15 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     });
 
     const stockDeltas: Array<{ productId: string; quantity: number }> = [];
+    const variantStockMap = buildVariantStockMap(baseProducts);
     materials.forEach((material) => {
       const movementRef = doc(collection(db, 'movements'));
       batch.set(movementRef, {
         id: movementRef.id,
         serviceOrderId: service.id,
         productId: material.productId,
+        variantId: material.variantId ?? null,
+        variantName: material.variantName ?? null,
         type: 'exit',
         reason: 'service',
         quantity: -Math.abs(material.quantity),
@@ -3788,12 +3836,18 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         relatedUnitCost: material.unitCost,
       });
       stockDeltas.push({ productId: material.productId, quantity: -Math.abs(material.quantity) });
+
+      if (material.variantId) {
+        const productVariantMap = variantStockMap.get(material.productId);
+        const currentStock = productVariantMap?.get(material.variantId) ?? 0;
+        productVariantMap?.set(material.variantId, currentStock - Math.abs(material.quantity));
+      }
     });
 
     applyPublicStockMapToBatch(
       batch,
       buildPublicStockMap(
-        movements,
+        baseMovements,
         stockDeltas.map((item) => item.productId),
         stockDeltas
       )
@@ -3808,8 +3862,61 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       });
     }
 
+    const touchedVariantProducts = materials.filter((material) => material.variantId).map((material) => material.productId);
+    if (touchedVariantProducts.length > 0) {
+      applyVariantStockMapToBatch(batch, variantStockMap, baseProducts);
+    }
+
     await batch.commit();
     return service;
+  };
+
+  const registerService = async (input: RegisterServiceInput) => {
+    return registerServiceInternal(input);
+  };
+
+  const updateService = async (serviceId: string, input: RegisterServiceInput) => {
+    const existingService = services.find((service) => service.id === serviceId);
+    if (!existingService) {
+      throw new Error('No se encontro el servicio a editar.');
+    }
+    if (existingService.source === 'sale-addon') {
+      throw new Error('Los servicios asociados a una venta deben editarse desde la venta original.');
+    }
+
+    const linkedMovements = movements.filter((movement) => movement.serviceOrderId === serviceId);
+    const restoredProducts = products.map((product) => {
+      const variantRestorations = new Map<string, number>();
+      existingService.materials
+        .filter((item) => item.productId === product.id && item.variantId)
+        .forEach((item) => {
+          variantRestorations.set(
+            item.variantId!,
+            (variantRestorations.get(item.variantId!) ?? 0) + item.quantity
+          );
+        });
+
+      if (variantRestorations.size === 0) {
+        return product;
+      }
+
+      return {
+        ...product,
+        variants: (product.variants ?? []).map((variant) => ({
+          ...variant,
+          stock: variant.stock + (variantRestorations.get(variant.id) ?? 0),
+        })),
+      };
+    });
+
+    const batch = writeBatch(db);
+    batch.delete(doc(db, 'services', serviceId));
+    linkedMovements.forEach((movement) => batch.delete(doc(db, 'movements', movement.id)));
+    await batch.commit();
+
+    const remainingMovements = movements.filter((movement) => movement.serviceOrderId !== serviceId);
+
+    return registerServiceInternal(input, remainingMovements, restoredProducts, { serviceId });
   };
 
   const createServiceVisit = async (input: CreateServiceVisitInput): Promise<ServiceVisit> => {
@@ -4181,6 +4288,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         registerSaleReturn,
         registerSaleReturns,
         registerService,
+        updateService,
         createServiceVisit,
         assignServiceVisit,
         startServiceVisit,
