@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
-import { Globe, ImagePlus, Save } from 'lucide-react';
+import { Globe, ImagePlus, RefreshCcw, Save } from 'lucide-react';
 import { SectionHeader } from '@/components/admin/shared/section-header';
 import { CatalogImageDialog } from '@/components/admin/products/catalog-image-dialog';
 import { Button } from '@/components/ui/button';
