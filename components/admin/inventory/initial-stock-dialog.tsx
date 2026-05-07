@@ -78,6 +78,7 @@ export function InitialStockDialog({
   const [notes, setNotes] = useState(defaultNotes);
   const [lines, setLines] = useState<InitialStockLineDraft[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const activeProducts = useMemo(
     () => products.filter((product) => product.status === 'active'),
@@ -129,6 +130,7 @@ export function InitialStockDialog({
       setNotes(defaultNotes);
       setLines([]);
       setErrorMessage('');
+      setIsSubmitting(false);
     }
   }, [open]);
 
@@ -144,6 +146,7 @@ export function InitialStockDialog({
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (isSubmitting) return;
     setErrorMessage('');
 
     if (!productId) {
@@ -193,28 +196,36 @@ export function InitialStockDialog({
       return;
     }
 
-    await onSubmit({
-      productId,
-      occurredAt,
-      notes: notes.trim(),
-      items: normalizedItems,
-    });
+    setIsSubmitting(true);
+    try {
+      await onSubmit({
+        productId,
+        occurredAt,
+        notes: notes.trim(),
+        items: normalizedItems,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <AdminResponsiveDialog
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={(nextOpen) => {
+        if (isSubmitting) return;
+        onOpenChange(nextOpen);
+      }}
       title="Cargar inventario inicial"
       description="Registra en una sola operacion el stock fisico inicial de un producto simple o varias variantes del mismo producto."
       desktopContentClassName="lg:max-w-5xl"
       footer={
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
             Cancelar
           </Button>
-          <Button form={initialStockFormId} type="submit">
-            Guardar carga inicial
+          <Button form={initialStockFormId} type="submit" disabled={isSubmitting}>
+            {isSubmitting ? 'Guardando...' : 'Guardar carga inicial'}
           </Button>
         </div>
       }

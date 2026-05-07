@@ -96,6 +96,7 @@ export function UserFormDialog({
     resolver: zodResolver(isEditing ? updateUserSchema : createUserSchema),
     defaultValues,
   });
+  const isSubmitting = form.formState.isSubmitting;
 
   useEffect(() => {
     if (!initialUser) {
@@ -118,7 +119,10 @@ export function UserFormDialog({
     <AdminResponsiveDialog
       key={dialogModeKey}
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={(nextOpen) => {
+        if (isSubmitting) return;
+        onOpenChange(nextOpen);
+      }}
       title={isEditing ? 'Editar usuario' : 'Nuevo usuario'}
       description={
         isEditing
@@ -128,11 +132,11 @@ export function UserFormDialog({
       desktopContentClassName="lg:max-w-4xl"
       footer={
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
             Cancelar
           </Button>
-          <Button form={userFormId} type="submit">
-            {isEditing ? 'Guardar cambios' : 'Crear usuario'}
+          <Button form={userFormId} type="submit" disabled={isSubmitting}>
+            {isSubmitting ? 'Guardando...' : isEditing ? 'Guardar cambios' : 'Crear usuario'}
           </Button>
         </div>
       }

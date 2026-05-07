@@ -44,6 +44,7 @@ export function SubcategoryFormDialog({
       status: 'active',
     },
   });
+  const isSubmitting = form.formState.isSubmitting;
 
   useEffect(() => {
     form.reset({
@@ -53,7 +54,13 @@ export function SubcategoryFormDialog({
   }, [form, open, subcategory]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (isSubmitting) return;
+        onOpenChange(nextOpen);
+      }}
+    >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{subcategory ? 'Editar subcategoria' : 'Nueva subcategoria'}</DialogTitle>
@@ -104,11 +111,11 @@ export function SubcategoryFormDialog({
             ) : null}
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={!category}>
-                {subcategory ? 'Guardar cambios' : 'Crear subcategoria'}
+              <Button type="submit" disabled={!category || isSubmitting}>
+                {isSubmitting ? 'Guardando...' : subcategory ? 'Guardar cambios' : 'Crear subcategoria'}
               </Button>
             </DialogFooter>
           </form>

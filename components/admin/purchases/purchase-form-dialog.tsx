@@ -234,6 +234,7 @@ export function PurchaseFormDialog({
     control: form.control,
     name: 'items',
   }) ?? defaultValues.items;
+  const isSubmitting = form.formState.isSubmitting;
   const values = {
     purchaseType: watchedPurchaseType,
     supplierId: watchedSupplierId,
@@ -489,6 +490,7 @@ export function PurchaseFormDialog({
     lockProduct = false,
     priceSeed?: { purchaseUnitValue?: number; purchaseUnitValueUsd?: number; suggestedSalePrice?: number }
   ) => {
+    if (isSubmitting) return;
     const preferredProduct = preferredProductId
       ? products.find((product) => product.id === preferredProductId)
       : undefined;
@@ -514,6 +516,7 @@ export function PurchaseFormDialog({
   };
 
   const openEditLineDialog = (index: number) => {
+    if (isSubmitting) return;
     setEditingLineIndex(index);
     setDraftLine(createDraftPurchaseLineFromValue(values.items[index]));
     setLockedDraftProductId(null);
@@ -710,17 +713,20 @@ export function PurchaseFormDialog({
     <>
     <AdminResponsiveDialog
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={(nextOpen) => {
+        if (isSubmitting) return;
+        onOpenChange(nextOpen);
+      }}
       title={initialValues ? 'Editar compra' : 'Registrar compra'}
       description="Registra una compra con uno o varios productos del mismo proveedor."
       desktopContentClassName="lg:max-w-4xl"
       footer={
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
             Cancelar
           </Button>
-          <Button form={purchaseFormId} type="submit">
-            {initialValues ? 'Guardar cambios' : 'Registrar compra'}
+          <Button form={purchaseFormId} type="submit" disabled={isSubmitting}>
+            {isSubmitting ? 'Guardando...' : initialValues ? 'Guardar cambios' : 'Registrar compra'}
           </Button>
         </div>
       }
@@ -1253,7 +1259,7 @@ export function PurchaseFormDialog({
                                 variant="outline"
                                 size="sm"
                                 className="w-full rounded-xl bg-card/88 sm:w-auto"
-                                disabled={!firstLineCanSeedVariants}
+                                disabled={!firstLineCanSeedVariants || isSubmitting}
                                 onClick={() =>
                                   openNewLineDialog(firstItemProduct.id, true, {
                                     purchaseUnitValue: Number(firstItem.purchaseUnitValue) || 0,
@@ -1327,7 +1333,7 @@ export function PurchaseFormDialog({
                                 variant="ghost"
                                 size="sm"
                                 className="w-full rounded-xl sm:w-auto"
-                                disabled={!canSeedSiblingVariants}
+                                disabled={!canSeedSiblingVariants || isSubmitting}
                                 onClick={() =>
                                   openNewLineDialog(selectedProduct.id, true, {
                                     purchaseUnitValue: Number(values.items[index]?.purchaseUnitValue) || 0,
@@ -1339,11 +1345,11 @@ export function PurchaseFormDialog({
                                 Otra variante
                               </Button>
                             ) : null}
-                            <Button type="button" variant="ghost" size="sm" className="w-full rounded-xl sm:w-auto" onClick={() => openEditLineDialog(index)}>
+                            <Button type="button" variant="ghost" size="sm" className="w-full rounded-xl sm:w-auto" onClick={() => openEditLineDialog(index)} disabled={isSubmitting}>
                               <Pencil className="mr-2 h-4 w-4" />
                               Editar
                             </Button>
-                            <Button type="button" variant="ghost" size="sm" className="w-full rounded-xl sm:w-auto" onClick={() => remove(index)}>
+                            <Button type="button" variant="ghost" size="sm" className="w-full rounded-xl sm:w-auto" onClick={() => remove(index)} disabled={isSubmitting}>
                               <MinusCircle className="mr-2 h-4 w-4" />
                               Quitar
                             </Button>
@@ -1371,6 +1377,7 @@ export function PurchaseFormDialog({
                   variant="outline"
                   className="w-full rounded-xl bg-card/88 sm:hidden"
                   onClick={() => openNewLineDialog()}
+                  disabled={isSubmitting}
                 >
                   <PlusCircle className="mr-2 h-4 w-4" />
                   Agregar producto
@@ -1380,6 +1387,7 @@ export function PurchaseFormDialog({
                   variant="outline"
                   className="rounded-xl bg-card/88 max-sm:hidden"
                   onClick={() => openNewLineDialog()}
+                  disabled={isSubmitting}
                 >
                   <PlusCircle className="mr-2 h-4 w-4" />
                   Agregar producto
@@ -1402,7 +1410,10 @@ export function PurchaseFormDialog({
 
     <AdminResponsiveDialog
       open={lineDialogOpen}
-      onOpenChange={setLineDialogOpen}
+      onOpenChange={(nextOpen) => {
+        if (isSubmitting) return;
+        setLineDialogOpen(nextOpen);
+      }}
       title={editingLineIndex === null ? 'Agregar producto a la compra' : 'Editar producto de la compra'}
       description={
         isLockedVariantFlow
@@ -1419,15 +1430,16 @@ export function PurchaseFormDialog({
               setLineDialogOpen(false);
               setLockedDraftProductId(null);
             }}
+            disabled={isSubmitting}
           >
             Cancelar
           </Button>
           {editingLineIndex === null && lockedDraftProductId && draftSelectableVariantOptions.length > 1 ? (
-            <Button type="button" variant="outline" onClick={() => saveDraftLine(true)}>
+            <Button type="button" variant="outline" onClick={() => saveDraftLine(true)} disabled={isSubmitting}>
               Agregar y seguir
             </Button>
           ) : null}
-          <Button form={lineFormId} type="submit">
+          <Button form={lineFormId} type="submit" disabled={isSubmitting}>
             {editingLineIndex === null ? 'Agregar producto' : 'Guardar cambios'}
           </Button>
         </div>

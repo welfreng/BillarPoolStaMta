@@ -42,6 +42,7 @@ export function CategoryFormDialog({
       status: 'active',
     },
   });
+  const isSubmitting = form.formState.isSubmitting;
 
   const handleSubmit = form.handleSubmit(async (values) => {
     form.clearErrors();
@@ -68,7 +69,13 @@ export function CategoryFormDialog({
   }, [category, form, open]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (isSubmitting) return;
+        onOpenChange(nextOpen);
+      }}
+    >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{category ? 'Editar categoria' : 'Nueva categoria'}</DialogTitle>
@@ -117,10 +124,12 @@ export function CategoryFormDialog({
             ) : null}
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
                 Cancelar
               </Button>
-              <Button type="submit">{category ? 'Guardar cambios' : 'Crear categoria'}</Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? 'Guardando...' : category ? 'Guardar cambios' : 'Crear categoria'}
+              </Button>
             </DialogFooter>
           </form>
         </Form>

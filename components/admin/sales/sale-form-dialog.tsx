@@ -1138,7 +1138,10 @@ export function SaleFormDialog({
     <>
       <AdminResponsiveDialog
         open={open}
-        onOpenChange={onOpenChange}
+        onOpenChange={(nextOpen) => {
+          if (isSubmitting) return;
+          onOpenChange(nextOpen);
+        }}
         title={isEditingSale ? 'Editar venta' : 'Registrar venta'}
         description={
           hideFinancialSummary
@@ -1711,6 +1714,7 @@ export function SaleFormDialog({
                     variant="outline"
                     className="hidden w-full rounded-xl bg-card/88 sm:inline-flex"
                     onClick={openNewLineDialog}
+                    disabled={isSubmitting}
                   >
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Agregar producto
@@ -1793,16 +1797,19 @@ export function SaleFormDialog({
 
       <AdminResponsiveDialog
         open={lineDialogOpen}
-        onOpenChange={setLineDialogOpen}
+        onOpenChange={(nextOpen) => {
+          if (isSubmitting) return;
+          setLineDialogOpen(nextOpen);
+        }}
         title={editingLineIndex === null ? 'Agregar producto a la venta' : 'Editar producto de la venta'}
         description="Configura esta linea y al guardarla quedara en la lista de productos solicitados."
         desktopContentClassName="lg:max-w-4xl"
         footer={
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button type="button" variant="outline" onClick={() => setLineDialogOpen(false)}>
+            <Button type="button" variant="outline" onClick={() => setLineDialogOpen(false)} disabled={isSubmitting}>
               Cancelar
             </Button>
-            <Button form={lineFormId} type="submit">
+            <Button form={lineFormId} type="submit" disabled={isSubmitting}>
               {editingLineIndex === null ? 'Agregar producto' : 'Guardar cambios'}
             </Button>
           </div>
