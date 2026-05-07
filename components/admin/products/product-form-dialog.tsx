@@ -1229,7 +1229,10 @@ export function ProductFormDialog({
   return (
     <AdminResponsiveDialog
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={(nextOpen) => {
+        if (form.formState.isSubmitting) return;
+        onOpenChange(nextOpen);
+      }}
       title={initialProduct ? 'Editar producto' : 'Nuevo producto'}
       description={
         structureLocked
@@ -1242,11 +1245,11 @@ export function ProductFormDialog({
       footerClassName="px-4 py-2.5 lg:px-5"
       footer={
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={form.formState.isSubmitting}>
             Cancelar
           </Button>
-          <Button form={productFormId} type="submit">
-            {initialProduct ? 'Guardar cambios' : 'Crear producto'}
+          <Button form={productFormId} type="submit" disabled={form.formState.isSubmitting}>
+            {form.formState.isSubmitting ? 'Guardando...' : initialProduct ? 'Guardar cambios' : 'Crear producto'}
           </Button>
         </div>
       }

@@ -154,6 +154,7 @@ export function ServiceFormDialog({
     resolver: zodResolver(serviceSchema),
     defaultValues,
   });
+  const isSubmitting = form.formState.isSubmitting;
 
   useEffect(() => {
     if (open) {
@@ -295,17 +296,20 @@ export function ServiceFormDialog({
   return (
     <AdminResponsiveDialog
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={(nextOpen) => {
+        if (isSubmitting) return;
+        onOpenChange(nextOpen);
+      }}
       title="Registrar servicio de torno"
       description="Registra el valor del trabajo y descuenta del inventario los productos usados en el servicio."
       desktopContentClassName="lg:max-w-4xl"
       footer={
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
             Cancelar
           </Button>
-          <Button form={serviceFormId} type="submit">
-            {submitLabel ?? 'Guardar servicio'}
+          <Button form={serviceFormId} type="submit" disabled={isSubmitting}>
+            {isSubmitting ? 'Guardando...' : submitLabel ?? 'Guardar servicio'}
           </Button>
         </div>
       }

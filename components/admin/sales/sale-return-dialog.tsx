@@ -83,6 +83,7 @@ export function SaleReturnDialog({
     resolver: zodResolver(saleReturnSchema),
     defaultValues,
   });
+  const isSubmitting = form.formState.isSubmitting;
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
@@ -130,7 +131,13 @@ export function SaleReturnDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (isSubmitting) return;
+        onOpenChange(nextOpen);
+      }}
+    >
       <DialogContent className="max-h-[92vh] w-[calc(100vw-1rem)] max-w-[96vw] overflow-y-auto px-4 pb-24 sm:w-[calc(100vw-2rem)] sm:px-5 sm:pb-6 lg:max-w-4xl lg:px-6">
         <DialogHeader>
           <DialogTitle>Registrar devolucion</DialogTitle>
@@ -345,11 +352,11 @@ export function SaleReturnDialog({
             />
 
             <DialogFooter className="sticky bottom-0 -mx-4 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:border-t-0 sm:bg-transparent sm:px-0 sm:py-0">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={fields.length === 0}>
-                Guardar devolucion
+              <Button type="submit" disabled={fields.length === 0 || isSubmitting}>
+                {isSubmitting ? 'Guardando...' : 'Guardar devolucion'}
               </Button>
             </DialogFooter>
           </form>

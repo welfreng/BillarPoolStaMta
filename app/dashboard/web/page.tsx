@@ -3,12 +3,11 @@
 import Image from 'next/image';
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
-import { Globe, ImagePlus, RefreshCcw, Save } from 'lucide-react';
+import { Globe, ImagePlus, Save } from 'lucide-react';
 import { SectionHeader } from '@/components/admin/shared/section-header';
 import { CatalogImageDialog } from '@/components/admin/products/catalog-image-dialog';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { useAdminData } from '@/components/admin/admin-data-context';
 import {
   getFriendlyFirestoreWriteErrorMessage,
   runFirestoreWriteWithBackoff,
@@ -36,12 +35,10 @@ async function loadFileAsDataUrl(
 
 export default function WebPageManagementPage() {
   const { toast } = useToast();
-  const { syncPublicProductStocks } = useAdminData();
   const [openCatalogImageDialog, setOpenCatalogImageDialog] = useState(false);
   const [serviceImages, setServiceImages] = useState<string[]>([]);
   const [draftServiceImages, setDraftServiceImages] = useState<string[]>([]);
   const [savingServices, setSavingServices] = useState(false);
-  const [syncingPublicStock, setSyncingPublicStock] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(
@@ -99,32 +96,6 @@ export default function WebPageManagementPage() {
     }
   };
 
-  const handleSyncPublicStock = async () => {
-    setSyncingPublicStock(true);
-    try {
-      const updatedProducts = await syncPublicProductStocks();
-      toast({
-        title: 'Stock web sincronizado',
-        description:
-          updatedProducts > 0
-            ? `La tienda virtual ya quedo actualizada. Productos sincronizados: ${updatedProducts}.`
-            : 'No habia cambios pendientes por sincronizar en el stock publico.',
-      });
-    } catch (error) {
-      console.error('Error sincronizando stock publico:', error);
-      toast({
-        title: 'No se pudo sincronizar el stock web',
-        description: getFriendlyFirestoreWriteErrorMessage(
-          error,
-          'Intenta nuevamente en unos segundos. Si acabas de hacer muchos cambios, espera un momento antes de reintentar.'
-        ),
-        variant: 'destructive',
-      });
-    } finally {
-      setSyncingPublicStock(false);
-    }
-  };
-
   return (
     <div className="space-y-5 sm:space-y-6">
       <SectionHeader
@@ -171,16 +142,6 @@ export default function WebPageManagementPage() {
               >
                 <ImagePlus className="mr-2 h-4 w-4" />
                 Gestionar imagenes del catalogo
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full rounded-xl sm:w-auto"
-                onClick={handleSyncPublicStock}
-                disabled={syncingPublicStock}
-              >
-                <RefreshCcw className="mr-2 h-4 w-4" />
-                {syncingPublicStock ? 'Sincronizando stock...' : 'Sincronizar stock web'}
               </Button>
             </div>
           </div>

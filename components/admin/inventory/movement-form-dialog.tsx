@@ -73,6 +73,7 @@ export function MovementFormDialog({
     ),
     defaultValues,
   });
+  const isSubmitting = form.formState.isSubmitting;
   const selectedType = form.watch('type');
   const selectedProductId = form.watch('productId');
   const selectedProduct = products.find((product) => product.id === selectedProductId);
@@ -92,17 +93,20 @@ export function MovementFormDialog({
   return (
     <AdminResponsiveDialog
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={(nextOpen) => {
+        if (isSubmitting) return;
+        onOpenChange(nextOpen);
+      }}
       title="Registrar movimiento de inventario"
       description="Usa opciones simples para registrar entradas, salidas o ajustes del stock."
       desktopContentClassName="lg:max-w-4xl"
       footer={
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
             Cancelar
           </Button>
-          <Button form={movementFormId} type="submit">
-            Guardar movimiento
+          <Button form={movementFormId} type="submit" disabled={isSubmitting}>
+            {isSubmitting ? 'Guardando...' : 'Guardar movimiento'}
           </Button>
         </div>
       }

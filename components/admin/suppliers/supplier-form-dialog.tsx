@@ -61,6 +61,7 @@ export function SupplierFormDialog({
     resolver: zodResolver(supplierSchema),
     defaultValues,
   });
+  const isSubmitting = form.formState.isSubmitting;
 
   useEffect(() => {
     if (!initialSupplier) {
@@ -81,17 +82,20 @@ export function SupplierFormDialog({
   return (
     <AdminResponsiveDialog
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={(nextOpen) => {
+        if (isSubmitting) return;
+        onOpenChange(nextOpen);
+      }}
       title={initialSupplier ? 'Editar proveedor' : 'Nuevo proveedor'}
       description="Registra los datos clave del proveedor para usarlo luego en las compras."
       desktopContentClassName="lg:max-w-4xl"
       footer={
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
             Cancelar
           </Button>
-          <Button form={supplierFormId} type="submit">
-            {initialSupplier ? 'Guardar cambios' : 'Crear proveedor'}
+          <Button form={supplierFormId} type="submit" disabled={isSubmitting}>
+            {isSubmitting ? 'Guardando...' : initialSupplier ? 'Guardar cambios' : 'Crear proveedor'}
           </Button>
         </div>
       }
