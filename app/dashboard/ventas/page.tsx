@@ -37,7 +37,60 @@ import { getSaleLineDisplayName } from '@/lib/admin/sale-line-display';
 import type { AuthorizationRequest, AuthorizationRequestType } from '@/lib/admin/types';
 
 function getAuthorizationTypeLabel(requestType: AuthorizationRequestType) {
-  return requestType === 'sale-return' ? 'devolucion' : 'edicion';
+  if (requestType === 'sale-return') return 'devolucion';
+  if (requestType === 'sale-discount') return 'descuento';
+  return 'edicion';
+}
+
+function buildDiscountRequestSummary(
+  draftSalePayload: AuthorizationRequest['draftSalePayload'],
+  products: ReturnType<typeof useAdminData>['products']
+) {
+  if (!draftSalePayload) return { lines: [], totalDiscount: 0 };
+
+  const lines = draftSalePayload.items
+    .map((item, index) => {
+      const product = products.find((productItem) => productItem.id === item.productId);
+      if (!product) return null;
+      const suggestedUnitPrice = item.variantId
+        ? Number(
+            product.variants?.find((variant) => variant.id === item.variantId)?.salePrice ??
+              product.salePrice ??
+              0
+          )
+        : Number(product.salePrice ?? 0);
+      const requestedUnitPrice = Number(item.unitPrice ?? 0);
+      const unitDiscount = suggestedUnitPrice - requestedUnitPrice;
+      if (unitDiscount <= 0) return null;
+
+      return {
+        key: `${item.productId}-${item.variantId ?? index}`,
+        lineNumber: index + 1,
+        productName: product.name,
+        quantity: Number(item.quantity ?? 0),
+        suggestedUnitPrice,
+        requestedUnitPrice,
+        lineDiscount: unitDiscount * Number(item.quantity ?? 0),
+      };
+    })
+    .filter(
+      (
+        item
+      ): item is {
+        key: string;
+        lineNumber: number;
+        productName: string;
+        quantity: number;
+        suggestedUnitPrice: number;
+        requestedUnitPrice: number;
+        lineDiscount: number;
+      } => Boolean(item)
+    );
+
+  return {
+    lines,
+    totalDiscount: lines.reduce((sum, line) => sum + line.lineDiscount, 0),
+  };
 }
 
 function getPendingRequestForGroup(
@@ -833,6 +886,12 @@ export default function VentasPage() {
         initialValues={initialSaleValues}
         mode={editingSaleBatchId ? 'edit' : 'create'}
         hideFinancialSummary={isSalesUser}
+        canEditUnitPrice
+        unitPriceHelpText={
+          isSalesUser
+            ? 'Si bajas el precio frente al valor sugerido, la venta se enviara a autorizacion antes de registrarse.'
+            : undefined
+        }
         onSubmit={async (values) => {
           try {
             const payload = {
@@ -844,6 +903,72 @@ export default function VentasPage() {
               responsibleUser:
                 profile?.nombre?.trim() || user?.displayName || user?.email || 'Usuario de ventas',
             };
+            const discountedLines = values.items
+              .map((item, index) => {
+                const product = products.find((productItem) => productItem.id === item.productId);
+                if (!product) return null;
+                const suggestedUnitPrice = item.variantId
+                  ? Number(
+                      product.variants?.find((variant) => variant.id === item.variantId)?.salePrice ??
+                        product.salePrice ??
+                        0
+                    )
+                  : Number(product.salePrice ?? 0);
+                const requestedUnitPrice = Number(item.unitPrice ?? 0);
+                if (requestedUnitPrice >= suggestedUnitPrice || suggestedUnitPrice <= 0) return null;
+                return {
+                  index: index + 1,
+                  productName: product.name,
+                  requestedUnitPrice,
+                  suggestedUnitPrice,
+                };
+              })
+              .filter(
+                (
+                  item
+                ): item is {
+                  index: number;
+                  productName: string;
+                  requestedUnitPrice: number;
+                  suggestedUnitPrice: number;
+                } => Boolean(item)
+              );
+
+            if (!editingSaleBatchId && isSalesUser && discountedLines.length > 0) {
+              const draftRequestId = `discount-${Date.now()}`;
+              const saleSummary = values.items
+                .map((item) => {
+                  const product = products.find((productItem) => productItem.id === item.productId);
+                  return `${product?.name ?? 'Producto'} x${formatNumber(item.quantity)}`;
+                })
+                .join(' | ');
+              const reason = discountedLines
+                .map(
+                  (line) =>
+                    `Linea ${line.index}: ${line.productName} de ${formatCurrency(line.suggestedUnitPrice)} a ${formatCurrency(line.requestedUnitPrice)}`
+                )
+                .join(' | ');
+
+              await createAuthorizationRequest({
+                saleId: draftRequestId,
+                saleBatchId: draftRequestId,
+                requestType: 'sale-discount',
+                customerName: values.customerName,
+                saleSummary,
+                reason,
+                requestedBy:
+                  profile?.nombre?.trim() || user?.displayName || user?.email || 'Usuario de ventas',
+                requestedByRole: role ?? 'sales',
+                draftSalePayload: payload,
+              });
+
+              setOpenDialog(false);
+              toast({
+                title: 'Solicitud de descuento enviada',
+                description: 'La venta no se registro aun. Quedo pendiente de aprobacion del administrador.',
+              });
+              return;
+            }
             if (editingSaleBatchId) {
               await updateSaleBatch(editingSaleBatchId, payload);
               if (isSalesUser && activeEditAuthorizationId) {

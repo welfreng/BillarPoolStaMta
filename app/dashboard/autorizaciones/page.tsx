@@ -12,10 +12,13 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import { formatCurrency, formatNumber, getProductById } from '@/lib/admin/calculations';
 import type { AuthorizationRequest } from '@/lib/admin/types';
 
 function getRequestTypeLabel(requestType: AuthorizationRequest['requestType']) {
-  return requestType === 'sale-return' ? 'Devolucion' : 'Edicion';
+  if (requestType === 'sale-return') return 'Devolucion';
+  if (requestType === 'sale-discount') return 'Descuento';
+  return 'Edicion';
 }
 
 function getStatusLabel(status: AuthorizationRequest['status']) {
@@ -44,9 +47,56 @@ function getStatusClasses(status: AuthorizationRequest['status']) {
   }
 }
 
+function buildDiscountApprovalSummary(
+  request: AuthorizationRequest,
+  products: ReturnType<typeof useAdminData>['products']
+) {
+  const lines = request.draftSalePayload?.items
+    .map((item, index) => {
+      const product = getProductById(products, item.productId);
+      if (!product) return null;
+      const suggestedUnitPrice = item.variantId
+        ? Number(
+            product.variants?.find((variant) => variant.id === item.variantId)?.salePrice ??
+              product.salePrice ??
+              0
+          )
+        : Number(product.salePrice ?? 0);
+      const requestedUnitPrice = Number(item.unitPrice ?? 0);
+      const unitDiscount = suggestedUnitPrice - requestedUnitPrice;
+      if (unitDiscount <= 0) return null;
+
+      return {
+        key: `${item.productId}-${item.variantId ?? index}`,
+        productName: product.name,
+        quantity: Number(item.quantity ?? 0),
+        suggestedUnitPrice,
+        requestedUnitPrice,
+        lineDiscount: unitDiscount * Number(item.quantity ?? 0),
+      };
+    })
+    .filter(
+      (
+        item
+      ): item is {
+        key: string;
+        productName: string;
+        quantity: number;
+        suggestedUnitPrice: number;
+        requestedUnitPrice: number;
+        lineDiscount: number;
+      } => Boolean(item)
+    ) ?? [];
+
+  return {
+    lines,
+    totalDiscount: lines.reduce((sum, line) => sum + line.lineDiscount, 0),
+  };
+}
+
 export default function AutorizacionesPage() {
   const { role, profile, user } = useAuth();
-  const { authorizationRequests, reviewAuthorizationRequest } = useAdminData();
+  const { authorizationRequests, reviewAuthorizationRequest, completeAuthorizationRequest, registerSale, products } = useAdminData();
   const { toast } = useToast();
   const [query, setQuery] = useState('');
   const [selectedRequest, setSelectedRequest] = useState<AuthorizationRequest | null>(null);
@@ -66,6 +116,10 @@ export default function AutorizacionesPage() {
   const pendingCount = authorizationRequests.filter((request) => request.status === 'pending').length;
   const approvedCount = authorizationRequests.filter((request) => request.status === 'approved').length;
   const rejectedCount = authorizationRequests.filter((request) => request.status === 'rejected').length;
+  const selectedDiscountSummary =
+    selectedRequest?.requestType === 'sale-discount'
+      ? buildDiscountApprovalSummary(selectedRequest, products)
+      : { lines: [], totalDiscount: 0 };
 
   if (role !== 'admin' && role !== 'superadmin') {
     return (
@@ -82,6 +136,26 @@ export default function AutorizacionesPage() {
     if (!selectedRequest) return;
 
     try {
+      if (status === 'approved' && selectedRequest.requestType === 'sale-discount' && selectedRequest.draftSalePayload) {
+        await reviewAuthorizationRequest(selectedRequest.id, {
+          status: 'approved',
+          reviewNote,
+          reviewedBy: profile?.nombre?.trim() || user?.displayName || user?.email || 'Superadmin',
+        });
+        await registerSale(selectedRequest.draftSalePayload);
+        await completeAuthorizationRequest({
+          requestId: selectedRequest.id,
+          completedBy: profile?.nombre?.trim() || user?.displayName || user?.email || 'Superadmin',
+        });
+        toast({
+          title: 'Descuento aprobado y venta registrada',
+          description: 'La venta con descuento ya quedo aplicada en el sistema.',
+        });
+        setSelectedRequest(null);
+        setReviewNote('');
+        return;
+      }
+
       await reviewAuthorizationRequest(selectedRequest.id, {
         status,
         reviewNote,
@@ -301,6 +375,30 @@ export default function AutorizacionesPage() {
                 <p className="mt-3 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Motivo enviado</p>
                 <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">{selectedRequest.reason}</p>
               </div>
+
+              {selectedRequest.requestType === 'sale-discount' && selectedDiscountSummary.lines.length > 0 ? (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-3 dark:border-amber-900/60 dark:bg-amber-950/20 sm:p-4">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">Descuento solicitado</p>
+                    <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+                      Total: {formatCurrency(selectedDiscountSummary.totalDiscount)}
+                    </p>
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    {selectedDiscountSummary.lines.map((line) => (
+                      <div key={line.key} className="rounded-xl bg-white/70 px-3 py-2 dark:bg-slate-950/40">
+                        <p className="font-medium text-slate-900 dark:text-slate-100">{line.productName}</p>
+                        <p className="text-xs text-slate-600 dark:text-slate-300">
+                          {formatNumber(line.quantity)} uds · normal {formatCurrency(line.suggestedUnitPrice)} · solicitado {formatCurrency(line.requestedUnitPrice)}
+                        </p>
+                        <p className="mt-1 text-xs font-medium text-amber-800 dark:text-amber-200">
+                          Descuento linea: {formatCurrency(line.lineDiscount)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
 
               <div className="space-y-2">
                 <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Nota del administrador</p>

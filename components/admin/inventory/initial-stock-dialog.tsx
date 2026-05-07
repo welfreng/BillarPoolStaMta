@@ -1,24 +1,15 @@
 'use client';
 
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { Check, ChevronsUpDown, PlusCircle } from 'lucide-react';
+import { useEffect, useId, useMemo, useState } from 'react';
+import { PlusCircle } from 'lucide-react';
 import { AdminResponsiveDialog } from '@/components/admin/admin-responsive-dialog';
 import type { Product } from '@/lib/admin/types';
 import { Button } from '@/components/ui/button';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Textarea } from '@/components/ui/textarea';
 import { getTodayDateInputValue } from '@/lib/admin/date-utils';
-import { cn } from '@/lib/utils';
 
 export interface InitialStockBatchFormValues {
   productId: string;
@@ -45,81 +36,6 @@ type InitialStockLineDraft = {
 
 const defaultOccurredAt = getTodayDateInputValue();
 const defaultNotes = 'Inventario inicial sin soporte ni proveedor confirmado.';
-
-function SearchableSelect({
-  value,
-  onChange,
-  placeholder,
-  searchPlaceholder,
-  emptyLabel,
-  options,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  placeholder: string;
-  searchPlaceholder: string;
-  emptyLabel: string;
-  options: Array<{ value: string; label: string }>;
-}) {
-  const [open, setOpen] = useState(false);
-  const listRef = useRef<HTMLDivElement | null>(null);
-  const selectedOption = options.find((option) => option.value === value);
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          role="combobox"
-          className="w-full min-w-0 justify-between overflow-hidden px-3 font-normal"
-        >
-          <span className="truncate text-left">
-            {selectedOption ? selectedOption.label : placeholder}
-          </span>
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[min(var(--radix-popover-trigger-width),calc(100vw-2rem))] min-w-[min(280px,calc(100vw-2rem))] p-0" align="start">
-        <Command>
-          <CommandInput placeholder={searchPlaceholder} />
-          <CommandList
-            ref={listRef}
-            onWheel={(event) => {
-              const element = listRef.current;
-              if (!element) return;
-              element.scrollTop += event.deltaY;
-              event.preventDefault();
-              event.stopPropagation();
-            }}
-          >
-            <CommandEmpty>{emptyLabel}</CommandEmpty>
-            <CommandGroup>
-              {options.map((option) => (
-                <CommandItem
-                  key={option.value}
-                  value={`${option.label} ${option.value}`}
-                  onSelect={() => {
-                    onChange(option.value);
-                    setOpen(false);
-                  }}
-                >
-                  <Check
-                    className={cn(
-                      'mr-2 h-4 w-4',
-                      value === option.value ? 'opacity-100' : 'opacity-0'
-                    )}
-                  />
-                  <span className="truncate">{option.label}</span>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  );
-}
 
 function createSimpleLine(product?: Product): InitialStockLineDraft[] {
   return [
@@ -312,6 +228,7 @@ export function InitialStockDialog({
             placeholder="Selecciona producto"
             searchPlaceholder="Buscar producto..."
             emptyLabel="No se encontraron productos."
+            recentStorageKey="initial-stock-products"
             options={activeProducts.map((product) => ({
               value: product.id,
               label: `${product.name} - ${product.brand}`,

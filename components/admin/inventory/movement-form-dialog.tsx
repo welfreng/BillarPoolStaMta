@@ -1,10 +1,9 @@
 'use client';
 
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Check, ChevronsUpDown } from 'lucide-react';
 import { AdminResponsiveDialog } from '@/components/admin/admin-responsive-dialog';
 import { movementReasonLabels, movementReasonsByType, movementTypeLabels } from '@/lib/admin/catalogs';
 import type { Product } from '@/lib/admin/types';
@@ -18,18 +17,9 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { cn } from '@/lib/utils';
 
 const movementSchema = z.object({
   productId: z.string().min(1, 'Selecciona un producto'),
@@ -40,81 +30,6 @@ const movementSchema = z.object({
   notes: z.string().min(4, 'Agrega una observacion breve'),
   responsibleUser: z.string().min(2, 'Ingresa el responsable'),
 });
-
-function SearchableSelect({
-  value,
-  onChange,
-  placeholder,
-  searchPlaceholder,
-  emptyLabel,
-  options,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  placeholder: string;
-  searchPlaceholder: string;
-  emptyLabel: string;
-  options: Array<{ value: string; label: string }>;
-}) {
-  const [open, setOpen] = useState(false);
-  const listRef = useRef<HTMLDivElement | null>(null);
-  const selectedOption = options.find((option) => option.value === value);
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          role="combobox"
-          className="w-full min-w-0 justify-between overflow-hidden px-3 font-normal"
-        >
-          <span className="truncate text-left">
-            {selectedOption ? selectedOption.label : placeholder}
-          </span>
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[min(var(--radix-popover-trigger-width),calc(100vw-2rem))] min-w-[min(280px,calc(100vw-2rem))] p-0" align="start">
-        <Command>
-          <CommandInput placeholder={searchPlaceholder} />
-          <CommandList
-            ref={listRef}
-            onWheel={(event) => {
-              const element = listRef.current;
-              if (!element) return;
-              element.scrollTop += event.deltaY;
-              event.preventDefault();
-              event.stopPropagation();
-            }}
-          >
-            <CommandEmpty>{emptyLabel}</CommandEmpty>
-            <CommandGroup>
-              {options.map((option) => (
-                <CommandItem
-                  key={option.value}
-                  value={`${option.label} ${option.value}`}
-                  onSelect={() => {
-                    onChange(option.value);
-                    setOpen(false);
-                  }}
-                >
-                  <Check
-                    className={cn(
-                      'mr-2 h-4 w-4',
-                      value === option.value ? 'opacity-100' : 'opacity-0'
-                    )}
-                  />
-                  <span className="truncate">{option.label}</span>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  );
-}
 
 export type MovementFormValues = z.infer<typeof movementSchema>;
 
@@ -209,18 +124,19 @@ export function MovementFormDialog({
                   <FormItem>
                     <FormLabel>Producto</FormLabel>
                     <FormControl>
-                      <SearchableSelect
+                            <SearchableSelect
                               value={field.value}
                               onChange={(value) => {
                                 field.onChange(value);
                                 form.setValue('variantId', '', { shouldValidate: true });
                               }}
-                        placeholder="Selecciona producto"
-                        searchPlaceholder="Buscar producto..."
-                        emptyLabel="No se encontraron productos."
-                        options={products.map((product) => ({
-                          value: product.id,
-                          label: `${product.name} - ${product.brand}`,
+                              placeholder="Selecciona producto"
+                              searchPlaceholder="Buscar producto..."
+                              emptyLabel="No se encontraron productos."
+                              recentStorageKey="inventory-movement-products"
+                              options={products.map((product) => ({
+                                value: product.id,
+                                label: `${product.name} - ${product.brand}`,
                         }))}
                       />
                     </FormControl>
