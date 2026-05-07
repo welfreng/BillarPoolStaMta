@@ -30,12 +30,12 @@ import {
   getStockAlertLabel,
   getVariantOrProductRealUnitCost,
 } from '@/lib/admin/calculations';
-import { getTodayDateInputValue, toOperationalDateISOString } from '@/lib/admin/date-utils';
+import { toOperationalDateISOString, getTodayDateInputValue } from '@/lib/admin/date-utils';
 import { useToast } from '@/hooks/use-toast';
 import type { StockAlert } from '@/lib/admin/types';
 
 export default function InventarioPage() {
-  const { categories, movements, products, purchases, sales, services, registerMovement, registerInitialStock, registerSale } = useAdminData();
+  const { categories, movements, products, purchases, sales, services, registerMovement, registerInitialStockBatch, registerSale } = useAdminData();
   const { role, profile, user } = useAuth();
   const { toast } = useToast();
   const [openDialog, setOpenDialog] = useState(false);
@@ -673,9 +673,9 @@ export default function InventarioPage() {
             products={products}
             onSubmit={async (values) => {
               try {
-                await registerInitialStock({
+                await registerInitialStockBatch({
                   ...values,
-                  occurredAt: new Date(values.occurredAt).toISOString(),
+                  occurredAt: toOperationalDateISOString(values.occurredAt),
                   responsibleUser:
                     profile?.nombre?.trim() || user?.displayName || user?.email || 'Administrador',
                 });

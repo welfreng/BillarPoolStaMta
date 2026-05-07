@@ -151,6 +151,20 @@ interface RegisterInitialStockInput {
   suggestedSalePrice?: number;
 }
 
+interface RegisterInitialStockBatchInput {
+  productId: string;
+  occurredAt: string;
+  notes: string;
+  responsibleUser: string;
+  items: Array<{
+    variantId?: string;
+    variantName?: string;
+    quantity: number;
+    estimatedUnitCost: number;
+    suggestedSalePrice?: number;
+  }>;
+}
+
 interface RegisterSaleInput {
   soldAt: string;
   items: Array<{
@@ -342,6 +356,10 @@ interface AdminDataContextValue {
   registerInitialStock: (input: RegisterInitialStockInput) => Promise<{
     movement: InventoryMovement;
     purchase: Purchase;
+  }>;
+  registerInitialStockBatch: (input: RegisterInitialStockBatchInput) => Promise<{
+    movements: InventoryMovement[];
+    purchases: Purchase[];
   }>;
   registerPurchase: (input: RegisterPurchaseInput) => Promise<Purchase[]>;
   updatePurchase: (purchaseId: string, input: RegisterPurchaseInput) => Promise<Purchase>;
@@ -2576,6 +2594,165 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     };
   };
 
+  const registerInitialStockBatch = async (input: RegisterInitialStockBatchInput) => {
+    const targetProduct = products.find((product) => product.id === input.productId);
+    if (!targetProduct) {
+      throw new Error('No se encontro el producto para cargar inventario inicial.');
+    }
+
+    const normalizedItems = input.items
+      .map((item) => ({
+        ...item,
+        quantity: Number(item.quantity ?? 0),
+        estimatedUnitCost: Number(item.estimatedUnitCost ?? 0),
+        suggestedSalePrice:
+          typeof item.suggestedSalePrice === 'number' ? Number(item.suggestedSalePrice) : undefined,
+      }))
+      .filter((item) => item.quantity > 0);
+
+    if (normalizedItems.length === 0) {
+      throw new Error('Agrega al menos una linea con cantidad mayor a cero.');
+    }
+
+    const isVarianted = getProductSaleMode(targetProduct) === 'varianted';
+    const variantStockMap = buildVariantStockMap(products);
+    const productVariantMap = variantStockMap.get(input.productId);
+    const batchId = doc(collection(db, 'purchase-batches')).id;
+    const stockDeltas: Array<{ productId: string; quantity: number }> = [];
+    const batch = writeBatch(db);
+    const purchasesCreated: Purchase[] = [];
+    const movementsCreated: InventoryMovement[] = [];
+    let lastSuggestedSalePriceForSimpleProduct: number | undefined;
+
+    normalizedItems.forEach((item, index) => {
+      const selectedVariant = item.variantId ? getProductVariantById(targetProduct, item.variantId) : null;
+      if (isVarianted && !selectedVariant) {
+        throw new Error(`Selecciona una variante valida para cargar inventario inicial de ${targetProduct.name}.`);
+      }
+      if (!Number.isFinite(item.quantity) || item.quantity <= 0) {
+        throw new Error('La cantidad inicial debe ser mayor a cero.');
+      }
+      if (!Number.isFinite(item.estimatedUnitCost) || item.estimatedUnitCost < 0) {
+        throw new Error('El costo estimado debe ser un valor valido.');
+      }
+
+      const purchaseRef = doc(collection(db, 'purchases'));
+      const movementRef = doc(collection(db, 'movements'));
+      const purchaseValueTotal = Number((item.quantity * item.estimatedUnitCost).toFixed(2));
+      const suggestedSalePrice =
+        typeof item.suggestedSalePrice === 'number' && Number.isFinite(item.suggestedSalePrice) && item.suggestedSalePrice >= 0
+          ? item.suggestedSalePrice
+          : Number(selectedVariant?.salePrice ?? targetProduct.salePrice ?? 0);
+
+      const purchase: Purchase = {
+        id: purchaseRef.id,
+        purchaseId: batchId,
+        purchaseBatchId: batchId,
+        productId: input.productId,
+        variantId: selectedVariant?.id,
+        variantName: selectedVariant?.name ?? item.variantName,
+        supplier: 'Inventario inicial sin proveedor',
+        source: 'initial-load',
+        purchasedAt: input.occurredAt,
+        presentationQuantity: item.quantity,
+        purchaseUnitValue: item.estimatedUnitCost,
+        quantityPurchased: item.quantity,
+        purchasePresentation: 'unit',
+        conversionFactor: 1,
+        purchaseValueTotal,
+        shippingValueTotal: 0,
+        totalInvestment: purchaseValueTotal,
+        realUnitCost: item.estimatedUnitCost,
+        suggestedSalePrice,
+        estimatedMargin: calculateMargin(item.estimatedUnitCost, suggestedSalePrice),
+        notes: input.notes,
+      };
+
+      const movement: InventoryMovement = {
+        id: movementRef.id,
+        productId: input.productId,
+        variantId: selectedVariant?.id,
+        variantName: selectedVariant?.name ?? item.variantName,
+        purchaseId: purchase.id,
+        purchaseBatchId: batchId,
+        type: 'entry',
+        reason: 'initial-load',
+        quantity: item.quantity,
+        notes: input.notes,
+        occurredAt: input.occurredAt,
+        responsibleUser: input.responsibleUser,
+        relatedUnitCost: item.estimatedUnitCost,
+      };
+
+      purchasesCreated.push(purchase);
+      movementsCreated.push(movement);
+      stockDeltas.push({ productId: input.productId, quantity: item.quantity });
+
+      batch.set(doc(db, 'purchases', purchase.id), {
+        ...serializePurchaseForFirestore(purchase),
+        docType: 'legacy-line',
+        purchasedAt: Timestamp.fromDate(new Date(input.occurredAt)),
+      });
+      batch.set(doc(db, 'purchase_items', purchase.id), {
+        ...serializePurchaseForFirestore(purchase),
+        purchaseId: batchId,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        purchasedAt: Timestamp.fromDate(new Date(input.occurredAt)),
+      });
+      batch.set(doc(db, 'movements', movement.id), {
+        ...movement,
+        occurredAt: Timestamp.fromDate(new Date(input.occurredAt)),
+      });
+      batch.set(doc(db, 'inventory_movements', movement.id), {
+        ...movement,
+        sourceType: 'initial-load',
+        sourceId: batchId,
+        occurredAt: Timestamp.fromDate(new Date(input.occurredAt)),
+      });
+
+      if (selectedVariant) {
+        const currentVariantStock = productVariantMap?.get(selectedVariant.id) ?? selectedVariant.stock ?? 0;
+        productVariantMap?.set(selectedVariant.id, currentVariantStock + item.quantity);
+      } else if (!isVarianted) {
+        lastSuggestedSalePriceForSimpleProduct = suggestedSalePrice;
+      }
+
+      if (selectedVariant && typeof suggestedSalePrice === 'number') {
+        const variantRecord = (targetProduct.variants ?? []).find((variant) => variant.id === selectedVariant.id);
+        if (variantRecord) {
+          variantRecord.salePrice = suggestedSalePrice;
+        }
+      }
+
+      if (index === normalizedItems.length - 1 && !isVarianted && typeof lastSuggestedSalePriceForSimpleProduct === 'number') {
+        batch.update(doc(db, 'products', input.productId), {
+          salePrice: lastSuggestedSalePriceForSimpleProduct,
+          updatedAt: serverTimestamp(),
+        });
+      }
+    });
+
+    applyPublicStockMapToBatch(
+      batch,
+      buildPublicStockMap(
+        movements,
+        [input.productId],
+        stockDeltas
+      )
+    );
+    if (isVarianted) {
+      applyVariantStockMapToBatch(batch, variantStockMap, products);
+    }
+
+    await batch.commit();
+
+    return {
+      movements: movementsCreated,
+      purchases: purchasesCreated,
+    };
+  };
+
   const createPurchaseBatch = async (
     input: RegisterPurchaseInput,
     existingBatchId?: string,
@@ -3993,6 +4170,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         deleteSupplier,
         registerMovement,
         registerInitialStock,
+        registerInitialStockBatch,
         registerPurchase,
         updatePurchase,
         updatePurchaseBatch,

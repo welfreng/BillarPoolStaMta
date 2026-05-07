@@ -77,6 +77,7 @@ export function UserFormDialog({
   onOpenChange,
   initialUser,
   canManagePasswords = false,
+  canManageEmails = false,
   canAssignSuperadmin = false,
   onSubmit,
 }: {
@@ -84,6 +85,7 @@ export function UserFormDialog({
   onOpenChange: (open: boolean) => void;
   initialUser?: AppUserAccount;
   canManagePasswords?: boolean;
+  canManageEmails?: boolean;
   canAssignSuperadmin?: boolean;
   onSubmit: (values: CreateUserFormValues | UpdateUserFormValues) => Promise<void> | void;
 }) {
@@ -120,7 +122,7 @@ export function UserFormDialog({
       title={isEditing ? 'Editar usuario' : 'Nuevo usuario'}
       description={
         isEditing
-          ? 'Actualiza los datos operativos del usuario. El correo de acceso no se cambia desde aqui.'
+          ? 'Actualiza los datos operativos del usuario. El superadmin tambien puede corregir correo y contrasena.'
           : 'Crea un usuario del sistema y asigna su rol de acceso.'
       }
       desktopContentClassName="lg:max-w-4xl"
@@ -166,11 +168,13 @@ export function UserFormDialog({
                   <FormItem>
                     <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input type="email" {...field} disabled={isEditing} />
+                      <Input type="email" {...field} disabled={isEditing && !canManageEmails} />
                     </FormControl>
                     {isEditing ? (
                       <FormDescription>
-                        El email tambien pertenece a Firebase Auth. Para cambiarlo de forma segura hace falta un backend con privilegios de administrador.
+                        {canManageEmails
+                          ? 'Como superadmin puedes corregir el correo. El cambio se aplicara de forma segura en Firebase Auth y en el perfil del sistema.'
+                          : 'El email tambien pertenece a Firebase Auth. Para cambiarlo de forma segura hace falta un backend con privilegios de administrador.'}
                       </FormDescription>
                     ) : null}
                     <FormMessage />

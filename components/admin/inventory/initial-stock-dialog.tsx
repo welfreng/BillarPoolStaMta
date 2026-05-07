@@ -1,10 +1,7 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { Check, ChevronsUpDown } from 'lucide-react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { Check, ChevronsUpDown, PlusCircle } from 'lucide-react';
 import { AdminResponsiveDialog } from '@/components/admin/admin-responsive-dialog';
 import type { Product } from '@/lib/admin/types';
 import { Button } from '@/components/ui/button';
@@ -16,42 +13,38 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { getTodayDateInputValue } from '@/lib/admin/date-utils';
 import { cn } from '@/lib/utils';
 
-const initialStockSchema = z.object({
-  productId: z.string().min(1, 'Selecciona un producto'),
-  variantId: z.string().default(''),
-  quantity: z.coerce.number().positive('La cantidad debe ser mayor a cero'),
-  estimatedUnitCost: z.coerce.number().min(0, 'El costo estimado no puede ser negativo'),
-  suggestedSalePrice: z.coerce.number().min(0, 'El precio de venta no puede ser negativo'),
-  occurredAt: z.string().min(1, 'Selecciona la fecha'),
-  notes: z.string().min(6, 'Agrega una nota breve sobre el origen del stock'),
-});
+export interface InitialStockBatchFormValues {
+  productId: string;
+  occurredAt: string;
+  notes: string;
+  items: Array<{
+    variantId?: string;
+    variantName?: string;
+    quantity: number;
+    estimatedUnitCost: number;
+    suggestedSalePrice: number;
+  }>;
+}
 
-export type InitialStockFormValues = z.infer<typeof initialStockSchema>;
-
-const defaultValues: InitialStockFormValues = {
-  productId: '',
-  variantId: '',
-  quantity: 1,
-  estimatedUnitCost: 0,
-  suggestedSalePrice: 0,
-  occurredAt: getTodayDateInputValue(),
-  notes: 'Inventario inicial sin soporte ni proveedor confirmado.',
+type InitialStockLineDraft = {
+  key: string;
+  variantId?: string;
+  variantName?: string;
+  label: string;
+  quantity: string;
+  estimatedUnitCost: string;
+  suggestedSalePrice: string;
 };
+
+const defaultOccurredAt = getTodayDateInputValue();
+const defaultNotes = 'Inventario inicial sin soporte ni proveedor confirmado.';
 
 function SearchableSelect({
   value,
@@ -128,6 +121,30 @@ function SearchableSelect({
   );
 }
 
+function createSimpleLine(product?: Product): InitialStockLineDraft[] {
+  return [
+    {
+      key: 'simple',
+      label: product?.name ?? 'Producto',
+      quantity: '1',
+      estimatedUnitCost: '0',
+      suggestedSalePrice: String(Number(product?.salePrice ?? 0)),
+    },
+  ];
+}
+
+function createVariantLines(product?: Product): InitialStockLineDraft[] {
+  return (product?.variants ?? []).map((variant, index) => ({
+    key: variant.id || `variant-${index + 1}`,
+    variantId: variant.id,
+    variantName: variant.name,
+    label: variant.displayName ?? variant.name,
+    quantity: '',
+    estimatedUnitCost: '0',
+    suggestedSalePrice: String(Number(variant.salePrice ?? product?.salePrice ?? 0)),
+  }));
+}
+
 export function InitialStockDialog({
   open,
   onOpenChange,
@@ -137,72 +154,144 @@ export function InitialStockDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   products: Product[];
-  onSubmit: (values: InitialStockFormValues) => Promise<void> | void;
+  onSubmit: (values: InitialStockBatchFormValues) => Promise<void> | void;
 }) {
   const initialStockFormId = useId();
-  const form = useForm<InitialStockFormValues>({
-    resolver: zodResolver(
-      z
-        .object({
-          productId: z.string().min(1, 'Selecciona un producto'),
-          variantId: z.string().default(''),
-          quantity: z.coerce.number().positive('La cantidad debe ser mayor a cero'),
-          estimatedUnitCost: z.coerce.number().min(0, 'El costo estimado no puede ser negativo'),
-          suggestedSalePrice: z.coerce.number().min(0, 'El precio de venta no puede ser negativo'),
-          occurredAt: z.string().min(1, 'Selecciona la fecha'),
-          notes: z.string().min(6, 'Agrega una nota breve sobre el origen del stock'),
-        })
-        .superRefine((values, ctx) => {
-          const selectedProduct = products.find((product) => product.id === values.productId);
-          if (!selectedProduct) return;
+  const [productId, setProductId] = useState('');
+  const [occurredAt, setOccurredAt] = useState(defaultOccurredAt);
+  const [notes, setNotes] = useState(defaultNotes);
+  const [lines, setLines] = useState<InitialStockLineDraft[]>([]);
+  const [errorMessage, setErrorMessage] = useState('');
 
-          if ((selectedProduct.variants?.length ?? 0) > 0 && !values.variantId.trim()) {
-            ctx.addIssue({
-              code: z.ZodIssueCode.custom,
-              message: 'Selecciona la variante para cargar inventario inicial.',
-              path: ['variantId'],
-            });
-          }
-        })
-    ),
-    defaultValues,
-  });
-
-  const selectedProductId = form.watch('productId');
-  const selectedVariantId = form.watch('variantId');
-  const selectedProduct = products.find((product) => product.id === selectedProductId);
-  const selectedVariant = selectedProduct?.variants?.find((variant) => variant.id === selectedVariantId);
+  const activeProducts = useMemo(
+    () => products.filter((product) => product.status === 'active'),
+    [products]
+  );
+  const selectedProduct = activeProducts.find((product) => product.id === productId);
+  const hasVariants = (selectedProduct?.variants?.length ?? 0) > 0;
+  const linesWithTotals = useMemo(
+    () =>
+      lines.map((line) => {
+        const quantity = Number(line.quantity || 0);
+        const estimatedUnitCost = Number(line.estimatedUnitCost || 0);
+        const suggestedSalePrice = Number(line.suggestedSalePrice || 0);
+        return {
+          ...line,
+          parsedQuantity: Number.isFinite(quantity) ? quantity : 0,
+          parsedEstimatedUnitCost: Number.isFinite(estimatedUnitCost) ? estimatedUnitCost : 0,
+          parsedSuggestedSalePrice: Number.isFinite(suggestedSalePrice) ? suggestedSalePrice : 0,
+          estimatedInvestment:
+            (Number.isFinite(quantity) ? quantity : 0) * (Number.isFinite(estimatedUnitCost) ? estimatedUnitCost : 0),
+          estimatedSalesValue:
+            (Number.isFinite(quantity) ? quantity : 0) * (Number.isFinite(suggestedSalePrice) ? suggestedSalePrice : 0),
+        };
+      }),
+    [lines]
+  );
+  const summaryTotals = useMemo(
+    () =>
+      linesWithTotals.reduce(
+        (totals, line) => {
+          totals.units += Math.max(line.parsedQuantity, 0);
+          totals.estimatedInvestment += Math.max(line.estimatedInvestment, 0);
+          totals.estimatedSalesValue += Math.max(line.estimatedSalesValue, 0);
+          return totals;
+        },
+        {
+          units: 0,
+          estimatedInvestment: 0,
+          estimatedSalesValue: 0,
+        }
+      ),
+    [linesWithTotals]
+  );
 
   useEffect(() => {
     if (!open) {
-      form.reset(defaultValues);
+      setProductId('');
+      setOccurredAt(defaultOccurredAt);
+      setNotes(defaultNotes);
+      setLines([]);
+      setErrorMessage('');
     }
-  }, [form, open]);
+  }, [open]);
 
   useEffect(() => {
-    if (!selectedProduct) return;
+    if (!selectedProduct) {
+      setLines([]);
+      return;
+    }
 
-    form.setValue('suggestedSalePrice', selectedProduct.salePrice, {
-      shouldDirty: true,
-      shouldValidate: true,
-    });
-  }, [form, selectedProduct, selectedProductId]);
+    setLines(hasVariants ? createVariantLines(selectedProduct) : createSimpleLine(selectedProduct));
+    setErrorMessage('');
+  }, [hasVariants, selectedProduct]);
 
-  useEffect(() => {
-    if (!selectedVariant || selectedVariant.salePrice === undefined) return;
-    form.setValue('suggestedSalePrice', Number(selectedVariant.salePrice), {
-      shouldDirty: true,
-      shouldValidate: true,
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setErrorMessage('');
+
+    if (!productId) {
+      setErrorMessage('Selecciona un producto.');
+      return;
+    }
+    if (!occurredAt) {
+      setErrorMessage('Selecciona la fecha de carga.');
+      return;
+    }
+    if (notes.trim().length < 6) {
+      setErrorMessage('Agrega una nota breve sobre el origen del stock.');
+      return;
+    }
+
+    const normalizedItems = lines
+      .map((line) => ({
+        variantId: line.variantId,
+        variantName: line.variantName,
+        quantity: Number(line.quantity || 0),
+        estimatedUnitCost: Number(line.estimatedUnitCost || 0),
+        suggestedSalePrice: Number(line.suggestedSalePrice || 0),
+      }))
+      .filter((line) => line.quantity > 0);
+
+    if (normalizedItems.length === 0) {
+      setErrorMessage(
+        hasVariants
+          ? 'Agrega al menos una variante con cantidad mayor a cero.'
+          : 'La cantidad inicial debe ser mayor a cero.'
+      );
+      return;
+    }
+
+    const invalidLine = normalizedItems.find(
+      (line) =>
+        !Number.isFinite(line.quantity) ||
+        line.quantity <= 0 ||
+        !Number.isFinite(line.estimatedUnitCost) ||
+        line.estimatedUnitCost < 0 ||
+        !Number.isFinite(line.suggestedSalePrice) ||
+        line.suggestedSalePrice < 0
+    );
+
+    if (invalidLine) {
+      setErrorMessage('Revisa cantidades, costos y precios de venta. No se admiten valores negativos.');
+      return;
+    }
+
+    await onSubmit({
+      productId,
+      occurredAt,
+      notes: notes.trim(),
+      items: normalizedItems,
     });
-  }, [form, selectedVariant]);
+  };
 
   return (
     <AdminResponsiveDialog
       open={open}
       onOpenChange={onOpenChange}
       title="Cargar inventario inicial"
-      description="Usa esta opcion cuando el negocio ya tiene stock fisico, pero no cuenta con factura o proveedor registrado."
-      desktopContentClassName="lg:max-w-4xl"
+      description="Registra en una sola operacion el stock fisico inicial de un producto simple o varias variantes del mismo producto."
+      desktopContentClassName="lg:max-w-5xl"
       footer={
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
@@ -214,157 +303,157 @@ export function InitialStockDialog({
         </div>
       }
     >
-        <Form {...form}>
-          <form
-            id={initialStockFormId}
-            onSubmit={form.handleSubmit(async (values) => {
-              await onSubmit(values);
-              form.reset(defaultValues);
-            })}
-            className="space-y-4"
-          >
-            <FormField
-              control={form.control}
-              name="productId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Producto</FormLabel>
-                  <FormControl>
-                    <SearchableSelect
-                      value={field.value}
-                      onChange={(value) => {
-                        field.onChange(value);
-                        form.setValue('variantId', '', { shouldValidate: true });
-                      }}
-                      placeholder="Selecciona producto"
-                      searchPlaceholder="Buscar producto..."
-                      emptyLabel="No se encontraron productos."
-                      options={products
-                        .filter((product) => product.status === 'active')
-                        .map((product) => ({
-                          value: product.id,
-                          label: `${product.name} - ${product.brand}`,
-                        }))}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+      <form id={initialStockFormId} onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-2">
+          <Label>Producto</Label>
+          <SearchableSelect
+            value={productId}
+            onChange={(value) => setProductId(value)}
+            placeholder="Selecciona producto"
+            searchPlaceholder="Buscar producto..."
+            emptyLabel="No se encontraron productos."
+            options={activeProducts.map((product) => ({
+              value: product.id,
+              label: `${product.name} - ${product.brand}`,
+            }))}
+          />
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="initial-stock-occurred-at">Fecha de carga</Label>
+            <Input
+              id="initial-stock-occurred-at"
+              type="date"
+              value={occurredAt}
+              onChange={(event) => setOccurredAt(event.target.value)}
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="initial-stock-notes">Observacion</Label>
+            <Textarea
+              id="initial-stock-notes"
+              rows={3}
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+              placeholder="Ejemplo: inventario recibido antes de usar el sistema, sin factura ni proveedor confirmado."
+            />
+          </div>
+        </div>
 
-            {selectedProduct?.variants?.length ? (
-              <FormField
-                control={form.control}
-                name="variantId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{selectedProduct.variantLabel || 'Variante'}</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Selecciona una variante" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {(selectedProduct.variants ?? []).map((variant) => (
-                          <SelectItem key={variant.id} value={variant.id}>
-                            {variant.name} ({variant.stock})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs leading-5 text-slate-500">
-                      La carga inicial de productos con variantes debe registrarse sobre una variante especifica.
-                    </p>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            ) : null}
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <FormField
-                control={form.control}
-                name="quantity"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Cantidad actual</FormLabel>
-                    <FormControl>
-                      <Input type="number" min="1" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="occurredAt"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Fecha de carga</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+        {selectedProduct ? (
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-900/70">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-950 dark:text-slate-50">
+                  {selectedProduct.name}
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {hasVariants
+                    ? 'Completa en una sola carga las variantes que realmente tienen stock inicial.'
+                    : 'Completa la cantidad, el costo estimado y el precio de venta del producto.'}
+                </p>
+              </div>
+              {hasVariants ? (
+                <div className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs text-slate-600 shadow-sm dark:bg-slate-950/80 dark:text-slate-300">
+                  <PlusCircle className="h-3.5 w-3.5" />
+                  Variantes en un solo guardado
+                </div>
+              ) : null}
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <FormField
-                control={form.control}
-                name="estimatedUnitCost"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Costo estimado por unidad</FormLabel>
-                    <FormControl>
-                      <Input type="number" min="0" step="0.01" {...field} />
-                    </FormControl>
-                    <p className="text-xs leading-5 text-slate-500">
-                      Si no conoces el costo exacto, puedes dejar un valor estimado para arrancar.
+            <div className="mt-4 space-y-3">
+              {linesWithTotals.map((line, index) => (
+                <div
+                  key={line.key}
+                  className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950/80 md:grid-cols-[minmax(0,1.4fr)_minmax(120px,0.75fr)_minmax(140px,0.95fr)_minmax(140px,0.95fr)_minmax(160px,1fr)]"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{line.label}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {hasVariants ? selectedProduct.variantLabel || 'Variante' : 'Producto simple'}
                     </p>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="suggestedSalePrice"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Precio de venta actual</FormLabel>
-                    <FormControl>
-                      <Input type="number" min="0" step="0.01" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor={`initial-stock-quantity-${index}`}>Cantidad</Label>
+                    <Input
+                      id={`initial-stock-quantity-${index}`}
+                      type="number"
+                      min="0"
+                      value={line.quantity}
+                      onChange={(event) =>
+                        setLines((current) =>
+                          current.map((item, itemIndex) =>
+                            itemIndex === index ? { ...item, quantity: event.target.value } : item
+                          )
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor={`initial-stock-cost-${index}`}>Costo estimado</Label>
+                    <Input
+                      id={`initial-stock-cost-${index}`}
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={line.estimatedUnitCost}
+                      onChange={(event) =>
+                        setLines((current) =>
+                          current.map((item, itemIndex) =>
+                            itemIndex === index ? { ...item, estimatedUnitCost: event.target.value } : item
+                          )
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor={`initial-stock-price-${index}`}>Precio de venta</Label>
+                    <Input
+                      id={`initial-stock-price-${index}`}
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={line.suggestedSalePrice}
+                      onChange={(event) =>
+                        setLines((current) =>
+                          current.map((item, itemIndex) =>
+                            itemIndex === index ? { ...item, suggestedSalePrice: event.target.value } : item
+                          )
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Resumen linea</Label>
+                    <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-300">
+                      <p>Inversion: ${line.estimatedInvestment.toLocaleString('es-CO')}</p>
+                      <p>Venta estimada: ${line.estimatedSalesValue.toLocaleString('es-CO')}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
 
-            <FormField
-              control={form.control}
-              name="notes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Observacion</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      rows={4}
-                      placeholder="Ejemplo: stock recibido antes de usar el sistema, sin factura ni proveedor confirmado."
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="mt-4 grid gap-3 rounded-2xl border border-cyan-200 bg-cyan-50/80 p-4 text-sm text-cyan-950 dark:border-cyan-900/40 dark:bg-cyan-950/20 dark:text-cyan-50 md:grid-cols-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.12em] text-cyan-800/80 dark:text-cyan-200/80">Unidades</p>
+                <p className="mt-1 text-lg font-semibold">{summaryTotals.units.toLocaleString('es-CO')}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-[0.12em] text-cyan-800/80 dark:text-cyan-200/80">Inversion estimada</p>
+                <p className="mt-1 text-lg font-semibold">${summaryTotals.estimatedInvestment.toLocaleString('es-CO')}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-[0.12em] text-cyan-800/80 dark:text-cyan-200/80">Venta estimada</p>
+                <p className="mt-1 text-lg font-semibold">${summaryTotals.estimatedSalesValue.toLocaleString('es-CO')}</p>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
-          </form>
-        </Form>
+        {errorMessage ? <p className="text-sm text-rose-600 dark:text-rose-300">{errorMessage}</p> : null}
+      </form>
     </AdminResponsiveDialog>
   );
 }
