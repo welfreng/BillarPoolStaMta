@@ -789,6 +789,7 @@ export function SaleFormDialog({
   const isSubmitting = form.formState.isSubmitting;
 
   const values = form.watch();
+  const hasSaleProduct = values.items.some((item) => Boolean(item.productId));
   const discountSummary = useMemo(() => {
     const lines = values.items
       .map((item, index) => {
@@ -1065,6 +1066,8 @@ export function SaleFormDialog({
   }, [draftLine.productId, draftLine.variantId, draftSelectedVariant, products]);
 
   const openNewLineDialog = () => {
+    if (!hasSaleProduct) return;
+
     setEditingLineIndex(null);
     setDraftLine(createDefaultDraftLine());
     setDraftGiftSectionEnabled(false);
@@ -1187,7 +1190,8 @@ export function SaleFormDialog({
               variant="outline"
               className="h-11 w-full rounded-xl bg-card/90 sm:h-9 sm:w-auto"
               onClick={openNewLineDialog}
-              disabled={isSubmitting}
+              disabled={isSubmitting || !hasSaleProduct}
+              title={!hasSaleProduct ? 'Selecciona primero el producto principal.' : undefined}
             >
               <PlusCircle className="mr-2 h-4 w-4" />
               Agregar producto
@@ -1808,7 +1812,8 @@ export function SaleFormDialog({
                     variant="outline"
                     className="hidden w-full rounded-xl bg-card/88 sm:inline-flex"
                     onClick={openNewLineDialog}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || !hasSaleProduct}
+                    title={!hasSaleProduct ? 'Selecciona primero el producto principal.' : undefined}
                   >
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Agregar producto

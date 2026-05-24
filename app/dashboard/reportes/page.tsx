@@ -1,10 +1,9 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { CalendarDays, FileText, ShoppingBag, TrendingUp, Wallet, Wrench } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, FileText, ShoppingBag, TrendingUp, Wallet, Wrench } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Line, LineChart, XAxis } from 'recharts';
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
 import {
   ChartContainer,
   ChartLegend,
@@ -25,9 +24,24 @@ import {
   buildSalesReportPdf,
 } from '@/lib/admin/report-export';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 const currentMonth = new Date().toISOString().slice(0, 7);
 const LOW_STOCK_ALERT_THRESHOLD = 5;
+const MONTH_OPTIONS = [
+  'enero',
+  'febrero',
+  'marzo',
+  'abril',
+  'mayo',
+  'junio',
+  'julio',
+  'agosto',
+  'septiembre',
+  'octubre',
+  'noviembre',
+  'diciembre',
+];
 const reportChartConfig = {
   revenue: { label: 'Ventas', color: '#0891b2' },
   profit: { label: 'Utilidad', color: '#059669' },
@@ -328,9 +342,12 @@ export default function ReportesPage() {
     return date.toLocaleDateString('es-CO', { month: 'long', year: 'numeric' });
   }, [selectedMonth]);
 
-  const selectedMonthDate = useMemo(() => {
+  const selectedMonthParts = useMemo(() => {
     const [year, month] = selectedMonth.split('-').map(Number);
-    return new Date(year, (month || 1) - 1, 1);
+    return {
+      year: year || new Date().getFullYear(),
+      month: month || 1,
+    };
   }, [selectedMonth]);
 
   const exportPdf = async () => {
@@ -374,26 +391,58 @@ export default function ReportesPage() {
                 </Button>
               </PopoverTrigger>
               <PopoverContent
-                className="w-auto rounded-2xl border border-border bg-card/95 p-0 text-foreground shadow-xl dark:border-slate-800 dark:bg-slate-950"
+                className="w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-border bg-card/95 p-3 text-foreground shadow-xl dark:border-slate-800 dark:bg-slate-950"
                 align="start"
               >
-                <Calendar
-                  mode="single"
-                  selected={selectedMonthDate}
-                  month={selectedMonthDate}
-                  onMonthChange={(date) => {
-                    const nextMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-                    setSelectedMonth(nextMonth);
-                  }}
-                  onSelect={(date) => {
-                    if (!date) return;
-                    const nextMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-                    setSelectedMonth(nextMonth);
-                    setCalendarOpen(false);
-                  }}
-                  captionLayout="dropdown"
-                  showOutsideDays={false}
-                />
+                <div className="flex items-center justify-between gap-2 border-b border-border pb-3 dark:border-slate-800">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9 rounded-xl"
+                    onClick={() =>
+                      setSelectedMonth(`${selectedMonthParts.year - 1}-${String(selectedMonthParts.month).padStart(2, '0')}`)
+                    }
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    <span className="sr-only">Año anterior</span>
+                  </Button>
+                  <p className="text-sm font-semibold text-foreground">{selectedMonthParts.year}</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9 rounded-xl"
+                    onClick={() =>
+                      setSelectedMonth(`${selectedMonthParts.year + 1}-${String(selectedMonthParts.month).padStart(2, '0')}`)
+                    }
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                    <span className="sr-only">Año siguiente</span>
+                  </Button>
+                </div>
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  {MONTH_OPTIONS.map((monthOption, index) => {
+                    const monthNumber = index + 1;
+                    const monthValue = `${selectedMonthParts.year}-${String(monthNumber).padStart(2, '0')}`;
+                    const isActive = selectedMonth === monthValue;
+
+                    return (
+                      <Button
+                        key={monthOption}
+                        type="button"
+                        variant={isActive ? 'default' : 'outline'}
+                        className={cn('h-10 rounded-xl px-2 text-xs capitalize', isActive ? '' : 'bg-background/80')}
+                        onClick={() => {
+                          setSelectedMonth(monthValue);
+                          setCalendarOpen(false);
+                        }}
+                      >
+                        {monthOption}
+                      </Button>
+                    );
+                  })}
+                </div>
               </PopoverContent>
             </Popover>
             <Button type="button" onClick={() => void exportPdf()} disabled={isExportingPdf} className="rounded-xl">
@@ -647,11 +696,10 @@ export default function ReportesPage() {
         </div>
 
         {dataset.summaryRows.length > 0 ? (
-          <Table className="min-w-[1260px]">
+          <Table className="min-w-[1160px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Fecha</TableHead>
-                <TableHead>Venta</TableHead>
                 <TableHead>Cliente</TableHead>
                 <TableHead>Telefono</TableHead>
                 <TableHead>Vendedor</TableHead>
@@ -669,7 +717,6 @@ export default function ReportesPage() {
               {dataset.summaryRows.map((row) => (
                 <TableRow key={row.transactionKey}>
                   <TableCell>{row.saleDate.slice(0, 16).replace('T', ' ')}</TableCell>
-                  <TableCell>{row.saleId}</TableCell>
                   <TableCell className="max-w-[220px] whitespace-normal">{row.customer}</TableCell>
                   <TableCell>{row.customerPhone || 'Sin telefono'}</TableCell>
                   <TableCell>{row.seller}</TableCell>
@@ -705,11 +752,10 @@ export default function ReportesPage() {
         </div>
 
         {dataset.detailRows.length > 0 ? (
-          <Table className="min-w-[1640px]">
+          <Table className="min-w-[1540px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Fecha</TableHead>
-                <TableHead>Venta</TableHead>
                 <TableHead>Cliente</TableHead>
                 <TableHead>Vendedor</TableHead>
                 <TableHead>Metodo pago</TableHead>
@@ -734,7 +780,6 @@ export default function ReportesPage() {
               {dataset.detailRows.map((row, index) => (
                 <TableRow key={`${row.transactionKey}-${row.itemType}-${row.reference}-${index}`}>
                   <TableCell>{row.saleDate.slice(0, 16).replace('T', ' ')}</TableCell>
-                  <TableCell>{row.saleId}</TableCell>
                   <TableCell className="max-w-[220px] whitespace-normal">{row.customer}</TableCell>
                   <TableCell>{row.seller}</TableCell>
                   <TableCell>{row.paymentMethod}</TableCell>
