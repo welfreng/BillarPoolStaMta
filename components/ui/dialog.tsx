@@ -60,7 +60,7 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          'bg-card text-card-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-[26px] border border-border p-6 shadow-[0_28px_80px_rgba(15,23,42,0.18)] duration-200 dark:border-slate-800 dark:shadow-[0_28px_80px_rgba(2,6,23,0.46)] sm:max-w-lg',
+          'bg-card text-card-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed inset-0 z-50 grid h-[100dvh] w-screen max-w-none translate-x-0 translate-y-0 gap-4 overflow-y-auto rounded-none border-0 border-border p-4 shadow-[0_28px_80px_rgba(15,23,42,0.18)] duration-200 dark:border-slate-800 dark:shadow-[0_28px_80px_rgba(2,6,23,0.46)] sm:inset-auto sm:top-[50%] sm:left-[50%] sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:w-full sm:max-w-lg sm:translate-x-[-50%] sm:translate-y-[-50%] sm:overflow-visible sm:rounded-[26px] sm:border sm:p-6',
           className,
         )}
         {...props}

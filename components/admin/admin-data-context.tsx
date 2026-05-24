@@ -14,6 +14,7 @@ import {
   deleteDoc,
   doc,
   getDocs,
+  increment,
   onSnapshot,
   orderBy,
   query,
@@ -59,6 +60,7 @@ import type {
   AuthorizationRequestStatus,
   AuthorizationRequestType,
   DashboardSummary,
+  Customer,
   InventoryMovement,
   MovementReason,
   MovementType,
@@ -112,6 +114,7 @@ interface RegisterMovementInput {
   type: MovementType;
   reason: MovementReason;
   quantity: number;
+  occurredAt?: string;
   notes: string;
   responsibleUser: string;
   relatedUnitCost?: number;
@@ -182,6 +185,7 @@ interface RegisterSaleInput {
   }>;
   customerName: string;
   customerPhone: string;
+  customerDocument?: string;
   paymentMethod?: string;
   paymentReference?: string;
   notes: string;
@@ -330,6 +334,7 @@ interface AdminDataContextValue {
   movements: InventoryMovement[];
   purchases: Purchase[];
   sales: Sale[];
+  customers: Customer[];
   services: ServiceOrder[];
   serviceVisits: ServiceVisit[];
   authorizationRequests: AuthorizationRequest[];
@@ -392,6 +397,8 @@ interface AdminDataContextValue {
 
 const AdminDataContext = createContext<AdminDataContextValue | undefined>(undefined);
 
+const ANONYMOUS_CUSTOMER_NAME = 'Cliente NN';
+
 function generateId(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
 }
@@ -428,6 +435,35 @@ function resolveOperationalResetOptions(
 
 function targetProductName(products: Product[], productId: string) {
   return products.find((product) => product.id === productId)?.name ?? 'producto';
+}
+
+function normalizeCustomerName(value: string) {
+  const trimmedValue = value.trim().replace(/\s+/g, ' ');
+  if (!trimmedValue) return ANONYMOUS_CUSTOMER_NAME;
+  if (trimmedValue.toLowerCase() === 'cliente mostrador') return ANONYMOUS_CUSTOMER_NAME;
+  return trimmedValue;
+}
+
+function isAnonymousCustomerName(value: string) {
+  return normalizeCustomerName(value).toLowerCase() === ANONYMOUS_CUSTOMER_NAME.toLowerCase();
+}
+
+function normalizeSearchText(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+function buildCustomerId(name: string, phone: string, documentNumber: string) {
+  const normalizedDocument = documentNumber.replace(/\D/g, '');
+  const normalizedPhone = phone.replace(/\D/g, '');
+  const normalizedName = normalizeSearchText(name)
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  if (normalizedDocument) return `doc-${normalizedDocument}`;
+  return normalizedPhone ? `phone-${normalizedPhone}` : `name-${normalizedName || 'cliente'}`;
 }
 
 function buildSaleGiftItems(
@@ -792,12 +828,30 @@ function mapSaleDocument(documentId: string, data: DocumentData): Sale {
     returnedQuantity: Number(data.returnedQuantity ?? 0),
     returnedSaleAmount: Number(data.returnedSaleAmount ?? 0),
     returnedCostAmount: Number(data.returnedCostAmount ?? 0),
+    customerId: data.customerId ? String(data.customerId) : undefined,
     customerName: String(data.customerName ?? ''),
     customerPhone: String(data.customerPhone ?? ''),
+    customerDocument: data.customerDocument ? String(data.customerDocument) : undefined,
     paymentMethod: String(data.paymentMethod ?? ''),
     paymentReference: String(data.paymentReference ?? ''),
     notes: String(data.notes ?? ''),
     responsibleUser: String(data.responsibleUser ?? 'Administrador'),
+  };
+}
+
+function mapCustomerDocument(documentId: string, data: DocumentData): Customer {
+  return {
+    id: documentId,
+    fullName: String(data.fullName ?? ''),
+    normalizedName: String(data.normalizedName ?? ''),
+    phone: data.phone ? String(data.phone) : undefined,
+    documentNumber: data.documentNumber ? String(data.documentNumber) : undefined,
+    lastSaleAt: data.lastSaleAt ? normalizeDateValue(data.lastSaleAt) : undefined,
+    lastSaleBatchId: data.lastSaleBatchId ? String(data.lastSaleBatchId) : undefined,
+    saleCount: Number(data.saleCount ?? 0),
+    totalRevenue: Number(data.totalRevenue ?? 0),
+    createdAt: data.createdAt ? normalizeDateValue(data.createdAt) : undefined,
+    updatedAt: data.updatedAt ? normalizeDateValue(data.updatedAt) : undefined,
   };
 }
 
@@ -954,6 +1008,9 @@ function mapAuthorizationRequestDocument(documentId: string, data: DocumentData)
             : [],
           customerName: String(data.draftSalePayload.customerName ?? ''),
           customerPhone: String(data.draftSalePayload.customerPhone ?? ''),
+          customerDocument: data.draftSalePayload.customerDocument
+            ? String(data.draftSalePayload.customerDocument)
+            : undefined,
           paymentMethod: data.draftSalePayload.paymentMethod
             ? String(data.draftSalePayload.paymentMethod)
             : undefined,
@@ -1259,6 +1316,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   const [movements, setMovements] = useState<InventoryMovement[]>(initialMovements);
   const [purchases, setPurchases] = useState<Purchase[]>(initialPurchases);
   const [sales, setSales] = useState<Sale[]>(initialSales);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [services, setServices] = useState<ServiceOrder[]>(initialServices);
   const [serviceVisits, setServiceVisits] = useState<ServiceVisit[]>([]);
   const [authorizationRequests, setAuthorizationRequests] = useState<AuthorizationRequest[]>([]);
@@ -1288,7 +1346,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     const readyCollections = new Set<string>();
     const markReady = (collectionName: string) => {
       readyCollections.add(collectionName);
-      if (readyCollections.size === 10) {
+      if (readyCollections.size === 11) {
         setLoading(false);
       }
     };
@@ -1408,6 +1466,18 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       }
     );
 
+    const unsubCustomers = onSnapshot(
+      query(collection(db, 'customers'), orderBy('fullName', 'asc')),
+      (snapshot) => {
+        setCustomers(snapshot.docs.map((item) => mapCustomerDocument(item.id, item.data())));
+        markReady('customers');
+      },
+      (error) => {
+        console.error('Error leyendo clientes desde Firestore:', error);
+        markReady('customers');
+      }
+    );
+
     const unsubServices = onSnapshot(
       query(collection(db, 'services'), orderBy('performedAt', 'desc')),
       (snapshot) => {
@@ -1454,6 +1524,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       unsubMovements();
       unsubPurchases();
       unsubSales();
+      unsubCustomers();
       unsubServices();
       unsubServiceVisits();
       unsubAuthorizationRequests();
@@ -1482,30 +1553,15 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   const buildForwardPublicStockMap = (
     sourceProducts: Product[],
     touchedProductIds: string[],
-    addedMovements: Array<{ productId: string; quantity: number }> = []
+    addedMovements: Array<{ productId: string; quantity: number }> = [],
+    baseMovements: InventoryMovement[] = movements
   ) => {
-    const uniqueProductIds = Array.from(new Set(touchedProductIds.filter(Boolean)));
-    const deltasByProductId = new Map<string, number>();
-
-    addedMovements.forEach((movement) => {
-      if (!movement.productId) return;
-      deltasByProductId.set(
-        movement.productId,
-        Number(deltasByProductId.get(movement.productId) ?? 0) + Number(movement.quantity ?? 0)
-      );
+    const simpleProductIds = touchedProductIds.filter((productId) => {
+      const product = sourceProducts.find((item) => item.id === productId);
+      return product ? getProductSaleMode(product) !== 'varianted' : true;
     });
 
-    return new Map(
-      uniqueProductIds.map((productId) => {
-        const product = sourceProducts.find((item) => item.id === productId);
-        const currentPublicStock = Math.max(
-          Number(product?.publicStock ?? product?.stock ?? product?.stockOnHand ?? 0),
-          0
-        );
-        const delta = Number(deltasByProductId.get(productId) ?? 0);
-        return [productId, Math.max(currentPublicStock + delta, 0)];
-      })
-    );
+    return buildPublicStockMap(baseMovements, simpleProductIds, addedMovements);
   };
 
   const applyPublicStockMapToBatch = (
@@ -2163,15 +2219,20 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   const createProduct = async (input: NewProductInput) => {
     const createdAt = new Date().toISOString();
     const productRef = doc(collection(db, 'products'));
-    const normalizedVariantAttributes = normalizeVariantAttributeDefinitions(input.variantAttributes);
-    const normalizedVariants = resetVariantInventoryState(
-      normalizeProductVariantRecords(
-        productRef.id,
-        normalizedVariantAttributes,
-        input.variants
+    const inputUsesVariants = input.saleMode === 'varianted';
+    const normalizedVariantAttributes = inputUsesVariants
+      ? normalizeVariantAttributeDefinitions(input.variantAttributes)
+      : [];
+    const normalizedVariants = inputUsesVariants
+      ? resetVariantInventoryState(
+          normalizeProductVariantRecords(
+            productRef.id,
+            normalizedVariantAttributes,
+            input.variants
+          )
       )
-    );
-    const nextSaleMode = input.saleMode === 'varianted' || normalizedVariants.length > 0 ? 'varianted' : 'simple';
+      : [];
+    const nextSaleMode = inputUsesVariants && normalizedVariants.length > 0 ? 'varianted' : 'simple';
     const productSummary =
       nextSaleMode === 'varianted'
         ? {
@@ -2226,16 +2287,21 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       throw new Error('No se encontro el producto a actualizar.');
     }
 
-    const normalizedVariantAttributes = normalizeVariantAttributeDefinitions(input.variantAttributes);
-    const normalizedVariants = preserveVariantInventoryState(
-      normalizeProductVariantRecords(
-        productId,
-        normalizedVariantAttributes,
-        input.variants
-      ),
-      existingProduct.variants ?? []
-    );
-    const nextSaleMode = input.saleMode === 'varianted' || normalizedVariants.length > 0 ? 'varianted' : 'simple';
+    const inputUsesVariants = input.saleMode === 'varianted';
+    const normalizedVariantAttributes = inputUsesVariants
+      ? normalizeVariantAttributeDefinitions(input.variantAttributes)
+      : [];
+    const normalizedVariants = inputUsesVariants
+      ? preserveVariantInventoryState(
+          normalizeProductVariantRecords(
+            productId,
+            normalizedVariantAttributes,
+            input.variants
+          ),
+          existingProduct.variants ?? []
+        )
+      : [];
+    const nextSaleMode = inputUsesVariants && normalizedVariants.length > 0 ? 'varianted' : 'simple';
     const nextProduct: Product = {
       ...existingProduct,
       ...input,
@@ -2499,7 +2565,10 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     });
     movements
       .filter((movement) => movement.productId === productId)
-      .forEach((movement) => batch.delete(doc(db, 'movements', movement.id)));
+      .forEach((movement) => {
+        batch.delete(doc(db, 'movements', movement.id));
+        batch.delete(doc(db, 'inventory_movements', movement.id));
+      });
     purchases
       .filter((purchase) => purchase.productId === productId)
       .forEach((purchase) => batch.delete(doc(db, 'purchases', purchase.id)));
@@ -2572,8 +2641,26 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       throw new Error(`Selecciona una variante valida para ${targetProduct.name}.`);
     }
 
+    const inputQuantity = Number(input.quantity);
+    if (!Number.isFinite(inputQuantity) || inputQuantity <= 0) {
+      throw new Error('La cantidad del movimiento debe ser mayor a cero.');
+    }
+    const occurredAtDate = input.occurredAt ? new Date(input.occurredAt) : new Date();
+    if (Number.isNaN(occurredAtDate.getTime())) {
+      throw new Error('La fecha del movimiento no es valida.');
+    }
     const normalizedQuantity =
-      input.type === 'exit' ? -Math.abs(input.quantity) : input.quantity;
+      input.type === 'exit' ? -Math.abs(inputQuantity) : inputQuantity;
+    if (input.type === 'exit') {
+      const availableStock = selectedVariant
+        ? getProductVariantStock(targetProduct, selectedVariant.id, movements)
+        : getProductStock(movements, input.productId);
+      if (inputQuantity > availableStock) {
+        throw new Error(
+          `No hay stock suficiente para ${targetProduct.name}. Disponible: ${availableStock}, solicitado: ${inputQuantity}.`
+        );
+      }
+    }
     const movementRef = doc(collection(db, 'movements'));
     const movement: InventoryMovement = {
       id: movementRef.id,
@@ -2584,7 +2671,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       reason: input.reason,
       quantity: normalizedQuantity,
       notes: input.notes,
-      occurredAt: new Date().toISOString(),
+      occurredAt: occurredAtDate.toISOString(),
       responsibleUser: input.responsibleUser,
       relatedUnitCost:
         input.relatedUnitCost ?? getVariantOrProductRealUnitCost(purchases, input.productId, selectedVariant?.id),
@@ -2593,11 +2680,11 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     const batch = writeBatch(db);
     batch.set(movementRef, {
       ...movement,
-      occurredAt: serverTimestamp(),
+      occurredAt: Timestamp.fromDate(occurredAtDate),
     });
     batch.set(doc(db, 'inventory_movements', movement.id), {
       ...movement,
-      occurredAt: serverTimestamp(),
+      occurredAt: Timestamp.fromDate(occurredAtDate),
       sourceType: 'manual-adjustment',
       sourceId: movement.id,
     });
@@ -2640,6 +2727,16 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     }
     if (!Number.isFinite(estimatedUnitCost) || estimatedUnitCost < 0) {
       throw new Error('El costo estimado debe ser un valor valido.');
+    }
+    const alreadyHasInventoryHistory = movements.some(
+      (movement) =>
+        movement.productId === input.productId &&
+        (selectedVariant ? movement.variantId === selectedVariant.id : !movement.variantId)
+    );
+    if (alreadyHasInventoryHistory) {
+      throw new Error(
+        'Este producto ya tiene historial de inventario. Usa Registrar movimiento para corregir stock sin duplicar la carga inicial.'
+      );
     }
 
     const purchaseRef = doc(collection(db, 'purchases'));
@@ -2784,6 +2881,18 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       if (!Number.isFinite(item.estimatedUnitCost) || item.estimatedUnitCost < 0) {
         throw new Error('El costo estimado debe ser un valor valido.');
       }
+      const alreadyHasInventoryHistory = movements.some(
+        (movement) =>
+          movement.productId === input.productId &&
+          (selectedVariant ? movement.variantId === selectedVariant.id : !movement.variantId)
+      );
+      if (alreadyHasInventoryHistory) {
+        throw new Error(
+          selectedVariant
+            ? `La variante ${selectedVariant.name} ya tiene historial de inventario. Usa Registrar movimiento para corregir stock.`
+            : 'Este producto ya tiene historial de inventario. Usa Registrar movimiento para corregir stock sin duplicar la carga inicial.'
+        );
+      }
 
       const purchaseRef = doc(collection(db, 'purchases'));
       const movementRef = doc(collection(db, 'movements'));
@@ -2915,11 +3024,18 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     if (input.items.length === 0) {
       throw new Error('Agrega al menos un producto a la compra.');
     }
+    const purchasedAtDate = new Date(input.purchasedAt);
+    if (Number.isNaN(purchasedAtDate.getTime())) {
+      throw new Error('La fecha de la compra no es valida.');
+    }
 
     input.items.forEach((item) => {
       const targetProduct = baseProducts.find((product) => product.id === item.productId);
       if (!targetProduct) {
         throw new Error('Uno de los productos de la compra no existe.');
+      }
+      if (getProductSaleMode(targetProduct) === 'varianted' && !getProductVariantById(targetProduct, item.variantId)) {
+        throw new Error(`Selecciona una variante valida para comprar ${targetProduct.name}.`);
       }
     });
     const isInternationalPurchase = input.purchaseType === 'international';
@@ -2947,6 +3063,12 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
           ? 'Cada linea internacional debe tener un valor unitario en USD mayor a cero.'
           : 'Cada linea debe tener un valor unitario de compra mayor a cero.'
       );
+    }
+    if (normalizedItemsWithConvertedPrice.some((item) => item.presentationQuantity <= 0)) {
+      throw new Error('Cada linea debe tener una cantidad comprada mayor a cero.');
+    }
+    if (normalizedItemsWithConvertedPrice.some((item) => item.suggestedSalePrice < 0)) {
+      throw new Error('El precio sugerido no puede ser negativo.');
     }
     const totalPurchasedUnits = normalizedItems.reduce(
       (total, item) => total + item.presentationQuantity,
@@ -3029,14 +3151,14 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       batch.set(doc(db, 'purchases', purchase.id), {
         ...serializePurchaseForFirestore(purchase),
         docType: 'legacy-line',
-        purchasedAt: Timestamp.fromDate(new Date(input.purchasedAt)),
+        purchasedAt: Timestamp.fromDate(purchasedAtDate),
       });
       batch.set(doc(db, 'purchase_items', purchase.id), {
         ...serializePurchaseForFirestore(purchase),
         purchaseId: batchId,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-        purchasedAt: Timestamp.fromDate(new Date(input.purchasedAt)),
+        purchasedAt: Timestamp.fromDate(purchasedAtDate),
       });
       batch.set(movementRef, {
         id: movementRef.id,
@@ -3049,7 +3171,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         reason: 'purchase',
         quantity: quantityPurchased,
         notes: `Compra grupal registrada a proveedor ${input.supplier}`,
-        occurredAt: Timestamp.fromDate(new Date(input.purchasedAt)),
+        occurredAt: Timestamp.fromDate(purchasedAtDate),
         responsibleUser: 'Administrador',
         relatedUnitCost: totals.realUnitCost,
       });
@@ -3066,11 +3188,19 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         reason: 'purchase',
         quantity: quantityPurchased,
         notes: `Compra grupal registrada a proveedor ${input.supplier}`,
-        occurredAt: Timestamp.fromDate(new Date(input.purchasedAt)),
+        occurredAt: Timestamp.fromDate(purchasedAtDate),
         responsibleUser: 'Administrador',
         relatedUnitCost: totals.realUnitCost,
       });
       stockDeltas.push({ productId: item.productId, quantity: quantityPurchased });
+      if (item.variantId) {
+        const targetProduct = baseProducts.find((product) => product.id === item.productId);
+        const variantRecord = (targetProduct?.variants ?? []).find((variant) => variant.id === item.variantId);
+        if (variantRecord) {
+          variantRecord.salePrice = Number(item.suggestedSalePrice ?? variantRecord.salePrice ?? targetProduct?.salePrice ?? 0);
+          variantRecord.latestUnitCost = totals.realUnitCost;
+        }
+      }
       batch.update(doc(db, 'products', item.productId), {
         salePrice:
           item.variantId && getProductSaleMode(baseProducts.find((product) => product.id === item.productId)) === 'varianted'
@@ -3087,7 +3217,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       buildForwardPublicStockMap(
         baseProducts,
         stockDeltas.map((item) => item.productId),
-        stockDeltas
+        stockDeltas,
+        baseMovements
       )
     );
     const variantStockMap = buildVariantStockMap(baseProducts);
@@ -3101,7 +3232,6 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       const variantRecord = (targetProduct?.variants ?? []).find((variant) => variant.id === item.variantId);
       if (variantRecord) {
         variantRecord.salePrice = Number(item.suggestedSalePrice ?? variantRecord.salePrice ?? targetProduct?.salePrice ?? 0);
-        variantRecord.latestUnitCost = getVariantOrProductRealUnitCost(purchases, item.productId, item.variantId);
       }
     });
     applyVariantStockMapToBatch(batch, variantStockMap, baseProducts);
@@ -3118,10 +3248,16 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     }
 
     const batch = writeBatch(db);
-    targetPurchases.forEach((purchase) => batch.delete(doc(db, 'purchases', purchase.id)));
+    targetPurchases.forEach((purchase) => {
+      batch.delete(doc(db, 'purchases', purchase.id));
+      batch.delete(doc(db, 'purchase_items', purchase.id));
+    });
     movements
       .filter((movement) => movement.purchaseBatchId === batchId)
-      .forEach((movement) => batch.delete(doc(db, 'movements', movement.id)));
+      .forEach((movement) => {
+        batch.delete(doc(db, 'movements', movement.id));
+        batch.delete(doc(db, 'inventory_movements', movement.id));
+      });
     await batch.commit();
 
     const remainingMovements = movements.filter((movement) => movement.purchaseBatchId !== batchId);
@@ -3140,9 +3276,13 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
 
     const batch = writeBatch(db);
     batch.delete(doc(db, 'purchases', purchaseId));
+    batch.delete(doc(db, 'purchase_items', purchaseId));
     movements
       .filter((movement) => movement.purchaseId === purchaseId)
-      .forEach((movement) => batch.delete(doc(db, 'movements', movement.id)));
+      .forEach((movement) => {
+        batch.delete(doc(db, 'movements', movement.id));
+        batch.delete(doc(db, 'inventory_movements', movement.id));
+      });
     await batch.commit();
 
     const remainingMovements = movements.filter((movement) => movement.purchaseId !== purchaseId);
@@ -3164,8 +3304,12 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
 
     const batch = writeBatch(db);
     batch.delete(doc(db, 'purchases', purchaseId));
+    batch.delete(doc(db, 'purchase_items', purchaseId));
     const removedMovements = movements.filter((movement) => movement.purchaseId === purchaseId);
-    removedMovements.forEach((movement) => batch.delete(doc(db, 'movements', movement.id)));
+    removedMovements.forEach((movement) => {
+      batch.delete(doc(db, 'movements', movement.id));
+      batch.delete(doc(db, 'inventory_movements', movement.id));
+    });
     applyPublicStockMapToBatch(
       batch,
       buildPublicStockMap(
@@ -3185,9 +3329,15 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     }
 
     const batch = writeBatch(db);
-    targetPurchases.forEach((purchase) => batch.delete(doc(db, 'purchases', purchase.id)));
+    targetPurchases.forEach((purchase) => {
+      batch.delete(doc(db, 'purchases', purchase.id));
+      batch.delete(doc(db, 'purchase_items', purchase.id));
+    });
     const removedMovements = movements.filter((movement) => movement.purchaseBatchId === batchId);
-    removedMovements.forEach((movement) => batch.delete(doc(db, 'movements', movement.id)));
+    removedMovements.forEach((movement) => {
+      batch.delete(doc(db, 'movements', movement.id));
+      batch.delete(doc(db, 'inventory_movements', movement.id));
+    });
     applyPublicStockMapToBatch(
       batch,
       buildPublicStockMap(
@@ -3210,7 +3360,9 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       throw new Error('Agrega al menos un producto a la venta.');
     }
 
+    const normalizedCustomerName = normalizeCustomerName(input.customerName);
     const normalizedCustomerPhone = input.customerPhone.trim();
+    const normalizedCustomerDocument = input.customerDocument?.trim() ?? '';
     const normalizedPaymentMethod = SALES_PAYMENT_FIELDS_ENABLED
       ? input.paymentMethod?.trim() || 'efectivo'
       : 'efectivo';
@@ -3222,6 +3374,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     }
 
     const variantStockMap = buildVariantStockMap(baseProducts);
+    const simpleStockMap = new Map<string, number>();
     const lineRecords = input.items.map((item) => {
       const targetProduct = baseProducts.find((product) => product.id === item.productId);
       if (!targetProduct) {
@@ -3248,10 +3401,13 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         variantId = selectedVariant.id;
         variantName = selectedVariant.name;
       } else {
-        const availableStock = getProductStock(baseMovements, item.productId);
+        const availableStock = simpleStockMap.has(item.productId)
+          ? Number(simpleStockMap.get(item.productId) ?? 0)
+          : getProductStock(baseMovements, item.productId);
         if (quantity > availableStock) {
           throw new Error(`La cantidad vendida supera el stock disponible de ${targetProduct.name}.`);
         }
+        simpleStockMap.set(item.productId, availableStock - quantity);
       }
 
       const realUnitCost = getVariantOrProductRealUnitCost(purchases, item.productId, variantId);
@@ -3311,6 +3467,9 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       const sale: Sale = {
         id: saleRef.id,
         saleBatchId,
+        customerId: isAnonymousCustomerName(normalizedCustomerName)
+          ? undefined
+          : buildCustomerId(normalizedCustomerName, normalizedCustomerPhone, normalizedCustomerDocument),
         productId: lineItem.productId,
         soldAt: input.soldAt,
         quantity: lineItem.quantity,
@@ -3328,8 +3487,9 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         returnedQuantity: 0,
         returnedSaleAmount: 0,
         returnedCostAmount: 0,
-        customerName: input.customerName,
+        customerName: normalizedCustomerName,
         customerPhone: normalizedCustomerPhone,
+        customerDocument: normalizedCustomerDocument || undefined,
         paymentMethod: normalizedPaymentMethod,
         paymentReference: normalizedPaymentReference,
         notes: input.notes,
@@ -3349,6 +3509,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         variantId: lineItem.variantId ?? null,
         variantName: lineItem.variantName ?? null,
         giftedProductId: sale.giftedProductId ?? null,
+        customerId: sale.customerId ?? null,
+        customerDocument: sale.customerDocument ?? null,
         paymentMethod: sale.paymentMethod,
         paymentReference: sale.paymentReference ?? null,
         soldAt: Timestamp.fromDate(new Date(input.soldAt)),
@@ -3363,7 +3525,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         type: 'exit',
         reason: 'sale',
         quantity: -Math.abs(lineItem.quantity),
-        notes: input.notes || `Venta registrada${input.customerName ? ` para ${input.customerName}` : ''}`,
+        notes: input.notes || `Venta registrada para ${normalizedCustomerName}`,
         occurredAt: Timestamp.fromDate(new Date(input.soldAt)),
         responsibleUser: input.responsibleUser,
         relatedUnitCost: lineItem.realUnitCost,
@@ -3379,7 +3541,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         type: 'exit',
         reason: 'sale',
         quantity: -Math.abs(lineItem.quantity),
-        notes: input.notes || `Venta registrada${input.customerName ? ` para ${input.customerName}` : ''}`,
+        notes: input.notes || `Venta registrada para ${normalizedCustomerName}`,
         occurredAt: Timestamp.fromDate(new Date(input.soldAt)),
         responsibleUser: input.responsibleUser,
         relatedUnitCost: lineItem.realUnitCost,
@@ -3397,7 +3559,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
           quantity: -Math.abs(giftItem.quantity),
           notes:
             input.notes ||
-            `Obsequio asociado a ${targetProductName(baseProducts, lineItem.productId)}${input.customerName ? ` para ${input.customerName}` : ''}`,
+            `Obsequio asociado a ${targetProductName(baseProducts, lineItem.productId)} para ${normalizedCustomerName}`,
           occurredAt: Timestamp.fromDate(new Date(input.soldAt)),
           responsibleUser: input.responsibleUser,
           relatedUnitCost: giftItem.unitCost,
@@ -3413,7 +3575,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
           quantity: -Math.abs(giftItem.quantity),
           notes:
             input.notes ||
-            `Obsequio asociado a ${targetProductName(baseProducts, lineItem.productId)}${input.customerName ? ` para ${input.customerName}` : ''}`,
+            `Obsequio asociado a ${targetProductName(baseProducts, lineItem.productId)} para ${normalizedCustomerName}`,
           occurredAt: Timestamp.fromDate(new Date(input.soldAt)),
           responsibleUser: input.responsibleUser,
           relatedUnitCost: giftItem.unitCost,
@@ -3438,7 +3600,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
           saleId: linkedSale.id,
           saleBatchId,
           performedAt: input.soldAt,
-          customerName: input.customerName,
+          customerName: normalizedCustomerName,
           cueReference: serviceItem.cueReference,
           paymentMethod: normalizedPaymentMethod,
           paymentReference: normalizedPaymentReference,
@@ -3451,7 +3613,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
           materials: [],
           notes:
             serviceItem.notes ||
-            `Servicio asociado a la venta de ${targetProduct.name}${input.customerName ? ` para ${input.customerName}` : ''}`,
+            `Servicio asociado a la venta de ${targetProduct.name} para ${normalizedCustomerName}`,
           responsibleUser: input.responsibleUser,
         };
 
@@ -3473,16 +3635,45 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       buildForwardPublicStockMap(
         baseProducts,
         stockDeltas.map((item) => item.productId),
-        stockDeltas
+        stockDeltas,
+        baseMovements
       )
     );
     applyVariantStockMapToBatch(batch, variantStockMap, baseProducts);
+
+    if (!isAnonymousCustomerName(normalizedCustomerName)) {
+      const customerId = buildCustomerId(normalizedCustomerName, normalizedCustomerPhone, normalizedCustomerDocument);
+      const customerRevenue = createdSales.reduce((sum, sale) => sum + sale.totalSale, 0);
+      const customerPayload: Omit<Customer, 'createdAt' | 'updatedAt'> = {
+        id: customerId,
+        fullName: normalizedCustomerName,
+        normalizedName: normalizeSearchText(normalizedCustomerName),
+        phone: normalizedCustomerPhone || undefined,
+        documentNumber: normalizedCustomerDocument || undefined,
+        lastSaleAt: input.soldAt,
+        lastSaleBatchId: saleBatchId,
+        saleCount: 0,
+        totalRevenue: 0,
+      };
+      batch.set(
+        doc(db, 'customers', customerId),
+        {
+          ...customerPayload,
+          phone: customerPayload.phone ?? null,
+          documentNumber: customerPayload.documentNumber ?? null,
+          saleCount: options?.saleBatchId ? increment(0) : increment(createdSales.length),
+          totalRevenue: options?.saleBatchId ? increment(0) : increment(customerRevenue),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+    }
 
     if (input.actorRole === 'sales') {
       const soldUnits = createdSales.reduce((sum, sale) => sum + sale.quantity, 0);
       queueAdminNotification(batch, {
         title: 'Nueva venta registrada',
-        message: `${input.responsibleUser} registro ${createdSales.length} item(s) para ${input.customerName || 'cliente'} por ${soldUnits} unidad(es).`,
+        message: `${input.responsibleUser} registro ${createdSales.length} item(s) para ${normalizedCustomerName} por ${soldUnits} unidad(es).`,
         href: '/dashboard/ventas',
         createdAt: input.soldAt,
       });
@@ -3605,10 +3796,15 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     const batch = writeBatch(db);
     existingSales.forEach((sale) => batch.delete(doc(db, 'sales', sale.id)));
     linkedServiceOrders.forEach((service) => batch.delete(doc(db, 'services', service.id)));
+    const saleMovementsToDelete = new Map<string, InventoryMovement>();
     movements
       .filter((movement) => existingSales.some((sale) => sale.id === movement.saleId))
-      .forEach((movement) => batch.delete(doc(db, 'movements', movement.id)));
-    giftMovementsToUpdate.forEach((movement) => batch.delete(doc(db, 'movements', movement.id)));
+      .forEach((movement) => saleMovementsToDelete.set(movement.id, movement));
+    giftMovementsToUpdate.forEach((movement) => saleMovementsToDelete.set(movement.id, movement));
+    saleMovementsToDelete.forEach((movement) => {
+      batch.delete(doc(db, 'movements', movement.id));
+      batch.delete(doc(db, 'inventory_movements', movement.id));
+    });
     await batch.commit();
 
     const remainingMovements = movements.filter(
@@ -3831,7 +4027,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     return updatedSales;
   };
 
-  const registerServiceInternal = async (
+  const buildServiceWritePlan = (
     input: RegisterServiceInput,
     baseMovements: InventoryMovement[] = movements,
     baseProducts: Product[] = products,
@@ -3851,10 +4047,6 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     }
 
     const directServiceCost = Math.max(Number(input.serviceCost ?? 0), 0);
-    if (input.materials.length === 0 && directServiceCost <= 0) {
-      throw new Error('Agrega materiales o un costo para registrar el servicio.');
-    }
-
     const materialMap = new Map<string, { productId: string; variantId?: string; variantName?: string; quantity: number }>();
     input.materials.forEach((item) => {
       const productId = item.productId?.trim();
@@ -3936,7 +4128,19 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       responsibleUser: input.responsibleUser,
     };
 
-    const batch = writeBatch(db);
+    return { service, materials };
+  };
+
+  const addServiceWritesToBatch = (
+    batch: ReturnType<typeof writeBatch>,
+    input: RegisterServiceInput,
+    plan: { service: ServiceOrder; materials: ServiceMaterialItem[] },
+    baseProducts: Product[],
+    baseMovements: InventoryMovement[],
+    extraTouchedProductIds: string[] = [],
+    extraTouchedVariantProductIds: string[] = []
+  ) => {
+    const { service, materials } = plan;
     batch.set(doc(db, 'services', service.id), {
       ...service,
       serviceLabel: service.serviceLabel ?? null,
@@ -3969,6 +4173,24 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         responsibleUser: input.responsibleUser,
         relatedUnitCost: material.unitCost,
       });
+      batch.set(doc(db, 'inventory_movements', movementRef.id), {
+        id: movementRef.id,
+        serviceOrderId: service.id,
+        productId: material.productId,
+        variantId: material.variantId ?? null,
+        variantName: material.variantName ?? null,
+        sourceType: 'service',
+        sourceId: service.id,
+        type: 'exit',
+        reason: 'service',
+        quantity: -Math.abs(material.quantity),
+        notes:
+          input.notes ||
+          `Consumo por servicio para ${input.customerName || 'cliente'}${input.cueReference ? ` - ${input.cueReference}` : ''}`,
+        occurredAt: Timestamp.fromDate(new Date(input.performedAt)),
+        responsibleUser: input.responsibleUser,
+        relatedUnitCost: material.unitCost,
+      });
       stockDeltas.push({ productId: material.productId, quantity: -Math.abs(material.quantity) });
 
       if (material.variantId) {
@@ -3982,8 +4204,9 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       batch,
       buildForwardPublicStockMap(
         baseProducts,
-        stockDeltas.map((item) => item.productId),
-        stockDeltas
+        [...extraTouchedProductIds, ...stockDeltas.map((item) => item.productId)],
+        stockDeltas,
+        baseMovements
       )
     );
 
@@ -3996,13 +4219,29 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       });
     }
 
-    const touchedVariantProducts = materials.filter((material) => material.variantId).map((material) => material.productId);
+    const touchedVariantProducts = Array.from(
+      new Set([
+        ...extraTouchedVariantProductIds,
+        ...materials.filter((material) => material.variantId).map((material) => material.productId),
+      ])
+    );
     if (touchedVariantProducts.length > 0) {
       applyVariantStockMapToBatch(batch, variantStockMap, baseProducts);
     }
 
+  };
+
+  const registerServiceInternal = async (
+    input: RegisterServiceInput,
+    baseMovements: InventoryMovement[] = movements,
+    baseProducts: Product[] = products,
+    options?: { serviceId?: string }
+  ) => {
+    const plan = buildServiceWritePlan(input, baseMovements, baseProducts, options);
+    const batch = writeBatch(db);
+    addServiceWritesToBatch(batch, input, plan, baseProducts, baseMovements);
     await batch.commit();
-    return service;
+    return plan.service;
   };
 
   const registerService = async (input: RegisterServiceInput) => {
@@ -4043,14 +4282,26 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       };
     });
 
+    const remainingMovements = movements.filter((movement) => movement.serviceOrderId !== serviceId);
+    const plan = buildServiceWritePlan(input, remainingMovements, restoredProducts, { serviceId });
+
     const batch = writeBatch(db);
-    batch.delete(doc(db, 'services', serviceId));
-    linkedMovements.forEach((movement) => batch.delete(doc(db, 'movements', movement.id)));
+    linkedMovements.forEach((movement) => {
+      batch.delete(doc(db, 'movements', movement.id));
+      batch.delete(doc(db, 'inventory_movements', movement.id));
+    });
+    addServiceWritesToBatch(
+      batch,
+      input,
+      plan,
+      restoredProducts,
+      remainingMovements,
+      linkedMovements.map((movement) => movement.productId),
+      linkedMovements.filter((movement) => movement.variantId).map((movement) => movement.productId)
+    );
     await batch.commit();
 
-    const remainingMovements = movements.filter((movement) => movement.serviceOrderId !== serviceId);
-
-    return registerServiceInternal(input, remainingMovements, restoredProducts, { serviceId });
+    return plan.service;
   };
 
   const createServiceVisit = async (input: CreateServiceVisitInput): Promise<ServiceVisit> => {
@@ -4392,6 +4643,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         movements,
         purchases,
         sales,
+        customers,
         services,
         serviceVisits,
         authorizationRequests,

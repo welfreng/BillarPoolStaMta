@@ -222,12 +222,28 @@ export interface Sale {
   returnedQuantity: number;
   returnedSaleAmount: number;
   returnedCostAmount: number;
+  customerId?: string;
   customerName: string;
   customerPhone: string;
+  customerDocument?: string;
   paymentMethod?: string;
   paymentReference?: string;
   notes: string;
   responsibleUser: string;
+}
+
+export interface Customer {
+  id: string;
+  fullName: string;
+  normalizedName: string;
+  phone?: string;
+  documentNumber?: string;
+  lastSaleAt?: string;
+  lastSaleBatchId?: string;
+  saleCount: number;
+  totalRevenue: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export type AuthorizationDraftSaleLine = {
@@ -248,6 +264,7 @@ export interface AuthorizationDraftSalePayload {
   items: AuthorizationDraftSaleLine[];
   customerName: string;
   customerPhone: string;
+  customerDocument?: string;
   paymentMethod?: string;
   paymentReference?: string;
   notes: string;

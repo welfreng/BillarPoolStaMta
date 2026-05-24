@@ -34,7 +34,6 @@ type InitialStockLineDraft = {
   suggestedSalePrice: string;
 };
 
-const defaultOccurredAt = getTodayDateInputValue();
 const defaultNotes = 'Inventario inicial sin soporte ni proveedor confirmado.';
 
 function createSimpleLine(product?: Product): InitialStockLineDraft[] {
@@ -74,7 +73,7 @@ export function InitialStockDialog({
 }) {
   const initialStockFormId = useId();
   const [productId, setProductId] = useState('');
-  const [occurredAt, setOccurredAt] = useState(defaultOccurredAt);
+  const [occurredAt, setOccurredAt] = useState(() => getTodayDateInputValue());
   const [notes, setNotes] = useState(defaultNotes);
   const [lines, setLines] = useState<InitialStockLineDraft[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
@@ -126,7 +125,7 @@ export function InitialStockDialog({
   useEffect(() => {
     if (!open) {
       setProductId('');
-      setOccurredAt(defaultOccurredAt);
+      setOccurredAt(getTodayDateInputValue());
       setNotes(defaultNotes);
       setLines([]);
       setErrorMessage('');
@@ -217,6 +216,9 @@ export function InitialStockDialog({
         onOpenChange(nextOpen);
       }}
       title="Cargar inventario inicial"
+      busy={isSubmitting}
+      busyTitle="Guardando carga inicial..."
+      busyDescription="Espera la confirmacion para evitar duplicar el inventario inicial."
       description="Registra en una sola operacion el stock fisico inicial de un producto simple o varias variantes del mismo producto."
       desktopContentClassName="lg:max-w-5xl"
       footer={

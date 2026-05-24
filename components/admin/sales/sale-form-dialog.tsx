@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
 import { formatCurrency, formatNumber, getProductStock, getVariantOrProductRealUnitCost } from '@/lib/admin/calculations';
 import { getTodayDateInputValue } from '@/lib/admin/date-utils';
@@ -39,7 +40,7 @@ import {
   saleGiftCategories,
   type SaleGiftCategory,
 } from '@/lib/admin/sale-gift-rules';
-import type { InventoryMovement, Product, Purchase } from '@/lib/admin/types';
+import type { Customer, InventoryMovement, Product, Purchase } from '@/lib/admin/types';
 import { createDefaultInstallationServiceItem, supportsInstallationService } from '@/lib/admin/sale-service-helpers';
 import { getProductVariantStock, getVariantSalePrice } from '@/lib/admin/variant-helpers';
 import { cn } from '@/lib/utils';
@@ -74,18 +75,11 @@ const saleSchema = z
     soldAt: z.string().min(1, 'Selecciona la fecha'),
     items: z.array(saleLineItemSchema).min(1, 'Agrega al menos un producto'),
     customerPhone: z.string().default(''),
-    customerName: z.string().min(2, 'Ingresa el nombre del cliente'),
+    customerDocument: z.string().default(''),
+    customerName: z.string().default(''),
     notes: z.string().default(''),
   })
   .superRefine((values, context) => {
-    if (values.customerName.trim().toLowerCase() === 'cliente mostrador') {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['customerName'],
-        message: 'Ingresa el nombre real del cliente.',
-      });
-    }
-
     const normalizedCustomerPhone = values.customerPhone.trim();
     if (normalizedCustomerPhone && normalizedCustomerPhone.length < 7) {
       context.addIssue({
@@ -740,7 +734,8 @@ const defaultValues: SaleFormValues = {
   soldAt: getTodayDateInputValue(),
   items: [createDefaultLineItem()],
   customerPhone: '',
-  customerName: 'Cliente mostrador',
+  customerDocument: '',
+  customerName: '',
   notes: '',
 };
 
@@ -750,6 +745,7 @@ export function SaleFormDialog({
   products,
   purchases,
   movements,
+  customers,
   initialValues,
   mode = initialValues ? 'edit' : 'create',
   hideFinancialSummary = false,
@@ -762,6 +758,7 @@ export function SaleFormDialog({
   products: Product[];
   purchases: Purchase[];
   movements: InventoryMovement[];
+  customers?: Customer[];
   initialValues?: SaleFormValues | null;
   mode?: 'create' | 'edit';
   hideFinancialSummary?: boolean;
@@ -771,6 +768,7 @@ export function SaleFormDialog({
 }) {
   const saleFormId = useId();
   const lineFormId = useId();
+  const customerListId = useId();
   const isEditingSale = mode === 'edit';
   const form = useForm<SaleFormValues>({
     resolver: zodResolver(saleSchema),
@@ -862,6 +860,30 @@ export function SaleFormDialog({
 
   const firstItem = values.items[0] ?? createDefaultLineItem();
   const normalizedCustomerPhone = values.customerPhone?.trim() ?? '';
+  const customerOptions = useMemo(
+    () =>
+      [...(customers ?? [])]
+        .filter((customer) => customer.fullName.trim())
+        .sort((left, right) => left.fullName.localeCompare(right.fullName, 'es')),
+    [customers]
+  );
+
+  const applyCustomerMemory = (rawValue: string) => {
+    const normalizedValue = rawValue.trim().toLowerCase();
+    if (!normalizedValue) return;
+
+    const matchedCustomer = customerOptions.find((customer) => {
+      const fullName = customer.fullName.trim().toLowerCase();
+      const phone = customer.phone?.trim().toLowerCase() ?? '';
+      const documentNumber = customer.documentNumber?.trim().toLowerCase() ?? '';
+      return fullName === normalizedValue || phone === normalizedValue || documentNumber === normalizedValue;
+    });
+    if (!matchedCustomer) return;
+
+    form.setValue('customerName', matchedCustomer.fullName, { shouldValidate: true, shouldDirty: true });
+    form.setValue('customerPhone', matchedCustomer.phone ?? '', { shouldValidate: true, shouldDirty: true });
+    form.setValue('customerDocument', matchedCustomer.documentNumber ?? '', { shouldValidate: true, shouldDirty: true });
+  };
 
   const saleSummaries = values.items.map((saleItem) => {
     const product = products.find((item) => item.id === saleItem.productId);
@@ -1121,7 +1143,9 @@ export function SaleFormDialog({
       return;
     }
 
-    if (editingLineIndex === null) {
+    if (editingLineIndex === null && values.items.length === 1 && !values.items[0]?.productId) {
+      update(0, normalizedDraftLine);
+    } else if (editingLineIndex === null) {
       append(normalizedDraftLine);
     } else {
       update(editingLineIndex, normalizedDraftLine);
@@ -1143,36 +1167,52 @@ export function SaleFormDialog({
           onOpenChange(nextOpen);
         }}
         title={isEditingSale ? 'Editar venta' : 'Registrar venta'}
+        busy={isSubmitting}
+        busyTitle={isEditingSale ? 'Actualizando venta...' : 'Registrando venta...'}
+        busyDescription="Espera la confirmacion. El formulario quedara bloqueado para evitar duplicados o cierres accidentales."
         description={
           hideFinancialSummary
             ? 'Cada venta descuenta stock y mantiene actualizado el inventario.'
             : 'Cada venta descuenta stock y deja trazabilidad para los reportes del negocio.'
         }
         desktopContentClassName="lg:max-w-4xl"
+        mobileContentClassName="rounded-none border-0 bg-background dark:bg-slate-950"
+        headerClassName="px-4 pt-3 pb-3 sm:px-5 lg:px-6"
+        bodyClassName="px-3 py-3 pb-4 sm:px-5 lg:px-6"
+        footerClassName="px-3 py-3 sm:px-5 lg:px-6"
         footer={
           <div className="grid gap-2 sm:flex sm:items-center sm:justify-between">
             <Button
               type="button"
               variant="outline"
-              className="w-full sm:w-auto"
+              className="h-11 w-full rounded-xl bg-card/90 sm:h-9 sm:w-auto"
               onClick={openNewLineDialog}
               disabled={isSubmitting}
             >
               <PlusCircle className="mr-2 h-4 w-4" />
               Agregar producto
             </Button>
-            <div className="grid grid-cols-2 gap-2 sm:flex">
+            <div className="grid grid-cols-[0.82fr_1.18fr] gap-2 sm:flex">
               <Button
                 type="button"
                 variant="outline"
-                className="w-full sm:w-auto"
+                className="h-11 w-full rounded-xl sm:h-9 sm:w-auto"
                 onClick={() => onOpenChange(false)}
                 disabled={isSubmitting}
               >
                 Cancelar
               </Button>
-              <Button form={saleFormId} type="submit" className="w-full sm:w-auto" disabled={isSubmitting}>
-                {isSubmitting ? 'Guardando...' : isEditingSale ? 'Actualizar venta' : 'Registrar venta'}
+              <Button form={saleFormId} type="submit" className="h-11 w-full rounded-xl sm:h-9 sm:w-auto" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <Spinner className="mr-2 h-4 w-4" />
+                    {isEditingSale ? 'Actualizando...' : 'Registrando...'}
+                  </>
+                ) : isEditingSale ? (
+                  'Actualizar venta'
+                ) : (
+                  'Registrar venta'
+                )}
               </Button>
             </div>
           </div>
@@ -1187,6 +1227,18 @@ export function SaleFormDialog({
               })}
               className="space-y-3.5 sm:space-y-6"
             >
+              <fieldset disabled={isSubmitting} className="space-y-3.5 disabled:pointer-events-none disabled:opacity-70 sm:space-y-6">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border border-emerald-200/80 bg-emerald-50/90 px-3.5 py-3 shadow-sm dark:border-emerald-900/60 dark:bg-emerald-950/24 md:hidden">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-200/80">
+                    Venta actual
+                  </p>
+                  <p className="mt-1 truncate text-sm font-medium text-emerald-950 dark:text-emerald-100">
+                    {formatNumber(saleSummaries.reduce((sum, item) => sum + item.quantity, 0))} unidades · {formatNumber(fields.length)} lineas
+                  </p>
+                </div>
+                <p className="text-right text-lg font-semibold text-emerald-950 dark:text-emerald-100">{formatCurrency(totals.totalSale)}</p>
+              </div>
               <AdminMobileSection
                 value="sale-customer"
                 title="Cliente y fecha"
@@ -1201,15 +1253,36 @@ export function SaleFormDialog({
                     <FormItem className="min-w-0">
                       <FormLabel>Nombre del cliente</FormLabel>
                       <FormControl>
-                        <Input placeholder="Cliente mostrador" {...field} />
+                        <Input
+                          placeholder="Cliente NN"
+                          list={customerListId}
+                          {...field}
+                          onChange={(event) => {
+                            field.onChange(event);
+                            applyCustomerMemory(event.target.value);
+                          }}
+                          onBlur={(event) => {
+                            field.onBlur();
+                            applyCustomerMemory(event.target.value);
+                          }}
+                        />
                       </FormControl>
+                      <datalist id={customerListId}>
+                        {customerOptions.map((customer) => (
+                          <option
+                            key={customer.id}
+                            value={customer.fullName}
+                            label={[customer.documentNumber, customer.phone].filter(Boolean).join(' - ')}
+                          />
+                        ))}
+                      </datalist>
                       {normalizedCustomerPhone.length >= 7 ? (
                         <p className="hidden text-xs text-slate-500 sm:block">
-                          Si vas a vender a mostrador, reemplaza `Cliente mostrador` por el nombre real antes de guardar.
+                          El telefono es opcional. Si agregas nombre real, el sistema crea o actualiza el cliente.
                         </p>
                       ) : (
                         <p className="hidden text-xs text-slate-500 sm:block">
-                          Ingresa nombre y telefono del cliente para registrar mejor la venta.
+                          Si no sabes el nombre, deja este campo vacio y se guardara como Cliente NN sin crear ficha.
                         </p>
                       )}
                       <FormMessage />
@@ -1233,9 +1306,34 @@ export function SaleFormDialog({
 
                 <FormField
                   control={form.control}
+                  name="customerDocument"
+                  render={({ field }) => (
+                    <FormItem className="min-w-0">
+                      <FormLabel>Cedula o NIT</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Opcional"
+                          inputMode="numeric"
+                          {...field}
+                          onBlur={(event) => {
+                            field.onBlur();
+                            applyCustomerMemory(event.target.value);
+                          }}
+                        />
+                      </FormControl>
+                      <p className="hidden text-xs text-slate-500 sm:block">
+                        Usalo cuando el cliente necesite quedar identificado en la factura.
+                      </p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
                   name="soldAt"
                   render={({ field }) => (
-                    <FormItem className="sm:col-span-2 lg:max-w-xs">
+                    <FormItem className="lg:max-w-xs">
                       <FormLabel>Fecha de venta</FormLabel>
                       <FormControl>
                         <Input type="date" {...field} />
@@ -1697,11 +1795,7 @@ export function SaleFormDialog({
                       );
                     })}
                   </div>
-                ) : (
-                  <div className="rounded-2xl border border-dashed border-slate-300 bg-card/88 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-400">
-                    Si la venta tiene mas de un producto, usa `Agregar producto` para sumarlo a la lista.
-                  </div>
-                )}
+                ) : null}
                 <FormField
                   control={form.control}
                   name="items"
@@ -1791,6 +1885,7 @@ export function SaleFormDialog({
                   )}
                 </div>
               </AdminMobileSection>
+              </fieldset>
             </form>
           </Form>
       </AdminResponsiveDialog>
@@ -1804,12 +1899,22 @@ export function SaleFormDialog({
         title={editingLineIndex === null ? 'Agregar producto a la venta' : 'Editar producto de la venta'}
         description="Configura esta linea y al guardarla quedara en la lista de productos solicitados."
         desktopContentClassName="lg:max-w-4xl"
+        mobileContentClassName="rounded-none border-0 bg-background dark:bg-slate-950"
+        headerClassName="px-4 pt-3 pb-3 sm:px-5 lg:px-6"
+        bodyClassName="px-3 py-3 pb-4 sm:px-5 lg:px-6"
+        footerClassName="px-3 py-3 sm:px-5 lg:px-6"
         footer={
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button type="button" variant="outline" onClick={() => setLineDialogOpen(false)} disabled={isSubmitting}>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 rounded-xl sm:h-9"
+              onClick={() => setLineDialogOpen(false)}
+              disabled={isSubmitting}
+            >
               Cancelar
             </Button>
-            <Button form={lineFormId} type="submit" disabled={isSubmitting}>
+            <Button form={lineFormId} type="submit" className="h-11 rounded-xl sm:h-9" disabled={isSubmitting}>
               {editingLineIndex === null ? 'Agregar producto' : 'Guardar cambios'}
             </Button>
           </div>

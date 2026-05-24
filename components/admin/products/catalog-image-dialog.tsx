@@ -310,8 +310,14 @@ export function CatalogImageDialog({
   return (
     <AdminResponsiveDialog
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={(nextOpen) => {
+        if (savingProductId) return;
+        onOpenChange(nextOpen);
+      }}
       title="Imagenes del catalogo web"
+      busy={Boolean(savingProductId)}
+      busyTitle="Publicando imagen..."
+      busyDescription="Espera la confirmacion antes de cambiar otra imagen o cerrar el panel."
       description="Aqui cambias las imagenes de los productos que se muestran en la tienda virtual y en los destacados."
       desktopContentClassName="max-w-[1040px]"
       bodyClassName="px-3 py-3 pb-4 sm:px-5 sm:py-4 sm:pb-6"

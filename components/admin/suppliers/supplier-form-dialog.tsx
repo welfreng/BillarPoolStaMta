@@ -87,6 +87,9 @@ export function SupplierFormDialog({
         onOpenChange(nextOpen);
       }}
       title={initialSupplier ? 'Editar proveedor' : 'Nuevo proveedor'}
+      busy={isSubmitting}
+      busyTitle={initialSupplier ? 'Guardando proveedor...' : 'Creando proveedor...'}
+      busyDescription="Espera la confirmacion antes de continuar."
       description="Registra los datos clave del proveedor para usarlo luego en las compras."
       desktopContentClassName="lg:max-w-4xl"
       footer={

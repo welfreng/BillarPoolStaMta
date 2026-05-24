@@ -30,6 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
 import { formatNumber, getProductById } from '@/lib/admin/calculations';
 import { getTodayDateInputValue } from '@/lib/admin/date-utils';
@@ -138,7 +139,23 @@ export function SaleReturnDialog({
         onOpenChange(nextOpen);
       }}
     >
-      <DialogContent className="max-h-[92vh] w-[calc(100vw-1rem)] max-w-[96vw] overflow-y-auto px-4 pb-24 sm:w-[calc(100vw-2rem)] sm:px-5 sm:pb-6 lg:max-w-4xl lg:px-6">
+      <DialogContent
+        className="h-[100dvh] max-h-[100dvh] w-screen max-w-none overflow-y-auto rounded-none border-0 px-4 pb-24 pt-4 sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:w-[calc(100vw-2rem)] sm:max-w-[96vw] sm:rounded-[26px] sm:border sm:px-5 sm:pb-6 sm:pt-6 lg:max-w-4xl lg:px-6"
+        showCloseButton={!isSubmitting}
+      >
+        {isSubmitting ? (
+          <div className="absolute inset-0 z-40 grid place-items-center rounded-[26px] bg-background/82 px-4 text-center backdrop-blur-sm">
+            <div className="grid max-w-sm place-items-center gap-3 rounded-xl border bg-card p-5 shadow-lg">
+              <Spinner className="h-7 w-7 text-primary" />
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-foreground">Guardando devolucion...</p>
+                <p className="text-xs text-muted-foreground">
+                  Espera la confirmacion para evitar duplicados o cierres accidentales.
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : null}
         <DialogHeader>
           <DialogTitle>Registrar devolucion</DialogTitle>
           <DialogDescription>

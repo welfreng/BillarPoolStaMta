@@ -124,6 +124,9 @@ export function UserFormDialog({
         onOpenChange(nextOpen);
       }}
       title={isEditing ? 'Editar usuario' : 'Nuevo usuario'}
+      busy={isSubmitting}
+      busyTitle={isEditing ? 'Guardando cambios...' : 'Creando usuario...'}
+      busyDescription="Espera la confirmacion antes de continuar."
       description={
         isEditing
           ? 'Actualiza los datos operativos del usuario. El superadmin tambien puede corregir correo y contrasena.'

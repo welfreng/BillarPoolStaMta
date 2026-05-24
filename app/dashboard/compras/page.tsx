@@ -1,10 +1,11 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pencil, Plus, ReceiptText, Search, Trash2 } from 'lucide-react';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { SectionHeader } from '@/components/admin/shared/section-header';
 import { PurchaseFormDialog, type PurchaseFormValues } from '@/components/admin/purchases/purchase-form-dialog';
@@ -23,6 +24,8 @@ export default function ComprasPage() {
   const [editingBatchId, setEditingBatchId] = useState<string | undefined>();
   const [editingPurchaseId, setEditingPurchaseId] = useState<string | undefined>();
   const [editingValues, setEditingValues] = useState<PurchaseFormValues | undefined>();
+  const [purchasePage, setPurchasePage] = useState(1);
+  const [purchasePageSize, setPurchasePageSize] = useState(20);
 
   const filteredPurchases = useMemo(() => {
     return purchases.filter((purchase) => {
@@ -89,6 +92,21 @@ export default function ComprasPage() {
       (a, b) => new Date(b.purchasedAt).getTime() - new Date(a.purchasedAt).getTime()
     );
   }, [filteredPurchases, suppliers]);
+  const purchaseTotalPages = Math.max(Math.ceil(groupedPurchases.length / purchasePageSize), 1);
+  const purchasePageStart = groupedPurchases.length === 0 ? 0 : (purchasePage - 1) * purchasePageSize + 1;
+  const purchasePageEnd = Math.min(purchasePage * purchasePageSize, groupedPurchases.length);
+  const paginatedPurchaseGroups = useMemo(
+    () => groupedPurchases.slice((purchasePage - 1) * purchasePageSize, purchasePage * purchasePageSize),
+    [groupedPurchases, purchasePage, purchasePageSize]
+  );
+
+  useEffect(() => {
+    setPurchasePage(1);
+  }, [query, purchasePageSize]);
+
+  useEffect(() => {
+    setPurchasePage((currentPage) => Math.min(currentPage, purchaseTotalPages));
+  }, [purchaseTotalPages]);
 
   const buildInitialValues = (groupItems: typeof filteredPurchases): PurchaseFormValues => ({
     purchaseType: groupItems[0]?.purchaseType === 'international' ? 'international' : 'local',
@@ -241,19 +259,58 @@ export default function ComprasPage() {
       </div>
 
       <div className="min-w-0 space-y-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-[0_18px_40px_rgba(2,6,23,0.24)] sm:p-6">
-        <div className="relative max-w-md">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar por producto o proveedor"
-            className="pl-9"
-          />
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="relative max-w-md lg:flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Buscar por producto o proveedor"
+              className="pl-9"
+            />
+          </div>
+          {groupedPurchases.length > 0 ? (
+            <div className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3 dark:border-slate-800 dark:bg-slate-900/55 sm:flex-row sm:items-center">
+              <p className="text-sm text-slate-600 dark:text-slate-300">
+                {formatNumber(purchasePageStart)}-{formatNumber(purchasePageEnd)} de {formatNumber(groupedPurchases.length)} compras
+              </p>
+              <Select value={String(purchasePageSize)} onValueChange={(value) => setPurchasePageSize(Number(value))}>
+                <SelectTrigger className="h-10 w-full sm:w-[150px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="20">20 por pagina</SelectItem>
+                  <SelectItem value="50">50 por pagina</SelectItem>
+                  <SelectItem value="100">100 por pagina</SelectItem>
+                </SelectContent>
+              </Select>
+              <div className="grid grid-cols-2 gap-2 sm:flex">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-xl"
+                  onClick={() => setPurchasePage((currentPage) => Math.max(currentPage - 1, 1))}
+                  disabled={purchasePage <= 1}
+                >
+                  Anterior
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-xl"
+                  onClick={() => setPurchasePage((currentPage) => Math.min(currentPage + 1, purchaseTotalPages))}
+                  disabled={purchasePage >= purchaseTotalPages}
+                >
+                  Siguiente
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </div>
 
         {groupedPurchases.length > 0 ? (
           <div className="space-y-4">
-            {groupedPurchases.map((group) => (
+            {paginatedPurchaseGroups.map((group) => (
               <div key={group.key} className="overflow-hidden rounded-3xl border border-slate-200">
                 <div className="flex flex-col gap-4 bg-slate-50 px-4 py-4 sm:px-5 md:flex-row md:items-center md:justify-between">
                   <div className="min-w-0">
@@ -404,6 +461,31 @@ export default function ComprasPage() {
                 </div>
               </div>
             ))}
+            <div className="flex flex-col gap-2 border-t border-slate-200 pt-3 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Pagina {formatNumber(purchasePage)} de {formatNumber(purchaseTotalPages)}
+              </p>
+              <div className="grid grid-cols-2 gap-2 sm:flex">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-xl"
+                  onClick={() => setPurchasePage((currentPage) => Math.max(currentPage - 1, 1))}
+                  disabled={purchasePage <= 1}
+                >
+                  Anterior
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-xl"
+                  onClick={() => setPurchasePage((currentPage) => Math.min(currentPage + 1, purchaseTotalPages))}
+                  disabled={purchasePage >= purchaseTotalPages}
+                >
+                  Siguiente
+                </Button>
+              </div>
+            </div>
           </div>
         ) : (
           <Empty className="border border-dashed border-slate-200 bg-slate-50/70 dark:border-slate-800 dark:bg-slate-900/60">

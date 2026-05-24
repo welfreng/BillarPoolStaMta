@@ -67,9 +67,7 @@ function summarizeProduct(product, movementStockByProductId) {
   const currentPublicStock = toNumber(product.publicStock ?? product.stock ?? product.stockOnHand ?? 0);
   const status = String(product.status ?? 'active');
 
-  const expectedCatalogStock = hasVariants
-    ? variantStock
-    : Math.max(movementStock, legacySimpleStock, currentPublicStock);
+  const expectedCatalogStock = hasVariants ? variantStock : movementStock;
 
   const shouldBeActive = expectedCatalogStock > 0;
   const hasMismatch =
@@ -122,6 +120,9 @@ async function main() {
     (item) => !item.hasVariants && item.legacySimpleStock > 0 && item.movementStock === 0
   );
   const visibleButInactive = summaries.filter((item) => item.shouldBeActive && item.status !== 'active');
+  const publiclyAvailableWithoutOperationalStock = summaries.filter(
+    (item) => item.status === 'active' && item.currentPublicStock > 0 && item.expectedCatalogStock <= 0
+  );
 
   console.log(
     JSON.stringify(
@@ -133,7 +134,9 @@ async function main() {
           mismatches: mismatches.length,
           legacySimpleProductsWithStock: legacySimpleProductsWithStock.length,
           visibleButInactive: visibleButInactive.length,
+          publiclyAvailableWithoutOperationalStock: publiclyAvailableWithoutOperationalStock.length,
         },
+        publiclyAvailableWithoutOperationalStock: publiclyAvailableWithoutOperationalStock.slice(0, 50),
         sampleMismatches: mismatches.slice(0, 50),
       },
       null,

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type WheelEvent } from 'react';
 import { Check, ChevronsUpDown, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -160,6 +160,16 @@ export function SearchableSelect({
     setOpen(false);
   };
 
+  const handleListWheel = (event: WheelEvent<HTMLDivElement>) => {
+    const listElement = listRef.current;
+    if (!listElement) return;
+
+    const canScrollVertically = listElement.scrollHeight > listElement.clientHeight;
+    if (!canScrollVertically) return;
+
+    event.stopPropagation();
+  };
+
   const commandContent = (
     <Command className="h-full w-full min-w-0">
         <div className="w-full min-w-0 border-b">
@@ -192,10 +202,11 @@ export function SearchableSelect({
       </div>
       <CommandList
         className={cn(
-          'w-full min-w-0 max-h-[min(60vh,24rem)] overscroll-contain touch-pan-y',
-          isMobile ? 'max-h-[calc(100dvh-10rem)]' : 'max-h-[min(15rem,42vh)]'
+          'w-full min-w-0 overflow-y-auto overscroll-contain touch-pan-y',
+          isMobile ? 'max-h-[calc(100dvh-10rem)]' : 'max-h-[min(22rem,60vh)]'
         )}
         ref={listRef}
+        onWheel={handleListWheel}
       >
         <CommandEmpty>
           {allowCreate && onCreate && query.trim() ? (

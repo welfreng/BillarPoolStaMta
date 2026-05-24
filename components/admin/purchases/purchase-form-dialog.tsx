@@ -718,6 +718,9 @@ export function PurchaseFormDialog({
         onOpenChange(nextOpen);
       }}
       title={initialValues ? 'Editar compra' : 'Registrar compra'}
+      busy={isSubmitting}
+      busyTitle={initialValues ? 'Actualizando compra...' : 'Registrando compra...'}
+      busyDescription="Espera la confirmacion para evitar duplicados o cierres accidentales."
       description="Registra una compra con uno o varios productos del mismo proveedor."
       desktopContentClassName="lg:max-w-4xl"
       footer={
