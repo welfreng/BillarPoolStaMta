@@ -27,6 +27,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { formatCurrency, formatNumber, getProductRealUnitCost, getProductStock, getVariantOrProductRealUnitCost } from '@/lib/admin/calculations';
 import { filterProductsByCategoryFamily } from '@/lib/admin/category-rules';
 import { serviceTypeLabels } from '@/lib/admin/catalogs';
+import { getTodayDateInputValue } from '@/lib/admin/date-utils';
 import { buildVariantDisplayName, getProductSaleMode, getProductVariantStock } from '@/lib/admin/variant-helpers';
 import type { InventoryMovement, Product, Purchase, ServiceType } from '@/lib/admin/types';
 
@@ -93,7 +94,7 @@ const defaultValues: ServiceFormValues = {
   serviceType: 'tip-installation',
   serviceLabel: '',
   serviceCategory: 'torno',
-  performedAt: new Date().toISOString().slice(0, 10),
+  performedAt: getTodayDateInputValue(),
   customerName: '',
   cueReference: '',
   paymentMethod: 'efectivo',
@@ -301,6 +302,9 @@ export function ServiceFormDialog({
         onOpenChange(nextOpen);
       }}
       title="Registrar servicio de torno"
+      busy={isSubmitting}
+      busyTitle="Guardando servicio..."
+      busyDescription="Espera la confirmacion. Se esta registrando el servicio y descontando inventario."
       description="Registra el valor del trabajo y descuenta del inventario los productos usados en el servicio."
       desktopContentClassName="lg:max-w-4xl"
       footer={

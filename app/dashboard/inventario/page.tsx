@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Boxes, ClipboardList, Eye, Plus, Search } from 'lucide-react';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { Button } from '@/components/ui/button';
@@ -48,6 +48,10 @@ export default function InventarioPage() {
   const [productId, setProductId] = useState('all');
   const [category, setCategory] = useState('all');
   const [adminTab, setAdminTab] = useState<'movements' | 'stock'>('movements');
+  const [movementPage, setMovementPage] = useState(1);
+  const [movementPageSize, setMovementPageSize] = useState(20);
+  const [stockPage, setStockPage] = useState(1);
+  const [stockPageSize, setStockPageSize] = useState(20);
   const categoryOptions = useMemo(() => toCategoryOptions(categories), [categories]);
   const isSalesUser = role === 'sales';
   const selectedSale = selectedSaleId ? sales.find((sale) => sale.id === selectedSaleId) ?? null : null;
@@ -62,11 +66,29 @@ export default function InventarioPage() {
       const matchesQuery = `${product.name} ${movement.notes} ${movement.reason}`
         .toLowerCase()
         .includes(query.toLowerCase());
-      const matchesType = type === 'all' || movement.type === type;
+      const matchesType =
+        type === 'all' ||
+        movement.type === type ||
+        (type === 'purchase' && movement.reason === 'purchase');
       const matchesProduct = productId === 'all' || movement.productId === productId;
       return matchesQuery && matchesType && matchesProduct;
     });
   }, [movements, productId, products, query, type]);
+  const movementTotalPages = Math.max(Math.ceil(filteredMovements.length / movementPageSize), 1);
+  const movementPageStart = filteredMovements.length === 0 ? 0 : (movementPage - 1) * movementPageSize + 1;
+  const movementPageEnd = Math.min(movementPage * movementPageSize, filteredMovements.length);
+  const paginatedMovements = useMemo(
+    () => filteredMovements.slice((movementPage - 1) * movementPageSize, movementPage * movementPageSize),
+    [filteredMovements, movementPage, movementPageSize]
+  );
+
+  useEffect(() => {
+    setMovementPage(1);
+  }, [query, type, productId, movementPageSize]);
+
+  useEffect(() => {
+    setMovementPage((currentPage) => Math.min(currentPage, movementTotalPages));
+  }, [movementTotalPages]);
 
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
@@ -109,6 +131,26 @@ export default function InventarioPage() {
       })
     );
   }, [filteredProducts, purchases]);
+  const stockTotalItems = Math.max(inventorySummary.length, variantInventorySummary.length);
+  const stockTotalPages = Math.max(Math.ceil(stockTotalItems / stockPageSize), 1);
+  const stockPageStart = stockTotalItems === 0 ? 0 : (stockPage - 1) * stockPageSize + 1;
+  const stockPageEnd = Math.min(stockPage * stockPageSize, stockTotalItems);
+  const paginatedInventorySummary = useMemo(
+    () => inventorySummary.slice((stockPage - 1) * stockPageSize, stockPage * stockPageSize),
+    [inventorySummary, stockPage, stockPageSize]
+  );
+  const paginatedVariantInventorySummary = useMemo(
+    () => variantInventorySummary.slice((stockPage - 1) * stockPageSize, stockPage * stockPageSize),
+    [variantInventorySummary, stockPage, stockPageSize]
+  );
+
+  useEffect(() => {
+    setStockPage(1);
+  }, [query, productId, category, stockPageSize]);
+
+  useEffect(() => {
+    setStockPage((currentPage) => Math.min(currentPage, stockTotalPages));
+  }, [stockTotalPages]);
 
   const totalInventoryUnits = inventorySummary.reduce((sum, item) => sum + item.stock, 0);
   const totalInventoryValue = inventorySummary.reduce((sum, item) => sum + item.inventoryValue, 0);
@@ -279,19 +321,19 @@ export default function InventarioPage() {
           </>
         ) : (
           <Tabs value={adminTab} onValueChange={(value) => setAdminTab(value as 'movements' | 'stock')} className="space-y-4">
-            <TabsList className="grid h-auto w-full grid-cols-2 rounded-2xl border border-slate-200 bg-slate-100 p-1.5 dark:border-slate-800 dark:bg-slate-900/80">
+            <TabsList className="grid h-auto w-full grid-cols-2 gap-2 rounded-2xl border border-slate-200 bg-slate-100/90 p-2 shadow-inner dark:border-slate-800 dark:bg-slate-900/80">
               <TabsTrigger
                 value="movements"
-                className="min-h-12 rounded-xl border border-transparent text-sm font-semibold text-slate-600 dark:text-slate-300 data-[state=active]:border-cyan-200 data-[state=active]:bg-cyan-50 data-[state=active]:text-cyan-900 data-[state=active]:shadow-sm dark:data-[state=active]:border-cyan-800 dark:data-[state=active]:bg-cyan-950/60 dark:data-[state=active]:text-cyan-100"
+                className="min-h-12 rounded-xl border border-slate-200 bg-white/80 text-sm font-semibold text-slate-600 shadow-sm transition-colors hover:bg-white dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-300 dark:hover:bg-slate-900 data-[state=active]:border-cyan-500 data-[state=active]:bg-cyan-600 data-[state=active]:text-white data-[state=active]:shadow-[0_12px_26px_rgba(8,145,178,0.28)] dark:data-[state=active]:border-cyan-400 dark:data-[state=active]:bg-cyan-500 dark:data-[state=active]:text-slate-950"
               >
-                <ClipboardList className="mr-2 h-4 w-4" />
+                <ClipboardList className="mr-2 hidden h-4 w-4 sm:block" />
                 Movimientos
               </TabsTrigger>
               <TabsTrigger
                 value="stock"
-                className="min-h-12 rounded-xl border border-transparent text-sm font-semibold text-slate-600 dark:text-slate-300 data-[state=active]:border-emerald-200 data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-900 data-[state=active]:shadow-sm dark:data-[state=active]:border-emerald-800 dark:data-[state=active]:bg-emerald-950/60 dark:data-[state=active]:text-emerald-100"
+                className="min-h-12 rounded-xl border border-slate-200 bg-white/80 text-sm font-semibold text-slate-600 shadow-sm transition-colors hover:bg-white dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-300 dark:hover:bg-slate-900 data-[state=active]:border-emerald-500 data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-[0_12px_26px_rgba(5,150,105,0.28)] dark:data-[state=active]:border-emerald-400 dark:data-[state=active]:bg-emerald-500 dark:data-[state=active]:text-slate-950"
               >
-                <Boxes className="mr-2 h-4 w-4" />
+                <Boxes className="mr-2 hidden h-4 w-4 sm:block" />
                 Stock actual
               </TabsTrigger>
             </TabsList>
@@ -365,7 +407,51 @@ export default function InventarioPage() {
 
               {filteredMovements.length > 0 ? (
                 <div className="min-w-0">
-                  <div className="mb-2 hidden text-xs text-slate-500 dark:text-slate-400 lg:block">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
+                  <div className="mb-3 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3 dark:border-slate-800 dark:bg-slate-900/55 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="text-sm text-slate-600 dark:text-slate-300">
+                      Mostrando <span className="font-semibold text-slate-950 dark:text-slate-50">{formatNumber(movementPageStart)}</span>-
+                      <span className="font-semibold text-slate-950 dark:text-slate-50">{formatNumber(movementPageEnd)}</span> de{' '}
+                      <span className="font-semibold text-slate-950 dark:text-slate-50">{formatNumber(filteredMovements.length)}</span> movimientos
+                    </div>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                      <Select
+                        value={String(movementPageSize)}
+                        onValueChange={(value) => setMovementPageSize(Number(value))}
+                      >
+                        <SelectTrigger className="h-10 w-full sm:w-[150px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="20">20 por pagina</SelectItem>
+                          <SelectItem value="50">50 por pagina</SelectItem>
+                          <SelectItem value="100">100 por pagina</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <div className="grid grid-cols-2 gap-2 sm:flex">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="rounded-xl"
+                          onClick={() => setMovementPage((currentPage) => Math.max(currentPage - 1, 1))}
+                          disabled={movementPage <= 1}
+                        >
+                          Anterior
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="rounded-xl"
+                          onClick={() => setMovementPage((currentPage) => Math.min(currentPage + 1, movementTotalPages))}
+                          disabled={movementPage >= movementTotalPages}
+                        >
+                          Siguiente
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mb-2 hidden text-xs text-slate-500 dark:text-slate-400 lg:block">
+                    Pagina {formatNumber(movementPage)} de {formatNumber(movementTotalPages)}. Desliza la tabla hacia la derecha para ver toda la informacion.
+                  </div>
                   <div className="pb-2">
                   <Table className="min-w-[860px]">
                     <TableHeader>
@@ -383,7 +469,7 @@ export default function InventarioPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {filteredMovements.map((movement) => {
+                        {paginatedMovements.map((movement) => {
                           const product = getProductById(products, movement.productId);
                           const isReturn = movement.reason === 'return';
                           const relatedSale = movement.saleId
@@ -482,6 +568,31 @@ export default function InventarioPage() {
                     </TableBody>
                   </Table>
                   </div>
+                  <div className="mt-3 flex flex-col gap-2 border-t border-slate-200 pt-3 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                      Pagina {formatNumber(movementPage)} de {formatNumber(movementTotalPages)}
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 sm:flex">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="rounded-xl"
+                        onClick={() => setMovementPage((currentPage) => Math.max(currentPage - 1, 1))}
+                        disabled={movementPage <= 1}
+                      >
+                        Anterior
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="rounded-xl"
+                        onClick={() => setMovementPage((currentPage) => Math.min(currentPage + 1, movementTotalPages))}
+                        disabled={movementPage >= movementTotalPages}
+                      >
+                        Siguiente
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <Empty className="border border-dashed border-slate-200 bg-slate-50/70 dark:border-slate-800 dark:bg-slate-900/60">
@@ -535,6 +646,45 @@ export default function InventarioPage() {
 
               {inventorySummary.length > 0 ? (
                 <div className="min-w-0 space-y-6">
+                  <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3 dark:border-slate-800 dark:bg-slate-900/55 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="text-sm text-slate-600 dark:text-slate-300">
+                      Mostrando <span className="font-semibold text-slate-950 dark:text-slate-50">{formatNumber(stockPageStart)}</span>-
+                      <span className="font-semibold text-slate-950 dark:text-slate-50">{formatNumber(stockPageEnd)}</span> de{' '}
+                      <span className="font-semibold text-slate-950 dark:text-slate-50">{formatNumber(stockTotalItems)}</span> registros
+                    </div>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                      <Select value={String(stockPageSize)} onValueChange={(value) => setStockPageSize(Number(value))}>
+                        <SelectTrigger className="h-10 w-full sm:w-[150px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="10">10 por pagina</SelectItem>
+                          <SelectItem value="20">20 por pagina</SelectItem>
+                          <SelectItem value="50">50 por pagina</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <div className="grid grid-cols-2 gap-2 sm:flex">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="rounded-xl"
+                          onClick={() => setStockPage((currentPage) => Math.max(currentPage - 1, 1))}
+                          disabled={stockPage <= 1}
+                        >
+                          Anterior
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="rounded-xl"
+                          onClick={() => setStockPage((currentPage) => Math.min(currentPage + 1, stockTotalPages))}
+                          disabled={stockPage >= stockTotalPages}
+                        >
+                          Siguiente
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
                   <div className="mb-2 hidden text-xs text-slate-500 lg:block">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
                   <div className="pb-2">
                   <Table className="min-w-[920px]">
@@ -550,7 +700,7 @@ export default function InventarioPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {inventorySummary.map(({ product, stock, realUnitCost, inventoryValue, alert }) => {
+                      {paginatedInventorySummary.map(({ product, stock, realUnitCost, inventoryValue, alert }) => {
                         const salePrice = getOperationalProductSalePrice(product);
                         const rowHoverSummary = [
                           product.name,
@@ -615,7 +765,7 @@ export default function InventarioPage() {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {variantInventorySummary.map(({ product, variant, stock, unitCost, inventoryValue, alert }) => (
+                            {paginatedVariantInventorySummary.map(({ product, variant, stock, unitCost, inventoryValue, alert }) => (
                               <TableRow key={variant.id}>
                                 <TableCell>
                                   <div>
@@ -646,6 +796,31 @@ export default function InventarioPage() {
                       </div>
                     </div>
                   ) : null}
+                  <div className="flex flex-col gap-2 border-t border-slate-200 pt-3 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                      Pagina {formatNumber(stockPage)} de {formatNumber(stockTotalPages)}
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 sm:flex">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="rounded-xl"
+                        onClick={() => setStockPage((currentPage) => Math.max(currentPage - 1, 1))}
+                        disabled={stockPage <= 1}
+                      >
+                        Anterior
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="rounded-xl"
+                        onClick={() => setStockPage((currentPage) => Math.min(currentPage + 1, stockTotalPages))}
+                        disabled={stockPage >= stockTotalPages}
+                      >
+                        Siguiente
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <Empty className="border border-dashed border-slate-200 bg-slate-50/70">
@@ -688,7 +863,7 @@ export default function InventarioPage() {
                 console.error('Error registrando carga inicial en Firestore:', error);
                 toast({
                   title: 'No se pudo registrar la carga inicial',
-                  description: 'Revisa la configuracion y permisos de Firebase.',
+                  description: error instanceof Error ? error.message : 'Revisa la configuracion y permisos de Firebase.',
                   variant: 'destructive',
                 });
                 throw error;
@@ -704,6 +879,7 @@ export default function InventarioPage() {
               try {
                 await registerMovement({
                   ...values,
+                  occurredAt: toOperationalDateISOString(values.occurredAt),
                   responsibleUser:
                     profile?.nombre?.trim() || user?.displayName || user?.email || values.responsibleUser,
                   relatedUnitCost: getVariantOrProductRealUnitCost(
@@ -721,7 +897,7 @@ export default function InventarioPage() {
                 console.error('Error registrando movimiento en Firestore:', error);
                 toast({
                   title: 'No se pudo registrar el movimiento',
-                  description: 'Revisa la configuracion y permisos de Firebase.',
+                  description: error instanceof Error ? error.message : 'Revisa la configuracion y permisos de Firebase.',
                   variant: 'destructive',
                 });
                 throw error;

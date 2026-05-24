@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Inter, Montserrat } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { AuthProvider } from '@/components/auth-context'
+import { FirestoreConsoleFilter } from '@/components/firestore-console-filter'
 import { Toaster } from '@/components/ui/toaster'
 import { SITE_LOGO } from '@/lib/branding'
 import './globals.css'
@@ -33,6 +34,7 @@ export default function RootLayout({
   return (
     <html lang="es" className="scroll-smooth" suppressHydrationWarning>
       <body suppressHydrationWarning className={`${inter.variable} ${montserrat.variable} font-sans antialiased`}>
+        <FirestoreConsoleFilter />
         <AuthProvider>
           {children}
         </AuthProvider>

@@ -43,7 +43,7 @@ function escapeHtml(value: string) {
 
 function fileNameFromSale(sale: Sale) {
   const date = sale.soldAt.slice(0, 10) || new Date().toISOString().slice(0, 10);
-  const customer = (sale.customerName || 'cliente')
+  const customer = getInvoiceCustomerName(sale)
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-zA-Z0-9]+/g, '-')
@@ -51,6 +51,10 @@ function fileNameFromSale(sale: Sale) {
     .toLowerCase();
 
   return `factura-${date}-${customer || 'venta'}.pdf`;
+}
+
+function getInvoiceCustomerName(sale: Sale) {
+  return sale.customerName?.trim() || 'Cliente NN';
 }
 
 async function loadImageAsDataUrl(src: string) {
@@ -131,11 +135,16 @@ async function buildInvoicePdf({
   doc.setTextColor(15, 23, 42);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
-  doc.text(sale.customerName || 'Cliente mostrador', marginX + 4, cursorY + 15);
+  doc.text(getInvoiceCustomerName(sale), marginX + 4, cursorY + 15);
   if (sale.customerPhone) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     doc.text(`Telefono: ${sale.customerPhone}`, marginX + 4, cursorY + 20);
+  }
+  if (sale.customerDocument) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text(`CC/NIT: ${sale.customerDocument}`, marginX + 4, cursorY + (sale.customerPhone ? 24 : 20));
   }
   doc.text(responsibleUser, marginX + 110, cursorY + 15);
 
@@ -276,6 +285,7 @@ export function SaleDetailsDialog({
 
   const groupedSales = sales.filter((item) => (item.saleBatchId ?? item.id) === (sale.saleBatchId ?? sale.id));
   const baseSale = groupedSales[0] ?? sale;
+  const invoiceCustomerName = getInvoiceCustomerName(baseSale);
   const linkedServices = services.filter(
     (service) =>
       service.source === 'sale-addon' &&
@@ -404,8 +414,9 @@ export function SaleDetailsDialog({
               </div>
               <div class="box" style="min-width:280px;">
                 <p class="muted">Cliente</p>
-                <p style="font-weight:700; margin-top:6px;">${escapeHtml(baseSale.customerName)}</p>
+                <p style="font-weight:700; margin-top:6px;">${escapeHtml(invoiceCustomerName)}</p>
                 ${baseSale.customerPhone ? `<p class="muted" style="margin-top:8px;">Telefono: ${escapeHtml(baseSale.customerPhone)}</p>` : ''}
+                ${baseSale.customerDocument ? `<p class="muted" style="margin-top:8px;">CC/NIT: ${escapeHtml(baseSale.customerDocument)}</p>` : ''}
                 <p class="muted" style="margin-top:8px;">Responsable: ${escapeHtml(baseSale.responsibleUser)}</p>
               </div>
             </div>
@@ -500,7 +511,7 @@ export function SaleDetailsDialog({
       const doc = await exportPdf();
       const pdfBlob = doc.output('blob');
       const pdfFile = new File([pdfBlob], fileNameFromSale(baseSale), { type: 'application/pdf' });
-      const shareMessage = `Factura de ${baseSale.customerName} - ${formatCurrency(netRevenue)}`;
+      const shareMessage = `Factura de ${invoiceCustomerName} - ${formatCurrency(netRevenue)}`;
       const whatsappPhone = normalizeWhatsappPhone(baseSale.customerPhone ?? '');
 
       if (
@@ -555,9 +566,12 @@ export function SaleDetailsDialog({
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-2xl border border-border bg-card/88 p-3 dark:border-slate-800 dark:bg-slate-950/72 sm:p-4">
                 <p className="text-xs text-muted-foreground">Cliente</p>
-                <p className="mt-1 font-semibold text-foreground">{baseSale.customerName}</p>
+                <p className="mt-1 font-semibold text-foreground">{invoiceCustomerName}</p>
                 {baseSale.customerPhone ? (
                   <p className="mt-1 text-sm text-muted-foreground">Telefono: {baseSale.customerPhone}</p>
+                ) : null}
+                {baseSale.customerDocument ? (
+                  <p className="mt-1 text-sm text-muted-foreground">CC/NIT: {baseSale.customerDocument}</p>
                 ) : null}
                 <p className="mt-1 text-sm text-muted-foreground">{formatDateTime(baseSale.soldAt)}</p>
               </div>
@@ -833,9 +847,12 @@ export function SaleDetailsDialog({
                 </div>
                 <div className="rounded-2xl border border-border bg-muted/70 px-3 py-3 text-sm dark:border-slate-800 dark:bg-slate-900/60 sm:px-4">
                   <p className="text-muted-foreground">Cliente</p>
-                  <p className="mt-1 font-semibold text-foreground">{baseSale.customerName}</p>
+                  <p className="mt-1 font-semibold text-foreground">{invoiceCustomerName}</p>
                   {baseSale.customerPhone ? (
                     <p className="mt-2 text-muted-foreground">Telefono: {baseSale.customerPhone}</p>
+                  ) : null}
+                  {baseSale.customerDocument ? (
+                    <p className="mt-2 text-muted-foreground">CC/NIT: {baseSale.customerDocument}</p>
                   ) : null}
                   <p className="mt-2 text-muted-foreground">Atendido por: {baseSale.responsibleUser}</p>
                 </div>

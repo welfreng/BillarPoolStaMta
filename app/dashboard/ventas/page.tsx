@@ -25,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+import { Spinner } from '@/components/ui/spinner';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { useAdminData } from '@/components/admin/admin-data-context';
@@ -165,6 +166,7 @@ export default function VentasPage() {
     sales,
     services,
     products,
+    customers,
     purchases,
     movements,
     registerSale,
@@ -190,6 +192,7 @@ export default function VentasPage() {
     requestType: AuthorizationRequestType;
   } | null>(null);
   const [authorizationReason, setAuthorizationReason] = useState('');
+  const [isSubmittingAuthorizationRequest, setIsSubmittingAuthorizationRequest] = useState(false);
   const [activeEditAuthorizationId, setActiveEditAuthorizationId] = useState<string | null>(null);
   const [activeReturnAuthorizationId, setActiveReturnAuthorizationId] = useState<string | null>(null);
   const isSalesUser = role === 'sales';
@@ -248,6 +251,7 @@ export default function VentasPage() {
           }))
         ),
         customerPhone: editingSale.customerPhone ?? '',
+        customerDocument: editingSale.customerDocument ?? '',
         customerName: editingSale.customerName,
         notes: editingSale.notes,
       }
@@ -881,6 +885,7 @@ export default function VentasPage() {
           }
         }}
         products={products}
+        customers={customers}
         purchases={purchases}
         movements={movements}
         initialValues={initialSaleValues}
@@ -894,8 +899,12 @@ export default function VentasPage() {
         }
         onSubmit={async (values) => {
           try {
+            const customerNameForSale =
+              values.customerName.trim().replace(/\s+/g, ' ') || 'Cliente NN';
             const payload = {
               ...values,
+              customerName: customerNameForSale,
+              customerDocument: values.customerDocument?.trim() ?? '',
               soldAt: toOperationalDateISOString(values.soldAt),
               paymentMethod: 'efectivo',
               paymentReference: '',
@@ -953,7 +962,7 @@ export default function VentasPage() {
                 saleId: draftRequestId,
                 saleBatchId: draftRequestId,
                 requestType: 'sale-discount',
-                customerName: values.customerName,
+                customerName: customerNameForSale,
                 saleSummary,
                 reason,
                 requestedBy:
@@ -1082,13 +1091,25 @@ export default function VentasPage() {
       <Dialog
         open={Boolean(authorizationDialogState)}
         onOpenChange={(nextOpen) => {
+          if (isSubmittingAuthorizationRequest) return;
           if (!nextOpen) {
             setAuthorizationDialogState(null);
             setAuthorizationReason('');
           }
         }}
       >
-        <DialogContent className="sm:max-w-xl">
+        <DialogContent className="sm:max-w-xl" showCloseButton={!isSubmittingAuthorizationRequest}>
+          {isSubmittingAuthorizationRequest ? (
+            <div className="absolute inset-0 z-40 grid place-items-center rounded-[26px] bg-background/82 px-4 text-center backdrop-blur-sm">
+              <div className="grid max-w-sm place-items-center gap-3 rounded-xl border bg-card p-5 shadow-lg">
+                <Spinner className="h-7 w-7 text-primary" />
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-foreground">Enviando solicitud...</p>
+                  <p className="text-xs text-muted-foreground">Espera la confirmacion antes de continuar.</p>
+                </div>
+              </div>
+            </div>
+          ) : null}
           <DialogHeader>
             <DialogTitle>Solicitar autorizacion</DialogTitle>
             <DialogDescription>
@@ -1114,6 +1135,7 @@ export default function VentasPage() {
                   onChange={(event) => setAuthorizationReason(event.target.value)}
                   placeholder="Explica por que necesitas editar o devolver esta venta."
                   rows={4}
+                  disabled={isSubmittingAuthorizationRequest}
                 />
               </div>
             </div>
@@ -1123,6 +1145,7 @@ export default function VentasPage() {
             <Button
               variant="outline"
               className="rounded-xl"
+              disabled={isSubmittingAuthorizationRequest}
               onClick={() => {
                 setAuthorizationDialogState(null);
                 setAuthorizationReason('');
@@ -1132,10 +1155,12 @@ export default function VentasPage() {
             </Button>
             <Button
               className="rounded-xl"
+              disabled={isSubmittingAuthorizationRequest}
               onClick={async () => {
                 if (!authorizationDialogState) return;
 
                 try {
+                  setIsSubmittingAuthorizationRequest(true);
                   await createAuthorizationRequest({
                     saleId: authorizationDialogState.saleId,
                     saleBatchId: authorizationDialogState.saleBatchId,
@@ -1162,10 +1187,12 @@ export default function VentasPage() {
                     ),
                     variant: 'destructive',
                   });
+                } finally {
+                  setIsSubmittingAuthorizationRequest(false);
                 }
               }}
             >
-              Enviar solicitud
+              {isSubmittingAuthorizationRequest ? 'Enviando...' : 'Enviar solicitud'}
             </Button>
           </DialogFooter>
         </DialogContent>

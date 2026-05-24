@@ -7,6 +7,7 @@ import { Globe, ImagePlus, RefreshCcw, Save } from 'lucide-react';
 import { SectionHeader } from '@/components/admin/shared/section-header';
 import { CatalogImageDialog } from '@/components/admin/products/catalog-image-dialog';
 import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
 import { useToast } from '@/hooks/use-toast';
 import {
   getFriendlyFirestoreWriteErrorMessage,
@@ -147,7 +148,18 @@ export default function WebPageManagementPage() {
           </div>
         </section>
 
-        <section className="rounded-3xl border border-border bg-card/88 p-3.5 shadow-sm dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-[0_18px_40px_rgba(2,6,23,0.24)] sm:p-5">
+        <section className="relative rounded-3xl border border-border bg-card/88 p-3.5 shadow-sm dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-[0_18px_40px_rgba(2,6,23,0.24)] sm:p-5">
+          {savingServices ? (
+            <div className="absolute inset-0 z-20 grid place-items-center rounded-3xl bg-background/82 px-4 text-center backdrop-blur-sm">
+              <div className="grid max-w-sm place-items-center gap-3 rounded-xl border bg-card p-5 shadow-lg">
+                <Spinner className="h-7 w-7 text-primary" />
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-foreground">Guardando galeria...</p>
+                  <p className="text-xs text-muted-foreground">Espera la confirmacion antes de continuar.</p>
+                </div>
+              </div>
+            </div>
+          ) : null}
           <div>
             <h2 className="text-lg font-semibold text-slate-950 dark:text-slate-50">Trabajos del torno en servicios</h2>
             <p className="mt-1 hidden text-sm leading-6 text-slate-500 dark:text-slate-400 sm:block">

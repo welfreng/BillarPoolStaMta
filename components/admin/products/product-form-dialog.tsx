@@ -205,12 +205,6 @@ function collectAttributeOptions(
   });
 }
 
-function getVariantCatalogInventoryHint(hasVariants: boolean) {
-  return hasVariants
-    ? 'El stock real de cada variante se administra desde Inventario o Compras. Desde catalogo solo defines atributos, SKU, precio y estado.'
-    : 'El stock inicial y los ajustes no se registran desde productos. Usa Inventario para carga inicial o movimientos controlados.';
-}
-
 const productSchema = z
   .object({
     name: z.string().min(3, 'Ingresa el nombre del producto'),
@@ -641,10 +635,6 @@ export function ProductFormDialog({
       description: 'Ya puedes usarla en este producto.',
     });
   };
-  const stockManagementHint = useMemo(
-    () => getVariantCatalogInventoryHint(saleMode === 'varianted'),
-    [saleMode]
-  );
   useEffect(() => {
     if (!usesCompactVariantEditor) return;
 
@@ -671,7 +661,7 @@ export function ProductFormDialog({
   }, [form, normalizedAttributeDefinitions, templateCompactAttributeOptions, usesCompactVariantEditor, watchedVariants]);
 
   useEffect(() => {
-    if (!variantsDisabledForSelection) return;
+    if (!variantsDisabledForSelection || structureLocked) return;
 
     if (form.getValues('saleMode') !== 'simple') {
       form.setValue('saleMode', 'simple', { shouldDirty: true, shouldValidate: true });
@@ -692,7 +682,7 @@ export function ProductFormDialog({
     if (form.getValues('historyVariantName')) {
       form.setValue('historyVariantName', '', { shouldDirty: true, shouldValidate: false });
     }
-  }, [form, replaceAttributes, replaceVariants, variantsDisabledForSelection]);
+  }, [form, replaceAttributes, replaceVariants, structureLocked, variantsDisabledForSelection]);
 
   useEffect(() => {
     if (!canReconfigureVirolaHistory) return;
@@ -1234,21 +1224,31 @@ export function ProductFormDialog({
         onOpenChange(nextOpen);
       }}
       title={initialProduct ? 'Editar producto' : 'Nuevo producto'}
+      busy={form.formState.isSubmitting}
+      busyTitle={initialProduct ? 'Guardando producto...' : 'Creando producto...'}
+      busyDescription="Espera la confirmacion antes de continuar."
       description={
         structureLocked
           ? 'Este producto ya tiene historial. Puedes ajustar datos comerciales y visuales, pero la estructura de variantes queda protegida para no afectar compras ni inventario.'
           : 'Registra la informacion esencial del producto y carga su imagen desde tu equipo.'
       }
       desktopContentClassName="lg:max-w-[58rem] xl:max-w-[62rem]"
-      headerClassName="px-4 pt-5 pb-3 lg:px-5"
-      bodyClassName="px-4 py-3 pb-5 lg:px-5"
-      footerClassName="px-4 py-2.5 lg:px-5"
+      mobileContentClassName="rounded-none border-0 bg-background dark:bg-slate-950"
+      headerClassName="px-4 pt-3 pb-3 sm:px-5 lg:px-5"
+      bodyClassName="px-3 py-3 pb-4 sm:px-5 lg:px-5"
+      footerClassName="px-3 py-3 sm:px-5 lg:px-5"
       footer={
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={form.formState.isSubmitting}>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11 rounded-xl sm:h-9"
+            onClick={() => onOpenChange(false)}
+            disabled={form.formState.isSubmitting}
+          >
             Cancelar
           </Button>
-          <Button form={productFormId} type="submit" disabled={form.formState.isSubmitting}>
+          <Button form={productFormId} type="submit" className="h-11 rounded-xl sm:h-9" disabled={form.formState.isSubmitting}>
             {form.formState.isSubmitting ? 'Guardando...' : initialProduct ? 'Guardar cambios' : 'Crear producto'}
           </Button>
         </div>
@@ -1277,20 +1277,24 @@ export function ProductFormDialog({
                     values.saleMode === 'varianted'
                       ? values.variantAttributes.map((attribute) => attribute.label.trim()).filter(Boolean).join(' / ')
                       : '',
-                  variants: values.variants.map((variant) => {
-                    const inferredHex =
-                      colorAttributeIndex >= 0
-                        ? inferColorHex(variant.attributeValues[colorAttributeIndex] ?? '')
-                        : '';
-                    const persistedVariant =
-                      initialProduct?.variants?.find((existingVariant) => existingVariant.id === variant.id) ?? null;
+                  variantAttributes: values.saleMode === 'varianted' ? values.variantAttributes : [],
+                  variants:
+                    values.saleMode === 'varianted'
+                      ? values.variants.map((variant) => {
+                          const inferredHex =
+                            colorAttributeIndex >= 0
+                              ? inferColorHex(variant.attributeValues[colorAttributeIndex] ?? '')
+                              : '';
+                          const persistedVariant =
+                            initialProduct?.variants?.find((existingVariant) => existingVariant.id === variant.id) ?? null;
 
-                    return {
-                      ...variant,
-                      stock: Math.max(Number(persistedVariant?.stock ?? 0), 0),
-                      colorHex: inferredHex || variant.colorHex || '',
-                    };
-                  }),
+                          return {
+                            ...variant,
+                            stock: Math.max(Number(persistedVariant?.stock ?? 0), 0),
+                            colorHex: inferredHex || variant.colorHex || '',
+                          };
+                        })
+                      : [],
                 };
 
                 await onSubmit(nextValues);
@@ -1466,9 +1470,6 @@ export function ProductFormDialog({
                     </div>
 
                     <div className="space-y-3 rounded-2xl border border-border bg-card/88 px-3 py-3 dark:border-slate-800 dark:bg-slate-950/70 sm:px-3.5 sm:py-3.5">
-                      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/70 dark:bg-amber-950/30 dark:text-amber-100">
-                        {stockManagementHint}
-                      </div>
                       {variantsDisabledForSelection ? (
                         <div className="rounded-2xl border border-border bg-muted/70 px-4 py-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300">
                           <span className="font-semibold text-slate-900 dark:text-slate-100">

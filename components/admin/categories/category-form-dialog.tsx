@@ -15,6 +15,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Spinner } from '@/components/ui/spinner';
 import type { ProductCategoryRecord } from '@/lib/admin/types';
 
 const schema = z.object({
@@ -76,7 +77,20 @@ export function CategoryFormDialog({
         onOpenChange(nextOpen);
       }}
     >
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" showCloseButton={!isSubmitting}>
+        {isSubmitting ? (
+          <div className="absolute inset-0 z-40 grid place-items-center rounded-[26px] bg-background/82 px-4 text-center backdrop-blur-sm">
+            <div className="grid max-w-sm place-items-center gap-3 rounded-xl border bg-card p-5 shadow-lg">
+              <Spinner className="h-7 w-7 text-primary" />
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-foreground">
+                  {category ? 'Guardando categoria...' : 'Creando categoria...'}
+                </p>
+                <p className="text-xs text-muted-foreground">Espera la confirmacion antes de continuar.</p>
+              </div>
+            </div>
+          </div>
+        ) : null}
         <DialogHeader>
           <DialogTitle>{category ? 'Editar categoria' : 'Nueva categoria'}</DialogTitle>
           <DialogDescription>

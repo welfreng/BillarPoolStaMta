@@ -592,3 +592,97 @@ To learn about active projects for the CLI, visit https://firebase.google.com/do
 [info] +  Deploy complete! 
 [info] 
 [info] Project Console: https://console.firebase.google.com/project/billarpoolstamta-5d4ac/overview
+[debug] [2026-05-24T13:34:22.938Z] ----------------------------------------------------------------------
+[debug] [2026-05-24T13:34:22.941Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\HP\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\firebase-tools\lib\bin\firebase.js deploy --only firestore:rules
+[debug] [2026-05-24T13:34:22.941Z] CLI Version:   15.18.0
+[debug] [2026-05-24T13:34:22.942Z] Platform:      win32
+[debug] [2026-05-24T13:34:22.942Z] Node Version:  v24.14.0
+[debug] [2026-05-24T13:34:22.942Z] Time:          Sun May 24 2026 08:34:22 GMT-0500 (hora estándar de Colombia)
+[debug] [2026-05-24T13:34:22.942Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-05-24T13:34:22.945Z] >>> [apiv2][query] GET https://firebase-public.firebaseio.com/cli.json [none]
+[error] 
+[error] Error: No currently active project.
+To run this command, you need to specify a project. You have two options:
+- Run this command with --project <alias_or_project_id>.
+- Set an active project by running firebase use --add, then rerun this command.
+To list all the Firebase projects to which you have access, run firebase projects:list.
+To learn about active projects for the CLI, visit https://firebase.google.com/docs/cli#project_aliases
+
+
+[debug] [2026-05-24T13:34:26.196Z] <<< [apiv2][status] GET https://firebase-public.firebaseio.com/cli.json 200
+[debug] [2026-05-24T13:34:26.197Z] <<< [apiv2][body] GET https://firebase-public.firebaseio.com/cli.json {"cloudBuildErrorAfter":1594252800000,"cloudBuildWarnAfter":1590019200000,"defaultNode10After":1594252800000,"minVersion":"3.0.5","node8DeploysDisabledAfter":1613390400000,"node8RuntimeDisabledAfter":1615809600000,"node8WarnAfter":1600128000000}
+[debug] [2026-05-24T13:34:36.678Z] ----------------------------------------------------------------------
+[debug] [2026-05-24T13:34:36.681Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\HP\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\firebase-tools\lib\bin\firebase.js deploy --only firestore:rules --project billarpoolstamta-5d4ac
+[debug] [2026-05-24T13:34:36.681Z] CLI Version:   15.18.0
+[debug] [2026-05-24T13:34:36.682Z] Platform:      win32
+[debug] [2026-05-24T13:34:36.682Z] Node Version:  v24.14.0
+[debug] [2026-05-24T13:34:36.682Z] Time:          Sun May 24 2026 08:34:36 GMT-0500 (hora estándar de Colombia)
+[debug] [2026-05-24T13:34:36.682Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-05-24T13:34:38.386Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-05-24T13:34:38.386Z] > authorizing via signed-in user (webnextwave@gmail.com)
+[debug] [2026-05-24T13:34:38.387Z] [iam] checking project billarpoolstamta-5d4ac for permissions ["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]
+[debug] [2026-05-24T13:34:38.389Z] Checked if tokens are valid: false, expires at: 1779457716062
+[debug] [2026-05-24T13:34:38.389Z] Checked if tokens are valid: false, expires at: 1779457716062
+[debug] [2026-05-24T13:34:38.389Z] > refreshing access token with scopes: []
+[debug] [2026-05-24T13:34:38.391Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2026-05-24T13:34:38.391Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-05-24T13:34:39.170Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2026-05-24T13:34:39.170Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-05-24T13:34:39.180Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/billarpoolstamta-5d4ac:testIamPermissions [none]
+[debug] [2026-05-24T13:34:39.180Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/billarpoolstamta-5d4ac:testIamPermissions  x-goog-user-project=billarpoolstamta-5d4ac
+[debug] [2026-05-24T13:34:39.180Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/billarpoolstamta-5d4ac:testIamPermissions {"permissions":["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]}
+[debug] [2026-05-24T13:34:39.927Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/billarpoolstamta-5d4ac:testIamPermissions 200
+[debug] [2026-05-24T13:34:39.928Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/billarpoolstamta-5d4ac:testIamPermissions {"permissions":["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]}
+[info] 
+[info] === Deploying to 'billarpoolstamta-5d4ac'...
+[info] 
+[info] i  deploying firestore 
+[info] i  firestore: ensuring required API firestore.googleapis.com is enabled... 
+[info] i  firestore: ensuring required API firestore.googleapis.com is enabled... 
+[debug] [2026-05-24T13:34:39.934Z] Checked if tokens are valid: true, expires at: 1779633278170
+[debug] [2026-05-24T13:34:39.934Z] Checked if tokens are valid: true, expires at: 1779633278170
+[debug] [2026-05-24T13:34:39.935Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/billarpoolstamta-5d4ac/databases/(default) [none]
+[debug] [2026-05-24T13:34:40.920Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/billarpoolstamta-5d4ac/databases/(default) 200
+[debug] [2026-05-24T13:34:40.921Z] <<< [apiv2][body] GET https://firestore.googleapis.com/v1/projects/billarpoolstamta-5d4ac/databases/(default) {"name":"projects/billarpoolstamta-5d4ac/databases/(default)","uid":"b8576ef2-6dab-4d4b-8b6e-027d4f039fe3","createTime":"2026-03-17T16:40:34.303799Z","updateTime":"2026-03-17T16:40:34.303799Z","locationId":"nam5","type":"FIRESTORE_NATIVE","concurrencyMode":"PESSIMISTIC","versionRetentionPeriod":"3600s","earliestVersionTime":"2026-05-24T12:34:41.922551Z","appEngineIntegrationMode":"DISABLED","keyPrefix":"s","pointInTimeRecoveryEnablement":"POINT_IN_TIME_RECOVERY_DISABLED","deleteProtectionState":"DELETE_PROTECTION_DISABLED","databaseEdition":"STANDARD","freeTier":true,"realtimeUpdatesMode":"REALTIME_UPDATES_MODE_ENABLED","etag":"INWfl5iF0pQDMPS+5Ly5p5MD"}
+[info] i  firestore: reading indexes from firestore.indexes.json... 
+[info] i  cloud.firestore: checking firestore.rules for compilation errors... 
+[debug] [2026-05-24T13:34:40.930Z] Checked if tokens are valid: true, expires at: 1779633278170
+[debug] [2026-05-24T13:34:40.931Z] Checked if tokens are valid: true, expires at: 1779633278170
+[debug] [2026-05-24T13:34:40.931Z] >>> [apiv2][query] POST https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac:test [none]
+[debug] [2026-05-24T13:34:40.931Z] >>> [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac:test [omitted]
+[debug] [2026-05-24T13:34:41.906Z] <<< [apiv2][status] POST https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac:test 200
+[debug] [2026-05-24T13:34:41.907Z] <<< [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac:test {}
+[info] +  cloud.firestore: rules file firestore.rules compiled successfully 
+[debug] [2026-05-24T13:34:41.911Z] Checked if tokens are valid: true, expires at: 1779633278170
+[debug] [2026-05-24T13:34:41.911Z] Checked if tokens are valid: true, expires at: 1779633278170
+[debug] [2026-05-24T13:34:41.917Z] >>> [apiv2][query] GET https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac/releases pageSize=10&pageToken=
+[debug] [2026-05-24T13:34:42.149Z] <<< [apiv2][status] GET https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac/releases 200
+[debug] [2026-05-24T13:34:42.149Z] <<< [apiv2][body] GET https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac/releases {"releases":[{"name":"projects/billarpoolstamta-5d4ac/releases/cloud.firestore","rulesetName":"projects/billarpoolstamta-5d4ac/rulesets/bb2f712b-8ed6-487f-a772-1e9cb69143b8","createTime":"2026-03-17T16:40:35.582379Z","updateTime":"2026-05-06T22:49:30.250483Z"}]}
+[debug] [2026-05-24T13:34:42.150Z] Checked if tokens are valid: true, expires at: 1779633278170
+[debug] [2026-05-24T13:34:42.150Z] Checked if tokens are valid: true, expires at: 1779633278170
+[debug] [2026-05-24T13:34:42.150Z] >>> [apiv2][query] GET https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac/rulesets/bb2f712b-8ed6-487f-a772-1e9cb69143b8 [none]
+[debug] [2026-05-24T13:34:42.374Z] <<< [apiv2][status] GET https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac/rulesets/bb2f712b-8ed6-487f-a772-1e9cb69143b8 200
+[debug] [2026-05-24T13:34:42.374Z] <<< [apiv2][body] GET https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac/rulesets/bb2f712b-8ed6-487f-a772-1e9cb69143b8 [omitted]
+[info] i  firestore: uploading rules firestore.rules... 
+[debug] [2026-05-24T13:34:42.380Z] Checked if tokens are valid: true, expires at: 1779633278170
+[debug] [2026-05-24T13:34:42.381Z] Checked if tokens are valid: true, expires at: 1779633278170
+[debug] [2026-05-24T13:34:42.381Z] >>> [apiv2][query] POST https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac/rulesets [none]
+[debug] [2026-05-24T13:34:42.382Z] >>> [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac/rulesets [omitted]
+[debug] [2026-05-24T13:34:42.822Z] <<< [apiv2][status] POST https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac/rulesets 200
+[debug] [2026-05-24T13:34:42.822Z] <<< [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac/rulesets {"name":"projects/billarpoolstamta-5d4ac/rulesets/6946fef2-9901-4564-bc29-6b954117391a","source":{"files":[{"content":"rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    function signedIn() {\n      return request.auth != null;\n    }\n\n    function isAdmin() {\n      return signedIn() &&\n        exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) &&\n        (\n          get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.role == 'admin' ||\n          get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.role == 'superadmin'\n        );\n    }\n\n    function isSuperAdmin() {\n      return signedIn() &&\n        exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) &&\n        get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.role == 'superadmin';\n    }\n\n    function isSales() {\n      return signedIn() &&\n        exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) &&\n        get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.role == 'sales';\n    }\n\n    function isPublicStockSyncUpdate() {\n      return resource != null &&\n        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['publicStock', 'updatedAt']);\n    }\n\n    match /usuarios/{userId} {\n      allow read: if signedIn() && (request.auth.uid == userId || isAdmin());\n      allow create: if signedIn() && (request.auth.uid == userId || isAdmin());\n      allow update: if signedIn() && (request.auth.uid == userId || isAdmin());\n      allow delete: if isSuperAdmin();\n    }\n\n    match /products/{productId} {\n      allow read: if signedIn() || (\n        resource.data.status == 'active'\n      );\n      allow create, delete: if isAdmin();\n      allow update: if isAdmin() || (isSales() && isPublicStockSyncUpdate());\n    }\n\n    match /product_variants/{variantId} {\n      allow read: if signedIn() || (\n        resource.data.status == 'active'\n      );\n      allow create, update, delete: if isAdmin();\n    }\n\n    match /product_categories/{categoryId} {\n      allow read: if signedIn();\n      allow create, update, delete: if isAdmin();\n    }\n\n    match /siteAssets/{documentId} {\n      allow read: if true;\n      allow create, update, delete: if isAdmin();\n    }\n\n    match /suppliers/{supplierId} {\n      allow read: if signedIn();\n      allow create, update, delete: if isAdmin();\n    }\n\n    match /movements/{movementId} {\n      allow read: if signedIn();\n      allow create: if isAdmin() || isSales();\n      allow update: if isAdmin() || isSales();\n      allow delete: if isAdmin() || isSales();\n    }\n\n    match /purchases/{purchaseId} {\n      allow read: if signedIn();\n      allow create, update, delete: if isAdmin();\n    }\n\n    match /purchase_items/{itemId} {\n      allow read: if signedIn();\n      allow create, update, delete: if isAdmin();\n    }\n\n    match /inventory_movements/{movementId} {\n      allow read: if signedIn();\n      allow create: if isAdmin() || isSales();\n      allow update: if isAdmin() || isSales();\n      allow delete: if isAdmin() || isSales();\n    }\n\n    match /sales/{saleId} {\n      allow read: if signedIn();\n      allow create: if isAdmin() || isSales();\n      allow update: if isAdmin() || isSales();\n      allow delete: if isAdmin() || isSales();\n    }\n\n    match /customers/{customerId} {\n      allow read: if signedIn();\n      allow create: if isAdmin() || isSales();\n      allow update: if isAdmin() || isSales();\n      allow delete: if isAdmin();\n    }\n\n    match /services/{serviceId} {\n      allow read: if signedIn();\n      allow create: if isAdmin() || isSales();\n      allow update: if isAdmin() || isSales();\n      allow delete: if isAdmin();\n    }\n\n    match /service-visits/{visitId} {\n      allow read: if signedIn();\n      allow create: if isAdmin() || isSales();\n      allow update: if isAdmin() || isSales();\n      allow delete: if isAdmin();\n    }\n\n    match /admin-notifications/{notificationId} {\n      allow read: if isAdmin();\n      allow create: if isAdmin() || isSales();\n      allow update: if isAdmin();\n      allow delete: if isAdmin();\n    }\n\n    match /authorization-requests/{requestId} {\n      allow read: if isAdmin() || isSales();\n      allow create: if isAdmin() || isSales();\n      allow update: if isAdmin() || isSales();\n      allow delete: if isAdmin();\n    }\n\n  }\n}\n","name":"firestore.rules"}]},"createTime":"2026-05-24T13:34:43.807167Z","metadata":{"services":["cloud.firestore"]}}
+[debug] [2026-05-24T13:34:42.823Z] [rules] created ruleset projects/billarpoolstamta-5d4ac/rulesets/6946fef2-9901-4564-bc29-6b954117391a
+[debug] [2026-05-24T13:34:42.824Z] [rules] releasing cloud.firestore with ruleset projects/billarpoolstamta-5d4ac/rulesets/6946fef2-9901-4564-bc29-6b954117391a
+[debug] [2026-05-24T13:34:42.825Z] Checked if tokens are valid: true, expires at: 1779633278170
+[debug] [2026-05-24T13:34:42.825Z] Checked if tokens are valid: true, expires at: 1779633278170
+[debug] [2026-05-24T13:34:42.826Z] >>> [apiv2][query] PATCH https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac/releases/cloud.firestore [none]
+[debug] [2026-05-24T13:34:42.826Z] >>> [apiv2][body] PATCH https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac/releases/cloud.firestore {"release":{"name":"projects/billarpoolstamta-5d4ac/releases/cloud.firestore","rulesetName":"projects/billarpoolstamta-5d4ac/rulesets/6946fef2-9901-4564-bc29-6b954117391a"}}
+[debug] [2026-05-24T13:34:43.226Z] <<< [apiv2][status] PATCH https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac/releases/cloud.firestore 200
+[debug] [2026-05-24T13:34:43.226Z] <<< [apiv2][body] PATCH https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac/releases/cloud.firestore {"name":"projects/billarpoolstamta-5d4ac/releases/cloud.firestore","rulesetName":"projects/billarpoolstamta-5d4ac/rulesets/6946fef2-9901-4564-bc29-6b954117391a","createTime":"2026-03-17T16:40:35.582379Z","updateTime":"2026-05-24T13:34:44.219206Z"}
+[debug] [2026-05-24T13:34:43.226Z] [rules] updated release projects/billarpoolstamta-5d4ac/releases/cloud.firestore
+[info] +  firestore: released rules firestore.rules to cloud.firestore 
+[info] 
+[info] +  Deploy complete! 
+[info] 
+[info] Project Console: https://console.firebase.google.com/project/billarpoolstamta-5d4ac/overview

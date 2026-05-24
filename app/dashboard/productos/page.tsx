@@ -622,7 +622,7 @@ export default function ProductosPage() {
         onSubmit={handleSave}
       />
       <Dialog open={openViewDialog} onOpenChange={setOpenViewDialog}>
-        <DialogContent className="max-h-[92vh] w-[calc(100vw-1rem)] max-w-6xl overflow-y-auto border-slate-800 bg-slate-950 p-0 text-white sm:w-[calc(100vw-2rem)]">
+        <DialogContent className="h-[100dvh] max-h-[100dvh] w-screen max-w-none overflow-y-auto rounded-none border-0 border-slate-800 bg-slate-950 p-0 text-white sm:h-auto sm:max-h-[92vh] sm:w-[calc(100vw-2rem)] sm:max-w-6xl sm:rounded-[26px] sm:border">
           {selectedProduct ? (
             <>
               <div

@@ -20,6 +20,7 @@ import { Input } from '@/components/ui/input';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { getTodayDateInputValue } from '@/lib/admin/date-utils';
 
 const movementSchema = z.object({
   productId: z.string().min(1, 'Selecciona un producto'),
@@ -27,21 +28,25 @@ const movementSchema = z.object({
   type: z.enum(['entry', 'exit', 'adjustment']),
   reason: z.enum(['purchase', 'sale', 'gift', 'manual-adjustment', 'damage', 'initial-load', 'transfer']),
   quantity: z.coerce.number().positive('La cantidad debe ser mayor a cero'),
+  occurredAt: z.string().min(1, 'Selecciona la fecha del movimiento'),
   notes: z.string().min(4, 'Agrega una observacion breve'),
   responsibleUser: z.string().min(2, 'Ingresa el responsable'),
 });
 
 export type MovementFormValues = z.infer<typeof movementSchema>;
 
-const defaultValues: MovementFormValues = {
-  productId: '',
-  variantId: '',
-  type: 'entry',
-  reason: 'purchase',
-  quantity: 1,
-  notes: '',
-  responsibleUser: 'Administrador',
-};
+function createDefaultValues(): MovementFormValues {
+  return {
+    productId: '',
+    variantId: '',
+    type: 'entry',
+    reason: 'purchase',
+    quantity: 1,
+    occurredAt: getTodayDateInputValue(),
+    notes: '',
+    responsibleUser: 'Administrador',
+  };
+}
 
 export function MovementFormDialog({
   open,
@@ -71,7 +76,7 @@ export function MovementFormDialog({
           }
         })
     ),
-    defaultValues,
+    defaultValues: createDefaultValues(),
   });
   const isSubmitting = form.formState.isSubmitting;
   const selectedType = form.watch('type');
@@ -98,6 +103,9 @@ export function MovementFormDialog({
         onOpenChange(nextOpen);
       }}
       title="Registrar movimiento de inventario"
+      busy={isSubmitting}
+      busyTitle="Guardando movimiento..."
+      busyDescription="Espera la confirmacion para evitar movimientos duplicados."
       description="Usa opciones simples para registrar entradas, salidas o ajustes del stock."
       desktopContentClassName="lg:max-w-4xl"
       footer={
@@ -116,7 +124,7 @@ export function MovementFormDialog({
             id={movementFormId}
             onSubmit={form.handleSubmit(async (values) => {
               await onSubmit(values);
-              form.reset(defaultValues);
+              form.reset(createDefaultValues());
             })}
             className="space-y-4"
           >
@@ -237,6 +245,19 @@ export function MovementFormDialog({
                     <FormLabel>Cantidad</FormLabel>
                     <FormControl>
                       <Input type="number" min="1" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="occurredAt"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Fecha</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

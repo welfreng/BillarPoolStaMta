@@ -13,9 +13,8 @@ import { useAdminData } from '@/components/admin/admin-data-context';
 import { useAuth } from '@/components/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, formatDateTime, formatNumber, getProductById } from '@/lib/admin/calculations';
+import { getDateKeyInBogota, getTodayDateInputValue, toOperationalDateISOString } from '@/lib/admin/date-utils';
 import { serviceTypeLabels } from '@/lib/admin/catalogs';
-
-const currentMonth = new Date().toISOString().slice(0, 7);
 
 export default function ServiciosPage() {
   const { services, products, purchases, movements, registerService, updateService } = useAdminData();
@@ -26,6 +25,7 @@ export default function ServiciosPage() {
   const [query, setQuery] = useState('');
   const isSalesUser = role === 'sales';
   const canEditServices = role === 'admin' || role === 'superadmin';
+  const currentMonth = getTodayDateInputValue().slice(0, 7);
   const getServiceDisplayLabel = (service: (typeof services)[number]) =>
     service.serviceLabel?.trim() || serviceTypeLabels[service.serviceType];
   const editableService = services.find((service) => service.id === editingServiceId) ?? null;
@@ -80,7 +80,7 @@ export default function ServiciosPage() {
     () =>
       filteredServices.reduce(
         (accumulator, service) => {
-          if (!service.performedAt.startsWith(currentMonth)) return accumulator;
+          if (getDateKeyInBogota(service.performedAt).slice(0, 7) !== currentMonth) return accumulator;
           accumulator.count += 1;
           accumulator.revenue += service.totalRevenue;
           accumulator.cost += service.totalCost ?? service.totalMaterialCost;
@@ -89,7 +89,7 @@ export default function ServiciosPage() {
         },
         { count: 0, revenue: 0, cost: 0, profit: 0 }
       ),
-    [filteredServices]
+    [currentMonth, filteredServices]
   );
 
   const buildMaterialChips = (service: (typeof filteredServices)[number]) =>
@@ -129,11 +129,7 @@ export default function ServiciosPage() {
       <SectionHeader
         eyebrow="Torno y reparaciones"
         title="Servicios"
-        description={
-          isSalesUser
-            ? 'Registra trabajos como instalacion de casquillos, virolas, supresores y extensiones para descontar inventario y dejar trazabilidad del servicio.'
-            : 'Registra trabajos como instalacion de casquillos, virolas, supresores y extensiones para descontar inventario y medir la utilidad real del torno.'
-        }
+        description="Gestiona los servicios registrados del negocio."
         actions={
           <Button onClick={() => setOpenDialog(true)} className="w-full rounded-xl sm:w-auto">
             <Plus className="mr-2 h-4 w-4" /> Registrar servicio
@@ -473,7 +469,7 @@ export default function ServiciosPage() {
             serviceType: values.serviceType,
             serviceLabel: values.serviceLabel,
             serviceCategory: values.serviceCategory,
-            performedAt: values.performedAt,
+            performedAt: toOperationalDateISOString(values.performedAt),
             customerName: values.customerName,
             cueReference: values.cueReference,
             paymentMethod: 'efectivo',

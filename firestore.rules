@@ -99,6 +99,13 @@ service cloud.firestore {
       allow delete: if isAdmin() || isSales();
     }
 
+    match /customers/{customerId} {
+      allow read: if signedIn();
+      allow create: if isAdmin() || isSales();
+      allow update: if isAdmin() || isSales();
+      allow delete: if isAdmin();
+    }
+
     match /services/{serviceId} {
       allow read: if signedIn();
       allow create: if isAdmin() || isSales();
