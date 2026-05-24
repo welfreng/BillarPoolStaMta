@@ -6,6 +6,8 @@ import {
   Activity,
   ArrowUpRight,
   Boxes,
+  CalendarDays,
+  ChevronLeft,
   ChevronRight,
   CircleAlert,
   Clock3,
@@ -25,6 +27,7 @@ import { SaleFormDialog, type SaleFormValues } from '@/components/admin/sales/sa
 import { useAdminData } from '@/components/admin/admin-data-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
 import {
   formatCurrency,
@@ -43,6 +46,20 @@ import { cn } from '@/lib/utils';
 const DASHBOARD_TIMEZONE = 'America/Bogota';
 const LOW_STOCK_THRESHOLD = 3;
 type DashboardPeriod = 'today' | 'week' | 'month';
+const MONTH_OPTIONS = [
+  'enero',
+  'febrero',
+  'marzo',
+  'abril',
+  'mayo',
+  'junio',
+  'julio',
+  'agosto',
+  'septiembre',
+  'octubre',
+  'noviembre',
+  'diciembre',
+];
 
 function getProductSalePriceSummary(product: Product) {
   const prices = (product.variants ?? [])
@@ -360,6 +377,7 @@ export default function DashboardPage() {
   const isSalesUser = role === 'sales';
   const [period, setPeriod] = useState<DashboardPeriod>('today');
   const [selectedMonth, setSelectedMonth] = useState(() => getMonthInputValue(new Date()));
+  const [monthCalendarOpen, setMonthCalendarOpen] = useState(false);
   const [productQuery, setProductQuery] = useState('');
   const [openSaleDialog, setOpenSaleDialog] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
@@ -371,6 +389,13 @@ export default function DashboardPage() {
     [effectivePeriod, selectedMonth]
   );
   const periodLabel = effectivePeriod === 'month' ? formatMonthLabel(dashboardRange.monthValue) : dashboardRange.label;
+  const selectedMonthParts = useMemo(() => {
+    const [year, month] = selectedMonth.split('-').map(Number);
+    return {
+      year: year || new Date().getFullYear(),
+      month: month || 1,
+    };
+  }, [selectedMonth]);
 
   const availableProducts = products
     .map((product) => ({
@@ -778,12 +803,72 @@ export default function DashboardPage() {
                 </p>
               </div>
               {!isSalesUser && period === 'month' ? (
-                <Input
-                  type="month"
-                  value={selectedMonth}
-                  onChange={(event) => setSelectedMonth(event.target.value)}
-                  className="w-full border-white/15 bg-black/10 text-white sm:w-[190px]"
-                />
+                <Popover open={monthCalendarOpen} onOpenChange={setMonthCalendarOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full justify-between rounded-2xl border-white/15 bg-black/10 text-white hover:bg-white/10 hover:text-white sm:w-[220px]"
+                    >
+                      <span className="truncate capitalize">{formatMonthLabel(selectedMonth)}</span>
+                      <CalendarDays className="ml-2 h-4 w-4 shrink-0 text-cyan-300" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className="w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-border bg-card/95 p-3 text-foreground shadow-xl dark:border-slate-800 dark:bg-slate-950"
+                    align="end"
+                  >
+                    <div className="flex items-center justify-between gap-2 border-b border-border pb-3 dark:border-slate-800">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-9 w-9 rounded-xl"
+                        onClick={() =>
+                          setSelectedMonth(`${selectedMonthParts.year - 1}-${String(selectedMonthParts.month).padStart(2, '0')}`)
+                        }
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                        <span className="sr-only">Año anterior</span>
+                      </Button>
+                      <p className="text-sm font-semibold text-foreground">{selectedMonthParts.year}</p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-9 w-9 rounded-xl"
+                        onClick={() =>
+                          setSelectedMonth(`${selectedMonthParts.year + 1}-${String(selectedMonthParts.month).padStart(2, '0')}`)
+                        }
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                        <span className="sr-only">Año siguiente</span>
+                      </Button>
+                    </div>
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                      {MONTH_OPTIONS.map((monthLabel, index) => {
+                        const monthNumber = index + 1;
+                        const monthValue = `${selectedMonthParts.year}-${String(monthNumber).padStart(2, '0')}`;
+                        const isActive = selectedMonth === monthValue;
+
+                        return (
+                          <Button
+                            key={monthLabel}
+                            type="button"
+                            variant={isActive ? 'default' : 'outline'}
+                            className={cn('h-10 rounded-xl px-2 text-xs capitalize', isActive ? '' : 'bg-background/80')}
+                            onClick={() => {
+                              setSelectedMonth(monthValue);
+                              setMonthCalendarOpen(false);
+                            }}
+                          >
+                            {monthLabel}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  </PopoverContent>
+                </Popover>
               ) : null}
             </div>
             {!isSalesUser ? (

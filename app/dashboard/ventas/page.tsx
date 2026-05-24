@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Clock3, CornerUpLeft, Eye, LockKeyhole, MoreHorizontal, Pencil, Plus, Receipt, Search } from 'lucide-react';
 import { SectionHeader } from '@/components/admin/shared/section-header';
 import { SaleDetailsDialog } from '@/components/admin/sales/sale-details-dialog';
@@ -25,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
@@ -184,6 +185,9 @@ export default function VentasPage() {
   const [detailsSaleId, setDetailsSaleId] = useState<string | null>(null);
   const [detailsInitialTab, setDetailsInitialTab] = useState<'details' | 'invoice'>('details');
   const [query, setQuery] = useState('');
+  const [saleCategory, setSaleCategory] = useState('all');
+  const [salePage, setSalePage] = useState(1);
+  const [salePageSize, setSalePageSize] = useState(20);
   const [authorizationDialogState, setAuthorizationDialogState] = useState<{
     saleBatchId: string;
     saleId: string;
@@ -259,15 +263,45 @@ export default function VentasPage() {
   const filteredSales = useMemo(() => {
     return saleGroups.filter((group) => {
       const baseSale = group.sales[0];
+      const soldProducts = group.sales.flatMap((sale) =>
+        sale.lineItems
+          .map((item) => getProductById(products, item.productId))
+          .filter((product): product is NonNullable<typeof product> => Boolean(product))
+      );
       const productNames = group.sales
         .flatMap((sale) => sale.lineItems.map((item) => getProductById(products, item.productId)?.name ?? ''))
         .join(' ');
+      const matchesCategory =
+        saleCategory === 'all' ||
+        soldProducts.some((product) => product.category === saleCategory);
       return `${productNames} ${baseSale?.customerName ?? ''} ${baseSale?.notes ?? ''}`
         .toLowerCase()
-        .includes(query.toLowerCase());
+        .includes(query.toLowerCase()) && matchesCategory;
     });
-  }, [products, query, saleGroups]);
+  }, [products, query, saleCategory, saleGroups]);
   const normalizedQuery = query.trim();
+  const saleCategoryOptions = useMemo(
+    () =>
+      Array.from(new Set(products.map((product) => product.category).filter(Boolean))).sort((left, right) =>
+        left.localeCompare(right, 'es')
+      ),
+    [products]
+  );
+  const saleTotalPages = Math.max(Math.ceil(filteredSales.length / salePageSize), 1);
+  const salePageStart = filteredSales.length === 0 ? 0 : (salePage - 1) * salePageSize + 1;
+  const salePageEnd = Math.min(salePage * salePageSize, filteredSales.length);
+  const paginatedSales = useMemo(
+    () => filteredSales.slice((salePage - 1) * salePageSize, salePage * salePageSize),
+    [filteredSales, salePage, salePageSize]
+  );
+
+  useEffect(() => {
+    setSalePage(1);
+  }, [query, saleCategory, salePageSize]);
+
+  useEffect(() => {
+    setSalePage((currentPage) => Math.min(currentPage, saleTotalPages));
+  }, [saleTotalPages]);
 
   const totals = useMemo(
     () =>
@@ -360,14 +394,29 @@ export default function VentasPage() {
       </div>
 
       <div className="min-w-0 space-y-3.5 rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-3.5 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-[linear-gradient(180deg,rgba(2,6,23,0.92)_0%,rgba(15,23,42,0.88)_100%)] dark:shadow-[0_20px_48px_rgba(2,6,23,0.28)] sm:space-y-4 sm:p-6">
-        <div className="relative max-w-md">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <Input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Buscar por producto, cliente o nota"
-            className="rounded-2xl border-slate-200 bg-white/90 pl-9 shadow-sm dark:border-slate-700 dark:bg-slate-900/75 dark:text-slate-100"
-          />
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_260px]">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Buscar por producto, cliente o nota"
+              className="rounded-2xl border-slate-200 bg-white/90 pl-9 shadow-sm dark:border-slate-700 dark:bg-slate-900/75 dark:text-slate-100"
+            />
+          </div>
+          <Select value={saleCategory} onValueChange={setSaleCategory}>
+            <SelectTrigger className="h-10 w-full rounded-2xl border-slate-200 bg-white/90 shadow-sm dark:border-slate-700 dark:bg-slate-900/75">
+              <SelectValue placeholder="Categoria" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas las categorias</SelectItem>
+              {saleCategoryOptions.map((category) => (
+                <SelectItem key={category} value={category}>
+                  {category}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {!loading ? (
@@ -379,6 +428,48 @@ export default function VentasPage() {
         ) : (
           <p className="text-xs text-slate-500 dark:text-slate-400">Cargando ventas desde Firestore...</p>
         )}
+
+        {!loading && filteredSales.length > 0 ? (
+          <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3 dark:border-slate-800 dark:bg-slate-900/55 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              Mostrando <span className="font-semibold text-slate-950 dark:text-slate-50">{formatNumber(salePageStart)}</span>-
+              <span className="font-semibold text-slate-950 dark:text-slate-50">{formatNumber(salePageEnd)}</span> de{' '}
+              <span className="font-semibold text-slate-950 dark:text-slate-50">{formatNumber(filteredSales.length)}</span> ventas
+            </p>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <Select value={String(salePageSize)} onValueChange={(value) => setSalePageSize(Number(value))}>
+                <SelectTrigger className="h-10 w-full sm:w-[150px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="20">20 por pagina</SelectItem>
+                  <SelectItem value="50">50 por pagina</SelectItem>
+                  <SelectItem value="100">100 por pagina</SelectItem>
+                </SelectContent>
+              </Select>
+              <div className="grid grid-cols-2 gap-2 sm:flex">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-xl"
+                  onClick={() => setSalePage((currentPage) => Math.max(currentPage - 1, 1))}
+                  disabled={salePage <= 1}
+                >
+                  Anterior
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-xl"
+                  onClick={() => setSalePage((currentPage) => Math.min(currentPage + 1, saleTotalPages))}
+                  disabled={salePage >= saleTotalPages}
+                >
+                  Siguiente
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {loading ? (
           <Empty className="border border-dashed border-slate-200 bg-slate-50/70 dark:border-slate-800 dark:bg-slate-900/60">
@@ -399,7 +490,7 @@ export default function VentasPage() {
               <p className="hidden sm:block">Scroll horizontal activo</p>
             </div>
             <div className="space-y-2.5 md:hidden">
-                {filteredSales.map((group) => {
+                {paginatedSales.map((group) => {
                   const baseSale = group.sales[0];
                   const saleBatchId = group.key;
                   const linkedServices = services.filter(
@@ -541,7 +632,7 @@ export default function VentasPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredSales.map((group) => {
+                  {paginatedSales.map((group) => {
                     const baseSale = group.sales[0];
                     const saleBatchId = group.key;
                     const linkedServices = services.filter(
@@ -856,6 +947,31 @@ export default function VentasPage() {
                 </TableBody>
               </Table>
             </div>
+            </div>
+            <div className="mt-3 flex flex-col gap-2 border-t border-slate-200 pt-3 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Pagina {formatNumber(salePage)} de {formatNumber(saleTotalPages)}
+              </p>
+              <div className="grid grid-cols-2 gap-2 sm:flex">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-xl"
+                  onClick={() => setSalePage((currentPage) => Math.max(currentPage - 1, 1))}
+                  disabled={salePage <= 1}
+                >
+                  Anterior
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-xl"
+                  onClick={() => setSalePage((currentPage) => Math.min(currentPage + 1, saleTotalPages))}
+                  disabled={salePage >= saleTotalPages}
+                >
+                  Siguiente
+                </Button>
+              </div>
             </div>
           </div>
         ) : (

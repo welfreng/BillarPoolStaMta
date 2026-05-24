@@ -297,7 +297,7 @@ export function SearchableSelect({
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogContent
             showCloseButton={false}
-            className="inset-0 left-0 top-0 !flex h-[100dvh] !h-[100dvh] w-screen !w-screen max-w-none !max-w-none translate-x-0 !translate-x-0 translate-y-0 !translate-y-0 flex-col items-stretch rounded-none !rounded-none border-0 p-0"
+            className="inset-0 left-0 top-0 !z-[100] !flex h-[100dvh] !h-[100dvh] w-screen !w-screen max-w-none !max-w-none translate-x-0 !translate-x-0 translate-y-0 !translate-y-0 flex-col items-stretch rounded-none !rounded-none border-0 p-0"
           >
             <DialogHeader className="w-full min-w-0 border-b px-4 py-3 text-left">
               <div className="flex items-center justify-between gap-3">
@@ -336,7 +336,7 @@ export function SearchableSelect({
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="z-50 w-[min(var(--radix-popover-trigger-width),calc(100vw-2rem))] min-w-[min(260px,calc(100vw-2rem))] p-0" align="start" sideOffset={6}>
+        <PopoverContent className="!z-[100] w-[min(var(--radix-popover-trigger-width),calc(100vw-2rem))] min-w-[min(260px,calc(100vw-2rem))] p-0" align="start" sideOffset={6}>
           {commandContent}
         </PopoverContent>
       </Popover>
