@@ -25,17 +25,17 @@ export default function Navbar() {
   ]
 
   return (
-    <header className="fixed left-0 right-0 top-0 z-50 border-b border-[#1e3a8a]/30 bg-[#0a1628]/95 backdrop-blur-md">
+    <header className="fixed left-0 right-0 top-0 z-50 border-b border-white/10 bg-[linear-gradient(135deg,#08162f_0%,#0a2472_58%,#12389b_100%)] shadow-[0_18px_50px_rgba(10,36,114,0.24)] backdrop-blur-md">
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 lg:px-8">
         <Link href={isHomePage ? "#inicio" : "/"} className="flex items-center gap-3">
           <Image
             src={SITE_LOGO}
             alt="Billar Pool Santa Marta"
-            width={50}
-            height={50}
-            className="rounded-full"
+            width={46}
+            height={46}
+            className="rounded-full drop-shadow-sm"
           />
-          <div className="hidden sm:block">
+          <div className="hidden xl:block">
             <p className="font-mono text-lg font-bold tracking-wide text-white">Billar Pool</p>
             <p className="text-xs uppercase tracking-widest text-[#d4a017]">Santa Marta</p>
           </div>
@@ -46,7 +46,7 @@ export default function Navbar() {
             <li key={link.href}>
               <Link
                 href={link.href}
-                className="rounded-lg px-3 py-2 text-sm font-medium text-white/80 transition-colors hover:bg-white/5 hover:text-[#d4a017]"
+                className="rounded-lg px-3 py-2 text-sm font-medium text-white/82 transition-colors hover:bg-white/10 hover:text-[#f5c451]"
               >
                 {link.label}
               </Link>
@@ -59,7 +59,7 @@ export default function Navbar() {
             href="https://wa.me/573006775284"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 rounded-lg bg-[#1a5632] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#1a5632]/80"
+            className="flex items-center gap-2 rounded-lg bg-white/12 px-4 py-2 text-sm font-semibold text-white ring-1 ring-white/18 transition-colors hover:bg-[#d4a017] hover:text-[#08162f]"
           >
             <Phone className="h-4 w-4" />
             WhatsApp
@@ -80,7 +80,7 @@ export default function Navbar() {
             </div>
           ) : (
             <Link href="/login">
-              <Button size="sm" className="bg-cyan-500 text-slate-950 hover:bg-cyan-400">
+              <Button size="sm" className="bg-[#d4a017] text-[#08162f] hover:bg-[#f5c451]">
                 Iniciar sesion
               </Button>
             </Link>
@@ -97,14 +97,14 @@ export default function Navbar() {
       </nav>
 
       {isOpen ? (
-        <div className="border-t border-[#1e3a8a]/30 bg-[#0a1628]/98 backdrop-blur-md lg:hidden">
+        <div className="border-t border-white/10 bg-[linear-gradient(135deg,#08162f_0%,#0a2472_70%,#12389b_100%)] backdrop-blur-md lg:hidden">
           <ul className="flex flex-col gap-1 px-4 py-4">
             {navLinks.map((link) => (
               <li key={link.href}>
                 <Link
                   href={link.href}
                   onClick={() => setIsOpen(false)}
-                  className="block rounded-lg px-4 py-3 text-sm font-medium text-white/80 transition-colors hover:bg-white/5 hover:text-[#d4a017]"
+                  className="block rounded-lg px-4 py-3 text-sm font-medium text-white/82 transition-colors hover:bg-white/10 hover:text-[#f5c451]"
                 >
                   {link.label}
                 </Link>
@@ -115,7 +115,7 @@ export default function Navbar() {
                 href="https://wa.me/573006775284"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 rounded-lg bg-[#1a5632] px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#1a5632]/80"
+                className="flex items-center justify-center gap-2 rounded-lg bg-[#d4a017] px-4 py-3 text-sm font-semibold text-[#08162f] transition-colors hover:bg-[#f5c451]"
               >
                 <Phone className="h-4 w-4" />
                 WhatsApp
@@ -137,7 +137,7 @@ export default function Navbar() {
                 </div>
               ) : (
                 <Link href="/login" onClick={() => setIsOpen(false)}>
-                  <Button className="w-full bg-cyan-500 text-slate-950 hover:bg-cyan-400">
+                  <Button className="w-full bg-[#d4a017] text-[#08162f] hover:bg-[#f5c451]">
                     Iniciar sesion
                   </Button>
                 </Link>

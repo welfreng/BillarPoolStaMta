@@ -19,7 +19,7 @@ export default function Footer() {
   ]
 
   return (
-    <footer id="contacto" className="bg-[#0a1628] text-white">
+    <footer id="contacto" className="bg-[linear-gradient(135deg,#08162f_0%,#0a2472_58%,#08162f_100%)] text-white">
       <div className="mx-auto max-w-7xl px-4 lg:px-8">
         <div className="grid grid-cols-1 gap-10 border-b border-white/10 py-16 md:grid-cols-2 lg:grid-cols-4">
           <div className="lg:col-span-1">

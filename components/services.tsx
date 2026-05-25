@@ -57,7 +57,7 @@ export default function Services() {
   }, [])
 
   return (
-    <section id="servicios" className="relative overflow-hidden bg-[#0a1628] py-24">
+    <section id="servicios" className="relative -mt-8 overflow-hidden rounded-t-[40px] border-t border-white/10 bg-[linear-gradient(145deg,#08162f_0%,#0a2472_52%,#0b1d3f_100%)] py-24 shadow-[0_-24px_70px_rgba(10,36,114,0.18)]">
       <div className="absolute inset-0 opacity-5">
         <div
           className="absolute inset-0"
@@ -83,8 +83,8 @@ export default function Services() {
 
             <div className="mt-10 space-y-6">
               {services.map((service, i) => (
-                <div key={i} className="group flex gap-4">
-                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-[#0a2472] transition-colors group-hover:bg-[#d4a017]">
+                <div key={i} className="group flex gap-4 rounded-2xl border border-white/10 bg-white/6 p-4">
+                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-white/12 ring-1 ring-white/12 transition-colors group-hover:bg-[#d4a017]">
                     <service.icon className="h-6 w-6 text-white transition-colors group-hover:text-[#0a1628]" />
                   </div>
                   <div>
@@ -106,7 +106,7 @@ export default function Services() {
           </div>
 
           <div className="relative">
-            <div className="relative overflow-hidden rounded-2xl shadow-2xl">
+            <div className="relative overflow-hidden rounded-3xl border border-white/12 shadow-2xl shadow-[#08162f]/40">
               <Image
                 src="/images/torno-reparacion.jpg"
                 alt="Taller de reparacion de tacos de billar con torno semiprofesional"
@@ -122,9 +122,6 @@ export default function Services() {
                 </div>
               </div>
             </div>
-            <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-[#d4a017]/20 blur-2xl" />
-            <div className="absolute -bottom-4 -left-4 h-32 w-32 rounded-full bg-[#0a2472]/30 blur-2xl" />
-
             {serviceImages.length > 0 ? (
               <div className="mt-5 grid grid-cols-3 gap-3">
                 {serviceImages.map((image, index) => (

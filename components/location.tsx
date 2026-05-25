@@ -2,7 +2,7 @@ import { MapPin, Clock, Phone, Navigation } from "lucide-react"
 
 export default function Location() {
   return (
-    <section id="ubicacion" className="py-24 bg-background">
+    <section id="ubicacion" className="bg-[linear-gradient(180deg,#f8fafc_0%,#eef5ff_100%)] py-24">
       <div className="mx-auto max-w-7xl px-4 lg:px-8">
         <div className="text-center mb-16">
           <p className="text-sm font-semibold tracking-widest uppercase text-[#d4a017] mb-2">
@@ -17,7 +17,7 @@ export default function Location() {
         </div>
 
         <div className="grid lg:grid-cols-5 gap-8">
-          <div className="lg:col-span-3 rounded-2xl overflow-hidden shadow-xl border border-border h-[400px] lg:h-[500px]">
+          <div className="h-[400px] overflow-hidden rounded-3xl border border-[#c8d3e6] shadow-[0_22px_50px_rgba(10,36,114,0.12)] lg:col-span-3 lg:h-[500px]">
             <iframe
               src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3916.485!2d-74.199!3d11.241!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2sBillar+Pool+Santa+Marta!5e0!3m2!1ses!2sco!4v1709416800000!5m2!1ses!2sco"
               width="100%"
@@ -31,7 +31,7 @@ export default function Location() {
           </div>
 
           <div className="lg:col-span-2 flex flex-col gap-6">
-            <div className="rounded-2xl bg-[#0a2472] p-8 text-white">
+            <div className="rounded-3xl bg-[linear-gradient(135deg,#08162f_0%,#0a2472_58%,#12389b_100%)] p-8 text-white shadow-[0_22px_50px_rgba(10,36,114,0.18)]">
               <h3 className="text-xl font-bold font-mono mb-6">Informacion de Contacto</h3>
               <div className="space-y-5">
                 <div className="flex items-start gap-4">
@@ -71,7 +71,7 @@ export default function Location() {
               href="https://www.google.com/maps/search/Billar+Pool+Santa+Marta"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center gap-3 rounded-2xl bg-card border border-border p-6 hover:border-[#0a2472]/30 hover:shadow-lg transition-all group"
+              className="group flex items-center justify-center gap-3 rounded-3xl border border-[#c8d3e6] bg-white p-6 shadow-sm transition-all hover:border-[#0a2472]/35 hover:shadow-[0_18px_42px_rgba(10,36,114,0.14)]"
             >
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#0a2472] group-hover:bg-[#d4a017] transition-colors">
                 <Navigation className="h-6 w-6 text-white group-hover:text-[#0a1628] transition-colors" />
@@ -86,7 +86,7 @@ export default function Location() {
               href="https://wa.me/573006775284?text=Hola%2C%20me%20gustaria%20saber%20como%20llegar%20a%20la%20tienda"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center gap-3 rounded-2xl bg-[#1a5632] p-6 hover:bg-[#1a5632]/90 transition-colors group"
+              className="group flex items-center justify-center gap-3 rounded-3xl bg-[#1a5632] p-6 shadow-[0_18px_42px_rgba(26,86,50,0.18)] transition-colors hover:bg-[#166534]"
             >
               <Phone className="h-6 w-6 text-white" />
               <div className="text-left">
