@@ -54,6 +54,8 @@ const defaultImage = SITE_LOGO
 const whatsappNumber = "573006775284"
 const categoryLabels = new Map(publicCatalogCategories.map((category) => [category.id, category.label]))
 const categoryOrder = new Map(publicCatalogCategories.map((category, index) => [category.id, index]))
+const productQueryParam = "producto"
+const variantQueryParam = "variante"
 
 function mapCatalogProduct(documentId: string, data: DocumentData): CatalogProduct {
   const fallbackProduct = publicCatalogProducts.find((product) => product.id === documentId)
@@ -117,6 +119,16 @@ function hasVariantPricingRange(product: CatalogProduct) {
 function getDefaultSelectedVariant(product: CatalogProduct | null) {
   if (!product || product.variants.length === 0) return null
   return product.variants.find((variant) => variant.stock > 0) ?? product.variants[0] ?? null
+}
+
+function buildProductPath(productId: string, variantId = "") {
+  const params = new URLSearchParams({ [productQueryParam]: productId })
+
+  if (variantId) {
+    params.set(variantQueryParam, variantId)
+  }
+
+  return `/tienda-virtual?${params.toString()}`
 }
 
 export default function ProductCatalog({
@@ -293,6 +305,51 @@ export default function ProductCatalog({
     null
   const selectedProductImage = selectedVariant?.image || selectedProduct?.image || defaultImage
   const selectedVariantIsAvailable = selectedVariant ? selectedVariant.stock > 0 : (selectedProduct?.publicStock ?? 0) > 0
+  const isStorePage = () =>
+    typeof window !== "undefined" && window.location.pathname.replace(/\/$/, "") === "/tienda-virtual"
+
+  const getAbsoluteProductUrl = (productId: string, variantId = "") => {
+    const productPath = buildProductPath(productId, variantId)
+
+    if (typeof window === "undefined") return productPath
+    return new URL(productPath, window.location.origin).toString()
+  }
+
+  const updateProductUrl = (productId: string, variantId = "", mode: "push" | "replace" = "push") => {
+    if (!isStorePage()) return
+
+    const nextUrl = new URL(window.location.href)
+    nextUrl.searchParams.set(productQueryParam, productId)
+    if (variantId) {
+      nextUrl.searchParams.set(variantQueryParam, variantId)
+    } else {
+      nextUrl.searchParams.delete(variantQueryParam)
+    }
+
+    window.history[mode === "push" ? "pushState" : "replaceState"](
+      null,
+      "",
+      `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`
+    )
+  }
+
+  const clearProductUrl = () => {
+    if (!isStorePage()) return
+
+    const nextUrl = new URL(window.location.href)
+    nextUrl.searchParams.delete(productQueryParam)
+    nextUrl.searchParams.delete(variantQueryParam)
+    window.history.replaceState(null, "", `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`)
+  }
+
+  const openProductDetail = (product: CatalogProduct) => {
+    const defaultVariant = getDefaultSelectedVariant(product)
+
+    setSelectedProductId(product.id)
+    setSelectedVariantId(defaultVariant?.id ?? "")
+    updateProductUrl(product.id, defaultVariant?.id ?? "")
+  }
+
   useEffect(() => {
     if (!selectedProduct) {
       setSelectedVariantId("")
@@ -308,10 +365,55 @@ export default function ProductCatalog({
         : getDefaultSelectedVariant(selectedProduct)?.id ?? ""
     )
   }, [selectedProduct])
+
+  useEffect(() => {
+    if (loading || visibleCatalogProducts.length === 0 || typeof window === "undefined") return
+
+    const syncProductFromUrl = () => {
+      const params = new URLSearchParams(window.location.search)
+      const productId = params.get(productQueryParam)
+      if (!productId) {
+        setSelectedProductId(null)
+        setSelectedVariantId("")
+        return
+      }
+
+      const product = visibleCatalogProducts.find((item) => item.id === productId)
+      if (!product) return
+
+      const variantId = params.get(variantQueryParam) ?? ""
+      const variant = product.variants.find((item) => item.id === variantId) ?? getDefaultSelectedVariant(product)
+
+      setSelectedProductId(product.id)
+      setSelectedVariantId(variant?.id ?? "")
+    }
+
+    syncProductFromUrl()
+    window.addEventListener("popstate", syncProductFromUrl)
+
+    return () => {
+      window.removeEventListener("popstate", syncProductFromUrl)
+    }
+  }, [loading, visibleCatalogProducts])
+
   const selectedCategoryLabel =
     selectedProduct ? categoryLabels.get(selectedProduct.category) ?? selectedProduct.category : ""
+  const selectedProductUrl = selectedProduct
+    ? getAbsoluteProductUrl(selectedProduct.id, selectedVariant?.id ?? "")
+    : ""
   const whatsappMessage = selectedProduct
-    ? `Hola, me interesa el producto ${selectedProduct.name}${selectedVariant ? ` - ${selectedVariant.name}` : ""} por ${formatCurrency(selectedVariant?.salePrice ?? selectedProduct.salePrice)}. Quiero mas informacion.`
+    ? [
+        "Hola, me interesa este producto:",
+        "",
+        `Producto: ${selectedProduct.name}`,
+        selectedVariant ? `Variante: ${selectedVariant.name}` : "",
+        `Precio: ${formatCurrency(selectedVariant?.salePrice ?? selectedProduct.salePrice)}`,
+        selectedProductUrl ? `Link: ${selectedProductUrl}` : "",
+        "",
+        "Quiero mas informacion.",
+      ]
+        .filter(Boolean)
+        .join("\n")
     : "Hola, quiero informacion sobre sus productos."
 
   const setPreviewSideFromViewport = (productId: string) => {
@@ -339,7 +441,14 @@ export default function ProductCatalog({
   }
 
   return (
-    <section id={sectionId} className="bg-background py-24">
+    <section
+      id={sectionId}
+      className={`relative z-10 bg-[linear-gradient(180deg,#f8fbff_0%,#eef5ff_48%,#f8fafc_100%)] ${
+        featuredOnly
+          ? "-mt-10 rounded-t-[40px] border-t border-white/80 pb-28 pt-20 shadow-[0_-24px_70px_rgba(8,22,47,0.18)]"
+          : "py-24"
+      }`}
+    >
       <div className="mx-auto max-w-7xl px-4 lg:px-8">
         <div className="mb-16 text-center">
           <p className="mb-2 text-sm font-semibold uppercase tracking-widest text-[#d4a017]">
@@ -376,10 +485,10 @@ export default function ProductCatalog({
                 <button
                   key={category.id}
                   onClick={() => setActiveCategory(category.id)}
-                  className={`rounded-lg px-5 py-2.5 text-sm font-semibold transition-all ${
+                  className={`rounded-xl px-5 py-2.5 text-sm font-semibold transition-all ${
                     activeCategory === category.id
-                      ? "bg-[#0a2472] text-white shadow-lg shadow-[#0a2472]/25"
-                      : "border border-border bg-card text-foreground hover:border-[#0a2472]/30 hover:bg-muted"
+                      ? "bg-[linear-gradient(135deg,#0a2472_0%,#12389b_100%)] text-white shadow-lg shadow-[#0a2472]/25"
+                      : "border border-[#c8d3e6] bg-white text-foreground shadow-sm hover:border-[#0a2472]/35 hover:bg-[#eef5ff]"
                   }`}
                 >
                   {category.label}
@@ -436,7 +545,7 @@ export default function ProductCatalog({
                       productCardRefs.current[product.id] = element
                     }}
                     onMouseEnter={() => setPreviewSideFromViewport(product.id)}
-                    className={`group relative overflow-visible rounded-2xl border border-border bg-card shadow-sm transition-all duration-300 hover:z-20 hover:-translate-y-1 hover:shadow-xl ${
+                    className={`group relative overflow-visible rounded-2xl border border-[#c8d3e6] bg-white shadow-sm transition-all duration-300 hover:z-20 hover:-translate-y-1 hover:border-[#0a2472]/35 hover:shadow-[0_20px_45px_rgba(10,36,114,0.16)] ${
                       product.publicStock <= 0 ? "border-slate-200 bg-slate-50/80 opacity-80" : ""
                     }`}
                   >
@@ -558,8 +667,8 @@ export default function ProductCatalog({
                       </div>
 
                       <button
-                        onClick={() => setSelectedProductId(product.id)}
-                        className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-[#0a2472] px-2.5 py-2 text-[11px] font-semibold text-white transition-colors hover:bg-[#d4a017] hover:text-[#0a1628] sm:text-xs"
+                        onClick={() => openProductDetail(product)}
+                        className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-[linear-gradient(135deg,#0a2472_0%,#12389b_100%)] px-2.5 py-2 text-[11px] font-semibold text-white transition-colors hover:bg-[#d4a017] hover:text-[#08162f] sm:text-xs"
                       >
                         Ver producto
                         <ShoppingBag className="h-3.5 w-3.5" />
@@ -595,7 +704,7 @@ export default function ProductCatalog({
                             productCardRefs.current[product.id] = element
                           }}
                           onMouseEnter={() => setPreviewSideFromViewport(product.id)}
-                          className={`group relative overflow-visible rounded-2xl border border-border bg-card shadow-sm transition-all duration-300 hover:z-20 hover:-translate-y-1 hover:shadow-xl ${
+                          className={`group relative overflow-visible rounded-2xl border border-[#c8d3e6] bg-white shadow-sm transition-all duration-300 hover:z-20 hover:-translate-y-1 hover:border-[#0a2472]/35 hover:shadow-[0_20px_45px_rgba(10,36,114,0.16)] ${
                             product.publicStock <= 0 ? "border-slate-200 bg-slate-50/80 opacity-80" : ""
                           }`}
                         >
@@ -717,8 +826,8 @@ export default function ProductCatalog({
                             </div>
 
                             <button
-                              onClick={() => setSelectedProductId(product.id)}
-                              className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-[#0a2472] px-2.5 py-2 text-[11px] font-semibold text-white transition-colors hover:bg-[#d4a017] hover:text-[#0a1628] sm:text-xs"
+                              onClick={() => openProductDetail(product)}
+                              className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-[linear-gradient(135deg,#0a2472_0%,#12389b_100%)] px-2.5 py-2 text-[11px] font-semibold text-white transition-colors hover:bg-[#d4a017] hover:text-[#08162f] sm:text-xs"
                             >
                               Ver producto
                               <ShoppingBag className="h-3.5 w-3.5" />
@@ -741,7 +850,7 @@ export default function ProductCatalog({
         )}
 
         <div className="mt-16 text-center">
-          <div className="inline-flex flex-col items-center gap-4 rounded-2xl bg-[#0a2472] p-8 shadow-xl sm:flex-row">
+          <div className="inline-flex flex-col items-center gap-4 rounded-3xl bg-[linear-gradient(135deg,#08162f_0%,#0a2472_58%,#12389b_100%)] p-8 shadow-[0_24px_60px_rgba(10,36,114,0.22)] sm:flex-row">
             <div className="text-left">
               <p className="font-mono text-xl font-bold text-white">
                 {featuredOnly ? "¿Quieres ver todo el catalogo?" : "¿Quieres ayuda para escoger?"}
@@ -782,25 +891,26 @@ export default function ProductCatalog({
           if (!open) {
             setSelectedProductId(null)
             setSelectedVariantId("")
+            clearProductUrl()
           }
         }}
       >
         {selectedProduct ? (
-          <DialogContent className="max-h-[90vh] w-[calc(100vw-1rem)] max-w-5xl overflow-y-auto rounded-3xl px-4 sm:w-[calc(100vw-2rem)] sm:px-6">
-            <DialogHeader>
+          <DialogContent className="flex max-h-[calc(100dvh-1.5rem)] w-[calc(100vw-1rem)] max-w-5xl flex-col overflow-hidden rounded-3xl px-0 py-0 sm:w-[calc(100vw-2rem)]">
+            <DialogHeader className="shrink-0 border-b border-slate-200 px-4 py-4 sm:px-6">
               <DialogTitle className="text-2xl font-semibold text-slate-950">{selectedProduct.name}</DialogTitle>
               <DialogDescription>
                 Revisa la informacion del producto y contacta al negocio para confirmar disponibilidad.
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-6">
-              <div className="relative min-h-[360px] overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-100 sm:min-h-[460px]">
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-6 lg:space-y-5">
+              <div className="relative min-h-[260px] overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-100 sm:min-h-[320px] lg:min-h-[340px] xl:min-h-[360px]">
                 <Image
                   src={selectedProductImage}
                   alt={selectedVariant ? `${selectedProduct.name} ${selectedVariant.name}` : selectedProduct.name}
                   fill
-                  className="object-cover"
+                  className="object-contain"
                   unoptimized={selectedProductImage.startsWith("data:")}
                 />
               </div>
@@ -843,6 +953,7 @@ export default function ProductCatalog({
                             onClick={() => {
                               if (variant.stock <= 0) return
                               setSelectedVariantId(variant.id)
+                              updateProductUrl(selectedProduct.id, variant.id, "replace")
                             }}
                             disabled={variant.stock <= 0}
                             className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium transition ${
