@@ -673,6 +673,7 @@ export default function DashboardPage() {
           },
         ],
         customerPhone: '',
+        customerDocument: '',
         customerName: '',
         notes: '',
       }

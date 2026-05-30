@@ -5,7 +5,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Gift, MinusCircle, Pencil, PlusCircle } from 'lucide-react';
+import { Check, Gift, MinusCircle, Pencil, PlusCircle } from 'lucide-react';
 import { AdminMobileSection } from '@/components/admin/admin-mobile-section';
 import { AdminResponsiveDialog } from '@/components/admin/admin-responsive-dialog';
 import { Button } from '@/components/ui/button';
@@ -31,6 +31,7 @@ import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
 import { formatCurrency, formatNumber, getProductStock, getVariantOrProductRealUnitCost } from '@/lib/admin/calculations';
+import { serviceTypeLabels } from '@/lib/admin/catalogs';
 import { getTodayDateInputValue } from '@/lib/admin/date-utils';
 import { matchesProductCategoryFamily } from '@/lib/admin/category-rules';
 import {
@@ -52,13 +53,31 @@ const saleGiftItemSchema = z.object({
   quantity: z.coerce.number().min(0, 'Ingresa una cantidad valida').default(0),
 });
 
+const saleServiceMaterialSchema = z.object({
+  productId: z.string().default(''),
+  variantId: z.string().default(''),
+  variantName: z.string().default(''),
+  quantity: z.coerce.number().min(0, 'Ingresa una cantidad valida').default(1),
+});
+
+const saleServiceTypeOptions = [
+  'tip-installation',
+  'ferrule-installation',
+  'tip-ferrule-installation',
+  'extension-installation',
+  'shaft-reduction',
+  'shaft-straightening',
+  'custom-turning',
+] as const;
+
 const saleServiceItemSchema = z.object({
-  serviceType: z.enum(['tip-installation', 'tip-ferrule-installation', 'extension-installation']).default('tip-installation'),
+  serviceType: z.enum(saleServiceTypeOptions).default('tip-installation'),
   serviceCategory: z.string().default('torno'),
   price: z.coerce.number().min(0, 'Ingresa un precio valido').default(0),
   cost: z.coerce.number().min(0, 'Ingresa un costo valido').default(0),
   cueReference: z.string().default(''),
   notes: z.string().default(''),
+  materials: z.array(saleServiceMaterialSchema).default([]),
 });
 
 const saleLineItemSchema = z.object({
@@ -147,11 +166,11 @@ const saleSchema = z
       });
 
       item.serviceItems.forEach((serviceItem, serviceIndex) => {
-        if ((Number(serviceItem.price) || 0) <= 0) {
+        if ((Number(serviceItem.price) || 0) < 0) {
           context.addIssue({
             code: z.ZodIssueCode.custom,
             path: ['items', index, 'serviceItems', serviceIndex, 'price'],
-            message: 'Ingresa el precio del servicio',
+            message: 'Ingresa un cobro adicional valido para el servicio',
           });
         }
         if ((Number(serviceItem.cost) || 0) < 0) {
@@ -168,6 +187,34 @@ const saleSchema = z
             message: 'Describe el taco o la referencia del servicio',
           });
         }
+
+        const seenMaterials = new Set<string>();
+        serviceItem.materials.forEach((material, materialIndex) => {
+          if (!material.productId) {
+            context.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['items', index, 'serviceItems', serviceIndex, 'materials', materialIndex, 'productId'],
+              message: 'Selecciona el material del servicio',
+            });
+          }
+          if ((Number(material.quantity) || 0) <= 0) {
+            context.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['items', index, 'serviceItems', serviceIndex, 'materials', materialIndex, 'quantity'],
+              message: 'La cantidad del material debe ser mayor a cero',
+            });
+          }
+
+          const materialKey = `${material.productId}::${material.variantId || ''}`;
+          if (seenMaterials.has(materialKey)) {
+            context.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['items', index, 'serviceItems', serviceIndex, 'materials', materialIndex, 'productId'],
+              message: 'No repitas el mismo material en el servicio',
+            });
+          }
+          seenMaterials.add(materialKey);
+        });
       });
     });
 
@@ -252,6 +299,145 @@ function createDefaultDraftLine(): DraftSaleLine {
     unitPrice: '',
     serviceItems: [],
     giftItems: [],
+  };
+}
+
+function createDefaultSaleServiceItem(
+  cueReference = '',
+  product?: Pick<Product, 'category'> | null
+): SaleLineFormValue['serviceItems'][number] {
+  const defaultServiceItem = createDefaultInstallationServiceItem(product);
+  return {
+    serviceType: defaultServiceItem.serviceType,
+    serviceCategory: defaultServiceItem.serviceCategory,
+    price: 0,
+    cost: 0,
+    notes: '',
+    cueReference,
+    materials: [],
+  };
+}
+
+function getSaleLineCueReferenceSuggestion(
+  items: SaleLineFormValue[],
+  products: Product[],
+  excludedProductId?: string,
+  excludedIndex?: number | null
+) {
+  const cueLine = items.find((item, index) => {
+    if (excludedIndex !== null && excludedIndex !== undefined && index === excludedIndex) return false;
+    if (excludedProductId && item.productId === excludedProductId) return false;
+
+    const product = products.find((candidate) => candidate.id === item.productId);
+    return matchesProductCategoryFamily(product, 'tacos');
+  });
+
+  if (!cueLine) {
+    const currentProduct = products.find((product) => product.id === excludedProductId);
+    if (matchesProductCategoryFamily(currentProduct, 'tacos')) {
+      const currentLine =
+        excludedIndex !== null && excludedIndex !== undefined ? items[excludedIndex] : undefined;
+      const currentVariant = currentProduct?.variants?.find((variant) => variant.id === currentLine?.variantId);
+      return [currentProduct?.name, currentVariant?.name].filter(Boolean).join(' - ') || 'Taco del cliente';
+    }
+
+    return 'Taco del cliente';
+  }
+
+  const cueProduct = products.find((product) => product.id === cueLine.productId);
+  const cueVariant = cueProduct?.variants?.find((variant) => variant.id === cueLine.variantId);
+
+  return [cueProduct?.name, cueVariant?.name].filter(Boolean).join(' - ') || 'Taco del cliente';
+}
+
+type ServiceMaterialFamily = 'casquillos' | 'virolas' | 'extensiones';
+
+const serviceMaterialSlots: Record<
+  SaleLineFormValue['serviceItems'][number]['serviceType'],
+  Array<{ family: ServiceMaterialFamily; label: string; placeholder: string }>
+> = {
+  'tip-installation': [
+    { family: 'casquillos', label: 'Casquillo', placeholder: 'Selecciona el casquillo' },
+  ],
+  'ferrule-installation': [
+    { family: 'virolas', label: 'Virola', placeholder: 'Selecciona la virola' },
+  ],
+  'tip-ferrule-installation': [
+    { family: 'casquillos', label: 'Casquillo', placeholder: 'Selecciona el casquillo' },
+    { family: 'virolas', label: 'Virola', placeholder: 'Selecciona la virola' },
+  ],
+  'extension-installation': [
+    { family: 'extensiones', label: 'Extension', placeholder: 'Selecciona la extension' },
+  ],
+  'shaft-reduction': [],
+  'shaft-straightening': [],
+  'custom-turning': [],
+};
+
+function getDefaultMaterialVariantId(product?: Product) {
+  return (product?.variants ?? []).find((variant) => variant.status !== 'inactive')?.id ?? '';
+}
+
+function getSaleServiceMaterialPrice(product?: Product, variantId?: string) {
+  if (!product) return 0;
+  return getVariantSalePrice(product, variantId || undefined);
+}
+
+function getSaleServiceMaterialLabel(product?: Product, variantId?: string) {
+  if (!product) return 'Material';
+  const variant = (product.variants ?? []).find((item) => item.id === variantId);
+  return [product.name, variant?.name].filter(Boolean).join(' - ');
+}
+
+function getServiceMaterialForFamily(
+  materials: NonNullable<SaleLineFormValue['serviceItems'][number]['materials']>,
+  products: Product[],
+  family: ServiceMaterialFamily
+) {
+  return materials.find((material) => {
+    const product = products.find((item) => item.id === material.productId);
+    return matchesProductCategoryFamily(product, family);
+  });
+}
+
+function setServiceMaterialForFamily(
+  serviceItem: SaleLineFormValue['serviceItems'][number],
+  products: Product[],
+  family: ServiceMaterialFamily,
+  productId: string
+) {
+  const currentMaterials = serviceItem.materials ?? [];
+  const nextProduct = products.find((product) => product.id === productId);
+  const nextVariantId = getDefaultMaterialVariantId(nextProduct);
+  const nextMaterial = {
+    productId,
+    variantId: nextVariantId,
+    variantName: nextProduct?.variants?.find((variant) => variant.id === nextVariantId)?.name ?? '',
+    quantity: 1,
+  };
+  const otherMaterials = currentMaterials.filter((material) => {
+    const product = products.find((item) => item.id === material.productId);
+    return !matchesProductCategoryFamily(product, family);
+  });
+
+  return {
+    ...serviceItem,
+    materials: productId ? [...otherMaterials, nextMaterial] : otherMaterials,
+  };
+}
+
+function updateServiceMaterialForFamily(
+  serviceItem: SaleLineFormValue['serviceItems'][number],
+  products: Product[],
+  family: ServiceMaterialFamily,
+  updater: (material: NonNullable<SaleLineFormValue['serviceItems'][number]['materials']>[number]) => NonNullable<SaleLineFormValue['serviceItems'][number]['materials']>[number]
+) {
+  return {
+    ...serviceItem,
+    materials: (serviceItem.materials ?? []).map((material) => {
+      const product = products.find((item) => item.id === material.productId);
+      return matchesProductCategoryFamily(product, family) ? updater(material) : material;
+    }),
   };
 }
 
@@ -627,99 +813,329 @@ function SaleGiftSection({
 function SaleServiceSection({
   line,
   onLineChange,
+  cueReferenceSuggestion,
+  serviceProduct,
+  products,
+  purchases,
+  movements,
+  hideFinancialSummary,
 }: {
   line: { serviceItems: SaleLineFormValue['serviceItems'] };
   onLineChange: (nextLine: { serviceItems: SaleLineFormValue['serviceItems'] }) => void;
+  cueReferenceSuggestion: string;
+  serviceProduct?: Pick<Product, 'category'> | null;
+  products: Product[];
+  purchases: Purchase[];
+  movements: InventoryMovement[];
+  hideFinancialSummary: boolean;
 }) {
   const serviceItem = line.serviceItems[0];
   const enabled = Boolean(serviceItem);
+  const materialSlots = serviceItem
+    ? serviceMaterialSlots[serviceItem.serviceType].filter(
+        (slot) => !matchesProductCategoryFamily(serviceProduct, slot.family)
+      )
+    : [];
+  const skippedMaterialSlots = serviceItem
+    ? serviceMaterialSlots[serviceItem.serviceType].filter((slot) =>
+        matchesProductCategoryFamily(serviceProduct, slot.family)
+      )
+    : [];
 
   return (
-    <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/70 sm:p-4">
-      <div className="flex flex-col gap-3">
-        <div className="flex items-start gap-3">
-          <div className="rounded-xl bg-cyan-50 p-2 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-200">
+    <div className="space-y-4 rounded-2xl border border-cyan-200/80 bg-cyan-50/75 p-3 dark:border-cyan-900/60 dark:bg-cyan-950/20 sm:p-4">
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="rounded-xl bg-cyan-100 p-2 text-cyan-800 dark:bg-cyan-950/70 dark:text-cyan-100">
             <Gift className="h-4 w-4" />
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Servicio asociado</p>
-            <p className="hidden text-sm text-slate-500 dark:text-slate-400 sm:block">
-              Registra aqui la instalacion para medir por separado el ingreso y la utilidad del torno.
+            <p className="text-sm font-semibold text-slate-950 dark:text-cyan-50">Instalacion en esta venta</p>
+            <p className="mt-1 max-w-2xl text-xs leading-5 text-cyan-800/85 dark:text-cyan-100/75 sm:text-sm">
+              Usalo cuando esta compra tambien incluye un trabajo de torno. Si el material ya esta agregado como producto, no lo repitas aqui.
             </p>
           </div>
         </div>
 
-        <label className="flex items-center gap-3 rounded-xl border border-border bg-card/88 px-3 py-2 dark:border-slate-700 dark:bg-slate-950/60">
-          <Checkbox
+        <label className="flex w-fit shrink-0 cursor-pointer items-center gap-3 rounded-xl border border-cyan-200 bg-card/90 px-3 py-2 dark:border-cyan-900/70 dark:bg-slate-950/60">
+          <input
+            type="checkbox"
+            className="sr-only"
             checked={enabled}
-            onCheckedChange={(checked) => {
-              const nextEnabled = checked === true;
+            onChange={(event) => {
+              const nextEnabled = event.target.checked;
               onLineChange({
                 ...line,
-                serviceItems: nextEnabled ? [serviceItem ?? createDefaultInstallationServiceItem()] : [],
+                serviceItems: nextEnabled ? [serviceItem ?? createDefaultSaleServiceItem(cueReferenceSuggestion, serviceProduct)] : [],
               });
             }}
           />
-          <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Incluir instalacion</span>
+          <span
+            className={cn(
+              'flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-colors',
+              enabled
+                ? 'border-primary bg-primary text-primary-foreground'
+                : 'border-cyan-300 bg-background text-transparent dark:border-cyan-800 dark:bg-slate-950'
+            )}
+            aria-hidden="true"
+          >
+            <Check className="h-3.5 w-3.5" />
+          </span>
+          <span className="text-sm font-medium text-slate-800 dark:text-cyan-50">Incluir servicio</span>
         </label>
       </div>
 
       {enabled && serviceItem ? (
-        <div className="grid gap-3 md:grid-cols-3">
-          <div className="space-y-2 md:col-span-3">
-            <Label>Referencia del taco</Label>
-            <Input
-              value={serviceItem.cueReference}
-              placeholder="Ej: Taco Cuetec de Juan"
-              onChange={(event) =>
+        <div className="grid gap-4">
+          <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_minmax(280px,0.85fr)]">
+            <div className="space-y-2">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                <Label>Referencia del taco</Label>
+                <button
+                  type="button"
+                  className="w-fit text-xs font-medium text-cyan-800 underline-offset-4 hover:underline dark:text-cyan-200"
+                  onClick={() =>
+                    onLineChange({
+                      ...line,
+                      serviceItems: [{ ...serviceItem, cueReference: cueReferenceSuggestion }],
+                    })
+                  }
+                >
+                  Usar sugerencia
+                </button>
+              </div>
+              <Input
+                value={serviceItem.cueReference}
+                placeholder={cueReferenceSuggestion}
+                onChange={(event) =>
+                  onLineChange({
+                    ...line,
+                    serviceItems: [{ ...serviceItem, cueReference: event.target.value }],
+                  })
+                }
+              />
+            </div>
+
+            <div className="min-w-0 space-y-2">
+              <Label>Tipo de servicio</Label>
+              <Select
+                value={serviceItem.serviceType}
+              onValueChange={(value) =>
                 onLineChange({
                   ...line,
-                  serviceItems: [{ ...serviceItem, cueReference: event.target.value }],
+                  serviceItems: [
+                    {
+                      ...serviceItem,
+                      serviceType: value as typeof serviceItem.serviceType,
+                      materials: (serviceItem.materials ?? []).filter((material) => {
+                        const product = products.find((item) => item.id === material.productId);
+                        return serviceMaterialSlots[value as typeof serviceItem.serviceType].some((slot) =>
+                          matchesProductCategoryFamily(product, slot.family)
+                        );
+                      }),
+                    },
+                  ],
                 })
               }
-            />
+            >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {saleServiceTypeOptions.map((value) => (
+                    <SelectItem key={value} value={value}>
+                      {serviceTypeLabels[value]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {materialSlots.length > 0 ? (
+            <div className="space-y-3 rounded-2xl border border-cyan-200/70 bg-card/80 p-3 dark:border-cyan-900/60 dark:bg-slate-950/45">
+              <div>
+                <p className="text-sm font-semibold text-slate-950 dark:text-cyan-50">Materiales que descuenta inventario</p>
+                <p className="text-xs text-cyan-800/75 dark:text-cyan-100/70">
+                  {hideFinancialSummary
+                    ? 'Opcional: usalo solo si el material no esta agregado como producto de la venta.'
+                    : 'Opcional: si agregas material aqui, se descuenta inventario, entra a factura y su costo real baja la utilidad.'}
+                </p>
+                {skippedMaterialSlots.length > 0 ? (
+                  <p className="mt-1 text-xs font-medium text-cyan-900 dark:text-cyan-100">
+                    {skippedMaterialSlots.map((slot) => slot.label).join(' y ')} ya se descuenta como producto vendido en esta linea.
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="grid gap-3 xl:grid-cols-2">
+                {materialSlots.map((slot) => {
+                  const material = getServiceMaterialForFamily(serviceItem.materials ?? [], products, slot.family);
+                  const materialProduct = products.find((product) => product.id === material?.productId);
+                  const materialVariant = materialProduct?.variants?.find((variant) => variant.id === material?.variantId);
+                  const materialQuantity = Number(material?.quantity ?? 1) || 1;
+                  const materialStock = materialProduct
+                    ? materialVariant
+                      ? getProductVariantStock(materialProduct, materialVariant.id, movements)
+                      : getProductStock(movements, materialProduct.id)
+                    : 0;
+                  const materialPrice = getSaleServiceMaterialPrice(materialProduct, materialVariant?.id) * materialQuantity;
+                  const materialCost =
+                    (materialProduct
+                      ? getVariantOrProductRealUnitCost(purchases, materialProduct.id, materialVariant?.id)
+                      : 0) * materialQuantity;
+                  const options = products
+                    .filter((product) => product.status === 'active' && matchesProductCategoryFamily(product, slot.family))
+                    .map((product) => ({ value: product.id, label: `${product.name} - ${product.brand || 'Sin marca'}` }));
+
+                  return (
+                    <div key={slot.family} className="min-w-0 space-y-3 rounded-xl border border-border/70 bg-background/70 p-3 dark:border-slate-800 dark:bg-slate-950/60">
+                      <div className="space-y-2">
+                        <Label>{slot.label}</Label>
+                        <SearchableSelect
+                          value={material?.productId ?? ''}
+                          onChange={(value) =>
+                            onLineChange({
+                              ...line,
+                              serviceItems: [{ ...setServiceMaterialForFamily(serviceItem, products, slot.family, value) }],
+                            })
+                          }
+                          placeholder={slot.placeholder}
+                          searchPlaceholder={`Buscar ${slot.label.toLowerCase()}...`}
+                          emptyLabel={`No hay ${slot.label.toLowerCase()} activos.`}
+                          recentStorageKey={`sales-service-${slot.family}`}
+                          options={options}
+                        />
+                      </div>
+
+                      {materialProduct && (materialProduct.variants?.length ?? 0) > 0 ? (
+                        <div className="space-y-2">
+                          <Label>{materialProduct.variantLabel || 'Variante'}</Label>
+                          <Select
+                            value={material?.variantId ?? ''}
+                            onValueChange={(value) =>
+                              onLineChange({
+                                ...line,
+                                serviceItems: [
+                                  {
+                                    ...updateServiceMaterialForFamily(serviceItem, products, slot.family, (current) => ({
+                                      ...current,
+                                      variantId: value,
+                                      variantName:
+                                        materialProduct.variants?.find((variant) => variant.id === value)?.name ?? '',
+                                    })),
+                                  },
+                                ],
+                              })
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecciona variante" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(materialProduct.variants ?? [])
+                                .filter((variant) => variant.status !== 'inactive')
+                                .map((variant) => (
+                                  <SelectItem key={variant.id} value={variant.id}>
+                                    {variant.name} ({formatNumber(getProductVariantStock(materialProduct, variant.id, movements))})
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      ) : null}
+
+                      {materialProduct ? (
+                        <div className="grid gap-3">
+                          <div className="space-y-2">
+                            <Label>Cantidad</Label>
+                            <Input
+                              type="number"
+                              min="1"
+                              max={Math.max(materialStock, 1)}
+                              value={materialQuantity}
+                              onChange={(event) =>
+                                onLineChange({
+                                  ...line,
+                                  serviceItems: [
+                                    {
+                                      ...updateServiceMaterialForFamily(serviceItem, products, slot.family, (current) => ({
+                                        ...current,
+                                        quantity: Math.max(Math.trunc(Number(event.target.value || 1)), 1),
+                                      })),
+                                    },
+                                  ],
+                                })
+                              }
+                            />
+                          </div>
+                          <div className="rounded-xl bg-cyan-50/75 px-3 py-2 text-xs leading-5 text-cyan-950 dark:bg-cyan-950/25 dark:text-cyan-50">
+                            <p className="font-medium">{getSaleServiceMaterialLabel(materialProduct, materialVariant?.id)}</p>
+                            <div className={cn('mt-1 grid gap-1', hideFinancialSummary ? 'sm:grid-cols-2' : 'sm:grid-cols-3')}>
+                              <span>Stock: {formatNumber(materialStock)}</span>
+                              <span>Factura: {formatCurrency(materialPrice)}</span>
+                              {!hideFinancialSummary ? <span>Costo real: {formatCurrency(materialCost)}</span> : null}
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+
+          <div className="grid gap-4 xl:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Cobro adicional</Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={serviceItem.price}
+                onChange={(event) =>
+                  onLineChange({
+                    ...line,
+                    serviceItems: [{ ...serviceItem, price: Number(event.target.value || 0) }],
+                  })
+                }
+              />
+              <p className="text-xs text-cyan-800/75 dark:text-cyan-100/70">
+                Dejalo en 0 cuando la instalacion vaya incluida con el producto.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Costo interno</Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={serviceItem.cost}
+                onChange={(event) =>
+                  onLineChange({
+                    ...line,
+                    serviceItems: [{ ...serviceItem, cost: Number(event.target.value || 0) }],
+                  })
+                }
+              />
+              <p className="text-xs text-cyan-800/75 dark:text-cyan-100/70">
+                Costo operativo del servicio: mano de obra, luz, lija, pegante o comision.
+              </p>
+            </div>
           </div>
 
           <div className="space-y-2">
-            <Label>Precio servicio</Label>
-            <Input
-              type="number"
-              min="0"
-              step="0.01"
-              value={serviceItem.price}
+            <Label>Notas del servicio</Label>
+            <Textarea
+              value={serviceItem.notes}
+              rows={2}
+              placeholder="Ej: instalar y ajustar punta antes de entregar."
               onChange={(event) =>
                 onLineChange({
                   ...line,
-                  serviceItems: [{ ...serviceItem, price: Number(event.target.value || 0) }],
-                })
-              }
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Costo servicio</Label>
-            <Input
-              type="number"
-              min="0"
-              step="0.01"
-              value={serviceItem.cost}
-              onChange={(event) =>
-                onLineChange({
-                  ...line,
-                  serviceItems: [{ ...serviceItem, cost: Number(event.target.value || 0) }],
-                })
-              }
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Categoria</Label>
-            <Input
-              value={serviceItem.serviceCategory ?? 'torno'}
-              onChange={(event) =>
-                onLineChange({
-                  ...line,
-                  serviceItems: [{ ...serviceItem, serviceCategory: event.target.value }],
+                  serviceItems: [{ ...serviceItem, notes: event.target.value }],
                 })
               }
             />
@@ -915,11 +1331,34 @@ export function SaleFormDialog({
     const serviceItems = saleItem.serviceItems.map((serviceItem) => {
       const price = Number(serviceItem.price) || 0;
       const cost = Number(serviceItem.cost) || 0;
+      const materials = (serviceItem.materials ?? []).map((material) => {
+        const materialProduct = products.find((product) => product.id === material.productId);
+        const materialQuantity = Number(material.quantity) || 0;
+        const materialRevenue = materialQuantity * getSaleServiceMaterialPrice(materialProduct, material.variantId || undefined);
+        const materialCost = materialProduct
+          ? materialQuantity * getVariantOrProductRealUnitCost(purchases, materialProduct.id, material.variantId || undefined)
+          : 0;
+
+        return {
+          ...material,
+          product: materialProduct,
+          quantity: materialQuantity,
+          totalRevenue: materialRevenue,
+          totalCost: materialCost,
+        };
+      });
+      const materialRevenue = materials.reduce((sum, item) => sum + item.totalRevenue, 0);
+      const materialCost = materials.reduce((sum, item) => sum + item.totalCost, 0);
       return {
         ...serviceItem,
         price,
         cost,
-        profit: price - cost,
+        materials,
+        materialRevenue,
+        materialCost,
+        totalRevenue: price + materialRevenue,
+        totalCost: cost + materialCost,
+        profit: price + materialRevenue - cost - materialCost,
       };
     });
 
@@ -934,8 +1373,8 @@ export function SaleFormDialog({
       giftItems,
       serviceItems,
       giftTotalCost: giftItems.reduce((sum, item) => sum + item.totalCost, 0),
-      serviceTotalRevenue: serviceItems.reduce((sum, item) => sum + item.price, 0),
-      serviceTotalCost: serviceItems.reduce((sum, item) => sum + item.cost, 0),
+      serviceTotalRevenue: serviceItems.reduce((sum, item) => sum + item.totalRevenue, 0),
+      serviceTotalCost: serviceItems.reduce((sum, item) => sum + item.totalCost, 0),
     };
   });
 
@@ -953,6 +1392,7 @@ export function SaleFormDialog({
   }, [saleSummaries]);
   const firstLineSummary = saleSummaries[0] ?? null;
   const firstItemProduct = products.find((product) => product.id === firstItem.productId) ?? null;
+  const firstItemHasService = firstItem.serviceItems.length > 0;
   const firstItemUsedVariantIds = getUsedVariantIdsForProduct(values.items, firstItem.productId, 0);
   const firstItemVariantOptions = getSelectableSaleVariants(firstItemProduct, movements, {
     usedVariantIds: firstItemUsedVariantIds,
@@ -1097,6 +1537,16 @@ export function SaleFormDialog({
         cueReference: item.cueReference?.trim() ?? '',
         serviceCategory: item.serviceCategory?.trim() ?? 'torno',
         notes: item.notes?.trim() ?? '',
+        materials: (item.materials ?? []).map((material) => {
+          const materialProduct = products.find((product) => product.id === material.productId);
+          const selectedVariant = materialProduct?.variants?.find((variant) => variant.id === material.variantId);
+          return {
+            productId: material.productId,
+            variantId: material.variantId?.trim() ?? '',
+            variantName: selectedVariant?.name ?? material.variantName?.trim() ?? '',
+            quantity: Number(material.quantity) || 1,
+          };
+        }),
       })),
       giftItems: normalizeGiftItems(draftLine.giftItems, products, movements, {
         defaultQuantity: Number(draftLine.quantity) || 1,
@@ -1141,7 +1591,14 @@ export function SaleFormDialog({
         return;
       }
     }
-    if (normalizedDraftLine.serviceItems.some((item) => (Number(item.price) || 0) <= 0 || !item.cueReference.trim())) {
+    if (
+      normalizedDraftLine.serviceItems.some(
+        (item) =>
+          (Number(item.price) || 0) < 0 ||
+          !item.cueReference.trim() ||
+          item.materials.some((material) => !material.productId || (Number(material.quantity) || 0) <= 0)
+      )
+    ) {
       setLineError('Completa el servicio asociado antes de guardar la linea.');
       return;
     }
@@ -1178,7 +1635,7 @@ export function SaleFormDialog({
             ? 'Cada venta descuenta stock y mantiene actualizado el inventario.'
             : 'Cada venta descuenta stock y deja trazabilidad para los reportes del negocio.'
         }
-        desktopContentClassName="lg:max-w-4xl"
+        desktopContentClassName="lg:max-w-5xl xl:max-w-6xl"
         mobileContentClassName="rounded-none border-0 bg-background dark:bg-slate-950"
         headerClassName="px-4 pt-3 pb-3 sm:px-5 lg:px-6"
         bodyClassName="px-3 py-3 pb-4 sm:px-5 lg:px-6"
@@ -1370,7 +1827,12 @@ export function SaleFormDialog({
                     </div>
                   </div>
 
-                  <div className="grid gap-5 lg:grid-cols-[minmax(0,1.45fr)_320px] lg:items-start">
+                  <div
+                    className={cn(
+                      'grid gap-5',
+                      !firstItemHasService && '2xl:grid-cols-[minmax(0,1.45fr)_320px] 2xl:items-start'
+                    )}
+                  >
                     <div className="grid gap-4">
                     <FormField
                       control={form.control}
@@ -1399,7 +1861,7 @@ export function SaleFormDialog({
                                 });
                                 form.setValue(
                                   'items.0.serviceItems',
-                                  supportsInstallationService(product) ? [createDefaultInstallationServiceItem()] : [],
+                                  [],
                                   { shouldValidate: true }
                                 );
                                 const nextGiftItems =
@@ -1631,6 +2093,12 @@ export function SaleFormDialog({
                     {supportsInstallationService(firstItemProduct) ? (
                       <SaleServiceSection
                         line={form.getValues('items.0')}
+                        cueReferenceSuggestion={getSaleLineCueReferenceSuggestion(values.items, products, firstItem.productId, 0)}
+                        serviceProduct={firstItemProduct}
+                        products={products}
+                        purchases={purchases}
+                        movements={movements}
+                        hideFinancialSummary={hideFinancialSummary}
                         onLineChange={(nextLine) =>
                           form.setValue('items.0', { ...form.getValues('items.0'), ...nextLine }, { shouldValidate: true })
                         }
@@ -1663,8 +2131,8 @@ export function SaleFormDialog({
 
                     </div>
 
-                    {firstItemProduct ? (
-                      <aside className="hidden rounded-3xl border border-border bg-muted/70 p-4 dark:border-slate-800 dark:bg-slate-900/60 lg:block">
+                    {firstItemProduct && !firstItemHasService ? (
+                      <aside className="hidden rounded-3xl border border-border bg-muted/70 p-4 dark:border-slate-800 dark:bg-slate-900/60 2xl:block">
                         <div className="overflow-hidden rounded-2xl border border-border bg-card/88 dark:border-slate-800 dark:bg-slate-950/72">
                           <div className="relative aspect-[4/3] w-full">
                             <Image
@@ -1765,7 +2233,10 @@ export function SaleFormDialog({
                               </p>
                               {summary.serviceItems.length > 0 ? (
                                 <p className="text-sm text-cyan-700">
-                                  Servicio: {summary.serviceItems.map((item) => `${item.serviceCategory || 'torno'} ${formatCurrency(item.price)}`).join(', ')}
+                                  Servicio: {summary.serviceItems.map((item) => {
+                                    const charge = Number(item.totalRevenue) || 0;
+                                    return `${serviceTypeLabels[item.serviceType]} ${charge > 0 ? formatCurrency(charge) : 'incluido'}`;
+                                  }).join(', ')}
                                 </p>
                               ) : null}
                               {summary.giftItems.length > 0 ? (
@@ -1948,7 +2419,7 @@ export function SaleFormDialog({
                       variantId: defaultVariant?.id ?? '',
                       quantity: current.quantity || '1',
                       unitPrice: product ? String(getInitialSaleUnitPrice(product, movements, defaultVariant?.id)) : current.unitPrice,
-                      serviceItems: supportsInstallationService(product) ? [createDefaultInstallationServiceItem()] : [],
+                      serviceItems: [],
                       giftItems:
                         product && getAllowedSaleGiftCategories(product).length > 0
                           ? normalizeGiftItems(
@@ -2112,6 +2583,17 @@ export function SaleFormDialog({
             {supportsInstallationService(draftProduct) ? (
               <SaleServiceSection
                 line={draftLine}
+                cueReferenceSuggestion={getSaleLineCueReferenceSuggestion(
+                  values.items,
+                  products,
+                  draftLine.productId,
+                  editingLineIndex
+                )}
+                serviceProduct={draftProduct}
+                products={products}
+                purchases={purchases}
+                movements={movements}
+                hideFinancialSummary={hideFinancialSummary}
                 onLineChange={(nextLine) => {
                   setDraftLine((current) => ({ ...current, ...nextLine }));
                   setLineError('');

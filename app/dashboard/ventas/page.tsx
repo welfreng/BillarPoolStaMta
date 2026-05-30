@@ -36,6 +36,7 @@ import { formatCurrency, formatDateTime, formatNumber, getProductById, getProduc
 import { toOperationalDateISOString } from '@/lib/admin/date-utils';
 import { getFriendlyFirestoreWriteErrorMessage } from '@/lib/firestore-write-retry';
 import { getSaleLineDisplayName } from '@/lib/admin/sale-line-display';
+import { getVariantSalePrice } from '@/lib/admin/variant-helpers';
 import type { AuthorizationRequest, AuthorizationRequestType } from '@/lib/admin/types';
 
 function getAuthorizationTypeLabel(requestType: AuthorizationRequestType) {
@@ -240,14 +241,26 @@ export default function VentasPage() {
             unitPrice: item.unitPrice,
             serviceItems: services
               .filter((service) => service.source === 'sale-addon' && service.saleId === sale.id)
-              .map((service) => ({
-                serviceType: service.serviceType,
-                serviceCategory: service.serviceCategory ?? 'torno',
-                price: service.totalRevenue,
-                cost: service.totalOperationalCost ?? service.totalCost ?? service.totalMaterialCost,
-                cueReference: service.cueReference,
-                notes: service.notes ?? '',
-              })),
+              .map((service) => {
+                const materialRevenue = service.materials.reduce((sum, material) => {
+                  const materialProduct = getProductById(products, material.productId);
+                  return sum + material.quantity * getVariantSalePrice(materialProduct, material.variantId);
+                }, 0);
+                return {
+                  serviceType: service.serviceType,
+                  serviceCategory: service.serviceCategory ?? 'torno',
+                  price: Math.max(service.totalRevenue - materialRevenue, 0),
+                  cost: service.totalOperationalCost ?? 0,
+                  cueReference: service.cueReference,
+                  notes: service.notes ?? '',
+                  materials: service.materials.map((material) => ({
+                    productId: material.productId,
+                    variantId: material.variantId ?? '',
+                    variantName: material.variantName ?? '',
+                    quantity: material.quantity,
+                  })),
+                };
+              }),
             giftItems: sale.giftItems.map((giftItem) => ({
               productId: giftItem.productId,
               quantity: giftItem.quantity,
@@ -307,17 +320,30 @@ export default function VentasPage() {
     () =>
       filteredSales.reduce(
         (accumulator, group) => {
+          const linkedServices = services.filter(
+            (service) =>
+              service.source === 'sale-addon' &&
+              group.sales.some((sale) => service.saleId === sale.id || service.saleBatchId === (sale.saleBatchId ?? sale.id))
+          );
+          const serviceRevenue = linkedServices.reduce((sum, service) => sum + service.totalRevenue, 0);
+          const serviceCost = linkedServices.reduce(
+            (sum, service) => sum + (service.totalCost ?? service.totalOperationalCost ?? service.totalMaterialCost),
+            0
+          );
+
           group.sales.forEach((sale) => {
             accumulator.totalRevenue += sale.totalSale - (sale.returnedSaleAmount ?? 0);
             accumulator.totalProfit +=
               sale.grossProfit - ((sale.returnedSaleAmount ?? 0) - (sale.returnedCostAmount ?? 0));
             accumulator.totalUnits += sale.quantity - (sale.returnedQuantity ?? 0);
           });
+          accumulator.totalRevenue += serviceRevenue;
+          accumulator.totalProfit += serviceRevenue - serviceCost;
           return accumulator;
         },
         { totalRevenue: 0, totalProfit: 0, totalUnits: 0 }
       ),
-    [filteredSales]
+    [filteredSales, services]
   );
   const pendingAuthorizationsCount = authorizationRequests.filter((request) => request.status === 'pending').length;
   const approvedAuthorizationsCount = authorizationRequests.filter((request) => request.status === 'approved').length;
@@ -1216,12 +1242,12 @@ export default function VentasPage() {
       >
         <DialogContent className="sm:max-w-xl" showCloseButton={!isSubmittingAuthorizationRequest}>
           {isSubmittingAuthorizationRequest ? (
-            <div className="absolute inset-0 z-40 grid place-items-center rounded-[26px] bg-background/82 px-4 text-center backdrop-blur-sm">
-              <div className="grid max-w-sm place-items-center gap-3 rounded-xl border bg-card p-5 shadow-lg">
-                <Spinner className="h-7 w-7 text-primary" />
+            <div className="fixed inset-0 z-[100] grid cursor-wait place-items-center bg-background/86 px-4 text-center backdrop-blur-md dark:bg-slate-950/86" aria-live="assertive" aria-busy="true">
+              <div className="grid w-full max-w-sm place-items-center gap-3 rounded-2xl border border-border bg-card p-5 shadow-[0_24px_70px_rgba(15,23,42,0.2)] dark:border-slate-800 dark:bg-slate-950">
+                <Spinner className="h-8 w-8 text-primary" />
                 <div className="space-y-1">
-                  <p className="text-sm font-semibold text-foreground">Enviando solicitud...</p>
-                  <p className="text-xs text-muted-foreground">Espera la confirmacion antes de continuar.</p>
+                  <p className="text-base font-semibold text-foreground">Enviando solicitud...</p>
+                  <p className="text-sm leading-5 text-muted-foreground">Espera la confirmacion antes de continuar.</p>
                 </div>
               </div>
             </div>

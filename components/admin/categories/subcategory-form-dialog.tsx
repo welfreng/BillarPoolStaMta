@@ -62,16 +62,16 @@ export function SubcategoryFormDialog({
         onOpenChange(nextOpen);
       }}
     >
-      <DialogContent className="sm:max-w-md" showCloseButton={!isSubmitting}>
+      <DialogContent className="z-[90] sm:max-w-md" overlayClassName="z-[80]" showCloseButton={!isSubmitting}>
         {isSubmitting ? (
-          <div className="absolute inset-0 z-40 grid place-items-center rounded-[26px] bg-background/82 px-4 text-center backdrop-blur-sm">
-            <div className="grid max-w-sm place-items-center gap-3 rounded-xl border bg-card p-5 shadow-lg">
-              <Spinner className="h-7 w-7 text-primary" />
+          <div className="fixed inset-0 z-[100] grid cursor-wait place-items-center bg-background/86 px-4 text-center backdrop-blur-md dark:bg-slate-950/86" aria-live="assertive" aria-busy="true">
+            <div className="grid w-full max-w-sm place-items-center gap-3 rounded-2xl border border-border bg-card p-5 shadow-[0_24px_70px_rgba(15,23,42,0.2)] dark:border-slate-800 dark:bg-slate-950">
+              <Spinner className="h-8 w-8 text-primary" />
               <div className="space-y-1">
-                <p className="text-sm font-semibold text-foreground">
+                <p className="text-base font-semibold text-foreground">
                   {subcategory ? 'Guardando subcategoria...' : 'Creando subcategoria...'}
                 </p>
-                <p className="text-xs text-muted-foreground">Espera la confirmacion antes de continuar.</p>
+                <p className="text-sm leading-5 text-muted-foreground">Espera la confirmacion antes de continuar.</p>
               </div>
             </div>
           </div>

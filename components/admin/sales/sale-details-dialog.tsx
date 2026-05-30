@@ -7,6 +7,7 @@ import { AdminResponsiveDialog } from '@/components/admin/admin-responsive-dialo
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatCurrency, formatDateTime, formatNumber, getProductById } from '@/lib/admin/calculations';
+import { serviceTypeLabels } from '@/lib/admin/catalogs';
 import { getSaleLineDisplayName } from '@/lib/admin/sale-line-display';
 import { SITE_LOGO } from '@/lib/branding';
 import type { Product, Sale, ServiceOrder } from '@/lib/admin/types';
@@ -55,6 +56,10 @@ function fileNameFromSale(sale: Sale) {
 
 function getInvoiceCustomerName(sale: Sale) {
   return sale.customerName?.trim() || 'Cliente NN';
+}
+
+function getServiceDisplayName(service: ServiceOrder) {
+  return service.serviceLabel?.trim() || serviceTypeLabels[service.serviceType] || 'Servicio de torno';
 }
 
 async function loadImageAsDataUrl(src: string) {
@@ -312,23 +317,25 @@ export function SaleDetailsDialog({
   const returnedAmount = groupedSales.reduce((sum, item) => sum + (item.returnedSaleAmount ?? 0), 0);
   const returnedCost = groupedSales.reduce((sum, item) => sum + (item.returnedCostAmount ?? 0), 0);
   const invoiceLogoUrl = typeof window !== 'undefined' ? `${window.location.origin}${SITE_LOGO}` : SITE_LOGO;
-  const invoiceLines: InvoiceLine[] = groupedSales.flatMap((saleItem) =>
+  const productInvoiceLines: InvoiceLine[] = groupedSales.flatMap((saleItem) =>
     saleItem.lineItems.map((item) => {
       const product = getProductById(products, item.productId);
-      const lineServiceRevenue = linkedServices
-        .filter((service) => service.saleId === saleItem.id)
-        .reduce((sum, service) => sum + service.totalRevenue, 0);
-      const effectiveUnitPrice =
-        item.quantity > 0 ? item.unitPrice + lineServiceRevenue / item.quantity : item.unitPrice;
 
       return {
         quantity: item.quantity,
         name: getSaleLineDisplayName(product, item),
-        unitPrice: effectiveUnitPrice,
-        total: item.totalSale + lineServiceRevenue,
+        unitPrice: item.unitPrice,
+        total: item.totalSale,
       };
     })
   );
+  const serviceInvoiceLines: InvoiceLine[] = linkedServices.map((service) => ({
+    quantity: 1,
+    name: `Servicio: ${getServiceDisplayName(service)}${service.cueReference ? ` - ${service.cueReference}` : ''}`,
+    unitPrice: service.totalRevenue,
+    total: service.totalRevenue,
+  }));
+  const invoiceLines: InvoiceLine[] = [...productInvoiceLines, ...serviceInvoiceLines];
   const invoiceGifts: InvoiceGift[] = giftItems.map((item) => {
     const product = getProductById(products, item.productId);
     return {
@@ -426,7 +433,7 @@ export function SaleDetailsDialog({
             </div>
 
             <div class="box">
-              <h3>Detalle de productos</h3>
+              <h3>Detalle de venta</h3>
               <table>
                 <thead>
                   <tr>
@@ -637,7 +644,7 @@ export function SaleDetailsDialog({
 
             <div className="rounded-2xl border border-border bg-card/88 p-3 dark:border-slate-800 dark:bg-slate-950/72 sm:p-4">
               <h3 className="text-sm font-semibold text-foreground">
-                {hideFinancialDetails ? 'Detalle de productos' : 'Detalle interno de productos'}
+                {hideFinancialDetails ? 'Detalle de venta' : 'Detalle interno de venta'}
               </h3>
               <div className="mt-4 space-y-3">
                 {lineItems.map((item, index) => {
@@ -671,7 +678,7 @@ export function SaleDetailsDialog({
                     </div>
                   );
                 })}
-                {!hideFinancialDetails && linkedServices.length > 0 ? (
+                {linkedServices.length > 0 ? (
                   linkedServices.map((service, index) => (
                     <div
                       key={`${service.id}-${index}`}
@@ -680,38 +687,28 @@ export function SaleDetailsDialog({
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                         <div className="min-w-0">
                           <p className="font-medium text-foreground">
-                            Servicio: {service.serviceCategory || 'torno'}
+                            Servicio: {getServiceDisplayName(service)}
                           </p>
                           <p className="text-sm text-muted-foreground">
                             {service.cueReference || 'Sin referencia'}
                           </p>
                           <p className="text-sm text-muted-foreground">
-                            Tipo: {service.serviceLabel?.trim()
-                              ? service.serviceLabel
-                              : service.serviceType === 'tip-installation'
-                                ? 'Instalacion de casquillo'
-                                : service.serviceType === 'ferrule-installation'
-                                  ? 'Instalacion de virola'
-                                  : service.serviceType === 'tip-ferrule-installation'
-                                    ? 'Instalacion de casquillo y virola'
-                                    : service.serviceType === 'shaft-reduction'
-                                      ? 'Rebajada de flecha'
-                                      : service.serviceType === 'shaft-straightening'
-                                        ? 'Enderezada de flecha'
-                                        : service.serviceType === 'custom-turning'
-                                          ? 'Trabajo personalizado de torno'
-                                          : 'Instalacion de extension'}
+                            Tipo: {getServiceDisplayName(service)}
                           </p>
                         </div>
                         <div className="text-left sm:text-right">
                           <p className="text-xs text-muted-foreground dark:text-cyan-100/70">Total servicio</p>
                           <p className="font-medium text-foreground">{formatCurrency(service.totalRevenue)}</p>
-                          <p className="mt-2 text-xs text-muted-foreground dark:text-cyan-100/70">Costo servicio</p>
-                          <p className="font-medium text-amber-800 dark:text-amber-200">
-                            {formatCurrency(service.totalCost ?? service.totalOperationalCost ?? service.totalMaterialCost)}
-                          </p>
-                          <p className="mt-2 text-xs text-muted-foreground dark:text-cyan-100/70">Utilidad</p>
-                          <p className="font-medium text-emerald-800 dark:text-emerald-200">{formatCurrency(service.grossProfit)}</p>
+                          {!hideFinancialDetails ? (
+                            <>
+                              <p className="mt-2 text-xs text-muted-foreground dark:text-cyan-100/70">Costo servicio</p>
+                              <p className="font-medium text-amber-800 dark:text-amber-200">
+                                {formatCurrency(service.totalCost ?? service.totalOperationalCost ?? service.totalMaterialCost)}
+                              </p>
+                              <p className="mt-2 text-xs text-muted-foreground dark:text-cyan-100/70">Utilidad</p>
+                              <p className="font-medium text-emerald-800 dark:text-emerald-200">{formatCurrency(service.grossProfit)}</p>
+                            </>
+                          ) : null}
                         </div>
                       </div>
                     </div>

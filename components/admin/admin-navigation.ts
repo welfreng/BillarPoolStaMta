@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   ShoppingCart,
   Tags,
+  UserRound,
   Users,
   Wrench,
 } from 'lucide-react';
@@ -31,6 +32,7 @@ export const adminNavigation: AdminNavItem[] = [
   { href: '/dashboard/categorias', label: 'Categorias', icon: FolderTree, helper: 'Estructura del catalogo' },
   { href: '/dashboard/proveedores', label: 'Proveedores', icon: Building2, helper: 'Contactos de compra' },
   { href: '/dashboard/ventas', label: 'Ventas', icon: ShoppingCart, helper: 'Salidas comerciales' },
+  { href: '/dashboard/clientes', label: 'Clientes', icon: UserRound, helper: 'Historial y datos' },
   { href: '/dashboard/autorizaciones', label: 'Autorizaciones', icon: ShieldCheck, helper: 'Aprobaciones pendientes' },
   { href: '/dashboard/servicios', label: 'Servicios', icon: Wrench, helper: 'Torno e instalaciones' },
   { href: '/dashboard/inventario', label: 'Inventario', icon: ClipboardList, helper: 'Movimientos y kardex' },
@@ -46,6 +48,7 @@ export function getNavigationForRole(role: AdminRole) {
       (item) =>
         item.href === '/dashboard' ||
         item.href === '/dashboard/ventas' ||
+        item.href === '/dashboard/clientes' ||
         item.href === '/dashboard/servicios' ||
         item.href === '/dashboard/inventario'
     );
