@@ -172,6 +172,7 @@ export default function InventarioPage() {
           },
         ],
         customerPhone: '',
+        customerDocument: '',
         customerName: '',
         notes: '',
       }

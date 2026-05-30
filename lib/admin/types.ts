@@ -193,6 +193,13 @@ export interface SaleLineItem {
   totalCost: number;
 }
 
+export interface SaleServiceMaterialItem {
+  productId: string;
+  variantId?: string;
+  variantName?: string;
+  quantity: number;
+}
+
 export interface SaleServiceItem {
   serviceType: ServiceType;
   serviceCategory: string;
@@ -200,6 +207,7 @@ export interface SaleServiceItem {
   cost: number;
   cueReference: string;
   notes: string;
+  materials?: SaleServiceMaterialItem[];
 }
 
 export interface Sale {

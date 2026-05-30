@@ -121,7 +121,7 @@ function buildProductVariantOptions(product?: Product) {
     .filter((variant) => variant.status !== 'inactive')
     .map((variant) => ({
       value: variant.id,
-      label: buildVariantDisplayName(variant, product.variantAttributeDefinitions),
+      label: buildVariantDisplayName(variant, product.variantAttributes),
     }));
 }
 
@@ -265,7 +265,7 @@ export function ServiceFormDialog({
     needsExtension && values.bumperProductId
       ? { productId: values.bumperProductId, variantId: values.bumperVariantId || undefined }
       : null,
-  ].filter((item): item is { productId: string; variantId?: string } => Boolean(item));
+  ].filter((item): item is NonNullable<typeof item> => Boolean(item));
 
   const materialSummary = selectedMaterials.map(({ productId, variantId }) => {
     const product = products.find((item) => item.id === productId);
@@ -283,7 +283,7 @@ export function ServiceFormDialog({
     return {
       productId: `${productId}::${variantId ?? ''}`,
       name: product?.name ?? 'Producto',
-      variantLabel: selectedVariant ? buildVariantDisplayName(selectedVariant, product?.variantAttributeDefinitions) : '',
+      variantLabel: selectedVariant ? buildVariantDisplayName(selectedVariant, product?.variantAttributes) : '',
       unitCost,
       stock,
     };

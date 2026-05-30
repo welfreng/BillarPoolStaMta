@@ -542,6 +542,9 @@ export function ProductFormDialog({
     matchesCategoryFamily(initialProduct?.category ?? '', 'virolas') &&
     variantTemplate?.id === 'virolas-color';
   const structureLocked = Boolean(initialProduct && historySummary?.hasActivity && !canReconfigureVirolaHistory);
+  const canCorrectLockedVariantLabels =
+    structureLocked && saleMode === 'varianted' && normalizedAttributeDefinitions.length > 0;
+  const canAppendLockedVariants = canCorrectLockedVariantLabels;
   const existingSingleAxisValues: string[] = [];
   const normalizedExistingSingleAxisValues = new Set<string>();
   const availableSingleAxisOptions: string[] = [];
@@ -1229,7 +1232,7 @@ export function ProductFormDialog({
       busyDescription="Espera la confirmacion antes de continuar."
       description={
         structureLocked
-          ? 'Este producto ya tiene historial. Puedes ajustar datos comerciales y visuales, pero la estructura de variantes queda protegida para no afectar compras ni inventario.'
+          ? 'Este producto ya tiene historial. Puedes corregir nombres visibles de variantes existentes, pero no agregar, quitar ni cambiar la estructura para proteger compras e inventario.'
           : 'Registra la informacion esencial del producto y carga su imagen desde tu equipo.'
       }
       desktopContentClassName="lg:max-w-[58rem] xl:max-w-[62rem]"
@@ -1287,9 +1290,28 @@ export function ProductFormDialog({
                               : '';
                           const persistedVariant =
                             initialProduct?.variants?.find((existingVariant) => existingVariant.id === variant.id) ?? null;
+                          const variantAttributes = values.variantAttributes.reduce<Record<string, string>>(
+                            (accumulator, attribute, attributeIndex) => {
+                              const value = variant.attributeValues[attributeIndex]?.trim();
+                              if (attribute.key && value) {
+                                accumulator[attribute.key] = value;
+                              }
+                              return accumulator;
+                            },
+                            {}
+                          );
+                          const generatedVariantName =
+                            buildVariantDisplayName(
+                              {
+                                name: '',
+                                attributes: variantAttributes,
+                              },
+                              values.variantAttributes
+                            ) || variant.name;
 
                           return {
                             ...variant,
+                            name: generatedVariantName,
                             stock: Math.max(Number(persistedVariant?.stock ?? 0), 0),
                             colorHex: inferredHex || variant.colorHex || '',
                           };
@@ -1500,7 +1522,7 @@ export function ProductFormDialog({
                       <div className="grid gap-2.5">
                         {structureLocked ? (
                           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-100">
-                            Este producto ya tiene historial y la estructura de variantes esta protegida.
+                            Este producto ya tiene historial. Solo corrige nombres mal escritos de variantes existentes; no uses esta opcion para cambiar una variante por otro producto real.
                           </div>
                         ) : null}
 
@@ -1691,7 +1713,7 @@ export function ProductFormDialog({
                                       variant="outline"
                                       size="sm"
                                       className="rounded-full bg-muted"
-                                      disabled={structureLocked}
+                                      disabled={structureLocked && !canAppendLockedVariants}
                                       onClick={() => appendSingleAxisVariant(option)}
                                     >
                                       + {option}
@@ -1705,14 +1727,14 @@ export function ProductFormDialog({
                                   value={customSingleAxisValue}
                                   onChange={(event) => setCustomSingleAxisValue(event.target.value)}
                                   placeholder={`Agregar otra ${singleAxisTemplate?.label?.toLowerCase() ?? 'variante'}`}
-                                  disabled={structureLocked}
+                                  disabled={structureLocked && !canAppendLockedVariants}
                                 />
                                 <Button
                                   type="button"
                                   variant="outline"
                                   className="w-full rounded-xl sm:w-auto"
                                   disabled={
-                                    structureLocked ||
+                                    (structureLocked && !canAppendLockedVariants) ||
                                     !customSingleAxisValue.trim() ||
                                     normalizedExistingSingleAxisValues.has(customSingleAxisValue.trim().toLowerCase())
                                   }
@@ -1769,6 +1791,8 @@ export function ProductFormDialog({
                             hiddenColumns={compactEditorConfig?.hiddenColumns}
                             manualRows={usesCompactManualRows}
                             hideStockColumn
+                            allowAttributeCorrectionWhenLocked={canCorrectLockedVariantLabels}
+                            allowAddRowsWhenLocked={canAppendLockedVariants}
                           />
                         ) : null}
 
@@ -1821,7 +1845,7 @@ export function ProductFormDialog({
                                                         <Input
                                                           placeholder={`Ej: ${attribute.label}`}
                                                           {...field}
-                                                          disabled={structureLocked}
+                                                          disabled={structureLocked && !canCorrectLockedVariantLabels}
                                                           className="h-8 rounded-md border-border bg-background/88 px-2.5 text-sm font-semibold text-slate-900 dark:border-slate-700 dark:bg-slate-900/72 dark:text-slate-100"
                                                           onChange={(event) => {
                                                             field.onChange(event);
@@ -1890,7 +1914,7 @@ export function ProductFormDialog({
                                               <Input
                                                 placeholder={`Ej: ${attribute.label}`}
                                                 {...field}
-                                                disabled={structureLocked}
+                                                disabled={structureLocked && !canCorrectLockedVariantLabels}
                                                 className={
                                                   usesSingleAxisTemplate
                                                     ? 'h-9 rounded-lg border-slate-200 bg-white text-sm font-semibold text-slate-900'
@@ -1987,7 +2011,10 @@ export function ProductFormDialog({
                               type="button"
                               variant="outline"
                               className="h-10 rounded-xl bg-white"
-                              disabled={structureLocked || (templateAllowsAttributeEditing && !canAddManualVariants)}
+                              disabled={
+                                (structureLocked && !canAppendLockedVariants) ||
+                                (templateAllowsAttributeEditing && !canAddManualVariants)
+                              }
                               onClick={() =>
                                 appendVariant({
                                   id: '',

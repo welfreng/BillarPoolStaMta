@@ -62,6 +62,8 @@ export function VariantCompactEditor({
   hiddenColumns,
   manualRows,
   hideStockColumn,
+  allowAttributeCorrectionWhenLocked,
+  allowAddRowsWhenLocked,
 }: {
   attributes: CompactAttributeControl[];
   rows: CompactVariantRow[];
@@ -85,12 +87,15 @@ export function VariantCompactEditor({
   hiddenColumns?: Array<'sku' | 'status'>;
   manualRows?: boolean;
   hideStockColumn?: boolean;
+  allowAttributeCorrectionWhenLocked?: boolean;
+  allowAddRowsWhenLocked?: boolean;
 }) {
   const [openAttributeKey, setOpenAttributeKey] = useState<string | null>(null);
   const [customValueDrafts, setCustomValueDrafts] = useState<Record<string, string>>({});
   const hiddenColumnSet = new Set(hiddenColumns ?? []);
   const showDeleteColumn = manualRows && Boolean(onRemoveRow);
   const showStockColumn = !hideStockColumn;
+  const attributeControlsDisabled = structureLocked && !allowAttributeCorrectionWhenLocked;
 
   return (
     <div className="min-w-0 space-y-2.5">
@@ -124,7 +129,7 @@ export function VariantCompactEditor({
               type="button"
               variant="outline"
               className="w-full rounded-xl bg-card/88 sm:w-auto"
-              disabled={structureLocked}
+              disabled={structureLocked && !allowAddRowsWhenLocked}
               onClick={onAddRow}
             >
               Agregar variante
@@ -282,7 +287,7 @@ export function VariantCompactEditor({
                               searchPlaceholder={`Buscar ${attribute.label.toLowerCase()}...`}
                               emptyLabel={`No se encontro ${attribute.label.toLowerCase()}.`}
                               options={rowOptions.map((option) => ({ value: option, label: option }))}
-                              disabled={structureLocked}
+                              disabled={attributeControlsDisabled}
                               allowCreate={attribute.allowCustom}
                               createLabel={`Crear "${attribute.label.toLowerCase()}"`}
                               onCreate={(value) => onAddAttributeValue(attribute.key, value)}
@@ -292,7 +297,7 @@ export function VariantCompactEditor({
                             <Select
                               value={row.values[attribute.key] || undefined}
                               onValueChange={(value) => onRowAttributeChange?.(index, attribute.key, value)}
-                              disabled={structureLocked}
+                              disabled={attributeControlsDisabled}
                             >
                               <SelectTrigger className="w-full min-w-[7rem] sm:w-[140px]">
                                 <SelectValue placeholder={`Selecciona ${attribute.label.toLowerCase()}`} />

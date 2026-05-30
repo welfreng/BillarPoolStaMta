@@ -44,6 +44,7 @@ import {
   buildVariantAttributeValues,
   getProductSaleMode,
   getProductVariantStock,
+  getVariantSalePrice,
   normalizeVariantAttributeDefinitions,
   normalizeProductVariants as normalizeProductVariantRecords,
   summarizeProductFromVariants,
@@ -88,6 +89,11 @@ type ProductMutationInput = Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'pu
 };
 type NewProductInput = ProductMutationInput;
 type NewSupplierInput = Omit<Supplier, 'id' | 'createdAt' | 'updatedAt'>;
+type CustomerMutationInput = {
+  fullName: string;
+  phone?: string;
+  documentNumber?: string;
+};
 type NewCategoryInput = {
   label: string;
 };
@@ -362,6 +368,8 @@ interface AdminDataContextValue {
   createSupplier: (input: NewSupplierInput) => Promise<Supplier>;
   updateSupplier: (supplierId: string, input: NewSupplierInput) => Promise<Supplier>;
   deleteSupplier: (supplierId: string) => Promise<void>;
+  createCustomer: (input: CustomerMutationInput) => Promise<Customer>;
+  updateCustomer: (customerId: string, input: CustomerMutationInput) => Promise<Customer>;
   registerMovement: (input: RegisterMovementInput) => Promise<InventoryMovement>;
   registerInitialStock: (input: RegisterInitialStockInput) => Promise<{
     movement: InventoryMovement;
@@ -464,6 +472,21 @@ function buildCustomerId(name: string, phone: string, documentNumber: string) {
     .replace(/^-+|-+$/g, '');
   if (normalizedDocument) return `doc-${normalizedDocument}`;
   return normalizedPhone ? `phone-${normalizedPhone}` : `name-${normalizedName || 'cliente'}`;
+}
+
+function normalizeCustomerMutationInput(input: CustomerMutationInput) {
+  const fullName = normalizeCustomerName(input.fullName);
+  const phone = input.phone?.trim() ?? '';
+  const documentNumber = input.documentNumber?.trim() ?? '';
+
+  if (isAnonymousCustomerName(fullName)) {
+    throw new Error('Ingresa un nombre real para crear el cliente.');
+  }
+  if (phone && phone.length < 7) {
+    throw new Error('Ingresa un telefono valido o dejalo vacio.');
+  }
+
+  return { fullName, phone, documentNumber };
 }
 
 function buildSaleGiftItems(
@@ -988,7 +1011,11 @@ function mapAuthorizationRequestDocument(documentId: string, data: DocumentData)
                   ? item.serviceItems.map((serviceItem: DocumentData) => ({
                       serviceType:
                         serviceItem?.serviceType === 'tip-ferrule-installation' ||
-                        serviceItem?.serviceType === 'extension-installation'
+                        serviceItem?.serviceType === 'extension-installation' ||
+                        serviceItem?.serviceType === 'ferrule-installation' ||
+                        serviceItem?.serviceType === 'shaft-reduction' ||
+                        serviceItem?.serviceType === 'shaft-straightening' ||
+                        serviceItem?.serviceType === 'custom-turning'
                           ? serviceItem.serviceType
                           : 'tip-installation',
                       serviceCategory: String(serviceItem?.serviceCategory ?? 'torno'),
@@ -996,6 +1023,14 @@ function mapAuthorizationRequestDocument(documentId: string, data: DocumentData)
                       cost: Number(serviceItem?.cost ?? 0),
                       cueReference: String(serviceItem?.cueReference ?? ''),
                       notes: String(serviceItem?.notes ?? ''),
+                      materials: Array.isArray(serviceItem?.materials)
+                        ? serviceItem.materials.map((material: DocumentData) => ({
+                            productId: String(material?.productId ?? ''),
+                            variantId: material?.variantId ? String(material.variantId) : undefined,
+                            variantName: material?.variantName ? String(material.variantName) : undefined,
+                            quantity: Number(material?.quantity ?? 0),
+                          }))
+                        : [],
                     }))
                   : [],
                 giftItems: Array.isArray(item?.giftItems)
@@ -1160,17 +1195,17 @@ function hasStructuralProductChanges(existingProduct: Product, nextProduct: Prod
 
   const currentVariants = normalizeComparableVariants(existingProduct);
   const nextVariants = normalizeComparableVariants(nextProduct);
+  const nextVariantsById = new Map(nextVariants.map((variant) => [variant.id, variant]));
 
-  if (currentVariants.length !== nextVariants.length) return true;
+  if (nextVariants.length < currentVariants.length) return true;
 
-  for (let index = 0; index < currentVariants.length; index += 1) {
-    const currentVariant = currentVariants[index];
-    const nextVariant = nextVariants[index];
+  for (const currentVariant of currentVariants) {
+    const nextVariant = nextVariantsById.get(currentVariant.id);
 
     if (!nextVariant) return true;
-    if (currentVariant.id !== nextVariant.id) return true;
-    if (currentVariant.name !== nextVariant.name) return true;
-    if (JSON.stringify(currentVariant.attributes) !== JSON.stringify(nextVariant.attributes)) return true;
+    // Existing variant IDs are the stable inventory key. Allow correcting visible
+    // attribute/name typos such as "Balnco" -> "Blanco" without treating it as a
+    // structural migration, as long as rows, IDs, stock and status are preserved.
     if (currentVariant.stock !== nextVariant.stock) return true;
     if (currentVariant.status !== nextVariant.status) return true;
   }
@@ -2631,6 +2666,77 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     setSuppliers((current) => current.filter((supplier) => supplier.id !== supplierId));
   };
 
+  const createCustomer = async (input: CustomerMutationInput) => {
+    const normalized = normalizeCustomerMutationInput(input);
+    const customerId = buildCustomerId(normalized.fullName, normalized.phone, normalized.documentNumber);
+    const existingCustomer = customers.find((customer) => customer.id === customerId);
+    if (existingCustomer) {
+      throw new Error('Ya existe un cliente con esa cedula, telefono o nombre.');
+    }
+
+    const now = new Date().toISOString();
+    const customer: Customer = {
+      id: customerId,
+      fullName: normalized.fullName,
+      normalizedName: normalizeSearchText(normalized.fullName),
+      phone: normalized.phone || undefined,
+      documentNumber: normalized.documentNumber || undefined,
+      saleCount: 0,
+      totalRevenue: 0,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await setDoc(doc(db, 'customers', customerId), {
+      ...customer,
+      phone: customer.phone ?? null,
+      documentNumber: customer.documentNumber ?? null,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    setCustomers((current) =>
+      [customer, ...current.filter((item) => item.id !== customer.id)].sort((left, right) =>
+        left.fullName.localeCompare(right.fullName, 'es')
+      )
+    );
+
+    return customer;
+  };
+
+  const updateCustomer = async (customerId: string, input: CustomerMutationInput) => {
+    const existingCustomer = customers.find((customer) => customer.id === customerId);
+    if (!existingCustomer) {
+      throw new Error('No se encontro el cliente a actualizar.');
+    }
+
+    const normalized = normalizeCustomerMutationInput(input);
+    const updatedCustomer: Customer = {
+      ...existingCustomer,
+      fullName: normalized.fullName,
+      normalizedName: normalizeSearchText(normalized.fullName),
+      phone: normalized.phone || undefined,
+      documentNumber: normalized.documentNumber || undefined,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await updateDoc(doc(db, 'customers', customerId), {
+      fullName: updatedCustomer.fullName,
+      normalizedName: updatedCustomer.normalizedName,
+      phone: updatedCustomer.phone ?? null,
+      documentNumber: updatedCustomer.documentNumber ?? null,
+      updatedAt: serverTimestamp(),
+    });
+
+    setCustomers((current) =>
+      current
+        .map((customer) => (customer.id === customerId ? updatedCustomer : customer))
+        .sort((left, right) => left.fullName.localeCompare(right.fullName, 'es'))
+    );
+
+    return updatedCustomer;
+  };
+
   const registerMovement = async (input: RegisterMovementInput) => {
     const targetProduct = products.find((product) => product.id === input.productId);
     if (!targetProduct) {
@@ -3430,7 +3536,62 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         cost: Math.max(Number(serviceItem.cost ?? 0), 0),
         cueReference: serviceItem.cueReference?.trim() || targetProduct.name,
         notes: serviceItem.notes?.trim() || '',
-      })).filter((serviceItem) => serviceItem.price > 0 || serviceItem.cost > 0 || serviceItem.cueReference);
+        materials: (serviceItem.materials ?? []).map((material) => {
+          const materialProductId = material.productId?.trim();
+          const materialProduct = baseProducts.find((product) => product.id === materialProductId);
+          if (!materialProduct) {
+            throw new Error('Selecciona todos los materiales del servicio asociado.');
+          }
+
+          const quantity = Math.max(Number(material.quantity ?? 0), 0);
+          if (quantity <= 0) {
+            throw new Error('La cantidad de cada material del servicio debe ser mayor a cero.');
+          }
+
+          const selectedVariant = material.variantId
+            ? getProductVariantById(materialProduct, material.variantId)
+            : null;
+          if (getProductSaleMode(materialProduct) === 'varianted' && !selectedVariant) {
+            throw new Error(`Selecciona una variante valida para ${materialProduct.name} en el servicio.`);
+          }
+
+          if (selectedVariant) {
+            const currentVariantStock =
+              variantStockMap.get(materialProduct.id)?.get(selectedVariant.id) ?? selectedVariant.stock;
+            if (quantity > currentVariantStock) {
+              throw new Error(`La variante ${selectedVariant.name} de ${materialProduct.name} no tiene stock suficiente.`);
+            }
+            variantStockMap.get(materialProduct.id)?.set(selectedVariant.id, currentVariantStock - quantity);
+          } else {
+            const availableStock = simpleStockMap.has(materialProduct.id)
+              ? Number(simpleStockMap.get(materialProduct.id) ?? 0)
+              : getProductStock(baseMovements, materialProduct.id);
+            if (quantity > availableStock) {
+              throw new Error(`La cantidad usada supera el stock disponible de ${materialProduct.name}.`);
+            }
+            simpleStockMap.set(materialProduct.id, availableStock - quantity);
+          }
+
+          const unitCost = getVariantOrProductRealUnitCost(purchases, materialProduct.id, selectedVariant?.id);
+          const unitPrice = getVariantSalePrice(materialProduct, selectedVariant?.id);
+          return {
+            productId: materialProduct.id,
+            variantId: selectedVariant?.id,
+            variantName: selectedVariant?.name ?? material.variantName?.trim() ?? undefined,
+            quantity,
+            unitCost,
+            totalCost: quantity * unitCost,
+            unitPrice,
+            totalRevenue: quantity * unitPrice,
+          };
+        }),
+      })).filter(
+        (serviceItem) =>
+          serviceItem.price > 0 ||
+          serviceItem.cost > 0 ||
+          serviceItem.materials.length > 0 ||
+          serviceItem.cueReference
+      );
 
       return { lineItem, giftItems, serviceItems, targetProduct };
     });
@@ -3592,6 +3753,18 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       const linkedSale = createdSales[index];
       serviceItems.forEach((serviceItem) => {
         const serviceRef = doc(collection(db, 'services'));
+        const materials: ServiceMaterialItem[] = serviceItem.materials.map((material) => ({
+          productId: material.productId,
+          variantId: material.variantId,
+          variantName: material.variantName,
+          quantity: material.quantity,
+          unitCost: material.unitCost,
+          totalCost: material.totalCost,
+        }));
+        const totalMaterialRevenue = serviceItem.materials.reduce((sum, material) => sum + material.totalRevenue, 0);
+        const totalMaterialCost = materials.reduce((sum, material) => sum + material.totalCost, 0);
+        const totalRevenue = serviceItem.price + totalMaterialRevenue;
+        const totalCost = serviceItem.cost + totalMaterialCost;
         const service: ServiceOrder = {
           id: serviceRef.id,
           serviceType: serviceItem.serviceType,
@@ -3604,13 +3777,13 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
           cueReference: serviceItem.cueReference,
           paymentMethod: normalizedPaymentMethod,
           paymentReference: normalizedPaymentReference,
-          servicePrice: serviceItem.price,
-          totalRevenue: serviceItem.price,
-          totalMaterialCost: 0,
+          servicePrice: totalRevenue,
+          totalRevenue,
+          totalMaterialCost,
           totalOperationalCost: serviceItem.cost,
-          totalCost: serviceItem.cost,
-          grossProfit: serviceItem.price - serviceItem.cost,
-          materials: [],
+          totalCost,
+          grossProfit: totalRevenue - totalCost,
+          materials,
           notes:
             serviceItem.notes ||
             `Servicio asociado a la venta de ${targetProduct.name} para ${normalizedCustomerName}`,
@@ -3626,6 +3799,46 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
           paymentMethod: service.paymentMethod,
           paymentReference: service.paymentReference ?? null,
           performedAt: Timestamp.fromDate(new Date(input.soldAt)),
+        });
+
+        materials.forEach((material) => {
+          const serviceMovementRef = doc(collection(db, 'movements'));
+          const movementNotes =
+            serviceItem.notes ||
+            `Material usado en servicio asociado a la venta de ${targetProduct.name} para ${normalizedCustomerName}`;
+          batch.set(serviceMovementRef, {
+            id: serviceMovementRef.id,
+            saleId: linkedSale.id,
+            serviceOrderId: service.id,
+            productId: material.productId,
+            variantId: material.variantId ?? null,
+            variantName: material.variantName ?? null,
+            type: 'exit',
+            reason: 'service',
+            quantity: -Math.abs(material.quantity),
+            notes: movementNotes,
+            occurredAt: Timestamp.fromDate(new Date(input.soldAt)),
+            responsibleUser: input.responsibleUser,
+            relatedUnitCost: material.unitCost,
+          });
+          batch.set(doc(db, 'inventory_movements', serviceMovementRef.id), {
+            id: serviceMovementRef.id,
+            saleId: linkedSale.id,
+            serviceOrderId: service.id,
+            productId: material.productId,
+            variantId: material.variantId ?? null,
+            variantName: material.variantName ?? null,
+            sourceType: 'service',
+            sourceId: service.id,
+            type: 'exit',
+            reason: 'service',
+            quantity: -Math.abs(material.quantity),
+            notes: movementNotes,
+            occurredAt: Timestamp.fromDate(new Date(input.soldAt)),
+            responsibleUser: input.responsibleUser,
+            relatedUnitCost: material.unitCost,
+          });
+          stockDeltas.push({ productId: material.productId, quantity: -Math.abs(material.quantity) });
         });
       });
     });
@@ -3706,6 +3919,16 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
             variantRestorations.set(
               item.variantId!,
               (variantRestorations.get(item.variantId!) ?? 0) + item.quantity
+            );
+          });
+      });
+      linkedServiceOrders.forEach((service) => {
+        service.materials
+          .filter((material) => material.productId === product.id && material.variantId)
+          .forEach((material) => {
+            variantRestorations.set(
+              material.variantId!,
+              (variantRestorations.get(material.variantId!) ?? 0) + material.quantity
             );
           });
       });
@@ -4665,6 +4888,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         createSupplier,
         updateSupplier,
         deleteSupplier,
+        createCustomer,
+        updateCustomer,
         registerMovement,
         registerInitialStock,
         registerInitialStockBatch,

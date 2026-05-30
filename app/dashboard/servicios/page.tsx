@@ -459,11 +459,7 @@ export default function ServiciosPage() {
                   quantity: 1,
                 }
               : null,
-          ].filter(
-            (
-              item
-            ): item is { productId: string; variantId?: string; variantName?: string; quantity: number } => Boolean(item)
-          );
+          ].filter((item): item is NonNullable<typeof item> => Boolean(item));
 
           const payload = {
             serviceType: values.serviceType,
