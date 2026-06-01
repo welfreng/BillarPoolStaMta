@@ -968,6 +968,14 @@ function mapServiceVisitDocument(documentId: string, data: DocumentData): Servic
   };
 }
 
+function serializeServiceMaterials(materials: ServiceMaterialItem[]) {
+  return materials.map((material) => ({
+    ...material,
+    variantId: material.variantId ?? null,
+    variantName: material.variantName ?? null,
+  }));
+}
+
 function mapAuthorizationRequestDocument(documentId: string, data: DocumentData): AuthorizationRequest {
   return {
     id: documentId,
@@ -3796,6 +3804,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
           source: service.source ?? 'sale-addon',
           saleId: service.saleId ?? null,
           saleBatchId: service.saleBatchId ?? null,
+          materials: serializeServiceMaterials(service.materials),
           paymentMethod: service.paymentMethod,
           paymentReference: service.paymentReference ?? null,
           performedAt: Timestamp.fromDate(new Date(input.soldAt)),
@@ -4371,6 +4380,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       source: service.source ?? 'standalone',
       saleId: service.saleId ?? null,
       saleBatchId: service.saleBatchId ?? null,
+      materials: serializeServiceMaterials(service.materials),
       paymentMethod: service.paymentMethod,
       paymentReference: service.paymentReference ?? null,
       performedAt: Timestamp.fromDate(new Date(input.performedAt)),
