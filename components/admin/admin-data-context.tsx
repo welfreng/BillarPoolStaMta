@@ -970,26 +970,39 @@ function mapServiceVisitDocument(documentId: string, data: DocumentData): Servic
 
 function serializeServiceMaterials(materials: ServiceMaterialItem[]) {
   return materials.map((material) => ({
-    ...material,
+    productId: material.productId,
     variantId: material.variantId ?? null,
     variantName: material.variantName ?? null,
+    quantity: Number(material.quantity ?? 0),
+    unitCost: Number(material.unitCost ?? 0),
+    totalCost: Number(material.totalCost ?? 0),
   }));
 }
 
-function sanitizeFirestoreData<T>(value: T): T {
-  if (value === undefined) return null as T;
-  if (value === null) return value;
-  if (value instanceof Timestamp) return value;
-  if (Array.isArray(value)) {
-    return value.map((item) => sanitizeFirestoreData(item)) as T;
-  }
-  if (typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>).map(([key, item]) => [key, sanitizeFirestoreData(item)])
-    ) as T;
-  }
-
-  return value;
+function serializeServiceForFirestore(service: ServiceOrder, performedAt: Timestamp) {
+  return {
+    id: service.id,
+    serviceType: service.serviceType,
+    serviceLabel: service.serviceLabel ?? null,
+    serviceCategory: service.serviceCategory ?? null,
+    source: service.source ?? 'standalone',
+    saleId: service.saleId ?? null,
+    saleBatchId: service.saleBatchId ?? null,
+    performedAt,
+    customerName: service.customerName ?? '',
+    cueReference: service.cueReference ?? '',
+    paymentMethod: service.paymentMethod ?? 'efectivo',
+    paymentReference: service.paymentReference ?? null,
+    servicePrice: Number(service.servicePrice ?? 0),
+    totalRevenue: Number(service.totalRevenue ?? 0),
+    totalMaterialCost: Number(service.totalMaterialCost ?? 0),
+    totalOperationalCost: Number(service.totalOperationalCost ?? 0),
+    totalCost: Number(service.totalCost ?? 0),
+    grossProfit: Number(service.grossProfit ?? 0),
+    materials: serializeServiceMaterials(service.materials ?? []),
+    notes: service.notes ?? '',
+    responsibleUser: service.responsibleUser ?? 'Administrador',
+  };
 }
 
 function mapAuthorizationRequestDocument(documentId: string, data: DocumentData): AuthorizationRequest {
@@ -3814,17 +3827,10 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
           responsibleUser: input.responsibleUser,
         };
 
-        batch.set(doc(db, 'services', service.id), sanitizeFirestoreData({
-          ...service,
-          serviceCategory: service.serviceCategory ?? null,
-          source: service.source ?? 'sale-addon',
-          saleId: service.saleId ?? null,
-          saleBatchId: service.saleBatchId ?? null,
-          materials: serializeServiceMaterials(service.materials),
-          paymentMethod: service.paymentMethod,
-          paymentReference: service.paymentReference ?? null,
-          performedAt: Timestamp.fromDate(new Date(input.soldAt)),
-        }));
+        batch.set(
+          doc(db, 'services', service.id),
+          serializeServiceForFirestore(service, Timestamp.fromDate(new Date(input.soldAt)))
+        );
 
         materials.forEach((material) => {
           const serviceMovementRef = doc(collection(db, 'movements'));
@@ -4389,18 +4395,10 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     extraTouchedVariantProductIds: string[] = []
   ) => {
     const { service, materials } = plan;
-    batch.set(doc(db, 'services', service.id), sanitizeFirestoreData({
-      ...service,
-      serviceLabel: service.serviceLabel ?? null,
-      serviceCategory: service.serviceCategory ?? null,
-      source: service.source ?? 'standalone',
-      saleId: service.saleId ?? null,
-      saleBatchId: service.saleBatchId ?? null,
-      materials: serializeServiceMaterials(service.materials),
-      paymentMethod: service.paymentMethod,
-      paymentReference: service.paymentReference ?? null,
-      performedAt: Timestamp.fromDate(new Date(input.performedAt)),
-    }));
+    batch.set(
+      doc(db, 'services', service.id),
+      serializeServiceForFirestore(service, Timestamp.fromDate(new Date(input.performedAt)))
+    );
 
     const stockDeltas: Array<{ productId: string; quantity: number }> = [];
     const variantStockMap = buildVariantStockMap(baseProducts);
