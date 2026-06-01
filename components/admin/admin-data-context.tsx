@@ -976,6 +976,22 @@ function serializeServiceMaterials(materials: ServiceMaterialItem[]) {
   }));
 }
 
+function sanitizeFirestoreData<T>(value: T): T {
+  if (value === undefined) return null as T;
+  if (value === null) return value;
+  if (value instanceof Timestamp) return value;
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeFirestoreData(item)) as T;
+  }
+  if (typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, item]) => [key, sanitizeFirestoreData(item)])
+    ) as T;
+  }
+
+  return value;
+}
+
 function mapAuthorizationRequestDocument(documentId: string, data: DocumentData): AuthorizationRequest {
   return {
     id: documentId,
@@ -3798,7 +3814,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
           responsibleUser: input.responsibleUser,
         };
 
-        batch.set(doc(db, 'services', service.id), {
+        batch.set(doc(db, 'services', service.id), sanitizeFirestoreData({
           ...service,
           serviceCategory: service.serviceCategory ?? null,
           source: service.source ?? 'sale-addon',
@@ -3808,7 +3824,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
           paymentMethod: service.paymentMethod,
           paymentReference: service.paymentReference ?? null,
           performedAt: Timestamp.fromDate(new Date(input.soldAt)),
-        });
+        }));
 
         materials.forEach((material) => {
           const serviceMovementRef = doc(collection(db, 'movements'));
@@ -4373,7 +4389,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     extraTouchedVariantProductIds: string[] = []
   ) => {
     const { service, materials } = plan;
-    batch.set(doc(db, 'services', service.id), {
+    batch.set(doc(db, 'services', service.id), sanitizeFirestoreData({
       ...service,
       serviceLabel: service.serviceLabel ?? null,
       serviceCategory: service.serviceCategory ?? null,
@@ -4384,7 +4400,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       paymentMethod: service.paymentMethod,
       paymentReference: service.paymentReference ?? null,
       performedAt: Timestamp.fromDate(new Date(input.performedAt)),
-    });
+    }));
 
     const stockDeltas: Array<{ productId: string; quantity: number }> = [];
     const variantStockMap = buildVariantStockMap(baseProducts);
