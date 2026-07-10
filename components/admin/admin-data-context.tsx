@@ -5,7 +5,6 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -1524,10 +1523,6 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   const [services, setServices] = useState<ServiceOrder[]>(initialServices);
   const [serviceVisits, setServiceVisits] = useState<ServiceVisit[]>([]);
   const [authorizationRequests, setAuthorizationRequests] = useState<AuthorizationRequest[]>([]);
-  const publicStockAutoSyncInFlightRef = useRef(false);
-  const shouldAutoSyncPublicStock =
-    activeCollections.includes('products') && activeCollections.includes('movements');
-
   const queueAdminNotification = (
     batch: ReturnType<typeof writeBatch>,
     input: {
@@ -1837,9 +1832,14 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   const applyVariantStockMapToBatch = (
     batch: ReturnType<typeof writeBatch>,
     variantStockMap: Map<string, Map<string, number>>,
-    sourceProducts: Product[]
+    sourceProducts: Product[],
+    touchedProductIds?: string[]
   ) => {
+    const allowedProductIds = touchedProductIds ? new Set(touchedProductIds.filter(Boolean)) : null;
+
     variantStockMap.forEach((variantMap, productId) => {
+      if (allowedProductIds && !allowedProductIds.has(productId)) return;
+
       const product = sourceProducts.find((item) => item.id === productId);
       if (!product) return;
 
@@ -2425,47 +2425,6 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     return changedCount;
   };
 
-  useEffect(() => {
-    if (!shouldAutoSyncPublicStock) return;
-    if (loading) return;
-    if (products.length === 0) return;
-    if (publicStockAutoSyncInFlightRef.current) return;
-
-    const hasMismatch = products.some((product) => {
-      if (getProductSaleMode(product) === 'varianted') {
-        const computedVariantStock = (product.variants ?? []).reduce(
-          (total, variant) => total + getProductVariantStock(product, variant.id, []),
-          0
-        );
-        const hasVariantPublicStockMismatch = (product.variants ?? []).some(
-          (variant) =>
-            Math.max(Number(variant.publicStock ?? variant.stock ?? 0), 0) !==
-            getProductVariantStock(product, variant.id, [])
-        );
-
-        return (
-          Math.max(Number(product.publicStock ?? 0), 0) !== computedVariantStock ||
-          hasVariantPublicStockMismatch ||
-          (computedVariantStock > 0 && product.status !== 'active')
-        );
-      }
-
-      const stock = getStoredProductStock(product);
-      return stock > 0 && product.status !== 'active';
-    });
-
-    if (!hasMismatch) return;
-
-    publicStockAutoSyncInFlightRef.current = true;
-    void syncPublicProductStocks()
-      .catch((error) => {
-        console.error('Error reconciliando stock publico automaticamente:', error);
-      })
-      .finally(() => {
-        publicStockAutoSyncInFlightRef.current = false;
-      });
-  }, [loading, products, shouldAutoSyncPublicStock]);
-
   const createProduct = async (input: NewProductInput) => {
     const createdAt = new Date().toISOString();
     const productRef = doc(collection(db, 'products'));
@@ -3024,7 +2983,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       const productVariantMap = variantStockMap.get(input.productId);
       const currentVariantStock = productVariantMap?.get(selectedVariant.id) ?? selectedVariant.stock ?? 0;
       productVariantMap?.set(selectedVariant.id, Math.max(currentVariantStock + normalizedQuantity, 0));
-      applyVariantStockMapToBatch(batch, variantStockMap, products);
+      applyVariantStockMapToBatch(batch, variantStockMap, products, [input.productId]);
     }
     await runFirestoreWriteWithBackoff(() => batch.commit(), {
       retries: 0,
@@ -3173,7 +3132,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       const productVariantMap = variantStockMap.get(input.productId);
       const currentVariantStock = productVariantMap?.get(selectedVariant.id) ?? selectedVariant.stock ?? 0;
       productVariantMap?.set(selectedVariant.id, currentVariantStock + quantity);
-      applyVariantStockMapToBatch(batch, variantStockMap, products);
+      applyVariantStockMapToBatch(batch, variantStockMap, products, [input.productId]);
     }
 
     await batch.commit();
@@ -3344,7 +3303,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       )
     );
     if (isVarianted) {
-      applyVariantStockMapToBatch(batch, variantStockMap, products);
+      applyVariantStockMapToBatch(batch, variantStockMap, products, [input.productId]);
     }
 
     await batch.commit();
@@ -3590,7 +3549,12 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         variantRecord.salePrice = Number(item.suggestedSalePrice ?? variantRecord.salePrice ?? targetProduct?.salePrice ?? 0);
       }
     });
-    applyVariantStockMapToBatch(batch, variantStockMap, baseProducts);
+    applyVariantStockMapToBatch(
+      batch,
+      variantStockMap,
+      baseProducts,
+      normalizedItems.filter((item) => item.variantId).map((item) => item.productId)
+    );
 
     return purchasesCreated;
   };
@@ -3703,7 +3667,12 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         removedMovements.map((movement) => movement.productId)
       )
     );
-    applyVariantStockMapToBatch(batch, buildVariantStockMap(projectedProducts, remainingMovements), projectedProducts);
+    applyVariantStockMapToBatch(
+      batch,
+      buildVariantStockMap(projectedProducts, remainingMovements),
+      projectedProducts,
+      removedMovements.map((movement) => movement.productId)
+    );
     await batch.commit();
   };
 
@@ -3732,7 +3701,12 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         removedMovements.map((movement) => movement.productId)
       )
     );
-    applyVariantStockMapToBatch(batch, buildVariantStockMap(projectedProducts, remainingMovements), projectedProducts);
+    applyVariantStockMapToBatch(
+      batch,
+      buildVariantStockMap(projectedProducts, remainingMovements),
+      projectedProducts,
+      removedMovements.map((movement) => movement.productId)
+    );
     await batch.commit();
   };
 
@@ -4130,7 +4104,12 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         baseMovements
       )
     );
-    applyVariantStockMapToBatch(batch, variantStockMap, baseProducts);
+    applyVariantStockMapToBatch(
+      batch,
+      variantStockMap,
+      baseProducts,
+      stockDeltas.map((item) => item.productId)
+    );
 
     if (!isAnonymousCustomerName(normalizedCustomerName)) {
       const customerId = buildCustomerId(normalizedCustomerName, normalizedCustomerPhone, normalizedCustomerDocument);
@@ -4458,7 +4437,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       const productVariantMap = variantStockMap.get(sale.productId);
       const currentVariantStock = productVariantMap?.get(sale.lineItems[0].variantId!) ?? 0;
       productVariantMap?.set(sale.lineItems[0].variantId!, currentVariantStock + Math.abs(input.quantity));
-      applyVariantStockMapToBatch(batch, variantStockMap, products);
+      applyVariantStockMapToBatch(batch, variantStockMap, products, [sale.productId]);
     }
 
     await batch.commit();
@@ -4582,7 +4561,12 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         requestedReturns.find((item) => item.saleId === sale.id)?.quantity ?? 0;
       productVariantMap?.set(variantId, currentVariantStock + Math.abs(restoredQuantity));
     });
-    applyVariantStockMapToBatch(batch, variantStockMap, products);
+    applyVariantStockMapToBatch(
+      batch,
+      variantStockMap,
+      products,
+      stockDeltas.map((item) => item.productId)
+    );
 
     await batch.commit();
 
@@ -4781,7 +4765,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       ])
     );
     if (touchedVariantProducts.length > 0) {
-      applyVariantStockMapToBatch(batch, variantStockMap, baseProducts);
+      applyVariantStockMapToBatch(batch, variantStockMap, baseProducts, touchedVariantProducts);
     }
 
   };
