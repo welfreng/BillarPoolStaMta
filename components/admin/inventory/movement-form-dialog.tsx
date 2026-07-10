@@ -35,7 +35,7 @@ const movementSchema = z.object({
 
 export type MovementFormValues = z.infer<typeof movementSchema>;
 
-function createDefaultValues(): MovementFormValues {
+function createDefaultValues(values?: Partial<MovementFormValues>): MovementFormValues {
   return {
     productId: '',
     variantId: '',
@@ -45,6 +45,7 @@ function createDefaultValues(): MovementFormValues {
     occurredAt: getTodayDateInputValue(),
     notes: '',
     responsibleUser: 'Administrador',
+    ...values,
   };
 }
 
@@ -53,11 +54,13 @@ export function MovementFormDialog({
   onOpenChange,
   products,
   onSubmit,
+  initialValues,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   products: Product[];
   onSubmit: (values: MovementFormValues) => Promise<void> | void;
+  initialValues?: Partial<MovementFormValues>;
 }) {
   const movementFormId = useId();
   const form = useForm<MovementFormValues>({
@@ -87,6 +90,11 @@ export function MovementFormDialog({
     () => [...(movementReasonsByType[selectedType] ?? movementReasonsByType.entry)] as MovementFormValues['reason'][],
     [selectedType]
   );
+
+  useEffect(() => {
+    if (!open) return;
+    form.reset(createDefaultValues(initialValues));
+  }, [form, initialValues, open]);
 
   useEffect(() => {
     const currentReason = form.getValues('reason') as MovementFormValues['reason'];
