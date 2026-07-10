@@ -11,7 +11,14 @@ import { SectionHeader } from '@/components/admin/shared/section-header';
 import { PurchaseFormDialog, type PurchaseFormValues } from '@/components/admin/purchases/purchase-form-dialog';
 import { ResponsiveRowActions } from '@/components/admin/shared/responsive-row-actions';
 import { useAdminData } from '@/components/admin/admin-data-context';
-import { calculateUnitProfit, formatCurrency, formatNumber, getProductById } from '@/lib/admin/calculations';
+import {
+  calculateUnitProfit,
+  formatCurrency,
+  formatNumber,
+  getOperationalProductRealUnitCost,
+  getOperationalProductStock,
+  getProductById,
+} from '@/lib/admin/calculations';
 import { getDateKeyInBogota, getTodayDateInputValue, toOperationalDateISOString } from '@/lib/admin/date-utils';
 import { getFriendlyFirestoreWriteErrorMessage } from '@/lib/firestore-write-retry';
 import { useToast } from '@/hooks/use-toast';
@@ -42,10 +49,24 @@ export default function ComprasPage() {
     (accumulator, purchase) => accumulator + purchase.totalInvestment,
     0
   );
+  const totalRegisteredInvestment = purchases.reduce(
+    (accumulator, purchase) => accumulator + purchase.totalInvestment,
+    0
+  );
   const totalPurchaseValue = filteredPurchases.reduce(
     (accumulator, purchase) => accumulator + purchase.purchaseValueTotal,
     0
   );
+  const currentPhysicalInvestment = useMemo(
+    () =>
+      products.reduce((total, product) => {
+        const stock = getOperationalProductStock(product, []);
+        const realUnitCost = getOperationalProductRealUnitCost(product, purchases);
+        return total + stock * realUnitCost;
+      }, 0),
+    [products, purchases]
+  );
+  const recoveredInvestment = Math.max(totalRegisteredInvestment - currentPhysicalInvestment, 0);
   const groupedPurchases = useMemo(() => {
     const groups = new Map<
       string,
@@ -56,6 +77,8 @@ export default function ComprasPage() {
         source: 'purchase' | 'initial-load';
         purchasedAt: string;
         totalPurchaseValue: number;
+        totalGrossPurchaseValue: number;
+        totalDiscountValue: number;
         totalInvestment: number;
         totalShipping: number;
         items: typeof filteredPurchases;
@@ -70,6 +93,8 @@ export default function ComprasPage() {
       if (existing) {
         existing.items.push(purchase);
         existing.totalPurchaseValue += purchase.purchaseValueTotal;
+        existing.totalGrossPurchaseValue += purchase.purchaseGrossValueTotal ?? purchase.purchaseValueTotal;
+        existing.totalDiscountValue += purchase.purchaseDiscountTotal ?? 0;
         existing.totalInvestment += purchase.totalInvestment;
         existing.totalShipping += purchase.shippingValueTotal;
         return;
@@ -82,6 +107,8 @@ export default function ComprasPage() {
         source: purchase.source ?? 'purchase',
         purchasedAt: purchase.purchasedAt,
         totalPurchaseValue: purchase.purchaseValueTotal,
+        totalGrossPurchaseValue: purchase.purchaseGrossValueTotal ?? purchase.purchaseValueTotal,
+        totalDiscountValue: purchase.purchaseDiscountTotal ?? 0,
         totalInvestment: purchase.totalInvestment,
         totalShipping: purchase.shippingValueTotal,
         items: [purchase],
@@ -116,6 +143,7 @@ export default function ComprasPage() {
       groupItems[0]?.supplier ??
       '',
     purchasedAt: groupItems[0]?.purchasedAt ? getDateKeyInBogota(groupItems[0].purchasedAt) : getTodayDateInputValue(),
+    discountPercent: groupItems[0]?.purchaseDiscountPercent ?? 0,
     shippingValueTotal: groupItems.reduce((sum, item) => sum + item.shippingValueTotal, 0),
     internationalVendorName: groupItems[0]?.internationalVendorName ?? '',
     productsValueUsd: groupItems[0]?.productsValueUsd ?? 0,
@@ -247,13 +275,16 @@ export default function ComprasPage() {
           </p>
           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Cada pedido puede incluir varios productos del mismo proveedor.</p>
         </div>
-        <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm sm:col-span-2 sm:p-6 xl:col-span-1">
-          <p className="text-sm text-emerald-800">Regla financiera activa</p>
-          <p className="mt-3 text-lg font-semibold text-emerald-950">
-            (valor_total_compra + valor_total_envio) / cantidad_comprada
+        <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm dark:border-emerald-900/60 dark:bg-emerald-950/20 sm:col-span-2 sm:p-6 xl:col-span-1">
+          <p className="text-sm text-emerald-800 dark:text-emerald-200">Inversion fisica actual</p>
+          <p className="mt-3 text-3xl font-semibold text-emerald-950 dark:text-emerald-50">
+            {formatCurrency(currentPhysicalInvestment)}
           </p>
-          <p className="mt-2 text-sm text-emerald-900">
-            El resultado se guarda como costo unitario real y afecta el inventario.
+          <p className="mt-2 text-sm text-emerald-900 dark:text-emerald-100">
+            Valor del inventario que queda: stock actual por costo real unitario.
+          </p>
+          <p className="mt-2 text-xs text-emerald-800 dark:text-emerald-200">
+            Recuperado o descargado: {formatCurrency(recoveredInvestment)}
           </p>
         </div>
       </div>
@@ -327,6 +358,11 @@ export default function ComprasPage() {
                   <div className="flex flex-wrap gap-3 text-sm">
                     <div className="rounded-2xl bg-white px-3 py-2 text-slate-600 dark:bg-slate-900/80 dark:text-slate-300">
                       Valor compra: <span className="font-semibold text-slate-900 dark:text-slate-100">{formatCurrency(group.totalPurchaseValue)}</span>
+                      {group.totalDiscountValue > 0 ? (
+                        <span className="ml-1 text-xs text-emerald-700">
+                          ({formatCurrency(group.totalGrossPurchaseValue)} - {formatCurrency(group.totalDiscountValue)})
+                        </span>
+                      ) : null}
                     </div>
                     <div className="rounded-2xl bg-white px-3 py-2 text-slate-600">
                       Envio total: <span className="font-semibold text-slate-900">{formatCurrency(group.totalShipping)}</span>
@@ -359,6 +395,14 @@ export default function ComprasPage() {
                             <p className="mt-1 text-sm text-slate-500">{product?.brand}</p>
                             <div className="mt-2 grid gap-1 text-sm text-slate-600">
                               <p>Cantidad: {formatNumber(purchase.quantityPurchased)} uds</p>
+                              {Number(purchase.purchaseDiscountTotal ?? 0) > 0 ? (
+                                <p>
+                                  Compra: {formatCurrency(purchase.purchaseValueTotal)}
+                                  <span className="text-emerald-700">
+                                    {' '}desc. {formatCurrency(purchase.purchaseDiscountTotal ?? 0)}
+                                  </span>
+                                </p>
+                              ) : null}
                               <p>Costo real: {formatCurrency(purchase.realUnitCost)}</p>
                               <p>Precio sugerido: {formatCurrency(currentSuggestedSalePrice)}</p>
                               <p>Utilidad: {formatCurrency(unitProfit)}</p>
@@ -414,7 +458,10 @@ export default function ComprasPage() {
                           const rowHoverSummary = [
                             product?.name ?? 'Producto',
                             `Cantidad: ${formatNumber(purchase.quantityPurchased)} uds`,
-                            `Compra: ${formatCurrency(purchase.purchaseValueTotal)}`,
+                            `Compra neta: ${formatCurrency(purchase.purchaseValueTotal)}`,
+                            Number(purchase.purchaseDiscountTotal ?? 0) > 0
+                              ? `Descuento: ${formatCurrency(purchase.purchaseDiscountTotal ?? 0)}`
+                              : '',
                             `Envio: ${formatCurrency(purchase.shippingValueTotal)}`,
                             `Inversion: ${formatCurrency(purchase.totalInvestment)}`,
                             `Costo unitario real: ${formatCurrency(purchase.realUnitCost)}`,
@@ -430,7 +477,18 @@ export default function ComprasPage() {
                               </div>
                             </TableCell>
                             <TableCell>{formatNumber(purchase.quantityPurchased)} uds</TableCell>
-                            <TableCell>{formatCurrency(purchase.purchaseValueTotal)}</TableCell>
+                            <TableCell>
+                              <div>
+                                <p>{formatCurrency(purchase.purchaseValueTotal)}</p>
+                                {Number(purchase.purchaseDiscountTotal ?? 0) > 0 ? (
+                                  <p className="text-xs text-emerald-700">
+                                    {formatCurrency(purchase.purchaseGrossValueTotal ?? purchase.purchaseValueTotal)}
+                                    {' '}-
+                                    {' '}{formatCurrency(purchase.purchaseDiscountTotal ?? 0)}
+                                  </p>
+                                ) : null}
+                              </div>
+                            </TableCell>
                             <TableCell>{formatCurrency(purchase.shippingValueTotal)}</TableCell>
                             <TableCell>{formatCurrency(purchase.totalInvestment)}</TableCell>
                             <TableCell>{formatCurrency(purchase.realUnitCost)}</TableCell>

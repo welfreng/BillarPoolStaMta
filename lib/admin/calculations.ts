@@ -88,6 +88,19 @@ export function getProductStock(movements: InventoryMovement[], productId: strin
   );
 }
 
+export function getStoredProductStock(product: Product | undefined) {
+  if (!product) return 0;
+  if (getProductSaleMode(product) === 'varianted') {
+    const variants = product.variants ?? [];
+    return variants.reduce(
+      (total, variant) => total + Math.max(Number(variant.stock ?? variant.publicStock ?? 0), 0),
+      0
+    );
+  }
+
+  return Math.max(Number(product.publicStock ?? 0), 0);
+}
+
 export function getLatestPurchaseForProduct(purchases: Purchase[], productId: string) {
   return purchases
     .filter((purchase) => purchase.productId === productId)
@@ -113,14 +126,8 @@ function getActiveOperationalVariants(product: Product): ProductVariant[] {
 }
 
 export function getOperationalProductStock(product: Product, movements: InventoryMovement[]) {
-  if (getProductSaleMode(product) !== 'varianted') {
-    return getProductStock(movements, product.id);
-  }
-
-  return getActiveOperationalVariants(product).reduce(
-    (total, variant) => total + Math.max(Number(variant.stock ?? 0), 0),
-    0
-  );
+  void movements;
+  return getStoredProductStock(product);
 }
 
 export function getOperationalProductSalePrice(product: Product) {

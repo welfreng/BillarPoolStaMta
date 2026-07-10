@@ -39,13 +39,13 @@ export function AdminSidebar() {
       <SidebarHeader className="px-4 py-5">
         <div className="rounded-[24px] border border-white/10 bg-[linear-gradient(145deg,#08162f_0%,#0a2472_58%,#0ea5e9_140%)] px-4 py-4 text-white shadow-[0_24px_50px_rgba(10,22,40,0.32)]">
           <div className="mb-3 flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/10 backdrop-blur">
+            <div className="flex h-12 w-16 items-center justify-center rounded-2xl border border-white/15 bg-white/12 p-1 shadow-lg shadow-black/15">
               <Image
                 src={SITE_LOGO}
                 alt="Billar Pool Santa Marta"
-                width={28}
-                height={28}
-                className="h-7 w-7 object-contain"
+                width={76}
+                height={60}
+                className="h-full w-full object-contain"
               />
             </div>
             <div className="min-w-0">

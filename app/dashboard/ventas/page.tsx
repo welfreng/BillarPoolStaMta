@@ -32,12 +32,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { useAdminData } from '@/components/admin/admin-data-context';
 import { useAuth } from '@/components/auth-context';
 import { useToast } from '@/hooks/use-toast';
-import { formatCurrency, formatDateTime, formatNumber, getProductById, getProductStock } from '@/lib/admin/calculations';
+import { formatCurrency, formatDateTime, formatNumber, getProductById } from '@/lib/admin/calculations';
 import { toOperationalDateISOString } from '@/lib/admin/date-utils';
 import { getFriendlyFirestoreWriteErrorMessage } from '@/lib/firestore-write-retry';
 import { getSaleLineDisplayName } from '@/lib/admin/sale-line-display';
 import { getVariantSalePrice } from '@/lib/admin/variant-helpers';
-import type { AuthorizationRequest, AuthorizationRequestType } from '@/lib/admin/types';
+import type { AuthorizationRequest, AuthorizationRequestType, Sale } from '@/lib/admin/types';
 
 function getAuthorizationTypeLabel(requestType: AuthorizationRequestType) {
   if (requestType === 'sale-return') return 'devolucion';
@@ -184,6 +184,7 @@ export default function VentasPage() {
   const [editingSaleBatchId, setEditingSaleBatchId] = useState<string | null>(null);
   const [returningSaleId, setReturningSaleId] = useState<string | null>(null);
   const [detailsSaleId, setDetailsSaleId] = useState<string | null>(null);
+  const [optimisticDetailsSales, setOptimisticDetailsSales] = useState<Sale[]>([]);
   const [detailsInitialTab, setDetailsInitialTab] = useState<'details' | 'invoice'>('details');
   const [query, setQuery] = useState('');
   const [saleCategory, setSaleCategory] = useState('all');
@@ -229,50 +230,69 @@ export default function VentasPage() {
     ? saleGroups.find((group) => group.key === returningSaleId || group.sales.some((sale) => sale.id === returningSaleId)) ?? null
     : null;
   const returningSale = returningGroup?.sales[0] ?? null;
-  const detailsSale = detailsSaleId ? sales.find((sale) => sale.id === detailsSaleId) ?? null : null;
-  const initialSaleValues: SaleFormValues | null = editingSale
-    ? {
-        soldAt: editingSale.soldAt.slice(0, 10),
-        items: (editingGroup?.sales ?? [editingSale]).flatMap((sale) =>
-          sale.lineItems.map((item) => ({
-            productId: item.productId,
-            variantId: item.variantId ?? '',
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            serviceItems: services
-              .filter((service) => service.source === 'sale-addon' && service.saleId === sale.id)
-              .map((service) => {
-                const materialRevenue = service.materials.reduce((sum, material) => {
-                  const materialProduct = getProductById(products, material.productId);
-                  return sum + material.quantity * getVariantSalePrice(materialProduct, material.variantId);
-                }, 0);
-                return {
-                  serviceType: service.serviceType,
-                  serviceCategory: service.serviceCategory ?? 'torno',
-                  price: Math.max(service.totalRevenue - materialRevenue, 0),
-                  cost: service.totalOperationalCost ?? 0,
-                  cueReference: service.cueReference,
-                  notes: service.notes ?? '',
-                  materials: service.materials.map((material) => ({
-                    productId: material.productId,
-                    variantId: material.variantId ?? '',
-                    variantName: material.variantName ?? '',
-                    quantity: material.quantity,
-                  })),
-                };
-              }),
-            giftItems: sale.giftItems.map((giftItem) => ({
-              productId: giftItem.productId,
-              quantity: giftItem.quantity,
-            })),
-          }))
-        ),
-        customerPhone: editingSale.customerPhone ?? '',
-        customerDocument: editingSale.customerDocument ?? '',
-        customerName: editingSale.customerName,
-        notes: editingSale.notes,
-      }
+  const detailsSale = detailsSaleId
+    ? sales.find((sale) => sale.id === detailsSaleId) ??
+      optimisticDetailsSales.find((sale) => sale.id === detailsSaleId) ??
+      null
     : null;
+  const detailSales = useMemo(() => {
+    if (optimisticDetailsSales.length === 0) return sales;
+    const optimisticIds = new Set(optimisticDetailsSales.map((sale) => sale.id));
+    return [
+      ...optimisticDetailsSales,
+      ...sales.filter((sale) => !optimisticIds.has(sale.id)),
+    ];
+  }, [optimisticDetailsSales, sales]);
+  const openSaleDetails = (sale: Sale, tab: 'details' | 'invoice' = 'details') => {
+    setOptimisticDetailsSales([]);
+    setDetailsInitialTab(tab);
+    setDetailsSaleId(sale.id);
+  };
+  const initialSaleValues: SaleFormValues | null = useMemo(() => {
+    if (!editingSale) return null;
+
+    return {
+      soldAt: editingSale.soldAt.slice(0, 10),
+      items: (editingGroup?.sales ?? [editingSale]).flatMap((sale) =>
+        sale.lineItems.map((item) => ({
+          productId: item.productId,
+          variantId: item.variantId ?? '',
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          serviceItems: services
+            .filter((service) => service.source === 'sale-addon' && service.saleId === sale.id)
+            .map((service) => {
+              const materialRevenue = service.materials.reduce((sum, material) => {
+                const materialProduct = getProductById(products, material.productId);
+                return sum + material.quantity * getVariantSalePrice(materialProduct, material.variantId);
+              }, 0);
+              return {
+                serviceType: service.serviceType,
+                serviceCategory: service.serviceCategory ?? 'torno',
+                price: Math.max(service.totalRevenue - materialRevenue, 0),
+                cost: service.totalOperationalCost ?? 0,
+                cueReference: service.cueReference,
+                notes: service.notes ?? '',
+                materials: service.materials.map((material) => ({
+                  productId: material.productId,
+                  variantId: material.variantId ?? '',
+                  variantName: material.variantName ?? '',
+                  quantity: material.quantity,
+                })),
+              };
+            }),
+          giftItems: sale.giftItems.map((giftItem) => ({
+            productId: giftItem.productId,
+            quantity: giftItem.quantity,
+          })),
+        }))
+      ),
+      customerPhone: editingSale.customerPhone ?? '',
+      customerDocument: editingSale.customerDocument ?? '',
+      customerName: editingSale.customerName,
+      notes: editingSale.notes,
+    };
+  }, [editingGroup?.sales, editingSale, products, services]);
   const filteredSales = useMemo(() => {
     return saleGroups.filter((group) => {
       const baseSale = group.sales[0];
@@ -599,8 +619,7 @@ export default function VentasPage() {
                         size="icon"
                         className="h-8 w-8 shrink-0 rounded-lg"
                         onClick={() => {
-                          setDetailsInitialTab('details');
-                          setDetailsSaleId(baseSale.id);
+                          openSaleDetails(baseSale);
                         }}
                       >
                         <Eye className="h-4 w-4" />
@@ -804,8 +823,7 @@ export default function VentasPage() {
                               size="icon"
                               className="h-8 w-8 rounded-lg"
                               onClick={() => {
-                                setDetailsInitialTab('details');
-                                setDetailsSaleId(baseSale.id);
+                                openSaleDetails(baseSale);
                               }}
                             >
                               <Eye className="h-4 w-4" />
@@ -824,8 +842,7 @@ export default function VentasPage() {
                               <DropdownMenuContent align="end" className="w-56 rounded-2xl">
                                 <DropdownMenuItem
                                   onClick={() => {
-                                    setDetailsInitialTab('details');
-                                    setDetailsSaleId(baseSale.id);
+                                    openSaleDetails(baseSale);
                                   }}
                                 >
                                   <Eye className="h-4 w-4" />
@@ -1133,15 +1150,19 @@ export default function VentasPage() {
                   console.error('No se pudo cerrar la autorizacion de edicion:', authorizationError);
                 }
               }
+              setOpenDialog(false);
             } else {
               const createdSales = await registerSale(payload);
               const createdSale = createdSales[0] ?? null;
+              setOpenDialog(false);
               if (createdSale) {
-                setDetailsInitialTab('invoice');
-                setDetailsSaleId(createdSale.id);
+                window.setTimeout(() => {
+                  setOptimisticDetailsSales(createdSales);
+                  setDetailsInitialTab('invoice');
+                  setDetailsSaleId(createdSale.id);
+                }, 0);
               }
             }
-            setOpenDialog(false);
             setEditingSaleBatchId(null);
             setActiveEditAuthorizationId(null);
             toast({
@@ -1167,11 +1188,12 @@ export default function VentasPage() {
         onOpenChange={(nextOpen) => {
           if (!nextOpen) {
             setDetailsSaleId(null);
+            setOptimisticDetailsSales([]);
             setDetailsInitialTab('details');
           }
         }}
         sale={detailsSale}
-        sales={sales}
+        sales={detailSales}
         services={services}
         products={products}
         hideFinancialDetails={isSalesUser}

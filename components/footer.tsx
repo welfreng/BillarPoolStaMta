@@ -24,13 +24,15 @@ export default function Footer() {
         <div className="grid grid-cols-1 gap-10 border-b border-white/10 py-16 md:grid-cols-2 lg:grid-cols-4">
           <div className="lg:col-span-1">
             <div className="mb-4 flex items-center gap-3">
-              <Image
-                src={SITE_LOGO}
-                alt="Billar Pool Santa Marta"
-                width={45}
-                height={45}
-                className="rounded-full"
-              />
+              <span className="flex h-20 w-24 items-center justify-center rounded-xl bg-white/10 p-1 shadow-lg shadow-black/20 ring-1 ring-white/15">
+                <Image
+                  src={SITE_LOGO}
+                  alt="Billar Pool Santa Marta"
+                  width={112}
+                  height={90}
+                  className="h-full w-full object-contain"
+                />
+              </span>
               <div>
                 <p className="font-mono text-lg font-bold text-white">Billar Pool</p>
                 <p className="text-xs uppercase tracking-widest text-[#d4a017]">Santa Marta</p>

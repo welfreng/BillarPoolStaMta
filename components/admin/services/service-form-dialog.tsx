@@ -24,7 +24,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { formatCurrency, formatNumber, getProductRealUnitCost, getProductStock, getVariantOrProductRealUnitCost } from '@/lib/admin/calculations';
+import { formatCurrency, formatNumber, getProductRealUnitCost, getStoredProductStock, getVariantOrProductRealUnitCost } from '@/lib/admin/calculations';
 import { filterProductsByCategoryFamily } from '@/lib/admin/category-rules';
 import { serviceTypeLabels } from '@/lib/admin/catalogs';
 import { getTodayDateInputValue } from '@/lib/admin/date-utils';
@@ -278,7 +278,7 @@ export function ServiceFormDialog({
     const stock = product
       ? variantId
         ? getProductVariantStock(product, variantId, movements)
-        : getProductStock(movements, product.id)
+        : getStoredProductStock(product)
       : 0;
     return {
       productId: `${productId}::${variantId ?? ''}`,

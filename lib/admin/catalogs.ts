@@ -31,6 +31,7 @@ export interface ProductVariantTemplateEditorConfig {
   fixedAttributes?: string[];
   searchableAttributes?: string[];
   allowCustomValuesFor?: string[];
+  optionalAttributes?: string[];
   hiddenColumns?: Array<'sku' | 'status'>;
 }
 
@@ -198,6 +199,7 @@ export function getProductVariantTemplate(input: {
         creationMode: 'manual-rows',
         searchableAttributes: ['color'],
         allowCustomValuesFor: ['color'],
+        optionalAttributes: ['color'],
         hiddenColumns: ['sku', 'status'],
       },
       attributes: [

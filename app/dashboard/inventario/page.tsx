@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Boxes, ClipboardList, Eye, Plus, Search } from 'lucide-react';
+import { Boxes, ClipboardList, Eye, Gift, Plus, Search } from 'lucide-react';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,7 @@ import { SectionHeader } from '@/components/admin/shared/section-header';
 import { MovementReasonBadge } from '@/components/admin/shared/status-badges';
 import { MovementFormDialog } from '@/components/admin/inventory/movement-form-dialog';
 import { InitialStockDialog } from '@/components/admin/inventory/initial-stock-dialog';
+import { GiftMovementDialog } from '@/components/admin/inventory/gift-movement-dialog';
 import { SaleFormDialog, type SaleFormValues } from '@/components/admin/sales/sale-form-dialog';
 import { SaleDetailsDialog } from '@/components/admin/sales/sale-details-dialog';
 import { useAdminData } from '@/components/admin/admin-data-context';
@@ -34,12 +35,15 @@ import { toOperationalDateISOString, getTodayDateInputValue } from '@/lib/admin/
 import { useToast } from '@/hooks/use-toast';
 import type { StockAlert } from '@/lib/admin/types';
 
+type StockStatusFilter = 'all' | 'in-stock' | 'out-of-stock';
+
 export default function InventarioPage() {
   const { categories, movements, products, purchases, sales, services, registerMovement, registerInitialStockBatch, registerSale } = useAdminData();
   const { role, profile, user } = useAuth();
   const { toast } = useToast();
   const [openDialog, setOpenDialog] = useState(false);
   const [openInitialStockDialog, setOpenInitialStockDialog] = useState(false);
+  const [openGiftDialog, setOpenGiftDialog] = useState(false);
   const [openSaleDialog, setOpenSaleDialog] = useState(false);
   const [selectedProductForSaleId, setSelectedProductForSaleId] = useState<string | null>(null);
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
@@ -47,6 +51,7 @@ export default function InventarioPage() {
   const [type, setType] = useState('all');
   const [productId, setProductId] = useState('all');
   const [category, setCategory] = useState('all');
+  const [stockStatus, setStockStatus] = useState<StockStatusFilter>('all');
   const [adminTab, setAdminTab] = useState<'movements' | 'stock'>('movements');
   const [movementPage, setMovementPage] = useState(1);
   const [movementPageSize, setMovementPageSize] = useState(20);
@@ -58,6 +63,26 @@ export default function InventarioPage() {
   const selectedProductForSale = selectedProductForSaleId
     ? products.find((product) => product.id === selectedProductForSaleId) ?? null
     : null;
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const params = new URLSearchParams(window.location.search);
+    const requestedTab = params.get('tab');
+    const requestedStock = params.get('stock');
+
+    if (requestedTab === 'stock') {
+      setAdminTab('stock');
+    }
+
+    if (
+      requestedStock === 'all' ||
+      requestedStock === 'in-stock' ||
+      requestedStock === 'out-of-stock'
+    ) {
+      setStockStatus(requestedStock);
+    }
+  }, []);
 
   const filteredMovements = useMemo(() => {
     return movements.filter((movement) => {
@@ -101,7 +126,7 @@ export default function InventarioPage() {
     });
   }, [category, productId, products, query]);
 
-  const inventorySummary = useMemo(() => {
+  const allInventorySummary = useMemo(() => {
     return filteredProducts.map((product) => {
       const stock = getOperationalProductStock(product, movements);
       const realUnitCost = getOperationalProductRealUnitCost(product, purchases);
@@ -115,7 +140,7 @@ export default function InventarioPage() {
       };
     });
   }, [filteredProducts, movements, purchases]);
-  const variantInventorySummary = useMemo(() => {
+  const allVariantInventorySummary = useMemo(() => {
     return filteredProducts.flatMap((product) =>
       (product.variants ?? []).map((variant) => {
         const stock = Math.max(Number(variant.stock ?? 0), 0);
@@ -131,6 +156,18 @@ export default function InventarioPage() {
       })
     );
   }, [filteredProducts, purchases]);
+  const inventorySummary = useMemo(() => {
+    if (stockStatus === 'all') return allInventorySummary;
+    return allInventorySummary.filter((item) =>
+      stockStatus === 'in-stock' ? item.stock > 0 : item.stock <= 0
+    );
+  }, [allInventorySummary, stockStatus]);
+  const variantInventorySummary = useMemo(() => {
+    if (stockStatus === 'all') return allVariantInventorySummary;
+    return allVariantInventorySummary.filter((item) =>
+      stockStatus === 'in-stock' ? item.stock > 0 : item.stock <= 0
+    );
+  }, [allVariantInventorySummary, stockStatus]);
   const stockTotalItems = Math.max(inventorySummary.length, variantInventorySummary.length);
   const stockTotalPages = Math.max(Math.ceil(stockTotalItems / stockPageSize), 1);
   const stockPageStart = stockTotalItems === 0 ? 0 : (stockPage - 1) * stockPageSize + 1;
@@ -146,7 +183,7 @@ export default function InventarioPage() {
 
   useEffect(() => {
     setStockPage(1);
-  }, [query, productId, category, stockPageSize]);
+  }, [query, productId, category, stockPageSize, stockStatus]);
 
   useEffect(() => {
     setStockPage((currentPage) => Math.min(currentPage, stockTotalPages));
@@ -177,6 +214,7 @@ export default function InventarioPage() {
         notes: '',
       }
     : null;
+  const currentResponsibleUser = profile?.nombre?.trim() || user?.displayName || user?.email || 'Administrador';
 
   return (
     <div className="space-y-6">
@@ -197,6 +235,13 @@ export default function InventarioPage() {
                 className="w-full rounded-xl sm:w-auto"
               >
                 <Plus className="mr-2 h-4 w-4" /> Carga inicial
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setOpenGiftDialog(true)}
+                className="w-full rounded-xl sm:w-auto"
+              >
+                <Gift className="mr-2 h-4 w-4" /> Registrar obsequio
               </Button>
               <Button onClick={() => setOpenDialog(true)} className="w-full rounded-xl sm:w-auto">
                 <Plus className="mr-2 h-4 w-4" /> Registrar movimiento
@@ -368,19 +413,32 @@ export default function InventarioPage() {
                   </SelectContent>
                 </Select>
               ) : (
-                <Select value={category} onValueChange={setCategory}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Categoria" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas las categorias</SelectItem>
-                    {categoryOptions.map((item) => (
-                      <SelectItem key={item.id} value={item.id}>
-                        {item.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <>
+                  <Select value={category} onValueChange={setCategory}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Categoria" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas las categorias</SelectItem>
+                      {categoryOptions.map((item) => (
+                        <SelectItem key={item.id} value={item.id}>
+                          {item.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={stockStatus} onValueChange={(value) => setStockStatus(value as StockStatusFilter)}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Estado de stock" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los stocks</SelectItem>
+                      <SelectItem value="in-stock">Con stock</SelectItem>
+                      <SelectItem value="out-of-stock">Agotados</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </>
               )}
 
               <Select value={productId} onValueChange={setProductId}>
@@ -645,7 +703,7 @@ export default function InventarioPage() {
                 </p>
               </div>
 
-              {inventorySummary.length > 0 ? (
+              {inventorySummary.length > 0 || variantInventorySummary.length > 0 ? (
                 <div className="min-w-0 space-y-6">
                   <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3 dark:border-slate-800 dark:bg-slate-900/55 sm:flex-row sm:items-center sm:justify-between">
                     <div className="text-sm text-slate-600 dark:text-slate-300">
@@ -865,6 +923,61 @@ export default function InventarioPage() {
                 toast({
                   title: 'No se pudo registrar la carga inicial',
                   description: error instanceof Error ? error.message : 'Revisa la configuracion y permisos de Firebase.',
+                  variant: 'destructive',
+                });
+                throw error;
+              }
+            }}
+          />
+
+          <GiftMovementDialog
+            open={openGiftDialog}
+            onOpenChange={setOpenGiftDialog}
+            products={products}
+            purchases={purchases}
+            movements={movements}
+            responsibleUser={currentResponsibleUser}
+            onSubmit={async (values) => {
+              try {
+                const unitCost = getVariantOrProductRealUnitCost(
+                  purchases,
+                  values.productId,
+                  values.variantId || undefined
+                );
+                const totalCost = unitCost * Number(values.quantity || 0);
+                await registerMovement({
+                  productId: values.productId,
+                  variantId: values.variantId || undefined,
+                  type: 'exit',
+                  reason: 'gift',
+                  quantity: Number(values.quantity),
+                  occurredAt: toOperationalDateISOString(values.occurredAt),
+                  responsibleUser: currentResponsibleUser,
+                  relatedUnitCost: unitCost,
+                  customerName: values.customerName,
+                  customerPhone: values.customerPhone,
+                  giftReason: values.giftReason,
+                  giftTotalCost: totalCost,
+                  notes: [
+                    `Obsequio sin venta para ${values.customerName}`,
+                    values.customerPhone ? `Telefono: ${values.customerPhone}` : '',
+                    `Motivo: ${values.giftReason}`,
+                    values.notes,
+                    `Costo total: ${formatCurrency(totalCost)}`,
+                  ].filter(Boolean).join(' | '),
+                });
+                setOpenGiftDialog(false);
+                setType('exit');
+                setAdminTab('movements');
+                toast({
+                  title: 'Obsequio registrado',
+                  description: `Se desconto el producto del inventario. Costo: ${formatCurrency(totalCost)}.`,
+                });
+              } catch (error) {
+                console.error('Error registrando obsequio en Firestore:', error);
+                toast({
+                  title: 'No se pudo registrar el obsequio',
+                  description: error instanceof Error ? error.message : 'Verifica el stock disponible.',
                   variant: 'destructive',
                 });
                 throw error;

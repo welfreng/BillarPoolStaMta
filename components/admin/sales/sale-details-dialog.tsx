@@ -288,7 +288,8 @@ export function SaleDetailsDialog({
 
   if (!sale) return null;
 
-  const groupedSales = sales.filter((item) => (item.saleBatchId ?? item.id) === (sale.saleBatchId ?? sale.id));
+  const groupedSalesFromStore = sales.filter((item) => (item.saleBatchId ?? item.id) === (sale.saleBatchId ?? sale.id));
+  const groupedSales = groupedSalesFromStore.length > 0 ? groupedSalesFromStore : [sale];
   const baseSale = groupedSales[0] ?? sale;
   const invoiceCustomerName = getInvoiceCustomerName(baseSale);
   const linkedServices = services.filter(

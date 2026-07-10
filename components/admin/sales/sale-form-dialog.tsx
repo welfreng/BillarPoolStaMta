@@ -30,7 +30,7 @@ import {
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
-import { formatCurrency, formatNumber, getProductStock, getVariantOrProductRealUnitCost } from '@/lib/admin/calculations';
+import { formatCurrency, formatNumber, getStoredProductStock, getVariantOrProductRealUnitCost } from '@/lib/admin/calculations';
 import { serviceTypeLabels } from '@/lib/admin/catalogs';
 import { getTodayDateInputValue } from '@/lib/admin/date-utils';
 import { matchesProductCategoryFamily } from '@/lib/admin/category-rules';
@@ -977,7 +977,7 @@ function SaleServiceSection({
                   const materialStock = materialProduct
                     ? materialVariant
                       ? getProductVariantStock(materialProduct, materialVariant.id, movements)
-                      : getProductStock(movements, materialProduct.id)
+                      : getStoredProductStock(materialProduct)
                     : 0;
                   const materialPrice = getSaleServiceMaterialPrice(materialProduct, materialVariant?.id) * materialQuantity;
                   const materialCost =
@@ -1308,7 +1308,7 @@ export function SaleFormDialog({
     const stock = product
       ? selectedVariant
         ? getProductVariantStock(product, selectedVariant.id, movements)
-        : getProductStock(movements, product.id)
+        : getStoredProductStock(product)
       : 0;
     const realUnitCost = product
       ? getVariantOrProductRealUnitCost(purchases, product.id, selectedVariant?.id)
@@ -1317,7 +1317,7 @@ export function SaleFormDialog({
     const unitPrice = Number(saleItem.unitPrice) || 0;
     const giftItems = saleItem.giftItems.map((giftItem) => {
       const giftProduct = products.find((item) => item.id === giftItem.productId);
-      const giftStock = giftProduct ? getProductStock(movements, giftProduct.id) : 0;
+      const giftStock = giftProduct ? getStoredProductStock(giftProduct) : 0;
       const giftQuantity = Number(giftItem.quantity) || 0;
       const giftUnitCost = giftProduct ? getVariantOrProductRealUnitCost(purchases, giftProduct.id) : 0;
       return {
@@ -1415,8 +1415,8 @@ export function SaleFormDialog({
   const draftSelectedVariant = (draftProduct?.variants ?? []).find((variant) => variant.id === draftLine.variantId) ?? null;
   const draftDisplayStock = draftSelectedVariant
     ? getProductVariantStock(draftProduct ?? undefined, draftSelectedVariant.id, movements)
-    : draftLine.productId
-      ? getProductStock(movements, draftLine.productId)
+    : draftProduct
+      ? getStoredProductStock(draftProduct)
       : 0;
   const draftAllowedGiftCategories = draftProduct ? getAllowedSaleGiftCategories(draftProduct) : [];
   const draftCanHaveGift = draftAllowedGiftCategories.length > 0;
@@ -1629,7 +1629,11 @@ export function SaleFormDialog({
         title={isEditingSale ? 'Editar venta' : 'Registrar venta'}
         busy={isSubmitting}
         busyTitle={isEditingSale ? 'Actualizando venta...' : 'Registrando venta...'}
-        busyDescription="Espera la confirmacion. El formulario quedara bloqueado para evitar duplicados o cierres accidentales."
+        busyDescription={
+          isEditingSale
+            ? 'Guardando cambios de inventario y venta. El formulario queda bloqueado para evitar duplicados.'
+            : 'Guardando la venta y preparando la factura. El formulario queda bloqueado para evitar duplicados.'
+        }
         description={
           hideFinancialSummary
             ? 'Cada venta descuenta stock y mantiene actualizado el inventario.'
@@ -1898,7 +1902,7 @@ export function SaleFormDialog({
                     />
 
                     {firstLineSummary?.product ? (
-                      <div className="sticky bottom-24 z-10 space-y-3 rounded-2xl border border-border bg-card/88 px-3.5 py-3 shadow-sm dark:bg-slate-900/82 md:static md:px-4 md:shadow-none">
+                      <div className="space-y-3 rounded-2xl border border-border bg-card/88 px-3.5 py-3 shadow-sm dark:bg-slate-900/82 md:px-4 md:shadow-none">
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                           <div>
                             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-700 dark:text-cyan-300">
@@ -2481,7 +2485,7 @@ export function SaleFormDialog({
                 </div>
               ) : null}
               {draftLine.productId ? (
-                <div className="sticky bottom-24 z-10 space-y-3 rounded-2xl border border-border bg-card/88 px-3.5 py-3 shadow-sm dark:bg-slate-900/82 sm:col-span-2 md:static md:px-4 md:shadow-none">
+                <div className="space-y-3 rounded-2xl border border-border bg-card/88 px-3.5 py-3 shadow-sm dark:bg-slate-900/82 sm:col-span-2 md:px-4 md:shadow-none">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-700 dark:text-cyan-300">
@@ -2522,7 +2526,7 @@ export function SaleFormDialog({
                     draftLine.productId
                       ? draftLine.variantId
                         ? getProductVariantStock(draftProduct ?? undefined, draftLine.variantId, movements)
-                        : getProductStock(movements, draftLine.productId)
+                        : getStoredProductStock(draftProduct ?? undefined)
                       : 1,
                     1
                   )}

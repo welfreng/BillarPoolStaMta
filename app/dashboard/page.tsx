@@ -33,9 +33,9 @@ import {
   formatCurrency,
   formatDateTime,
   formatNumber,
+  getOperationalProductRealUnitCost,
   getOperationalProductStock,
   getProductById,
-  getProductStock,
   getStockAlert,
 } from '@/lib/admin/calculations';
 import { getDateKeyInBogota, getTodayDateInputValue, toOperationalDateISOString } from '@/lib/admin/date-utils';
@@ -400,7 +400,7 @@ export default function DashboardPage() {
   const availableProducts = products
     .map((product) => ({
       ...product,
-      stock: getProductStock(movements, product.id),
+      stock: getOperationalProductStock(product, movements),
     }))
     .filter((product) => product.status === 'active' && product.stock > 0)
     .sort((left, right) => right.stock - left.stock);
@@ -408,7 +408,7 @@ export default function DashboardPage() {
   const outProducts = products
     .map((product) => ({
       ...product,
-      stock: getProductStock(movements, product.id),
+      stock: getOperationalProductStock(product, movements),
     }))
     .filter((product) => product.status === 'active' && getStockAlert(product, movements) === 'out')
     .sort((left, right) => left.name.localeCompare(right.name));
@@ -492,7 +492,7 @@ export default function DashboardPage() {
     return salesRevenue + servicesRevenue;
   }, [filteredSales, filteredServices]);
 
-  const periodProfit = useMemo(() => {
+  const profitBreakdown = useMemo(() => {
     const salesProfit = filteredSales.reduce((sum, sale) => {
       const baseProfit = Number(sale.grossProfit ?? 0);
       const returnedRevenue = Number(sale.returnedSaleAmount ?? 0);
@@ -500,8 +500,27 @@ export default function DashboardPage() {
       return sum + (baseProfit - (returnedRevenue - returnedCost));
     }, 0);
     const servicesProfit = filteredServices.reduce((sum, service) => sum + Number(service.grossProfit ?? 0), 0);
-    return salesProfit + servicesProfit;
+
+    return {
+      sales: salesProfit,
+      services: servicesProfit,
+      total: salesProfit + servicesProfit,
+    };
   }, [filteredSales, filteredServices]);
+
+  const periodProfit = useMemo(() => {
+    return profitBreakdown.total;
+  }, [profitBreakdown.total]);
+
+  const currentPhysicalInvestment = useMemo(
+    () =>
+      products.reduce((total, product) => {
+        const stock = getOperationalProductStock(product, movements);
+        const realUnitCost = getOperationalProductRealUnitCost(product, purchases);
+        return total + stock * realUnitCost;
+      }, 0),
+    [movements, products, purchases]
+  );
 
   const periodUnitsSold = useMemo(
     () =>
@@ -582,6 +601,35 @@ export default function DashboardPage() {
     return Array.from(totals.values()).sort(
       (left, right) => right.count - left.count || right.revenue - left.revenue
     )[0] ?? null;
+  }, [filteredServices]);
+
+  const serviceSummary = useMemo(() => {
+    const totalRevenue = filteredServices.reduce((sum, service) => sum + Number(service.totalRevenue ?? 0), 0);
+    const totalCost = filteredServices.reduce(
+      (sum, service) =>
+        sum +
+        Number(
+          service.totalCost ??
+            Number(service.totalMaterialCost ?? 0) + Number(service.totalOperationalCost ?? 0)
+        ),
+      0
+    );
+    const totalProfit = filteredServices.reduce((sum, service) => sum + Number(service.grossProfit ?? 0), 0);
+    const materialCost = filteredServices.reduce((sum, service) => sum + Number(service.totalMaterialCost ?? 0), 0);
+    const operationalCost = filteredServices.reduce((sum, service) => sum + Number(service.totalOperationalCost ?? 0), 0);
+    const recent = [...filteredServices]
+      .sort((left, right) => new Date(right.performedAt).getTime() - new Date(left.performedAt).getTime())
+      .slice(0, 5);
+
+    return {
+      count: filteredServices.length,
+      totalRevenue,
+      totalCost,
+      totalProfit,
+      materialCost,
+      operationalCost,
+      recent,
+    };
   }, [filteredServices]);
 
   const activityItems = useMemo(() => {
@@ -750,15 +798,15 @@ export default function DashboardPage() {
         {
           title: `Utilidad ${dashboardRange.kpiLabel}`,
           value: formatCurrency(periodProfit),
-          helper: 'Margen bruto estimado con datos actuales.',
+          helper: `Ventas ${formatCurrency(profitBreakdown.sales)} - Servicios ${formatCurrency(profitBreakdown.services)}.`,
           icon: TrendingUp,
           tone: periodProfit >= 0 ? ('warning' as const) : ('danger' as const),
         },
         {
-          title: `Transacciones ${dashboardRange.kpiLabel}`,
-          value: formatNumber(periodTransactions),
-          helper: 'Ventas y servicios registrados en el rango.',
-          icon: ReceiptText,
+          title: 'Capital fisico actual',
+          value: formatCurrency(currentPhysicalInvestment),
+          helper: 'Stock disponible multiplicado por costo real unitario.',
+          icon: PackageCheck,
           tone: 'default' as const,
         },
       ];
@@ -1090,6 +1138,72 @@ export default function DashboardPage() {
             </div>
           </SectionCard>
         ) : null}
+
+        {!isSalesUser ? (
+          <SectionCard
+            title="Servicios del periodo"
+            description={`Ingresos, costos y utilidad de servicios para ${periodLabel.toLowerCase()}.`}
+          >
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-[24px] border border-violet-200/80 bg-violet-50/70 p-4 dark:border-violet-900/60 dark:bg-violet-950/20">
+                <p className="text-sm font-medium text-violet-800 dark:text-violet-200">Servicios hechos</p>
+                <p className="mt-2 text-2xl font-semibold text-foreground">{formatNumber(serviceSummary.count)}</p>
+                <p className="mt-1 text-xs text-muted-foreground">Trabajos registrados en el periodo.</p>
+              </div>
+              <div className="rounded-[24px] border border-emerald-200/80 bg-emerald-50/70 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/20">
+                <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">Ingreso servicios</p>
+                <p className="mt-2 text-2xl font-semibold text-foreground">{formatCurrency(serviceSummary.totalRevenue)}</p>
+                <p className="mt-1 text-xs text-muted-foreground">Cobro total por mano de obra y materiales.</p>
+              </div>
+              <div className="rounded-[24px] border border-amber-200/80 bg-amber-50/70 p-4 dark:border-amber-900/60 dark:bg-amber-950/20">
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Costo servicios</p>
+                <p className="mt-2 text-2xl font-semibold text-foreground">{formatCurrency(serviceSummary.totalCost)}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {formatCurrency(serviceSummary.materialCost)} materiales · {formatCurrency(serviceSummary.operationalCost)} operativo
+                </p>
+              </div>
+              <div className="rounded-[24px] border border-cyan-200/80 bg-cyan-50/70 p-4 dark:border-cyan-900/60 dark:bg-cyan-950/20">
+                <p className="text-sm font-medium text-cyan-800 dark:text-cyan-200">Utilidad servicios</p>
+                <p className="mt-2 text-2xl font-semibold text-foreground">{formatCurrency(serviceSummary.totalProfit)}</p>
+                <p className="mt-1 text-xs text-muted-foreground">Ingreso menos materiales y costo operativo.</p>
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-2">
+              {serviceSummary.recent.map((service) => (
+                <div
+                  key={service.id}
+                  className="flex flex-col gap-3 rounded-[20px] border border-border bg-background/72 px-4 py-3 dark:border-slate-800 dark:bg-background/48 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0">
+                    <p className="line-clamp-1 text-sm font-medium text-foreground">{getServiceLabel(service)}</p>
+                    <p className="line-clamp-1 text-xs text-muted-foreground">
+                      {service.customerName || 'Cliente NN'} - {service.cueReference || 'Sin referencia'}
+                    </p>
+                    <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
+                      {service.source === 'sale-addon' ? 'Servicio asociado a venta' : 'Servicio directo'} · {formatDateTime(service.performedAt)}
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-sm sm:min-w-[220px] sm:text-right">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Ingreso</p>
+                      <p className="font-semibold text-emerald-700 dark:text-emerald-300">{formatCurrency(service.totalRevenue)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Utilidad</p>
+                      <p className="font-semibold text-cyan-700 dark:text-cyan-300">{formatCurrency(service.grossProfit)}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {serviceSummary.recent.length === 0 ? (
+                <div className="rounded-2xl border border-border bg-muted/60 p-4 text-sm text-muted-foreground dark:border-slate-800 dark:bg-muted/60">
+                  No hay servicios registrados en este periodo.
+                </div>
+              ) : null}
+            </div>
+          </SectionCard>
+        ) : null}
       </section>
 
       <SectionCard
@@ -1121,17 +1235,17 @@ export default function DashboardPage() {
               ) : null}
             </div>
             {!isSalesUser ? (
-              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                <Button asChild size="sm" variant="outline" className="rounded-2xl">
-                  <Link href="/dashboard/inventario">Ver todos</Link>
+              <div className="mt-4 flex flex-col gap-2">
+                <Button asChild size="sm" className="w-full rounded-2xl bg-rose-700 text-white hover:bg-rose-800">
+                  <Link href="/dashboard/inventario?tab=stock&stock=out-of-stock">Ver productos agotados</Link>
                 </Button>
                 <a
-                  className="inline-flex"
+                  className="inline-flex w-full"
                   href={`https://wa.me/573006775284?text=${outProductsMessage}`}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  <Button size="sm" variant="outline" className="w-full rounded-2xl sm:w-auto">
+                  <Button size="sm" variant="outline" className="w-full rounded-2xl">
                     <SendHorizonal className="h-4 w-4" />
                     Reporte
                   </Button>
@@ -1162,17 +1276,17 @@ export default function DashboardPage() {
               ) : null}
             </div>
             {!isSalesUser ? (
-              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                <Button asChild size="sm" variant="outline" className="rounded-2xl">
-                  <Link href="/dashboard/inventario">Ver todos</Link>
+              <div className="mt-4 flex flex-col gap-2">
+                <Button asChild size="sm" className="w-full rounded-2xl bg-amber-700 text-white hover:bg-amber-800">
+                  <Link href="/dashboard/inventario?tab=stock&stock=out-of-stock">Ver variantes agotadas</Link>
                 </Button>
                 <a
-                  className="inline-flex"
+                  className="inline-flex w-full"
                   href={`https://wa.me/573006775284?text=${outVariantMessage}`}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  <Button size="sm" variant="outline" className="w-full rounded-2xl sm:w-auto">
+                  <Button size="sm" variant="outline" className="w-full rounded-2xl">
                     <SendHorizonal className="h-4 w-4" />
                     Reporte
                   </Button>
@@ -1203,11 +1317,11 @@ export default function DashboardPage() {
                   </div>
                 ) : null}
               </div>
-              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                <Button asChild size="sm" variant="outline" className="rounded-2xl">
-                  <Link href="/dashboard/inventario">Ver todos</Link>
+              <div className="mt-4 flex flex-col gap-2">
+                <Button asChild size="sm" className="w-full rounded-2xl bg-cyan-700 text-white hover:bg-cyan-800">
+                  <Link href="/dashboard/inventario?tab=stock&stock=in-stock">Ver stock bajo</Link>
                 </Button>
-                <Button asChild size="sm" variant="outline" className="rounded-2xl">
+                <Button asChild size="sm" variant="outline" className="w-full rounded-2xl">
                   <Link href="/dashboard/reportes">Reporte</Link>
                 </Button>
               </div>

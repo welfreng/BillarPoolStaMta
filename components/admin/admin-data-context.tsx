@@ -9,10 +9,12 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { usePathname } from 'next/navigation';
 import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   increment,
   onSnapshot,
@@ -25,6 +27,7 @@ import {
   where,
   writeBatch,
   type DocumentData,
+  type QuerySnapshot,
 } from 'firebase/firestore';
 import {
   calculateMargin,
@@ -32,7 +35,7 @@ import {
   getDashboardSummary,
   getLatestMovements,
   getProductRealUnitCost,
-  getProductStock,
+  getStoredProductStock,
   getVariantOrProductRealUnitCost,
 } from '@/lib/admin/calculations';
 import { initialMovements, initialProducts, initialPurchases, initialSales, initialServices, initialSuppliers } from '@/lib/admin/mock-data';
@@ -124,12 +127,17 @@ interface RegisterMovementInput {
   notes: string;
   responsibleUser: string;
   relatedUnitCost?: number;
+  customerName?: string;
+  customerPhone?: string;
+  giftReason?: string;
+  giftTotalCost?: number;
 }
 
 interface RegisterPurchaseInput {
   supplierId?: string;
   supplier: string;
   purchasedAt: string;
+  discountPercent?: number;
   shippingValueTotal: number;
   purchaseType?: 'local' | 'international';
   internationalVendorName?: string;
@@ -405,6 +413,89 @@ interface AdminDataContextValue {
 
 const AdminDataContext = createContext<AdminDataContextValue | undefined>(undefined);
 
+type AdminLiveCollectionKey =
+  | 'product_categories'
+  | 'products'
+  | 'product_variants'
+  | 'suppliers'
+  | 'movements'
+  | 'purchases'
+  | 'sales'
+  | 'customers'
+  | 'services'
+  | 'service-visits'
+  | 'authorization-requests';
+
+const allAdminLiveCollections: AdminLiveCollectionKey[] = [
+  'product_categories',
+  'products',
+  'product_variants',
+  'suppliers',
+  'movements',
+  'purchases',
+  'sales',
+  'customers',
+  'services',
+  'service-visits',
+  'authorization-requests',
+];
+
+const noAdminLiveCollections: AdminLiveCollectionKey[] = [];
+
+function getAdminLiveCollectionsForPath(pathname: string | null): AdminLiveCollectionKey[] {
+  const normalizedPathname = (pathname ?? '').replace(/\/$/, '') || '/dashboard';
+
+  if (normalizedPathname === '/dashboard/web' || normalizedPathname === '/dashboard/usuarios') {
+    return noAdminLiveCollections;
+  }
+
+  if (normalizedPathname === '/dashboard') {
+    return ['products', 'movements', 'purchases', 'sales', 'services', 'authorization-requests'];
+  }
+
+  if (normalizedPathname === '/dashboard/compras') {
+    return ['products', 'suppliers', 'purchases'];
+  }
+
+  if (normalizedPathname === '/dashboard/proveedores') {
+    return ['suppliers', 'purchases'];
+  }
+
+  if (normalizedPathname === '/dashboard/clientes') {
+    return ['customers'];
+  }
+
+  if (normalizedPathname === '/dashboard/categorias') {
+    return ['product_categories', 'products'];
+  }
+
+  if (normalizedPathname === '/dashboard/productos') {
+    return ['product_categories', 'products', 'product_variants', 'movements', 'purchases', 'sales', 'services'];
+  }
+
+  if (normalizedPathname === '/dashboard/inventario') {
+    return ['product_categories', 'products', 'movements', 'purchases', 'sales', 'services'];
+  }
+
+  if (normalizedPathname === '/dashboard/ventas') {
+    return ['products', 'movements', 'purchases', 'sales', 'customers', 'services', 'authorization-requests'];
+  }
+
+  if (normalizedPathname === '/dashboard/servicios') {
+    return ['products', 'movements', 'purchases', 'services', 'service-visits'];
+  }
+
+  if (normalizedPathname === '/dashboard/reportes') {
+    return ['products', 'movements', 'sales', 'services'];
+  }
+
+  if (normalizedPathname === '/dashboard/autorizaciones') {
+    return ['products', 'movements', 'purchases', 'sales', 'authorization-requests'];
+  }
+
+  return allAdminLiveCollections;
+}
+
 const ANONYMOUS_CUSTOMER_NAME = 'Cliente NN';
 
 function generateId(prefix: string) {
@@ -577,6 +668,9 @@ function serializePurchaseForFirestore(purchase: Purchase) {
     purchaseBatchId: purchase.purchaseBatchId ?? null,
     source: purchase.source ?? null,
     purchaseUnitValueUsd: purchase.purchaseUnitValueUsd ?? null,
+    purchaseGrossValueTotal: purchase.purchaseGrossValueTotal ?? purchase.purchaseValueTotal,
+    purchaseDiscountPercent: purchase.purchaseDiscountPercent ?? null,
+    purchaseDiscountTotal: purchase.purchaseDiscountTotal ?? null,
     purchaseType: purchase.purchaseType ?? 'local',
     internationalVendorName: purchase.internationalVendorName ?? null,
     productsValueUsd: purchase.productsValueUsd ?? null,
@@ -669,21 +763,32 @@ function getProductVariantById(product: Product, variantId?: string) {
   return product.variants?.find((variant) => variant.id === variantId) ?? null;
 }
 
-function buildVariantStockMap(products: Product[]) {
+function buildVariantStockMap(products: Product[], sourceMovements: InventoryMovement[] = []) {
+  void sourceMovements;
   return new Map(
     products.map((product) => [
       product.id,
-      new Map((product.variants ?? []).map((variant) => [variant.id, variant.stock])),
+      new Map(
+        (product.variants ?? []).map((variant) => [
+          variant.id,
+          Math.max(Number(variant.stock ?? variant.publicStock ?? 0), 0),
+        ])
+      ),
     ])
   );
 }
 
-function getPublicStockFromMovements(movements: Array<{ productId: string; quantity: number }>, productId: string) {
-  return Math.max(
-    movements
-      .filter((movement) => movement.productId === productId)
-      .reduce((total, movement) => total + movement.quantity, 0),
-    0
+function buildVariantStockMapFromProductState(products: Product[]) {
+  return new Map(
+    products.map((product) => [
+      product.id,
+      new Map(
+        (product.variants ?? []).map((variant) => [
+          variant.id,
+          Math.max(Number(variant.stock ?? 0), 0),
+        ])
+      ),
+    ])
   );
 }
 
@@ -732,6 +837,27 @@ function mapMovementDocument(documentId: string, data: DocumentData): InventoryM
     occurredAt: normalizeDateValue(data.occurredAt),
     responsibleUser: String(data.responsibleUser ?? 'Administrador'),
     relatedUnitCost: Number(data.relatedUnitCost ?? 0),
+    customerName: data.customerName ? String(data.customerName) : undefined,
+    customerPhone: data.customerPhone ? String(data.customerPhone) : undefined,
+    giftReason: data.giftReason ? String(data.giftReason) : undefined,
+    giftTotalCost: data.giftTotalCost !== undefined ? Number(data.giftTotalCost ?? 0) : undefined,
+  };
+}
+
+function serializeMovementForFirestore(movement: InventoryMovement) {
+  return {
+    ...movement,
+    variantId: movement.variantId ?? null,
+    variantName: movement.variantName ?? null,
+    purchaseId: movement.purchaseId ?? null,
+    purchaseBatchId: movement.purchaseBatchId ?? null,
+    saleId: movement.saleId ?? null,
+    serviceOrderId: movement.serviceOrderId ?? null,
+    relatedUnitCost: Number(movement.relatedUnitCost ?? 0),
+    customerName: movement.customerName ?? null,
+    customerPhone: movement.customerPhone ?? null,
+    giftReason: movement.giftReason ?? null,
+    giftTotalCost: movement.giftTotalCost ?? null,
   };
 }
 
@@ -756,6 +882,9 @@ function mapPurchaseDocument(documentId: string, data: DocumentData): Purchase {
         ? data.purchasePresentation
         : 'unit',
     conversionFactor: Number(data.conversionFactor ?? 1),
+    purchaseGrossValueTotal: Number(data.purchaseGrossValueTotal ?? data.purchaseValueTotal ?? 0),
+    purchaseDiscountPercent: Number(data.purchaseDiscountPercent ?? 0),
+    purchaseDiscountTotal: Number(data.purchaseDiscountTotal ?? 0),
     purchaseValueTotal: Number(data.purchaseValueTotal ?? 0),
     shippingValueTotal: Number(data.shippingValueTotal ?? 0),
     purchaseType: data.purchaseType === 'international' ? 'international' : 'local',
@@ -1380,6 +1509,9 @@ function preserveVariantInventoryState(
 }
 
 export function AdminDataProvider({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const activeCollections = useMemo(() => getAdminLiveCollectionsForPath(pathname), [pathname]);
+  const activeCollectionSignature = activeCollections.join('|');
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<ProductCategoryRecord[]>([]);
   const [products, setProducts] = useState<Product[]>(initialProducts);
@@ -1393,6 +1525,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   const [serviceVisits, setServiceVisits] = useState<ServiceVisit[]>([]);
   const [authorizationRequests, setAuthorizationRequests] = useState<AuthorizationRequest[]>([]);
   const publicStockAutoSyncInFlightRef = useRef(false);
+  const shouldAutoSyncPublicStock =
+    activeCollections.includes('products') && activeCollections.includes('movements');
 
   const queueAdminNotification = (
     batch: ReturnType<typeof writeBatch>,
@@ -1415,210 +1549,254 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    const activeCollectionSet = new Set(activeCollections);
+    if (activeCollectionSet.size === 0) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
     const readyCollections = new Set<string>();
     const markReady = (collectionName: string) => {
       readyCollections.add(collectionName);
-      if (readyCollections.size === 11) {
+      if (readyCollections.size >= activeCollectionSet.size) {
         setLoading(false);
       }
     };
-
-    const unsubCategories = onSnapshot(
-      collection(db, 'product_categories'),
-      (snapshot) => {
-        setCategories(
-          snapshot.docs
-            .map((item) => mapProductCategoryDocument(item.id, item.data()))
-            .sort((left, right) => left.sortOrder - right.sortOrder || left.label.localeCompare(right.label, 'es'))
-        );
-        markReady('product_categories');
-      },
-      (error) => {
-        console.error('Error leyendo categorias desde Firestore:', error);
-        markReady('product_categories');
+    const applyConfirmedSnapshot = (
+      collectionName: string,
+      snapshot: QuerySnapshot<DocumentData>,
+      applySnapshot: () => void
+    ) => {
+      if (snapshot.metadata.hasPendingWrites) {
+        markReady(collectionName);
+        return;
       }
-    );
 
-    const unsubProducts = onSnapshot(
-      query(collection(db, 'products'), orderBy('createdAt', 'desc')),
-      (snapshot) => {
-        setProducts(snapshot.docs.map((item) => mapProductDocument(item.id, item.data())));
-        markReady('products');
-      },
-      (error) => {
-        console.error('Error leyendo productos desde Firestore:', error);
-        markReady('products');
-      }
-    );
+      applySnapshot();
+      markReady(collectionName);
+    };
+    const unsubscribers: Array<() => void> = [];
 
-    const unsubSuppliers = onSnapshot(
-      query(collection(db, 'suppliers'), orderBy('createdAt', 'desc')),
-      (snapshot) => {
-        setSuppliers(snapshot.docs.map((item) => mapSupplierDocument(item.id, item.data())));
-        markReady('suppliers');
-      },
-      (error) => {
-        console.error('Error leyendo proveedores desde Firestore:', error);
-        markReady('suppliers');
-      }
-    );
+    if (activeCollectionSet.has('product_categories')) {
+      unsubscribers.push(onSnapshot(
+        collection(db, 'product_categories'),
+        (snapshot) => {
+          applyConfirmedSnapshot('product_categories', snapshot, () =>
+            setCategories(
+              snapshot.docs
+                .map((item) => mapProductCategoryDocument(item.id, item.data()))
+                .sort((left, right) => left.sortOrder - right.sortOrder || left.label.localeCompare(right.label, 'es'))
+            )
+          );
+        },
+        (error) => {
+          console.error('Error leyendo categorias desde Firestore:', error);
+          markReady('product_categories');
+        }
+      ));
+    }
 
-    const unsubProductVariants = onSnapshot(
-      query(collection(db, 'product_variants'), orderBy('productId', 'asc')),
-      (snapshot) => {
-        setProductVariants(
-          snapshot.docs.map((item) => {
-            const data = item.data();
-            return {
-              id: item.id,
-              productId: String(data.productId ?? ''),
-              name: String(data.name ?? data.displayName ?? ''),
-              displayName: String(data.displayName ?? data.name ?? ''),
-              sku: data.sku ? String(data.sku) : undefined,
-              salePrice: Number(data.salePrice ?? 0),
-              latestUnitCost: Number(data.latestUnitCost ?? 0),
-              stock: Number(data.stock ?? data.stockOnHand ?? 0),
-              publicStock: Number(data.publicStock ?? data.stock ?? data.stockOnHand ?? 0),
-              status: data.status === 'inactive' ? 'inactive' : 'active',
-              sortOrder: Number(data.sortOrder ?? 0),
-              attributes:
-                data.attributes && typeof data.attributes === 'object'
-                  ? Object.fromEntries(
-                      Object.entries(data.attributes).map(([key, value]) => [key, String(value ?? '')])
-                    )
-                  : {},
-              attributeValues: Array.isArray(data.attributeValues)
-                ? data.attributeValues.map((value: unknown) => String(value ?? ''))
-                : [],
-              colorHex: typeof data.colorHex === 'string' ? String(data.colorHex) : undefined,
-            } satisfies ProductVariant;
-          })
-        );
-        markReady('product_variants');
-      },
-      (error) => {
-        console.error('Error leyendo variantes desde Firestore:', error);
-        markReady('product_variants');
-      }
-    );
+    if (activeCollectionSet.has('products')) {
+      unsubscribers.push(onSnapshot(
+        query(collection(db, 'products'), orderBy('createdAt', 'desc')),
+        (snapshot) => {
+          applyConfirmedSnapshot('products', snapshot, () =>
+            setProducts(snapshot.docs.map((item) => mapProductDocument(item.id, item.data())))
+          );
+        },
+        (error) => {
+          console.error('Error leyendo productos desde Firestore:', error);
+          markReady('products');
+        }
+      ));
+    }
 
-    const unsubMovements = onSnapshot(
-      query(collection(db, 'movements'), orderBy('occurredAt', 'desc')),
-      (snapshot) => {
-        setMovements(snapshot.docs.map((item) => mapMovementDocument(item.id, item.data())));
-        markReady('movements');
-      },
-      (error) => {
-        console.error('Error leyendo movimientos desde Firestore:', error);
-        markReady('movements');
-      }
-    );
+    if (activeCollectionSet.has('suppliers')) {
+      unsubscribers.push(onSnapshot(
+        query(collection(db, 'suppliers'), orderBy('createdAt', 'desc')),
+        (snapshot) => {
+          applyConfirmedSnapshot('suppliers', snapshot, () =>
+            setSuppliers(snapshot.docs.map((item) => mapSupplierDocument(item.id, item.data())))
+          );
+        },
+        (error) => {
+          console.error('Error leyendo proveedores desde Firestore:', error);
+          markReady('suppliers');
+        }
+      ));
+    }
 
-    const unsubPurchases = onSnapshot(
-      query(collection(db, 'purchases'), orderBy('purchasedAt', 'desc')),
-      (snapshot) => {
-        setPurchases(snapshot.docs.map((item) => mapPurchaseDocument(item.id, item.data())));
-        markReady('purchases');
-      },
-      (error) => {
-        console.error('Error leyendo compras desde Firestore:', error);
-        markReady('purchases');
-      }
-    );
+    if (activeCollectionSet.has('product_variants')) {
+      unsubscribers.push(onSnapshot(
+        query(collection(db, 'product_variants'), orderBy('productId', 'asc')),
+        (snapshot) => {
+          applyConfirmedSnapshot('product_variants', snapshot, () =>
+            setProductVariants(
+              snapshot.docs.map((item) => {
+                const data = item.data();
+                return {
+                  id: item.id,
+                  productId: String(data.productId ?? ''),
+                  name: String(data.name ?? data.displayName ?? ''),
+                  displayName: String(data.displayName ?? data.name ?? ''),
+                  sku: data.sku ? String(data.sku) : undefined,
+                  salePrice: Number(data.salePrice ?? 0),
+                  latestUnitCost: Number(data.latestUnitCost ?? 0),
+                  stock: Number(data.stock ?? data.stockOnHand ?? 0),
+                  publicStock: Number(data.publicStock ?? data.stock ?? data.stockOnHand ?? 0),
+                  status: data.status === 'inactive' ? 'inactive' : 'active',
+                  sortOrder: Number(data.sortOrder ?? 0),
+                  attributes:
+                    data.attributes && typeof data.attributes === 'object'
+                      ? Object.fromEntries(
+                          Object.entries(data.attributes).map(([key, value]) => [key, String(value ?? '')])
+                        )
+                      : {},
+                  attributeValues: Array.isArray(data.attributeValues)
+                    ? data.attributeValues.map((value: unknown) => String(value ?? ''))
+                    : [],
+                  colorHex: typeof data.colorHex === 'string' ? String(data.colorHex) : undefined,
+                } satisfies ProductVariant;
+              })
+            )
+          );
+        },
+        (error) => {
+          console.error('Error leyendo variantes desde Firestore:', error);
+          markReady('product_variants');
+        }
+      ));
+    }
 
-    const unsubSales = onSnapshot(
-      query(collection(db, 'sales'), orderBy('soldAt', 'desc')),
-      (snapshot) => {
-        setSales(snapshot.docs.map((item) => mapSaleDocument(item.id, item.data())));
-        markReady('sales');
-      },
-      (error) => {
-        console.error('Error leyendo ventas desde Firestore:', error);
-        markReady('sales');
-      }
-    );
+    if (activeCollectionSet.has('movements')) {
+      unsubscribers.push(onSnapshot(
+        query(collection(db, 'movements'), orderBy('occurredAt', 'desc')),
+        (snapshot) => {
+          applyConfirmedSnapshot('movements', snapshot, () =>
+            setMovements(snapshot.docs.map((item) => mapMovementDocument(item.id, item.data())))
+          );
+        },
+        (error) => {
+          console.error('Error leyendo movimientos desde Firestore:', error);
+          markReady('movements');
+        }
+      ));
+    }
 
-    const unsubCustomers = onSnapshot(
-      query(collection(db, 'customers'), orderBy('fullName', 'asc')),
-      (snapshot) => {
-        setCustomers(snapshot.docs.map((item) => mapCustomerDocument(item.id, item.data())));
-        markReady('customers');
-      },
-      (error) => {
-        console.error('Error leyendo clientes desde Firestore:', error);
-        markReady('customers');
-      }
-    );
+    if (activeCollectionSet.has('purchases')) {
+      unsubscribers.push(onSnapshot(
+        query(collection(db, 'purchases'), orderBy('purchasedAt', 'desc')),
+        (snapshot) => {
+          applyConfirmedSnapshot('purchases', snapshot, () =>
+            setPurchases(snapshot.docs.map((item) => mapPurchaseDocument(item.id, item.data())))
+          );
+        },
+        (error) => {
+          console.error('Error leyendo compras desde Firestore:', error);
+          markReady('purchases');
+        }
+      ));
+    }
 
-    const unsubServices = onSnapshot(
-      query(collection(db, 'services'), orderBy('performedAt', 'desc')),
-      (snapshot) => {
-        setServices(snapshot.docs.map((item) => mapServiceDocument(item.id, item.data())));
-        markReady('services');
-      },
-      (error) => {
-        console.error('Error leyendo servicios desde Firestore:', error);
-        markReady('services');
-      }
-    );
+    if (activeCollectionSet.has('sales')) {
+      unsubscribers.push(onSnapshot(
+        query(collection(db, 'sales'), orderBy('soldAt', 'desc')),
+        (snapshot) => {
+          applyConfirmedSnapshot('sales', snapshot, () =>
+            setSales(snapshot.docs.map((item) => mapSaleDocument(item.id, item.data())))
+          );
+        },
+        (error) => {
+          console.error('Error leyendo ventas desde Firestore:', error);
+          markReady('sales');
+        }
+      ));
+    }
 
-    const unsubServiceVisits = onSnapshot(
-      query(collection(db, 'service-visits'), orderBy('scheduledAt', 'desc')),
-      (snapshot) => {
-        setServiceVisits(snapshot.docs.map((item) => mapServiceVisitDocument(item.id, item.data())));
-        markReady('service-visits');
-      },
-      (error) => {
-        console.error('Error leyendo visitas de servicio desde Firestore:', error);
-        markReady('service-visits');
-      }
-    );
+    if (activeCollectionSet.has('customers')) {
+      unsubscribers.push(onSnapshot(
+        query(collection(db, 'customers'), orderBy('fullName', 'asc')),
+        (snapshot) => {
+          applyConfirmedSnapshot('customers', snapshot, () =>
+            setCustomers(snapshot.docs.map((item) => mapCustomerDocument(item.id, item.data())))
+          );
+        },
+        (error) => {
+          console.error('Error leyendo clientes desde Firestore:', error);
+          markReady('customers');
+        }
+      ));
+    }
 
-    const unsubAuthorizationRequests = onSnapshot(
-      query(collection(db, 'authorization-requests'), orderBy('createdAt', 'desc')),
-      (snapshot) => {
-        setAuthorizationRequests(
-          snapshot.docs.map((item) => mapAuthorizationRequestDocument(item.id, item.data()))
-        );
-        markReady('authorization-requests');
-      },
-      (error) => {
-        console.error('Error leyendo autorizaciones desde Firestore:', error);
-        markReady('authorization-requests');
-      }
-    );
+    if (activeCollectionSet.has('services')) {
+      unsubscribers.push(onSnapshot(
+        query(collection(db, 'services'), orderBy('performedAt', 'desc')),
+        (snapshot) => {
+          applyConfirmedSnapshot('services', snapshot, () =>
+            setServices(snapshot.docs.map((item) => mapServiceDocument(item.id, item.data())))
+          );
+        },
+        (error) => {
+          console.error('Error leyendo servicios desde Firestore:', error);
+          markReady('services');
+        }
+      ));
+    }
+
+    if (activeCollectionSet.has('service-visits')) {
+      unsubscribers.push(onSnapshot(
+        query(collection(db, 'service-visits'), orderBy('scheduledAt', 'desc')),
+        (snapshot) => {
+          applyConfirmedSnapshot('service-visits', snapshot, () =>
+            setServiceVisits(snapshot.docs.map((item) => mapServiceVisitDocument(item.id, item.data())))
+          );
+        },
+        (error) => {
+          console.error('Error leyendo visitas de servicio desde Firestore:', error);
+          markReady('service-visits');
+        }
+      ));
+    }
+
+    if (activeCollectionSet.has('authorization-requests')) {
+      unsubscribers.push(onSnapshot(
+        query(collection(db, 'authorization-requests'), orderBy('createdAt', 'desc')),
+        (snapshot) => {
+          applyConfirmedSnapshot('authorization-requests', snapshot, () =>
+            setAuthorizationRequests(
+              snapshot.docs.map((item) => mapAuthorizationRequestDocument(item.id, item.data()))
+            )
+          );
+        },
+        (error) => {
+          console.error('Error leyendo autorizaciones desde Firestore:', error);
+          markReady('authorization-requests');
+        }
+      ));
+    }
 
     return () => {
-      unsubCategories();
-      unsubProducts();
-      unsubProductVariants();
-      unsubSuppliers();
-      unsubMovements();
-      unsubPurchases();
-      unsubSales();
-      unsubCustomers();
-      unsubServices();
-      unsubServiceVisits();
-      unsubAuthorizationRequests();
+      unsubscribers.forEach((unsubscribe) => unsubscribe());
     };
-  }, []);
+  }, [activeCollectionSignature]);
 
   const buildPublicStockMap = (
-    baseMovements: InventoryMovement[],
+    sourceProducts: Product[],
     touchedProductIds: string[],
     addedMovements: Array<{ productId: string; quantity: number }> = []
   ) => {
     const uniqueProductIds = Array.from(new Set(touchedProductIds.filter(Boolean)));
-    const projectedMovements = [
-      ...baseMovements.map((movement) => ({ productId: movement.productId, quantity: movement.quantity })),
-      ...addedMovements,
-    ];
 
     return new Map(
-      uniqueProductIds.map((productId) => [
-        productId,
-        getPublicStockFromMovements(projectedMovements, productId),
-      ])
+      uniqueProductIds.map((productId) => {
+        const product = sourceProducts.find((item) => item.id === productId);
+        const currentStock = getStoredProductStock(product);
+        const delta = addedMovements
+          .filter((movement) => movement.productId === productId)
+          .reduce((total, movement) => total + movement.quantity, 0);
+        return [productId, Math.max(currentStock + delta, 0)];
+      })
     );
   };
 
@@ -1628,12 +1806,13 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     addedMovements: Array<{ productId: string; quantity: number }> = [],
     baseMovements: InventoryMovement[] = movements
   ) => {
+    void baseMovements;
     const simpleProductIds = touchedProductIds.filter((productId) => {
       const product = sourceProducts.find((item) => item.id === productId);
       return product ? getProductSaleMode(product) !== 'varianted' : true;
     });
 
-    return buildPublicStockMap(baseMovements, simpleProductIds, addedMovements);
+    return buildPublicStockMap(sourceProducts, simpleProductIds, addedMovements);
   };
 
   const applyPublicStockMapToBatch = (
@@ -1645,6 +1824,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         doc(db, 'products', productId),
         {
           publicStock,
+          stock: publicStock,
+          stockOnHand: publicStock,
           ...(publicStock > 0 ? { status: 'active' } : {}),
           updatedAt: serverTimestamp(),
         },
@@ -2182,15 +2363,13 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     let changedCount = 0;
     products.forEach((product) => {
       if (getProductSaleMode(product) === 'varianted') {
-        const variantStockMap = new Map(
-          (product.variants ?? []).map((variant) => [variant.id, Math.max(Number(variant.stock ?? 0), 0)])
-        );
+        const variantStockMap = buildVariantStockMap([product]).get(product.id) ?? new Map<string, number>();
         const computedPublicStock = Array.from(variantStockMap.values()).reduce((total, stock) => total + stock, 0);
         const currentPublicStock = Math.max(Number(product.publicStock ?? 0), 0);
         const hasVariantPublicStockMismatch = (product.variants ?? []).some(
           (variant) => Math.max(Number(variant.publicStock ?? 0), 0) !== Math.max(Number(variant.stock ?? 0), 0)
         );
-        const shouldForcePublicStatus = computedPublicStock > 0;
+        const shouldForcePublicStatus = computedPublicStock > 0 && product.status !== 'active';
 
         if (computedPublicStock === currentPublicStock && !hasVariantPublicStockMismatch && !shouldForcePublicStatus) {
           return;
@@ -2215,10 +2394,9 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const publicStock = getProductStock(movements, product.id);
-      const currentPublicStock = Math.max(Number(product.publicStock ?? 0), 0);
-      const shouldForcePublicStatus = publicStock > 0;
-      if (publicStock === currentPublicStock && !shouldForcePublicStatus) {
+      const publicStock = getStoredProductStock(product);
+      const shouldForcePublicStatus = publicStock > 0 && product.status !== 'active';
+      if (!shouldForcePublicStatus) {
         return;
       }
 
@@ -2226,6 +2404,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         doc(db, 'products', product.id),
         {
           publicStock,
+          stock: publicStock,
+          stockOnHand: publicStock,
           ...(shouldForcePublicStatus ? { status: 'active' } : {}),
           updatedAt: serverTimestamp(),
         },
@@ -2239,13 +2419,14 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     }
 
     await runFirestoreWriteWithBackoff(() => batch.commit(), {
-      retries: 5,
+      retries: 0,
       initialDelayMs: 700,
     });
     return changedCount;
   };
 
   useEffect(() => {
+    if (!shouldAutoSyncPublicStock) return;
     if (loading) return;
     if (products.length === 0) return;
     if (publicStockAutoSyncInFlightRef.current) return;
@@ -2253,13 +2434,13 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     const hasMismatch = products.some((product) => {
       if (getProductSaleMode(product) === 'varianted') {
         const computedVariantStock = (product.variants ?? []).reduce(
-          (total, variant) => total + Math.max(Number(variant.stock ?? 0), 0),
+          (total, variant) => total + getProductVariantStock(product, variant.id, []),
           0
         );
         const hasVariantPublicStockMismatch = (product.variants ?? []).some(
           (variant) =>
             Math.max(Number(variant.publicStock ?? variant.stock ?? 0), 0) !==
-            Math.max(Number(variant.stock ?? 0), 0)
+            getProductVariantStock(product, variant.id, [])
         );
 
         return (
@@ -2269,11 +2450,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         );
       }
 
-      const computedMovementStock = getProductStock(movements, product.id);
-      return (
-        Math.max(Number(product.publicStock ?? 0), 0) !== computedMovementStock ||
-        (computedMovementStock > 0 && product.status !== 'active')
-      );
+      const stock = getStoredProductStock(product);
+      return stock > 0 && product.status !== 'active';
     });
 
     if (!hasMismatch) return;
@@ -2286,7 +2464,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       .finally(() => {
         publicStockAutoSyncInFlightRef.current = false;
       });
-  }, [loading, movements, products]);
+  }, [loading, products, shouldAutoSyncPublicStock]);
 
   const createProduct = async (input: NewProductInput) => {
     const createdAt = new Date().toISOString();
@@ -2434,7 +2612,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     }> = [];
 
     if (canAutoMigrateHistory && historyVariant) {
-      const currentLegacyStock = Math.max(getProductStock(movements, productId), 0);
+      const currentLegacyStock = getStoredProductStock(existingProduct);
 
       const baseMigratedVariants = normalizedVariants.map((variant) =>
         variant.id === historyVariant?.id
@@ -2797,7 +2975,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     if (input.type === 'exit') {
       const availableStock = selectedVariant
         ? getProductVariantStock(targetProduct, selectedVariant.id, movements)
-        : getProductStock(movements, input.productId);
+        : getStoredProductStock(targetProduct);
       if (inputQuantity > availableStock) {
         throw new Error(
           `No hay stock suficiente para ${targetProduct.name}. Disponible: ${availableStock}, solicitado: ${inputQuantity}.`
@@ -2818,17 +2996,21 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       responsibleUser: input.responsibleUser,
       relatedUnitCost:
         input.relatedUnitCost ?? getVariantOrProductRealUnitCost(purchases, input.productId, selectedVariant?.id),
+      customerName: input.customerName?.trim() || undefined,
+      customerPhone: input.customerPhone?.trim() || undefined,
+      giftReason: input.giftReason?.trim() || undefined,
+      giftTotalCost: input.giftTotalCost,
     };
 
     const batch = writeBatch(db);
     batch.set(movementRef, {
-      ...movement,
+      ...serializeMovementForFirestore(movement),
       occurredAt: Timestamp.fromDate(occurredAtDate),
     });
     batch.set(doc(db, 'inventory_movements', movement.id), {
-      ...movement,
+      ...serializeMovementForFirestore(movement),
       occurredAt: Timestamp.fromDate(occurredAtDate),
-      sourceType: 'manual-adjustment',
+      sourceType: input.reason === 'gift' ? 'gift' : 'manual-adjustment',
       sourceId: movement.id,
     });
     applyPublicStockMapToBatch(
@@ -2838,19 +3020,42 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       ])
     );
     if (selectedVariant) {
-      const variantStockMap = buildVariantStockMap(products);
+      const variantStockMap = buildVariantStockMap(products, movements);
       const productVariantMap = variantStockMap.get(input.productId);
       const currentVariantStock = productVariantMap?.get(selectedVariant.id) ?? selectedVariant.stock ?? 0;
       productVariantMap?.set(selectedVariant.id, Math.max(currentVariantStock + normalizedQuantity, 0));
       applyVariantStockMapToBatch(batch, variantStockMap, products);
     }
-    await batch.commit();
+    await runFirestoreWriteWithBackoff(() => batch.commit(), {
+      retries: 0,
+      initialDelayMs: 700,
+      timeoutMs: 9000,
+    });
 
     return movement;
   };
 
+  const getFreshProductsForPurchase = async (input: RegisterPurchaseInput) => {
+    const touchedProductIds = Array.from(new Set(input.items.map((item) => item.productId).filter(Boolean)));
+    if (touchedProductIds.length === 0) {
+      return products;
+    }
+
+    const freshProductDocs = await Promise.all(
+      touchedProductIds.map((productId) => getDoc(doc(db, 'products', productId)))
+    );
+    const freshProductsById = new Map(
+      freshProductDocs
+        .filter((snapshot) => snapshot.exists())
+        .map((snapshot) => [snapshot.id, mapProductDocument(snapshot.id, snapshot.data())])
+    );
+
+    return products.map((product) => freshProductsById.get(product.id) ?? product);
+  };
+
   const registerPurchase = async (input: RegisterPurchaseInput) => {
-    return createPurchaseBatch(input);
+    const freshProducts = await getFreshProductsForPurchase(input);
+    return createPurchaseBatch(input, undefined, movements, freshProducts);
   };
 
   const registerInitialStock = async (input: RegisterInitialStockInput) => {
@@ -2936,15 +3141,11 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       purchasedAt: Timestamp.fromDate(new Date(input.occurredAt)),
     });
     batch.set(doc(db, 'movements', movement.id), {
-      ...movement,
-      variantId: movement.variantId ?? null,
-      variantName: movement.variantName ?? null,
+      ...serializeMovementForFirestore(movement),
       occurredAt: Timestamp.fromDate(new Date(input.occurredAt)),
     });
     batch.set(doc(db, 'inventory_movements', movement.id), {
-      ...movement,
-      variantId: movement.variantId ?? null,
-      variantName: movement.variantName ?? null,
+      ...serializeMovementForFirestore(movement),
       sourceType: 'initial-load',
       sourceId: purchase.id,
       occurredAt: Timestamp.fromDate(new Date(input.occurredAt)),
@@ -2968,7 +3169,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       ])
     );
     if (selectedVariant) {
-      const variantStockMap = buildVariantStockMap(products);
+      const variantStockMap = buildVariantStockMap(products, movements);
       const productVariantMap = variantStockMap.get(input.productId);
       const currentVariantStock = productVariantMap?.get(selectedVariant.id) ?? selectedVariant.stock ?? 0;
       productVariantMap?.set(selectedVariant.id, currentVariantStock + quantity);
@@ -3004,7 +3205,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     }
 
     const isVarianted = getProductSaleMode(targetProduct) === 'varianted';
-    const variantStockMap = buildVariantStockMap(products);
+    const variantStockMap = buildVariantStockMap(products, movements);
     const productVariantMap = variantStockMap.get(input.productId);
     const batchId = doc(collection(db, 'purchase-batches')).id;
     const stockDeltas: Array<{ productId: string; quantity: number }> = [];
@@ -3102,15 +3303,11 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         purchasedAt: Timestamp.fromDate(new Date(input.occurredAt)),
       });
       batch.set(doc(db, 'movements', movement.id), {
-        ...movement,
-        variantId: movement.variantId ?? null,
-        variantName: movement.variantName ?? null,
+        ...serializeMovementForFirestore(movement),
         occurredAt: Timestamp.fromDate(new Date(input.occurredAt)),
       });
       batch.set(doc(db, 'inventory_movements', movement.id), {
-        ...movement,
-        variantId: movement.variantId ?? null,
-        variantName: movement.variantName ?? null,
+        ...serializeMovementForFirestore(movement),
         sourceType: 'initial-load',
         sourceId: batchId,
         occurredAt: Timestamp.fromDate(new Date(input.occurredAt)),
@@ -3158,7 +3355,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     };
   };
 
-  const createPurchaseBatch = async (
+  const addPurchaseBatchWritesToBatch = (
+    batch: ReturnType<typeof writeBatch>,
     input: RegisterPurchaseInput,
     existingBatchId?: string,
     baseMovements: InventoryMovement[] = movements,
@@ -3221,15 +3419,27 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       (total, item) => total + Number((item.purchaseUnitValue * item.presentationQuantity).toFixed(2)),
       0
     );
+    const normalizedDiscountPercent = Math.min(Math.max(Number(input.discountPercent ?? 0), 0), 100);
+    const totalDiscountValue = Number(((totalPurchaseValue * normalizedDiscountPercent) / 100).toFixed(2));
     const batchId = existingBatchId ?? doc(collection(db, 'purchase-batches')).id;
-    const batch = writeBatch(db);
     const purchasesCreated: Purchase[] = [];
     const stockDeltas: Array<{ productId: string; quantity: number }> = [];
 
     normalizedItemsWithConvertedPrice.forEach((item, index) => {
       const conversionFactor = 1;
       const quantityPurchased = item.presentationQuantity;
-      const purchaseValueTotal = Number((item.purchaseUnitValue * item.presentationQuantity).toFixed(2));
+      const purchaseGrossValueTotal = Number((item.purchaseUnitValue * item.presentationQuantity).toFixed(2));
+      const purchaseDiscountBase = Number(((purchaseGrossValueTotal * normalizedDiscountPercent) / 100).toFixed(2));
+      const adjustedPurchaseDiscount =
+        index === normalizedItemsWithConvertedPrice.length - 1
+          ? Number(
+              (
+                totalDiscountValue -
+                purchasesCreated.reduce((sum, purchase) => sum + Number(purchase.purchaseDiscountTotal ?? 0), 0)
+              ).toFixed(2)
+            )
+          : purchaseDiscountBase;
+      const purchaseValueTotal = Number(Math.max(purchaseGrossValueTotal - adjustedPurchaseDiscount, 0).toFixed(2));
       const shippingShare =
         totalPurchasedUnits > 0
           ? Number(((input.shippingValueTotal * quantityPurchased) / totalPurchasedUnits).toFixed(2))
@@ -3271,6 +3481,9 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         quantityPurchased,
         purchasePresentation: 'unit',
         conversionFactor,
+        purchaseGrossValueTotal,
+        purchaseDiscountPercent: normalizedDiscountPercent,
+        purchaseDiscountTotal: adjustedPurchaseDiscount,
         purchaseValueTotal,
         shippingValueTotal: adjustedShippingShare,
         purchaseType: isInternationalPurchase ? 'international' : 'local',
@@ -3364,7 +3577,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         baseMovements
       )
     );
-    const variantStockMap = buildVariantStockMap(baseProducts);
+    const variantStockMap = buildVariantStockMap(baseProducts, baseMovements);
     normalizedItems.forEach((item) => {
       if (!item.variantId) return;
       const targetProduct = baseProducts.find((product) => product.id === item.productId);
@@ -3379,8 +3592,28 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     });
     applyVariantStockMapToBatch(batch, variantStockMap, baseProducts);
 
-    await batch.commit();
+    return purchasesCreated;
+  };
 
+  const createPurchaseBatch = async (
+    input: RegisterPurchaseInput,
+    existingBatchId?: string,
+    baseMovements: InventoryMovement[] = movements,
+    baseProducts: Product[] = products
+  ) => {
+    const batch = writeBatch(db);
+    const purchasesCreated = addPurchaseBatchWritesToBatch(
+      batch,
+      input,
+      existingBatchId,
+      baseMovements,
+      baseProducts
+    );
+    await runFirestoreWriteWithBackoff(() => batch.commit(), {
+      retries: 0,
+      initialDelayMs: 700,
+      timeoutMs: 12000,
+    });
     return purchasesCreated;
   };
 
@@ -3401,11 +3634,18 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         batch.delete(doc(db, 'movements', movement.id));
         batch.delete(doc(db, 'inventory_movements', movement.id));
       });
-    await batch.commit();
 
     const remainingMovements = movements.filter((movement) => movement.purchaseBatchId !== batchId);
     const projectedProducts = projectProductsWithoutPurchases(products, targetPurchases);
-    return createPurchaseBatch(input, batchId, remainingMovements, projectedProducts);
+    const updatedPurchases = addPurchaseBatchWritesToBatch(
+      batch,
+      input,
+      batchId,
+      remainingMovements,
+      projectedProducts
+    );
+    await batch.commit();
+    return updatedPurchases;
   };
 
   const updatePurchase = async (purchaseId: string, input: RegisterPurchaseInput) => {
@@ -3426,16 +3666,17 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         batch.delete(doc(db, 'movements', movement.id));
         batch.delete(doc(db, 'inventory_movements', movement.id));
       });
-    await batch.commit();
 
     const remainingMovements = movements.filter((movement) => movement.purchaseId !== purchaseId);
     const projectedProducts = projectProductsWithoutPurchases(products, [targetPurchase]);
-    const [updatedPurchase] = await createPurchaseBatch(
+    const [updatedPurchase] = addPurchaseBatchWritesToBatch(
+      batch,
       input,
       targetPurchase.purchaseBatchId,
       remainingMovements,
       projectedProducts
     );
+    await batch.commit();
     return updatedPurchase;
   };
 
@@ -3453,15 +3694,16 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       batch.delete(doc(db, 'movements', movement.id));
       batch.delete(doc(db, 'inventory_movements', movement.id));
     });
+    const remainingMovements = movements.filter((movement) => movement.purchaseId !== purchaseId);
+    const projectedProducts = projectProductsWithoutPurchases(products, [targetPurchase]);
     applyPublicStockMapToBatch(
       batch,
       buildPublicStockMap(
-        movements.filter((movement) => movement.purchaseId !== purchaseId),
+        projectedProducts,
         removedMovements.map((movement) => movement.productId)
       )
     );
-    const projectedProducts = projectProductsWithoutPurchases(products, [targetPurchase]);
-    applyVariantStockMapToBatch(batch, buildVariantStockMap(projectedProducts), projectedProducts);
+    applyVariantStockMapToBatch(batch, buildVariantStockMap(projectedProducts, remainingMovements), projectedProducts);
     await batch.commit();
   };
 
@@ -3481,23 +3723,28 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       batch.delete(doc(db, 'movements', movement.id));
       batch.delete(doc(db, 'inventory_movements', movement.id));
     });
+    const remainingMovements = movements.filter((movement) => movement.purchaseBatchId !== batchId);
+    const projectedProducts = projectProductsWithoutPurchases(products, targetPurchases);
     applyPublicStockMapToBatch(
       batch,
       buildPublicStockMap(
-        movements.filter((movement) => movement.purchaseBatchId !== batchId),
+        projectedProducts,
         removedMovements.map((movement) => movement.productId)
       )
     );
-    const projectedProducts = projectProductsWithoutPurchases(products, targetPurchases);
-    applyVariantStockMapToBatch(batch, buildVariantStockMap(projectedProducts), projectedProducts);
+    applyVariantStockMapToBatch(batch, buildVariantStockMap(projectedProducts, remainingMovements), projectedProducts);
     await batch.commit();
   };
 
-  const registerSaleInternal = async (
+  const addSaleWritesToBatch = (
+    batch: ReturnType<typeof writeBatch>,
     input: RegisterSaleInput,
     baseMovements: InventoryMovement[] = movements,
     baseProducts: Product[] = products,
-    options?: { saleBatchId?: string }
+    options?: {
+      saleBatchId?: string;
+      initialVariantStockMap?: Map<string, Map<string, number>>;
+    }
   ) => {
     if (input.items.length === 0) {
       throw new Error('Agrega al menos un producto a la venta.');
@@ -3516,7 +3763,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       throw new Error('Ingresa un telefono valido o dejalo vacio.');
     }
 
-    const variantStockMap = buildVariantStockMap(baseProducts);
+    const variantStockMap = options?.initialVariantStockMap ?? buildVariantStockMap(baseProducts, baseMovements);
     const simpleStockMap = new Map<string, number>();
     const lineRecords = input.items.map((item) => {
       const targetProduct = baseProducts.find((product) => product.id === item.productId);
@@ -3546,7 +3793,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       } else {
         const availableStock = simpleStockMap.has(item.productId)
           ? Number(simpleStockMap.get(item.productId) ?? 0)
-          : getProductStock(baseMovements, item.productId);
+          : getStoredProductStock(targetProduct);
         if (quantity > availableStock) {
           throw new Error(`La cantidad vendida supera el stock disponible de ${targetProduct.name}.`);
         }
@@ -3602,7 +3849,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
           } else {
             const availableStock = simpleStockMap.has(materialProduct.id)
               ? Number(simpleStockMap.get(materialProduct.id) ?? 0)
-              : getProductStock(baseMovements, materialProduct.id);
+              : getStoredProductStock(materialProduct);
             if (quantity > availableStock) {
               throw new Error(`La cantidad usada supera el stock disponible de ${materialProduct.name}.`);
             }
@@ -3644,7 +3891,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     });
 
     for (const [productId, requestedQuantity] of requestedGiftTotals) {
-      const availableGiftStock = getProductStock(baseMovements, productId);
+      const giftProduct = baseProducts.find((product) => product.id === productId);
+      const availableGiftStock = getStoredProductStock(giftProduct);
       const stockReservedBySale = lineRecords
         .filter((record) => record.lineItem.productId === productId)
         .reduce((sum, record) => sum + record.lineItem.quantity, 0);
@@ -3656,7 +3904,6 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
 
     const saleBatchId = options?.saleBatchId ?? doc(collection(db, 'sale-batches')).id;
 
-    const batch = writeBatch(db);
     const stockDeltas: Array<{ productId: string; quantity: number }> = [];
     const createdSales: Sale[] = lineRecords.map(({ lineItem, giftItems }) => {
       const saleRef = doc(collection(db, 'sales'));
@@ -3923,13 +4170,58 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       });
     }
 
-    await batch.commit();
+    return createdSales;
+  };
 
+  const getFreshProductsForSale = async (input: RegisterSaleInput) => {
+    const touchedProductIds = new Set<string>();
+    input.items.forEach((item) => {
+      if (item.productId) touchedProductIds.add(item.productId);
+      item.giftItems?.forEach((giftItem) => {
+        if (giftItem.productId) touchedProductIds.add(giftItem.productId);
+      });
+      item.serviceItems?.forEach((serviceItem) => {
+        serviceItem.materials?.forEach((material) => {
+          if (material.productId) touchedProductIds.add(material.productId);
+        });
+      });
+    });
+
+    if (touchedProductIds.size === 0) {
+      return products;
+    }
+
+    const freshProductDocs = await Promise.all(
+      Array.from(touchedProductIds).map((productId) => getDoc(doc(db, 'products', productId)))
+    );
+    const freshProductsById = new Map(
+      freshProductDocs
+        .filter((snapshot) => snapshot.exists())
+        .map((snapshot) => [snapshot.id, mapProductDocument(snapshot.id, snapshot.data())])
+    );
+
+    return products.map((product) => freshProductsById.get(product.id) ?? product);
+  };
+
+  const registerSaleInternal = async (
+    input: RegisterSaleInput,
+    baseMovements: InventoryMovement[] = movements,
+    baseProducts: Product[] = products,
+    options?: { saleBatchId?: string }
+  ) => {
+    const batch = writeBatch(db);
+    const createdSales = addSaleWritesToBatch(batch, input, baseMovements, baseProducts, options);
+    await runFirestoreWriteWithBackoff(() => batch.commit(), {
+      retries: 0,
+      initialDelayMs: 700,
+      timeoutMs: 12000,
+    });
     return createdSales;
   };
 
   const registerSale = async (input: RegisterSaleInput) => {
-    return registerSaleInternal(input, movements);
+    const freshProducts = await getFreshProductsForSale(input);
+    return registerSaleInternal(input, movements, freshProducts);
   };
 
   const updateSaleBatch = async (saleBatchId: string, input: RegisterSaleInput) => {
@@ -4022,8 +4314,9 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     ].filter((value): value is string => Boolean(value)));
 
     for (const productId of touchedProductIds) {
-      const restoredStock =
-        getProductStock(movements, productId) +
+      const restoredProduct = restoredProducts.find((product) => product.id === productId);
+      const currentProduct = products.find((product) => product.id === productId);
+      const restoredExistingQuantity =
         existingSales
           .flatMap((sale) => sale.lineItems)
           .filter((item) => item.productId === productId)
@@ -4032,6 +4325,10 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
           .flatMap((sale) => sale.giftItems)
           .filter((item) => item.productId === productId)
           .reduce((sum, item) => sum + item.quantity, 0);
+      const restoredStock =
+        restoredProduct && getProductSaleMode(restoredProduct) === 'varianted'
+          ? getStoredProductStock(restoredProduct)
+          : getStoredProductStock(currentProduct) + restoredExistingQuantity;
       const requestedStock =
         nextLineRecords
           .filter((record) => record.lineItem.productId === productId)
@@ -4059,27 +4356,38 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       batch.delete(doc(db, 'movements', movement.id));
       batch.delete(doc(db, 'inventory_movements', movement.id));
     });
-    await batch.commit();
-
     const remainingMovements = movements.filter(
-      (movement) => !existingSales.some((sale) => sale.id === movement.saleId)
+      (movement) =>
+        !existingSales.some((sale) => sale.id === movement.saleId) &&
+        !saleMovementsToDelete.has(movement.id)
     );
 
-    return registerSaleInternal({
-      ...input,
-      items: nextLineRecords.map((record, index) => ({
-        productId: record.lineItem.productId,
-        variantId: record.lineItem.variantId,
-        variantName: record.lineItem.variantName,
-        quantity: record.lineItem.quantity,
-        unitPrice: record.lineItem.unitPrice,
-        serviceItems: input.items[index]?.serviceItems ?? [],
-        giftItems: record.giftItems.map((giftItem) => ({
-          productId: giftItem.productId,
-          quantity: giftItem.quantity,
+    const updatedSales = addSaleWritesToBatch(
+      batch,
+      {
+        ...input,
+        items: nextLineRecords.map((record, index) => ({
+          productId: record.lineItem.productId,
+          variantId: record.lineItem.variantId,
+          variantName: record.lineItem.variantName,
+          quantity: record.lineItem.quantity,
+          unitPrice: record.lineItem.unitPrice,
+          serviceItems: input.items[index]?.serviceItems ?? [],
+          giftItems: record.giftItems.map((giftItem) => ({
+            productId: giftItem.productId,
+            quantity: giftItem.quantity,
+          })),
         })),
-      })),
-    }, remainingMovements, restoredProducts, { saleBatchId });
+      },
+      remainingMovements,
+      restoredProducts,
+      {
+        saleBatchId,
+        initialVariantStockMap: buildVariantStockMapFromProductState(restoredProducts),
+      }
+    );
+    await batch.commit();
+    return updatedSales;
   };
 
   const registerSaleReturn = async (input: RegisterSaleReturnInput) => {
@@ -4146,7 +4454,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       ])
     );
     if (sale.lineItems[0]?.variantId) {
-      const variantStockMap = buildVariantStockMap(products);
+      const variantStockMap = buildVariantStockMap(products, movements);
       const productVariantMap = variantStockMap.get(sale.productId);
       const currentVariantStock = productVariantMap?.get(sale.lineItems[0].variantId!) ?? 0;
       productVariantMap?.set(sale.lineItems[0].variantId!, currentVariantStock + Math.abs(input.quantity));
@@ -4264,7 +4572,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         stockDeltas
       )
     );
-    const variantStockMap = buildVariantStockMap(products);
+    const variantStockMap = buildVariantStockMap(products, movements);
     updatedSales.forEach((sale) => {
       const variantId = sale.lineItems[0]?.variantId;
       if (!variantId) return;
@@ -4335,7 +4643,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
 
       const availableStock = selectedVariant
         ? getProductVariantStock(product, selectedVariant.id, baseMovements)
-        : getProductStock(baseMovements, productId);
+        : getStoredProductStock(product);
       if (quantity > availableStock) {
         throw new Error(
           `La cantidad usada supera el stock disponible de ${selectedVariant ? `${product.name} - ${selectedVariant.name}` : product.name}.`
@@ -4401,7 +4709,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     );
 
     const stockDeltas: Array<{ productId: string; quantity: number }> = [];
-    const variantStockMap = buildVariantStockMap(baseProducts);
+    const variantStockMap = buildVariantStockMap(baseProducts, baseMovements);
     materials.forEach((material) => {
       const movementRef = doc(collection(db, 'movements'));
       batch.set(movementRef, {

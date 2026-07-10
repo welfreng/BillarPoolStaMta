@@ -28,13 +28,16 @@ export default function Navbar() {
     <header className="fixed left-0 right-0 top-0 z-50 border-b border-white/10 bg-[linear-gradient(135deg,#08162f_0%,#0a2472_58%,#12389b_100%)] shadow-[0_18px_50px_rgba(10,36,114,0.24)] backdrop-blur-md">
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 lg:px-8">
         <Link href={isHomePage ? "#inicio" : "/"} className="flex items-center gap-3">
-          <Image
-            src={SITE_LOGO}
-            alt="Billar Pool Santa Marta"
-            width={46}
-            height={46}
-            className="rounded-full drop-shadow-sm"
-          />
+          <span className="flex h-16 w-20 items-center justify-center rounded-xl bg-white/10 p-1 shadow-lg shadow-black/20 ring-1 ring-white/20">
+            <Image
+              src={SITE_LOGO}
+              alt="Billar Pool Santa Marta"
+              width={96}
+              height={76}
+              className="h-full w-full object-contain"
+              priority
+            />
+          </span>
           <div className="hidden xl:block">
             <p className="font-mono text-lg font-bold tracking-wide text-white">Billar Pool</p>
             <p className="text-xs uppercase tracking-widest text-[#d4a017]">Santa Marta</p>

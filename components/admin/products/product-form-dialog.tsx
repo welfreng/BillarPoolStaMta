@@ -205,6 +205,19 @@ function collectAttributeOptions(
   });
 }
 
+function isOptionalVariantAttributeForProduct(
+  values: { category: string },
+  attribute: { key?: string; label?: string }
+) {
+  const normalizedKey = String(attribute.key ?? '').trim().toLowerCase();
+  const normalizedLabel = String(attribute.label ?? '').trim().toLowerCase();
+
+  return (
+    matchesCategoryFamily(values.category, 'guantes') &&
+    (normalizedKey === 'color' || normalizedLabel === 'color')
+  );
+}
+
 const productSchema = z
   .object({
     name: z.string().min(3, 'Ingresa el nombre del producto'),
@@ -261,6 +274,7 @@ const productSchema = z
       if (
         values.saleMode === 'varianted' &&
         values.variantAttributes.some((attribute, attributeIndex) => {
+          if (isOptionalVariantAttributeForProduct(values, attribute)) return false;
           const value = variant.attributeValues[attributeIndex]?.trim();
           return attribute.label.trim() && !value;
         })
@@ -277,14 +291,19 @@ const productSchema = z
       const seenSignatures = new Set<string>();
       values.variants.forEach((variant, index) => {
         const signature = values.variantAttributes
-          .map((_, attributeIndex) => variant.attributeValues[attributeIndex]?.trim() ?? '')
+          .map((attribute, attributeIndex) => {
+            const value = variant.attributeValues[attributeIndex]?.trim() ?? '';
+            if (!value && isOptionalVariantAttributeForProduct(values, attribute)) return '';
+            return value;
+          })
           .filter(Boolean)
           .map((value) => value.toLowerCase())
           .join('||');
 
-        const isComplete = values.variantAttributes.every((_, attributeIndex) =>
-          Boolean(variant.attributeValues[attributeIndex]?.trim())
-        );
+        const isComplete = values.variantAttributes.every((attribute, attributeIndex) => {
+          if (isOptionalVariantAttributeForProduct(values, attribute)) return true;
+          return Boolean(variant.attributeValues[attributeIndex]?.trim());
+        });
         if (!isComplete || !signature) return;
 
         if (seenSignatures.has(signature)) {
@@ -521,6 +540,7 @@ export function ProductFormDialog({
       ? variantTemplate.editor
       : null;
   const usesCompactVariantEditor = Boolean(compactEditorConfig);
+  const usesGlobalCompactPrice = compactEditorConfig?.priceMode === 'global';
   const usesCompactManualRows = compactEditorConfig?.creationMode === 'manual-rows';
   const singleAxisTemplate = variantTemplate?.mode === 'single-axis-list' ? variantTemplate.attributes[0] ?? null : null;
   const templateAllowsAttributeEditing = !variantTemplate || variantTemplate.allowAttributeEditing === true;
@@ -558,6 +578,10 @@ export function ProductFormDialog({
   );
   const customCompactAttributeKeys = useMemo(
     () => new Set(compactEditorConfig?.allowCustomValuesFor ?? []),
+    [compactEditorConfig]
+  );
+  const optionalCompactAttributeKeys = useMemo(
+    () => new Set(compactEditorConfig?.optionalAttributes ?? []),
     [compactEditorConfig]
   );
   const templateCompactAttributeOptions = useMemo(
@@ -600,6 +624,7 @@ export function ProductFormDialog({
         fixed: fixedCompactAttributeKeys.has(attribute.key),
         searchable: searchableCompactAttributeKeys.has(attribute.key),
         allowCustom: customCompactAttributeKeys.has(attribute.key),
+        optional: optionalCompactAttributeKeys.has(attribute.key),
       })),
     [
       compactSelectedAttributeValues,
@@ -607,6 +632,7 @@ export function ProductFormDialog({
       customCompactOptions,
       fixedCompactAttributeKeys,
       normalizedAttributeDefinitions,
+      optionalCompactAttributeKeys,
       searchableCompactAttributeKeys,
       templateCompactAttributeOptions,
     ]
@@ -715,7 +741,7 @@ export function ProductFormDialog({
   }, [form, saleMode, variantSummary]);
 
   useEffect(() => {
-    if ((!usesSingleAxisTemplate && !usesAutoCombinationTemplate) || structureLocked) {
+    if (!usesGlobalCompactPrice && !usesSingleAxisTemplate && !usesAutoCombinationTemplate) {
       return;
     }
 
@@ -736,7 +762,7 @@ export function ProductFormDialog({
     form,
     replaceVariants,
     selectedSalePrice,
-    structureLocked,
+    usesGlobalCompactPrice,
     usesAutoCombinationTemplate,
     usesSingleAxisTemplate,
   ]);
@@ -990,6 +1016,21 @@ export function ProductFormDialog({
 
     rebuildCompactAutoCombinationVariants({ [attributeKey]: nextSelectedValues });
   };
+  const compactVariantIsComplete = (attributeValues: string[]) =>
+    normalizedAttributeDefinitions.every((attribute, index) => {
+      if (optionalCompactAttributeKeys.has(attribute.key)) return true;
+      return Boolean(attributeValues[index]?.trim());
+    });
+  const buildCompactVariantSignature = (attributeValues: string[]) =>
+    normalizedAttributeDefinitions
+      .map((attribute, index) => {
+        const value = attributeValues[index]?.trim() ?? '';
+        if (!value && optionalCompactAttributeKeys.has(attribute.key)) return '';
+        return value;
+      })
+      .filter(Boolean)
+      .map((value) => value.toLowerCase())
+      .join('||');
   const setCompactRowAttribute = (rowIndex: number, attributeKey: string, value: string) => {
     const attributeIndex = normalizedAttributeDefinitions.findIndex((attribute) => attribute.key === attributeKey);
     if (attributeIndex < 0) return;
@@ -1001,19 +1042,19 @@ export function ProductFormDialog({
     const nextAttributeValues = [...(currentVariant.attributeValues ?? normalizedAttributeDefinitions.map(() => ''))];
     nextAttributeValues[attributeIndex] = value;
 
-    const isComplete = normalizedAttributeDefinitions.every((_, index) => Boolean(nextAttributeValues[index]?.trim()));
+    const isComplete = compactVariantIsComplete(nextAttributeValues);
     if (isComplete) {
-      const signature = nextAttributeValues.map((item) => item.trim().toLowerCase()).join('||');
+      const signature = buildCompactVariantSignature(nextAttributeValues);
       const hasDuplicate = currentVariants.some((variant, index) => {
         if (index === rowIndex) return false;
         const otherValues = normalizedAttributeDefinitions.map(
           (_, attributeValueIndex) => variant.attributeValues?.[attributeValueIndex]?.trim() ?? ''
         );
-        const otherComplete = otherValues.every(Boolean);
-        return otherComplete && otherValues.map((item) => item.toLowerCase()).join('||') === signature;
+        const otherComplete = compactVariantIsComplete(otherValues);
+        return otherComplete && buildCompactVariantSignature(otherValues) === signature;
       });
 
-      if (hasDuplicate) {
+      if (signature && hasDuplicate) {
         toast({
           title: 'Variante repetida',
           description: 'Esa combinacion de atributos ya existe en este producto.',
@@ -1055,16 +1096,18 @@ export function ProductFormDialog({
           ? option.trim().toLowerCase()
           : (currentRow.attributeValues?.[comparisonIndex] ?? '').trim().toLowerCase()
       );
-      const nextValuesAreComplete = nextValues.every(Boolean);
+      const nextValuesAreComplete = compactVariantIsComplete(nextValues);
+      const nextSignature = buildCompactVariantSignature(nextValues);
       const isDuplicateWithinContext =
         nextValuesAreComplete &&
+        Boolean(nextSignature) &&
         currentVariants.some((variant, index) => {
           if (index === rowIndex) return false;
 
           const otherValues = normalizedAttributeDefinitions.map(
             (_, comparisonIndex) => variant.attributeValues?.[comparisonIndex]?.trim().toLowerCase() ?? ''
           );
-          return otherValues.every(Boolean) && otherValues.join('||') === nextValues.join('||');
+          return compactVariantIsComplete(otherValues) && buildCompactVariantSignature(otherValues) === nextSignature;
         });
 
       const currentValue = (currentRow.attributeValues?.[attributeIndex] ?? '').trim().toLowerCase();
@@ -1078,10 +1121,11 @@ export function ProductFormDialog({
     const existingSignatures = new Set(
       currentVariants
         .map((variant) =>
-          normalizedAttributeDefinitions
-            .map((_, index) => variant.attributeValues?.[index]?.trim().toLowerCase() ?? '')
-            .join('||')
+          buildCompactVariantSignature(
+            normalizedAttributeDefinitions.map((_, index) => variant.attributeValues?.[index]?.trim() ?? '')
+          )
         )
+        .filter(Boolean)
     );
 
     const search = (
@@ -1096,8 +1140,9 @@ export function ProductFormDialog({
       const attribute = normalizedAttributeDefinitions[attributeIndex];
       const baseOptions =
         compactAttributeControls.find((control) => control.key === attribute.key)?.options ?? [];
+      const options = optionalCompactAttributeKeys.has(attribute.key) ? ['', ...baseOptions] : baseOptions;
 
-      for (const option of baseOptions) {
+      for (const option of options) {
         const nextValues = [...currentValues];
         nextValues[attributeIndex] = option;
         const found = search(attributeIndex + 1, nextValues);
@@ -1768,7 +1813,7 @@ export function ProductFormDialog({
                             }))}
                             structureLocked={structureLocked}
                             globalPrice={
-                              compactEditorConfig?.priceMode === 'global'
+                              usesGlobalCompactPrice
                                 ? {
                                     label: 'Precio sugerido global',
                                     description: 'Este valor se replica automaticamente en todas las variantes de este preset.',
@@ -2046,7 +2091,7 @@ export function ProductFormDialog({
                   headerClassName="mb-2 sm:mb-2.5"
                 >
                   <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
-                    {usesCompactVariantEditor && compactEditorConfig?.priceMode === 'global' ? (
+                    {usesCompactVariantEditor && usesGlobalCompactPrice ? (
                       <div className="hidden rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300 sm:block">
                         El precio de venta se controla desde el bloque de variantes.
                       </div>
