@@ -9,11 +9,14 @@ export default function Hero() {
           src="/images/hero-billar.png"
           alt="Tienda de accesorios para billar Billar Pool Santa Marta"
           fill
-          className="object-cover object-[32%_28%] sm:object-[34%_24%] lg:object-[center_22%]"
+          className="object-cover object-[32%_18%] sm:object-[30%_16%] lg:object-[center_14%]"
           sizes="100vw"
           priority
         />
-        <div className="absolute inset-0 bg-[linear-gradient(160deg,rgba(8,22,47,0.82)_0%,rgba(10,36,114,0.58)_48%,rgba(8,22,47,0.9)_100%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,12,28,0.08)_0%,rgba(5,12,28,0.2)_28%,rgba(8,22,47,0.6)_50%,rgba(8,22,47,0.76)_100%)]" />
+        <div className="absolute left-0 top-[7%] h-[39%] w-[44%] bg-[radial-gradient(ellipse_at_center,rgba(59,130,246,0.4)_0%,rgba(147,197,253,0.2)_34%,rgba(5,12,28,0)_78%)] mix-blend-screen" />
+        <div className="absolute left-[4%] top-[12%] h-[22%] w-[30%] rounded-full bg-cyan-400/10 blur-2xl mix-blend-screen" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_43%,rgba(5,12,28,0.28)_0%,rgba(5,12,28,0.12)_28%,rgba(5,12,28,0.46)_100%)]" />
         <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-[#08162f] via-[#08162f]/72 to-transparent" />
       </div>
 
@@ -22,11 +25,11 @@ export default function Hero() {
           <p className="mb-5 rounded-full border border-white/16 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.28em] text-[#f5c451] shadow-[0_14px_34px_rgba(2,6,23,0.2)] backdrop-blur-sm">
             Tienda especializada en Santa Marta
           </p>
-          <h1 className="font-mono text-4xl font-bold tracking-tight text-white text-balance sm:text-5xl lg:text-6xl">
+          <h1 className="font-mono text-4xl font-bold tracking-tight text-white text-balance drop-shadow-[0_8px_24px_rgba(0,0,0,0.65)] sm:text-5xl lg:text-6xl">
             Billar Pool
             <span className="block text-[#d4a017]">Santa Marta</span>
           </h1>
-          <p className="mt-5 max-w-2xl text-lg leading-relaxed text-white/84 text-pretty sm:text-xl">
+          <p className="mt-5 max-w-2xl text-lg leading-relaxed text-white/90 text-pretty drop-shadow-[0_6px_18px_rgba(0,0,0,0.55)] sm:text-xl">
             Tienda de Accesorios para Billar. Todo lo que necesitas para tu negocio y tu juego profesional.
           </p>
 

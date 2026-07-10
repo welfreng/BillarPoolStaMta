@@ -29,13 +29,26 @@ import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getTodayDateInputValue } from '@/lib/admin/date-utils';
 
+function normalizeDecimalValue(value: unknown) {
+  if (typeof value !== 'string') return value;
+  const normalizedValue = value.trim().replace(/\s/g, '').replace(',', '.');
+  return normalizedValue === '' ? 0 : normalizedValue;
+}
+
+function normalizeDecimalInput(value: string) {
+  return value.replace(/,/g, '.');
+}
+
+const nonNegativeDecimalSchema = z.preprocess(normalizeDecimalValue, z.coerce.number().min(0));
+const positiveDecimalSchema = z.preprocess(normalizeDecimalValue, z.coerce.number().positive('Cantidad invalida'));
+
 const purchaseLineSchema = z.object({
   productId: z.string().min(1, 'Selecciona un producto'),
   variantId: z.string().default(''),
-  presentationQuantity: z.coerce.number().positive('Cantidad invalida'),
-  purchaseUnitValue: z.coerce.number().min(0),
-  purchaseUnitValueUsd: z.coerce.number().min(0),
-  suggestedSalePrice: z.coerce.number().min(0),
+  presentationQuantity: positiveDecimalSchema,
+  purchaseUnitValue: nonNegativeDecimalSchema,
+  purchaseUnitValueUsd: nonNegativeDecimalSchema,
+  suggestedSalePrice: nonNegativeDecimalSchema,
 });
 
 const purchaseSchema = z.object({
@@ -43,13 +56,14 @@ const purchaseSchema = z.object({
   supplierId: z.string().optional(),
   supplier: z.string().min(2, 'Ingresa el proveedor'),
   purchasedAt: z.string().min(1, 'Selecciona la fecha'),
-  shippingValueTotal: z.coerce.number().min(0),
+  discountPercent: nonNegativeDecimalSchema,
+  shippingValueTotal: nonNegativeDecimalSchema,
   internationalVendorName: z.string().optional(),
-  productsValueUsd: z.coerce.number().min(0),
-  shippingValueUsd: z.coerce.number().min(0),
-  platformFeePercent: z.coerce.number().min(0),
-  usdToCopRate: z.coerce.number().min(0),
-  customsTaxCop: z.coerce.number().min(0),
+  productsValueUsd: nonNegativeDecimalSchema,
+  shippingValueUsd: nonNegativeDecimalSchema,
+  platformFeePercent: nonNegativeDecimalSchema,
+  usdToCopRate: nonNegativeDecimalSchema,
+  customsTaxCop: nonNegativeDecimalSchema,
   items: z.array(purchaseLineSchema).min(1, 'Agrega al menos un producto'),
 }).superRefine((value, context) => {
   if (value.purchaseType !== 'international') return;
@@ -96,6 +110,7 @@ const defaultValues: PurchaseFormValues = {
   supplierId: '',
   supplier: '',
   purchasedAt: getTodayDateInputValue(),
+  discountPercent: 0,
   shippingValueTotal: 0,
   internationalVendorName: '',
   productsValueUsd: 0,
@@ -202,6 +217,10 @@ export function PurchaseFormDialog({
     control: form.control,
     name: 'purchaseType',
   });
+  const watchedDiscountPercent = useWatch({
+    control: form.control,
+    name: 'discountPercent',
+  });
   const watchedShippingValueTotal = useWatch({
     control: form.control,
     name: 'shippingValueTotal',
@@ -238,6 +257,7 @@ export function PurchaseFormDialog({
   const values = {
     purchaseType: watchedPurchaseType,
     supplierId: watchedSupplierId,
+    discountPercent: watchedDiscountPercent,
     shippingValueTotal: watchedShippingValueTotal,
     internationalVendorName: watchedInternationalVendorName,
     productsValueUsd: watchedProductsValueUsd,
@@ -312,10 +332,13 @@ export function PurchaseFormDialog({
     }
   }, [form, replace, values.purchaseType, values.usdToCopRate, values.items]);
 
-  const totalPurchaseValue = values.items.reduce(
+  const grossPurchaseValue = values.items.reduce(
     (sum, item) => sum + ((Number(item.purchaseUnitValue) || 0) * (Number(item.presentationQuantity) || 0)),
     0
   );
+  const normalizedDiscountPercent = Math.min(Math.max(Number(values.discountPercent) || 0, 0), 100);
+  const totalDiscountValue = Number(((grossPurchaseValue * normalizedDiscountPercent) / 100).toFixed(2));
+  const totalPurchaseValue = Number(Math.max(grossPurchaseValue - totalDiscountValue, 0).toFixed(2));
   const totalPurchasedUnits = values.items.reduce(
     (sum, item) => sum + (Number(item.presentationQuantity) || 0),
     0
@@ -325,7 +348,20 @@ export function PurchaseFormDialog({
     () =>
       values.items.map((item, index) => {
         const quantityPurchased = Number(item.presentationQuantity) || 0;
-        const purchaseValueTotal = (Number(item.purchaseUnitValue) || 0) * (Number(item.presentationQuantity) || 0);
+        const grossLineValue = (Number(item.purchaseUnitValue) || 0) * (Number(item.presentationQuantity) || 0);
+        const discountShareBase = Number(((grossLineValue * normalizedDiscountPercent) / 100).toFixed(2));
+        const previousDiscount = values.items
+          .slice(0, index)
+          .reduce((sum, previousItem) => {
+            const previousGrossLineValue =
+              (Number(previousItem.purchaseUnitValue) || 0) * (Number(previousItem.presentationQuantity) || 0);
+            return sum + Number(((previousGrossLineValue * normalizedDiscountPercent) / 100).toFixed(2));
+          }, 0);
+        const discountShare =
+          index === values.items.length - 1
+            ? Number((totalDiscountValue - previousDiscount).toFixed(2))
+            : discountShareBase;
+        const purchaseValueTotal = Number(Math.max(grossLineValue - discountShare, 0).toFixed(2));
         const shippingShareBase =
           totalPurchasedUnits > 0
             ? Number((((Number(values.shippingValueTotal) || 0) * quantityPurchased) / totalPurchasedUnits).toFixed(2))
@@ -351,13 +387,15 @@ export function PurchaseFormDialog({
         );
         return {
           index,
+          grossLineValue,
+          discountShare,
           purchaseValueTotal,
           quantityPurchased,
           shippingShare,
           totals,
         };
       }),
-    [totalPurchasedUnits, values.items, values.shippingValueTotal]
+    [normalizedDiscountPercent, totalDiscountValue, totalPurchasedUnits, values.items, values.shippingValueTotal]
   );
   const shippingPerUnit = totalPurchasedUnits > 0 ? (Number(values.shippingValueTotal) || 0) / totalPurchasedUnits : 0;
   const firstItem = values.items[0] ?? createDefaultPurchaseLine();
@@ -421,18 +459,12 @@ export function PurchaseFormDialog({
       hasVariants && currentVariantId
         ? currentVariantId
         : getAvailableVariantOptions(firstItemProduct.id, 0)[0]?.id ?? '';
-    const nextSuggestedSalePrice = getPurchaseVariantSuggestedSalePrice(firstItemProduct, resolvedVariantId);
-    const currentSuggestedSalePrice = Number(values.items[0]?.suggestedSalePrice ?? 0);
-
     if (hasVariants && resolvedVariantId && currentVariantId !== resolvedVariantId) {
       form.setValue('items.0.variantId', resolvedVariantId, {
         shouldValidate: true,
         shouldDirty: true,
       });
-    }
-
-    if (currentSuggestedSalePrice !== nextSuggestedSalePrice) {
-      form.setValue('items.0.suggestedSalePrice', nextSuggestedSalePrice, {
+      form.setValue('items.0.suggestedSalePrice', getPurchaseVariantSuggestedSalePrice(firstItemProduct, resolvedVariantId), {
         shouldValidate: true,
         shouldDirty: true,
       });
@@ -464,13 +496,10 @@ export function PurchaseFormDialog({
       hasVariants && currentVariantId
         ? currentVariantId
         : variantPool[0]?.id ?? '';
-    const nextSuggestedSalePrice = getPurchaseVariantSuggestedSalePrice(draftProduct, resolvedVariantId);
-    const currentSuggestedSalePrice = Number(draftLine.suggestedSalePrice ?? 0);
-
-    if ((hasVariants && currentVariantId !== resolvedVariantId) || currentSuggestedSalePrice !== nextSuggestedSalePrice) {
+    if (hasVariants && currentVariantId !== resolvedVariantId) {
       setDraftLine((current) => {
         const nextVariantId = hasVariants ? resolvedVariantId : '';
-        const nextSuggestedPrice = String(nextSuggestedSalePrice || '');
+        const nextSuggestedPrice = String(getPurchaseVariantSuggestedSalePrice(draftProduct, resolvedVariantId) || '');
 
         if (current.variantId === nextVariantId && current.suggestedSalePrice === nextSuggestedPrice) {
           return current;
@@ -848,7 +877,59 @@ export function PurchaseFormDialog({
                     />
                   </div>
 
-                  <div className="rounded-2xl border border-amber-200/80 bg-amber-50/75 p-3.5 dark:border-amber-900/60 dark:bg-amber-950/22 sm:p-5">
+                  <div className="space-y-4 rounded-2xl border border-amber-200/80 bg-amber-50/75 p-3.5 dark:border-amber-900/60 dark:bg-amber-950/22 sm:p-5">
+                    <FormField
+                      control={form.control}
+                      name="discountPercent"
+                      render={({ field }) => {
+                        const quickValue = ['0', '15', '20'].includes(String(Number(field.value ?? 0)))
+                          ? String(Number(field.value ?? 0))
+                          : 'custom';
+
+                        return (
+                          <FormItem className="min-w-0">
+                            <FormLabel className="text-amber-950 dark:text-amber-100">
+                              Descuento sobre la compra
+                            </FormLabel>
+                            <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_8rem]">
+                              <Select
+                                value={quickValue}
+                                onValueChange={(value) => {
+                                  if (value !== 'custom') {
+                                    field.onChange(Number(value));
+                                  }
+                                }}
+                              >
+                                <FormControl>
+                                  <SelectTrigger className="h-12 border-amber-300 bg-background/92 dark:bg-slate-950/72">
+                                    <SelectValue placeholder="Selecciona descuento" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="0">Sin descuento</SelectItem>
+                                  <SelectItem value="15">15%</SelectItem>
+                                  <SelectItem value="20">20%</SelectItem>
+                                  <SelectItem value="custom">Otro porcentaje</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormControl>
+                                <Input
+                                  className="h-12 border-amber-300 bg-background/92 text-lg font-semibold dark:bg-slate-950/72"
+                                  type="text"
+                                  inputMode="decimal"
+                                  value={field.value ?? 0}
+                                  onChange={(event) => field.onChange(normalizeDecimalInput(event.target.value))}
+                                />
+                              </FormControl>
+                            </div>
+                            <p className="text-xs text-amber-800 dark:text-amber-200">
+                              Se aplica al valor de productos; el envio se suma despues y se reparte por unidades.
+                            </p>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
+                    />
                     <FormField
                       control={form.control}
                       name="shippingValueTotal"
@@ -860,11 +941,11 @@ export function PurchaseFormDialog({
                           <FormControl>
                             <Input
                               className="min-w-0 h-12 border-amber-300 bg-background/92 text-lg font-semibold dark:bg-slate-950/72"
-                              type="number"
-                              min="0"
-                              step="0.01"
+                              type="text"
+                              inputMode="decimal"
                               disabled={values.purchaseType === 'international'}
                               {...field}
+                              onChange={(event) => field.onChange(normalizeDecimalInput(event.target.value))}
                             />
                           </FormControl>
                           {values.purchaseType === 'international' ? (
@@ -913,7 +994,12 @@ export function PurchaseFormDialog({
                           <FormItem className="min-w-0">
                             <FormLabel>TRM / tasa USD a COP</FormLabel>
                             <FormControl>
-                              <Input type="number" min="0" step="0.01" {...field} />
+                              <Input
+                                type="text"
+                                inputMode="decimal"
+                                {...field}
+                                onChange={(event) => field.onChange(normalizeDecimalInput(event.target.value))}
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -926,7 +1012,7 @@ export function PurchaseFormDialog({
                           <FormItem className="min-w-0">
                             <FormLabel>Valor de productos (USD, auto)</FormLabel>
                             <FormControl>
-                              <Input type="number" min="0" step="0.01" {...field} disabled />
+                              <Input type="text" inputMode="decimal" {...field} disabled />
                             </FormControl>
                             <p className="text-xs text-muted-foreground">
                               Se calcula automaticamente con las lineas en USD.
@@ -942,7 +1028,12 @@ export function PurchaseFormDialog({
                           <FormItem className="min-w-0">
                             <FormLabel>Envio internacional (USD)</FormLabel>
                             <FormControl>
-                              <Input type="number" min="0" step="0.01" {...field} />
+                              <Input
+                                type="text"
+                                inputMode="decimal"
+                                {...field}
+                                onChange={(event) => field.onChange(normalizeDecimalInput(event.target.value))}
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -955,7 +1046,12 @@ export function PurchaseFormDialog({
                           <FormItem className="min-w-0">
                             <FormLabel>Comision plataforma (%)</FormLabel>
                             <FormControl>
-                              <Input type="number" min="0" step="0.01" {...field} />
+                              <Input
+                                type="text"
+                                inputMode="decimal"
+                                {...field}
+                                onChange={(event) => field.onChange(normalizeDecimalInput(event.target.value))}
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -968,7 +1064,12 @@ export function PurchaseFormDialog({
                           <FormItem className="min-w-0">
                             <FormLabel>Impuestos DIAN/Aduana (COP)</FormLabel>
                             <FormControl>
-                              <Input type="number" min="0" step="1" {...field} />
+                              <Input
+                                type="text"
+                                inputMode="decimal"
+                                {...field}
+                                onChange={(event) => field.onChange(normalizeDecimalInput(event.target.value))}
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -1140,15 +1241,15 @@ export function PurchaseFormDialog({
                               </FormLabel>
                               <FormControl>
                                 <Input
-                                  type="number"
-                                  min="0"
-                                  step="0.000001"
+                                  type="text"
+                                  inputMode="decimal"
                                   {...field}
                                   onChange={(event) => {
-                                    field.onChange(event);
+                                    const nextValue = normalizeDecimalInput(event.target.value);
+                                    field.onChange(nextValue);
                                     resetPack12Normalization(fields[0]?.id ?? 'primary-line');
                                     if (firstItem.productId) {
-                                      const unitValueUsd = Number(event.target.value) || 0;
+                                      const unitValueUsd = Number(nextValue) || 0;
                                       syncProductPurchaseValueInForm(firstItem.productId, {
                                         purchaseUnitValueUsd: unitValueUsd,
                                         purchaseUnitValue: convertUsdToCop(unitValueUsd, Number(values.usdToCopRate) || 0),
@@ -1174,16 +1275,16 @@ export function PurchaseFormDialog({
                               <FormLabel>{firstItemIsPack12 ? 'Valor unitario por pieza' : 'Valor unitario de compra'}</FormLabel>
                               <FormControl>
                                 <Input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
+                                  type="text"
+                                  inputMode="decimal"
                                   {...field}
                                   onChange={(event) => {
-                                    field.onChange(event);
+                                    const nextValue = normalizeDecimalInput(event.target.value);
+                                    field.onChange(nextValue);
                                     resetPack12Normalization(fields[0]?.id ?? 'primary-line');
                                     if (firstItem.productId) {
                                       syncProductPurchaseValueInForm(firstItem.productId, {
-                                        purchaseUnitValue: Number(event.target.value) || 0,
+                                        purchaseUnitValue: Number(nextValue) || 0,
                                       });
                                     }
                                   }}
@@ -1207,11 +1308,10 @@ export function PurchaseFormDialog({
                             <FormLabel>Precio sugerido de venta</FormLabel>
                             <FormControl>
                               <Input
-                                type="number"
-                                min="0"
-                                step="0.01"
+                                type="text"
+                                inputMode="decimal"
                                 {...field}
-                                onChange={(event) => field.onChange(event)}
+                                onChange={(event) => field.onChange(normalizeDecimalInput(event.target.value))}
                               />
                             </FormControl>
                             <FormMessage />
@@ -1220,7 +1320,7 @@ export function PurchaseFormDialog({
                       />
                     </div>
 
-                    <div className="grid gap-2 sm:grid-cols-3 sm:gap-3">
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 sm:gap-3">
                       <div className="rounded-2xl border border-border/70 bg-background/86 dark:border-slate-800 dark:bg-slate-950/60 p-2.5 sm:p-4">
                         <p className="text-xs text-muted-foreground">
                           {firstItemIsPack12 ? 'Cantidad convertida a paquetes' : 'Cantidad comprada'}
@@ -1230,9 +1330,15 @@ export function PurchaseFormDialog({
                         </p>
                       </div>
                       <div className="rounded-2xl border border-border/70 bg-background/86 dark:border-slate-800 dark:bg-slate-950/60 p-2.5 sm:p-4">
-                        <p className="text-xs text-muted-foreground">Valor total compra</p>
+                        <p className="text-xs text-muted-foreground">Compra bruta</p>
                         <p className="mt-1 font-semibold text-foreground">
-                          {formatCurrency(firstPreview?.purchaseValueTotal ?? 0)}
+                          {formatCurrency(firstPreview?.grossLineValue ?? 0)}
+                        </p>
+                      </div>
+                      <div className="rounded-2xl border border-border/70 bg-background/86 dark:border-slate-800 dark:bg-slate-950/60 p-2.5 sm:p-4">
+                        <p className="text-xs text-muted-foreground">Descuento aplicado</p>
+                        <p className="mt-1 font-semibold text-emerald-700 dark:text-emerald-300">
+                          -{formatCurrency(firstPreview?.discountShare ?? 0)}
                         </p>
                       </div>
                       <div className="rounded-2xl border border-border/70 bg-background/86 dark:border-slate-800 dark:bg-slate-950/60 p-2.5 sm:p-4">
@@ -1247,7 +1353,12 @@ export function PurchaseFormDialog({
                       <div className="mt-4 space-y-2 rounded-2xl bg-background/86 px-3 py-2.5 text-sm text-slate-600 dark:bg-slate-950/60 dark:text-slate-300 sm:space-y-3">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <span className="truncate">{firstItemProduct.name} - {firstItemProduct.brand || 'Sin marca'}</span>
-                          <span className="font-medium text-foreground">Total linea: {formatCurrency(firstPreview?.purchaseValueTotal ?? 0)}</span>
+                          <span className="font-medium text-foreground">
+                            Neto linea: {formatCurrency(firstPreview?.purchaseValueTotal ?? 0)}
+                          </span>
+                          <span className="font-medium text-foreground">
+                            Costo real c/envio: {formatCurrency(firstPreview?.totals.realUnitCost ?? 0)}
+                          </span>
                         </div>
                         {firstItemVariantOptions.length > 0 ? (
                           <div className="flex flex-col gap-2 border-t border-border pt-3 dark:border-slate-800 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
@@ -1322,7 +1433,10 @@ export function PurchaseFormDialog({
                               Precio sugerido: {formatCurrency(values.items[index]?.suggestedSalePrice ?? 0)}
                             </p>
                             <p className="text-sm text-slate-500">
-                              Total linea: {formatCurrency(preview?.purchaseValueTotal ?? 0)}
+                              Neto linea: {formatCurrency(preview?.purchaseValueTotal ?? 0)}
+                            </p>
+                            <p className="text-sm text-slate-500">
+                              Costo real c/envio: {formatCurrency(preview?.totals.realUnitCost ?? 0)}
                             </p>
                             <p className="text-sm text-slate-400">
                               {isPack12 ? 'Conversion por paquete aplicada' : 'Sin conversion automatica'}
@@ -1401,9 +1515,21 @@ export function PurchaseFormDialog({
                     <p className="text-sm font-medium text-emerald-950 dark:text-emerald-100">Total acumulado de la compra</p>
                     <p className="text-xs text-emerald-800 dark:text-emerald-200/80">
                       {formatNumber(totalPurchasedUnits)} unidades en {formatNumber(fields.length)} lineas
+                      {normalizedDiscountPercent > 0 ? ` - descuento ${formatNumber(normalizedDiscountPercent)}%` : ''}
                     </p>
                   </div>
-                  <p className="text-lg font-semibold text-emerald-950 dark:text-emerald-100">{formatCurrency(totalPurchaseValue)}</p>
+                  <div className="text-left sm:text-right">
+                    <p className="text-xs text-emerald-800 dark:text-emerald-200/80">
+                      Bruto {formatCurrency(grossPurchaseValue)}
+                      {totalDiscountValue > 0 ? ` - desc. ${formatCurrency(totalDiscountValue)}` : ''}
+                    </p>
+                    <p className="text-lg font-semibold text-emerald-950 dark:text-emerald-100">
+                      Neto {formatCurrency(totalPurchaseValue)}
+                    </p>
+                    <p className="text-xs text-emerald-800 dark:text-emerald-200/80">
+                      Inversion con envio {formatCurrency(totalPurchaseValue + (Number(values.shippingValueTotal) || 0))}
+                    </p>
+                  </div>
                 </div>
               </div>
             </AdminMobileSection>
@@ -1573,19 +1699,19 @@ export function PurchaseFormDialog({
                       : 'Valor unitario de compra'}
                 </Label>
                 <Input
-                  type="number"
-                  min="0"
-                  step={values.purchaseType === 'international' ? '0.000001' : '0.01'}
+                  type="text"
+                  inputMode="decimal"
                   value={values.purchaseType === 'international' ? draftLine.purchaseUnitValueUsd : draftLine.purchaseUnitValue}
                   onChange={(event) => {
+                    const nextValue = normalizeDecimalInput(event.target.value);
                     setDraftLine((current) => ({
                       ...current,
                       purchaseUnitValue:
                         values.purchaseType === 'international'
-                          ? String(convertUsdToCop(Number(event.target.value) || 0, Number(values.usdToCopRate) || 0))
-                          : event.target.value,
+                          ? String(convertUsdToCop(Number(nextValue) || 0, Number(values.usdToCopRate) || 0))
+                          : nextValue,
                       purchaseUnitValueUsd:
-                        values.purchaseType === 'international' ? event.target.value : current.purchaseUnitValueUsd,
+                        values.purchaseType === 'international' ? nextValue : current.purchaseUnitValueUsd,
                     }));
                     setLineError('');
                   }}
@@ -1626,14 +1752,13 @@ export function PurchaseFormDialog({
             <div className="min-w-0 space-y-2">
               <Label>Precio sugerido de venta</Label>
               <Input
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 value={draftLine.suggestedSalePrice}
                 onChange={(event) => {
                   setDraftLine((current) => ({
                     ...current,
-                    suggestedSalePrice: event.target.value,
+                    suggestedSalePrice: normalizeDecimalInput(event.target.value),
                   }));
                   setLineError('');
                 }}

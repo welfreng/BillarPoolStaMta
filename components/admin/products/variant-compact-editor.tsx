@@ -33,6 +33,7 @@ interface CompactAttributeControl {
   fixed?: boolean;
   searchable?: boolean;
   allowCustom?: boolean;
+  optional?: boolean;
 }
 
 export interface CompactVariantRow {
@@ -42,6 +43,12 @@ export interface CompactVariantRow {
   stock: number;
   sku: string;
   status: 'active' | 'inactive';
+}
+
+const OPTIONAL_ATTRIBUTE_EMPTY_VALUE = '__optional_empty__';
+
+function getOptionalAttributeLabel(attributeLabel: string) {
+  return `Sin ${attributeLabel.toLowerCase()}`;
 }
 
 export function VariantCompactEditor({
@@ -109,7 +116,6 @@ export function VariantCompactEditor({
                 min="0"
                 step="0.01"
                 value={globalPrice.value}
-                disabled={structureLocked}
                 onChange={(event) => globalPrice.onChange(Number(event.target.value || 0))}
                 className="bg-background/88"
               />
@@ -276,17 +282,32 @@ export function VariantCompactEditor({
                   {attributes.map((attribute) => (
                     <TableCell key={`${row.id}-${attribute.key}`} className="align-top">
                       {(() => {
-                        const rowOptions = getRowAttributeOptions?.(index, attribute.key, attribute.options) ?? attribute.options;
+                        const fallbackOptions = attribute.optional ? ['', ...attribute.options] : attribute.options;
+                        const rowOptions = getRowAttributeOptions?.(index, attribute.key, fallbackOptions) ?? fallbackOptions;
+                        const normalizedRowOptions = Array.from(new Set(rowOptions));
+                        const selectOptions = normalizedRowOptions.map((option) => ({
+                          value: option || OPTIONAL_ATTRIBUTE_EMPTY_VALUE,
+                          label: option || getOptionalAttributeLabel(attribute.label),
+                        }));
+                        const rowValue = row.values[attribute.key] ?? '';
+                        const selectValue = attribute.optional && !rowValue ? OPTIONAL_ATTRIBUTE_EMPTY_VALUE : rowValue;
+                        const handleAttributeChange = (nextValue: string) => {
+                          onRowAttributeChange?.(
+                            index,
+                            attribute.key,
+                            nextValue === OPTIONAL_ATTRIBUTE_EMPTY_VALUE ? '' : nextValue
+                          );
+                        };
 
                         return manualRows ? (
                           attribute.searchable ? (
                             <SearchableSelect
-                              value={row.values[attribute.key] ?? ''}
-                              onChange={(value) => onRowAttributeChange?.(index, attribute.key, value)}
+                              value={selectValue}
+                              onChange={handleAttributeChange}
                               placeholder={`Selecciona ${attribute.label.toLowerCase()}`}
                               searchPlaceholder={`Buscar ${attribute.label.toLowerCase()}...`}
                               emptyLabel={`No se encontro ${attribute.label.toLowerCase()}.`}
-                              options={rowOptions.map((option) => ({ value: option, label: option }))}
+                              options={selectOptions}
                               disabled={attributeControlsDisabled}
                               allowCreate={attribute.allowCustom}
                               createLabel={`Crear "${attribute.label.toLowerCase()}"`}
@@ -295,17 +316,17 @@ export function VariantCompactEditor({
                             />
                           ) : (
                             <Select
-                              value={row.values[attribute.key] || undefined}
-                              onValueChange={(value) => onRowAttributeChange?.(index, attribute.key, value)}
+                              value={selectValue || undefined}
+                              onValueChange={handleAttributeChange}
                               disabled={attributeControlsDisabled}
                             >
                               <SelectTrigger className="w-full min-w-[7rem] sm:w-[140px]">
                                 <SelectValue placeholder={`Selecciona ${attribute.label.toLowerCase()}`} />
                               </SelectTrigger>
                               <SelectContent>
-                                {rowOptions.map((option) => (
-                                  <SelectItem key={option} value={option}>
-                                    {option}
+                                {selectOptions.map((option) => (
+                                  <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
@@ -313,12 +334,12 @@ export function VariantCompactEditor({
                           )
                         ) : attribute.searchable && !attribute.fixed ? (
                           <SearchableSelect
-                            value={row.values[attribute.key] ?? ''}
+                            value={selectValue}
                             onChange={(value) => onToggleAttributeValue(attribute.key, value)}
                             placeholder={`Selecciona ${attribute.label.toLowerCase()}`}
                             searchPlaceholder={`Buscar ${attribute.label.toLowerCase()}...`}
                             emptyLabel={`No se encontro ${attribute.label.toLowerCase()}.`}
-                            options={rowOptions.map((option) => ({ value: option, label: option }))}
+                            options={selectOptions}
                             disabled
                           />
                         ) : (
@@ -334,7 +355,6 @@ export function VariantCompactEditor({
                         min="0"
                         step="0.01"
                         value={Number(row.salePrice ?? 0)}
-                        disabled={structureLocked}
                         onChange={(event) => onRowSalePriceChange?.(index, Number(event.target.value || 0))}
                         onFocus={(event) => {
                           if (event.target.value === '0') {

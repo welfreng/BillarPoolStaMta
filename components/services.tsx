@@ -2,7 +2,7 @@
 
 import Image from "next/image"
 import { useEffect, useState } from "react"
-import { doc, onSnapshot } from "firebase/firestore"
+import { doc, getDoc } from "firebase/firestore"
 import { Wrench, RefreshCw, Layers, CircleDot } from "lucide-react"
 import { db } from "@/lib/firebase"
 
@@ -33,27 +33,95 @@ const services = [
   },
 ]
 
+const servicesGalleryCacheKey = "bp-services-gallery-cache-v1"
+const servicesGalleryCacheTtlMs = 30 * 60 * 1000
+
+interface ServicesGalleryCache {
+  storedAt: number
+  images: string[]
+}
+
+function readServicesGalleryCache(allowExpired = false): ServicesGalleryCache | null {
+  if (typeof window === "undefined") return null
+
+  try {
+    const rawCache = window.localStorage.getItem(servicesGalleryCacheKey)
+    if (!rawCache) return null
+
+    const parsedCache = JSON.parse(rawCache) as Partial<ServicesGalleryCache>
+    if (typeof parsedCache.storedAt !== "number" || !Array.isArray(parsedCache.images)) {
+      return null
+    }
+
+    const isFresh = Date.now() - parsedCache.storedAt < servicesGalleryCacheTtlMs
+    if (!allowExpired && !isFresh) return null
+
+    return {
+      storedAt: parsedCache.storedAt,
+      images: parsedCache.images.filter((item): item is string => typeof item === "string").slice(0, 3),
+    }
+  } catch {
+    return null
+  }
+}
+
+function writeServicesGalleryCache(images: string[]) {
+  if (typeof window === "undefined") return
+
+  try {
+    const nextCache: ServicesGalleryCache = {
+      storedAt: Date.now(),
+      images,
+    }
+
+    window.localStorage.setItem(servicesGalleryCacheKey, JSON.stringify(nextCache))
+  } catch {
+    // Non-critical cache; Firestore remains the source of truth.
+  }
+}
+
 export default function Services() {
   const [serviceImages, setServiceImages] = useState<string[]>([])
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(
-      doc(db, "siteAssets", "services-gallery"),
-      (snapshot) => {
+    let isMounted = true
+
+    const loadServiceImages = async () => {
+      const freshCache = readServicesGalleryCache()
+      if (freshCache) {
+        setServiceImages(freshCache.images)
+        return
+      }
+
+      const expiredCache = readServicesGalleryCache(true)
+      if (expiredCache) {
+        setServiceImages(expiredCache.images)
+      }
+
+      try {
+        const snapshot = await getDoc(doc(db, "siteAssets", "services-gallery"))
+        if (!isMounted) return
+
         const data = snapshot.data()
         const images = Array.isArray(data?.images)
           ? data.images.filter((item): item is string => typeof item === "string").slice(0, 3)
           : []
 
         setServiceImages(images)
-      },
-      (error) => {
-        console.error("Error leyendo galeria de servicios:", error)
-        setServiceImages([])
+        writeServicesGalleryCache(images)
+      } catch (error) {
+        console.warn("No se pudo actualizar la galeria de servicios desde Firestore:", error)
+        if (isMounted) {
+          setServiceImages(expiredCache?.images ?? [])
+        }
       }
-    )
+    }
 
-    return () => unsubscribe()
+    void loadServiceImages()
+
+    return () => {
+      isMounted = false
+    }
   }, [])
 
   return (

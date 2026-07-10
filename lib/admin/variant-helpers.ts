@@ -92,16 +92,13 @@ export function getProductVariantStock(
   variantId: string | undefined,
   movements: InventoryMovement[]
 ) {
+  void movements;
   if (!product || !variantId) return 0;
-  const directStock = (product.variants ?? []).find((variant) => variant.id === variantId)?.stock;
-  if (typeof directStock === 'number') return Math.max(directStock, 0);
+  const variant = (product.variants ?? []).find((item) => item.id === variantId);
+  const directStock = Number(variant?.stock ?? variant?.publicStock ?? 0);
+  if (Number.isFinite(directStock)) return Math.max(directStock, 0);
 
-  return Math.max(
-    movements
-      .filter((movement) => movement.productId === product.id && movement.variantId === variantId)
-      .reduce((total, movement) => total + movement.quantity, 0),
-    0
-  );
+  return 0;
 }
 
 export function getVariantRealUnitCost(

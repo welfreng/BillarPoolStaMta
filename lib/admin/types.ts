@@ -127,6 +127,10 @@ export interface InventoryMovement {
   occurredAt: string;
   responsibleUser: string;
   relatedUnitCost: number;
+  customerName?: string;
+  customerPhone?: string;
+  giftReason?: string;
+  giftTotalCost?: number;
 }
 
 export interface Purchase {
@@ -146,6 +150,9 @@ export interface Purchase {
   quantityPurchased: number;
   purchasePresentation: PresentationKind;
   conversionFactor: number;
+  purchaseGrossValueTotal?: number;
+  purchaseDiscountPercent?: number;
+  purchaseDiscountTotal?: number;
   purchaseValueTotal: number;
   shippingValueTotal: number;
   purchaseType?: 'local' | 'international';

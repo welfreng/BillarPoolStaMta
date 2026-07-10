@@ -56,6 +56,76 @@ const categoryLabels = new Map(publicCatalogCategories.map((category) => [catego
 const categoryOrder = new Map(publicCatalogCategories.map((category, index) => [category.id, index]))
 const productQueryParam = "producto"
 const variantQueryParam = "variante"
+const catalogCacheKey = "bp-public-catalog-cache-v1"
+const catalogCacheTtlMs = 30 * 60 * 1000
+
+interface PublicCatalogCache {
+  storedAt: number
+  products: CatalogProduct[]
+  imageOverrides: CatalogImageOverrideMaps
+}
+
+function getEmptyImageOverrides(): CatalogImageOverrideMaps {
+  return {
+    byProductId: {},
+    byProductName: {},
+    byVariantKey: {},
+  }
+}
+
+function sortCatalogProducts(items: CatalogProduct[]) {
+  return [...items].sort((left, right) => {
+    const leftAvailability = left.publicStock > 0 ? 0 : 1
+    const rightAvailability = right.publicStock > 0 ? 0 : 1
+    if (leftAvailability !== rightAvailability) return leftAvailability - rightAvailability
+    return left.name.localeCompare(right.name)
+  })
+}
+
+function readCatalogCache(allowExpired = false): PublicCatalogCache | null {
+  if (typeof window === "undefined") return null
+
+  try {
+    const rawCache = window.localStorage.getItem(catalogCacheKey)
+    if (!rawCache) return null
+
+    const parsedCache = JSON.parse(rawCache) as Partial<PublicCatalogCache>
+    if (
+      typeof parsedCache.storedAt !== "number" ||
+      !Array.isArray(parsedCache.products) ||
+      !parsedCache.imageOverrides
+    ) {
+      return null
+    }
+
+    const isFresh = Date.now() - parsedCache.storedAt < catalogCacheTtlMs
+    if (!allowExpired && !isFresh) return null
+
+    return {
+      storedAt: parsedCache.storedAt,
+      products: sortCatalogProducts(parsedCache.products),
+      imageOverrides: parsedCache.imageOverrides,
+    }
+  } catch {
+    return null
+  }
+}
+
+function writeCatalogCache(products: CatalogProduct[], imageOverrides: CatalogImageOverrideMaps) {
+  if (typeof window === "undefined") return
+
+  try {
+    const nextCache: PublicCatalogCache = {
+      storedAt: Date.now(),
+      products,
+      imageOverrides,
+    }
+
+    window.localStorage.setItem(catalogCacheKey, JSON.stringify(nextCache))
+  } catch {
+    // The catalog still works without local cache; this only protects Firestore reads.
+  }
+}
 
 function mapCatalogProduct(documentId: string, data: DocumentData): CatalogProduct {
   const fallbackProduct = publicCatalogProducts.find((product) => product.id === documentId)
@@ -144,11 +214,7 @@ export default function ProductCatalog({
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null)
   const [selectedVariantId, setSelectedVariantId] = useState<string>("")
   const [products, setProducts] = useState<CatalogProduct[]>([])
-  const [imageOverrides, setImageOverrides] = useState<CatalogImageOverrideMaps>({
-    byProductId: {},
-    byProductName: {},
-    byVariantKey: {},
-  })
+  const [imageOverrides, setImageOverrides] = useState<CatalogImageOverrideMaps>(getEmptyImageOverrides())
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState("")
   const [previewSides, setPreviewSides] = useState<Record<string, "left" | "right">>({})
@@ -158,15 +224,22 @@ export default function ProductCatalog({
   useEffect(() => {
     let isMounted = true
 
-    const sortProducts = (items: CatalogProduct[]) =>
-      items.sort((left, right) => {
-        const leftAvailability = left.publicStock > 0 ? 0 : 1
-        const rightAvailability = right.publicStock > 0 ? 0 : 1
-        if (leftAvailability !== rightAvailability) return leftAvailability - rightAvailability
-        return left.name.localeCompare(right.name)
-      })
-
     const loadCatalog = async () => {
+      const freshCache = readCatalogCache()
+      if (freshCache) {
+        setProducts(freshCache.products)
+        setImageOverrides(freshCache.imageOverrides)
+        setLoading(false)
+        return
+      }
+
+      const expiredCache = readCatalogCache(true)
+      if (expiredCache && isMounted) {
+        setProducts(expiredCache.products)
+        setImageOverrides(expiredCache.imageOverrides)
+        setLoading(false)
+      }
+
       try {
         const [productsSnapshot, imagesSnapshot] = await Promise.all([
           getDocs(
@@ -180,7 +253,7 @@ export default function ProductCatalog({
 
         if (!isMounted) return
 
-        const nextProducts = sortProducts(
+        const nextProducts = sortCatalogProducts(
           productsSnapshot.docs
             .map((snapshotItem) => mapCatalogProduct(snapshotItem.id, snapshotItem.data()))
         )
@@ -188,11 +261,13 @@ export default function ProductCatalog({
 
         setProducts(nextProducts)
         setImageOverrides(nextImageOverrides)
+        writeCatalogCache(nextProducts, nextImageOverrides)
       } catch (error) {
-        console.error("Error leyendo productos del catalogo:", error)
+        console.warn("No se pudo actualizar el catalogo publico desde Firestore:", error)
         if (isMounted) {
-          setProducts([])
-          setImageOverrides({ byProductId: {}, byProductName: {}, byVariantKey: {} })
+          const fallbackCache = readCatalogCache(true)
+          setProducts(fallbackCache?.products ?? [])
+          setImageOverrides(fallbackCache?.imageOverrides ?? getEmptyImageOverrides())
         }
       } finally {
         if (isMounted) {

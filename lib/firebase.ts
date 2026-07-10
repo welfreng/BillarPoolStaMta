@@ -3,8 +3,7 @@ import { getAuth } from 'firebase/auth';
 import {
   getFirestore,
   initializeFirestore,
-  persistentLocalCache,
-  persistentMultipleTabManager,
+  memoryLocalCache,
 } from 'firebase/firestore';
 
 export const firebaseConfig = {
@@ -23,9 +22,7 @@ export const db =
   typeof window === 'undefined'
     ? getFirestore(app)
     : initializeFirestore(app, {
-        localCache: persistentLocalCache({
-          tabManager: persistentMultipleTabManager(),
-        }),
+        localCache: memoryLocalCache(),
       });
 
 export default app;
