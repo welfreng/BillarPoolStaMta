@@ -2,10 +2,11 @@
 
 import Image from "next/image"
 import { useEffect, useMemo, useState } from "react"
-import { doc, getDoc } from "firebase/firestore"
-import { Gift, MessageCircle, Sparkles, Tag } from "lucide-react"
+import { collection, doc, documentId, getDoc, getDocs, query, type DocumentData, where } from "firebase/firestore"
+import { Clock3, Gift, MessageCircle, Sparkles, Tag } from "lucide-react"
 import { db } from "@/lib/firebase"
 import { SITE_LOGO } from "@/lib/branding"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 interface PublicPromotion {
   id: string
@@ -17,18 +18,13 @@ interface PublicPromotion {
   priceText: string
   giftText: string
   conditionText: string
+  urgencyText: string
+  endsAt: string
   ctaText: string
   active: boolean
 }
 
 const whatsappNumber = "573006775284"
-const promotionsCacheKey = "bp-public-promotions-cache-v1"
-const promotionsCacheTtlMs = 30 * 60 * 1000
-
-interface PromotionsCache {
-  storedAt: number
-  items: PublicPromotion[]
-}
 
 function sanitizePromotion(item: Partial<PublicPromotion>, index: number): PublicPromotion {
   return {
@@ -38,61 +34,120 @@ function sanitizePromotion(item: Partial<PublicPromotion>, index: number): Publi
     productId: String(item.productId || ""),
     productName: String(item.productName || "Producto destacado"),
     productImage: String(item.productImage || SITE_LOGO),
-    priceText: String(item.priceText || ""),
+    priceText: formatPromotionPriceText(String(item.priceText || "")),
     giftText: String(item.giftText || ""),
     conditionText: String(item.conditionText || ""),
+    urgencyText: String(item.urgencyText || "No dejes pasar esta oportunidad"),
+    endsAt: String(item.endsAt || ""),
     ctaText: String(item.ctaText || "Quiero esta promocion"),
     active: item.active !== false,
   }
 }
 
-function readPromotionsCache(allowExpired = false): PromotionsCache | null {
-  if (typeof window === "undefined") return null
+function formatPromotionPriceText(value: string) {
+  const trimmedValue = value.trim()
+  if (!trimmedValue) return ""
 
-  try {
-    const rawCache = window.localStorage.getItem(promotionsCacheKey)
-    if (!rawCache) return null
+  const formatCopAmount = (amount: number) =>
+    `$ ${new Intl.NumberFormat("es-CO", {
+      maximumFractionDigits: 0,
+    }).format(amount)}`
 
-    const parsedCache = JSON.parse(rawCache) as Partial<PromotionsCache>
-    if (typeof parsedCache.storedAt !== "number" || !Array.isArray(parsedCache.items)) return null
+  const parseCurrencyText = (text: string) => {
+    const numericCandidate = text
+      .trim()
+      .replace(/\s/g, "")
+      .replace(/\$/g, "")
+      .replace(/COP/gi, "")
+      .replace(/\./g, "")
+      .replace(/,/g, ".")
+    const parsedValue = Number(numericCandidate)
+    return Number.isFinite(parsedValue) ? parsedValue : null
+  }
 
-    const isFresh = Date.now() - parsedCache.storedAt < promotionsCacheTtlMs
-    if (!allowExpired && !isFresh) return null
+  const parsedValue = parseCurrencyText(trimmedValue)
+  if (parsedValue !== null) return formatCopAmount(parsedValue)
 
-    return {
-      storedAt: parsedCache.storedAt,
-      items: parsedCache.items.map(sanitizePromotion).filter((item) => item.active),
-    }
-  } catch {
-    return null
+  return trimmedValue.replace(/(?:COP\s*)?\$?\s*(\d{1,3}(?:[.,]\d{3})+|\d{4,})(?:,\d+)?/gi, (match) => {
+    const parsedMatch = parseCurrencyText(match)
+    return parsedMatch === null ? match : formatCopAmount(parsedMatch)
+  })
+}
+
+function getPromotionTimeLeft(endsAt: string, now: number) {
+  if (!endsAt) return null
+  const endTime = new Date(endsAt).getTime()
+  if (Number.isNaN(endTime)) return null
+
+  const totalSeconds = Math.max(Math.floor((endTime - now) / 1000), 0)
+  const days = Math.floor(totalSeconds / 86400)
+  const hours = Math.floor((totalSeconds % 86400) / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+
+  return {
+    expired: totalSeconds <= 0,
+    days,
+    hours,
+    minutes,
+    seconds,
   }
 }
 
-function writePromotionsCache(items: PublicPromotion[]) {
-  if (typeof window === "undefined") return
+function formatCountdownPart(value: number) {
+  return String(value).padStart(2, "0")
+}
 
-  try {
-    window.localStorage.setItem(
-      promotionsCacheKey,
-      JSON.stringify({
-        storedAt: Date.now(),
-        items,
-      })
+function getPublicProductStock(data: DocumentData) {
+  const variants = Array.isArray(data.variants)
+    ? data.variants.filter((variant: DocumentData) => variant?.status !== "inactive")
+    : []
+
+  if (variants.length > 0) {
+    return variants.reduce(
+      (total: number, variant: DocumentData) =>
+        total + Math.max(Number(variant?.publicStock ?? variant?.stock ?? 0), 0),
+      0
     )
-  } catch {
-    // Cache only reduces Firestore reads; the section works without it.
   }
+
+  return Math.max(Number(data.publicStock ?? data.stock ?? data.stockOnHand ?? 0), 0)
 }
 
-function buildPromotionMessage(promotion: PublicPromotion) {
+async function loadPromotionProductStock(items: PublicPromotion[]) {
+  const productIds = Array.from(
+    new Set(items.map((item) => item.productId).filter((item): item is string => Boolean(item)))
+  ).slice(0, 10)
+
+  if (productIds.length === 0) return {}
+
+  const snapshot = await getDocs(
+    query(collection(db, "products"), where(documentId(), "in", productIds))
+  )
+
+  return snapshot.docs.reduce<Record<string, number>>((accumulator, item) => {
+    accumulator[item.id] = getPublicProductStock(item.data())
+    return accumulator
+  }, {})
+}
+
+function getPromotionCode(index: number) {
+  return `PROMO-${String(index + 1).padStart(2, "0")}`
+}
+
+function buildPromotionMessage(promotion: PublicPromotion, promotionCode: string) {
+  const priceText = formatPromotionPriceText(promotion.priceText)
+
   return [
     "Hola, quiero informacion sobre esta promocion:",
     "",
+    `Codigo: ${promotionCode}`,
     `Promocion: ${promotion.title}`,
     promotion.productName ? `Producto: ${promotion.productName}` : "",
-    promotion.priceText ? `Precio: ${promotion.priceText}` : "",
+    priceText ? `Precio: ${priceText}` : "",
     promotion.giftText ? `Incluye: ${promotion.giftText}` : "",
     promotion.conditionText ? `Condicion: ${promotion.conditionText}` : "",
+    promotion.endsAt ? `Finaliza: ${new Date(promotion.endsAt).toLocaleString("es-CO")}` : "",
   ]
     .filter(Boolean)
     .join("\n")
@@ -100,25 +155,20 @@ function buildPromotionMessage(promotion: PublicPromotion) {
 
 export default function Promotions() {
   const [promotions, setPromotions] = useState<PublicPromotion[]>([])
+  const [productStockById, setProductStockById] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
+  const [now, setNow] = useState(() => Date.now())
+  const [previewPromotion, setPreviewPromotion] = useState<PublicPromotion | null>(null)
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(interval)
+  }, [])
 
   useEffect(() => {
     let isMounted = true
 
     const loadPromotions = async () => {
-      const freshCache = readPromotionsCache()
-      if (freshCache) {
-        setPromotions(freshCache.items)
-        setLoading(false)
-        return
-      }
-
-      const expiredCache = readPromotionsCache(true)
-      if (expiredCache) {
-        setPromotions(expiredCache.items)
-        setLoading(false)
-      }
-
       try {
         const snapshot = await getDoc(doc(db, "siteAssets", "promotions"))
         if (!isMounted) return
@@ -129,11 +179,11 @@ export default function Promotions() {
           : []
 
         setPromotions(items)
-        writePromotionsCache(items)
+        setProductStockById(await loadPromotionProductStock(items))
       } catch (error) {
         console.warn("No se pudieron cargar las promociones:", error)
         if (isMounted) {
-          setPromotions(expiredCache?.items ?? [])
+          setPromotions([])
         }
       } finally {
         if (isMounted) {
@@ -149,7 +199,18 @@ export default function Promotions() {
     }
   }, [])
 
-  const visiblePromotions = useMemo(() => promotions.filter((item) => item.active), [promotions])
+  const visiblePromotions = useMemo(
+    () =>
+      promotions.filter((item) => {
+        if (!item.active) return false
+        if (item.productId && productStockById[item.productId] !== undefined && productStockById[item.productId] <= 0) {
+          return false
+        }
+        const timeLeft = getPromotionTimeLeft(item.endsAt, now)
+        return !timeLeft?.expired
+      }),
+    [now, productStockById, promotions]
+  )
 
   if (!loading && visiblePromotions.length === 0) return null
 
@@ -174,45 +235,93 @@ export default function Promotions() {
           </div>
         ) : (
           <div className="grid gap-5 lg:grid-cols-2">
-            {visiblePromotions.map((promotion) => {
-              const productUrl = promotion.productId ? `/tienda-virtual?producto=${promotion.productId}` : "/tienda-virtual"
-              const whatsappMessage = buildPromotionMessage(promotion)
+            {visiblePromotions.map((promotion, index) => {
+              const productUrl = "/tienda-virtual"
+              const promotionCode = getPromotionCode(index)
+              const priceText = formatPromotionPriceText(promotion.priceText)
+              const whatsappMessage = buildPromotionMessage(promotion, promotionCode)
+              const timeLeft = getPromotionTimeLeft(promotion.endsAt, now)
+              const countdownItems = timeLeft
+                ? [
+                    ...(timeLeft.days > 0 ? [{ label: "Dias", value: timeLeft.days }] : []),
+                    { label: "Horas", value: timeLeft.hours },
+                    { label: "Min", value: timeLeft.minutes },
+                    { label: "Seg", value: timeLeft.seconds },
+                  ]
+                : []
 
               return (
                 <article
                   key={promotion.id}
-                  className="overflow-hidden rounded-[28px] border border-slate-200 bg-[linear-gradient(135deg,#08162f_0%,#0a2472_58%,#0b1d3f_100%)] shadow-[0_24px_70px_rgba(8,22,47,0.18)]"
+                  className="overflow-hidden rounded-3xl border border-slate-200 bg-[linear-gradient(135deg,#08162f_0%,#0a2472_62%,#0b1d3f_100%)] shadow-[0_20px_55px_rgba(8,22,47,0.16)]"
                 >
-                  <div className="grid min-h-[320px] md:grid-cols-[0.95fr_1.05fr]">
-                    <div className="relative min-h-[240px] bg-white">
-                      <Image
-                        src={promotion.productImage || SITE_LOGO}
-                        alt={promotion.productName}
-                        fill
-                        className="object-contain p-5"
-                        unoptimized={(promotion.productImage || SITE_LOGO).startsWith("data:")}
-                      />
-                      <div className="absolute left-4 top-4 inline-flex items-center gap-2 rounded-full bg-[#d4a017] px-3 py-1.5 text-xs font-bold text-[#08162f]">
-                        <Sparkles className="h-3.5 w-3.5" />
-                        Promo
-                      </div>
+                  <div className="grid md:grid-cols-[0.82fr_1.18fr]">
+                    <div className="relative bg-white p-4">
+                      <button
+                        type="button"
+                        className="relative block h-64 w-full cursor-zoom-in rounded-2xl bg-white md:h-full md:min-h-[310px]"
+                        onClick={() => setPreviewPromotion(promotion)}
+                        aria-label={`Ampliar ${promotion.title}`}
+                      >
+                        <Image
+                          src={promotion.productImage || SITE_LOGO}
+                          alt={promotion.title || promotion.productName || "Promocion"}
+                          fill
+                          className="object-contain p-2"
+                          unoptimized={(promotion.productImage || SITE_LOGO).startsWith("data:")}
+                        />
+                        <div className="absolute left-2 top-2 inline-flex items-center gap-1.5 rounded-full bg-[#d4a017] px-2.5 py-1 text-[11px] font-bold text-[#08162f] shadow-sm">
+                          <Sparkles className="h-3.5 w-3.5" />
+                          {promotionCode}
+                        </div>
+                      </button>
+                      {timeLeft ? (
+                        <div className="mt-3 rounded-2xl border border-slate-200 bg-[#08162f] p-2.5 text-white shadow-lg md:absolute md:bottom-4 md:left-4 md:right-4 md:z-10 md:mt-0 md:bg-[#08162f]/92 md:backdrop-blur-md">
+                          <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#d4a017]">
+                            <Clock3 className="h-3.5 w-3.5" />
+                            Termina en
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            {countdownItems.slice(-3).map((item) => (
+                              <div key={item.label} className="rounded-xl bg-white/12 px-2 py-1.5 text-center">
+                                <p className="font-mono text-lg font-bold leading-none">
+                                  {formatCountdownPart(item.value)}
+                                </p>
+                                <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-white/55">
+                                  {item.label}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
 
-                    <div className="flex flex-col justify-between p-5 text-white sm:p-6">
+                    <div className="flex flex-col justify-between p-5 text-white">
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-200">
-                          {promotion.productName}
+                          {promotionCode}
                         </p>
-                        <h3 className="mt-3 font-mono text-2xl font-bold leading-tight">{promotion.title}</h3>
-                        <p className="mt-3 text-sm leading-6 text-white/72">{promotion.description}</p>
+                        <h3 className="mt-2 font-mono text-xl font-bold leading-tight sm:text-2xl">{promotion.title}</h3>
+                        <p className="mt-2 text-sm leading-6 text-white/72">{promotion.description}</p>
+                        <div className="mt-3 rounded-2xl border border-[#d4a017]/35 bg-[#d4a017]/12 px-3.5 py-3">
+                          <p className="text-sm font-bold text-[#f4d169]">
+                            {promotion.urgencyText || "No dejes pasar esta oportunidad"}
+                          </p>
+                          {timeLeft ? (
+                            <p className="mt-1 text-xs text-white/60">
+                              Esta promocion esta activa por tiempo limitado.
+                            </p>
+                          ) : null}
+                        </div>
 
-                        <div className="mt-5 grid gap-3">
-                          {promotion.priceText ? (
+                        <div className="mt-3 grid gap-2">
+                          {priceText ? (
                             <div className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/8 p-3">
                               <Tag className="mt-0.5 h-4 w-4 text-[#d4a017]" />
                               <div>
                                 <p className="text-xs uppercase tracking-[0.16em] text-white/45">Oferta</p>
-                                <p className="text-sm font-semibold">{promotion.priceText}</p>
+                                <p className="text-sm font-semibold">{priceText}</p>
                               </div>
                             </div>
                           ) : null}
@@ -231,21 +340,21 @@ export default function Promotions() {
                         </div>
                       </div>
 
-                      <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                      <div className="mt-4 flex flex-col gap-2 sm:flex-row">
                         <a
                           href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#d4a017] px-5 py-3 text-sm font-bold text-[#08162f] transition-colors hover:bg-[#d4a017]/90"
+                          className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#d4a017] px-4 py-2.5 text-sm font-bold text-[#08162f] transition-colors hover:bg-[#d4a017]/90"
                         >
                           <MessageCircle className="h-4 w-4" />
                           {promotion.ctaText || "Quiero esta promocion"}
                         </a>
                         <a
                           href={productUrl}
-                          className="inline-flex items-center justify-center rounded-xl border border-white/16 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/10"
+                          className="inline-flex items-center justify-center rounded-xl border border-white/16 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-white/10"
                         >
-                          Ver producto
+                          Ver productos
                         </a>
                       </div>
                     </div>
@@ -256,6 +365,27 @@ export default function Promotions() {
           </div>
         )}
       </div>
+      <Dialog open={Boolean(previewPromotion)} onOpenChange={(open) => !open && setPreviewPromotion(null)}>
+        {previewPromotion ? (
+          <DialogContent className="max-w-5xl bg-white p-0 sm:rounded-[28px]" showCloseButton>
+            <DialogHeader className="border-b border-slate-200 px-4 py-4 sm:px-6">
+              <DialogTitle className="text-left text-xl text-slate-950">{previewPromotion.title}</DialogTitle>
+              <DialogDescription className="text-left">
+                Imagen ampliada de la promocion.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="relative min-h-[70dvh] bg-white">
+              <Image
+                src={previewPromotion.productImage || SITE_LOGO}
+                alt={previewPromotion.title || "Promocion ampliada"}
+                fill
+                className="object-contain p-3 sm:p-6"
+                unoptimized={(previewPromotion.productImage || SITE_LOGO).startsWith("data:")}
+              />
+            </div>
+          </DialogContent>
+        ) : null}
+      </Dialog>
     </section>
   )
 }

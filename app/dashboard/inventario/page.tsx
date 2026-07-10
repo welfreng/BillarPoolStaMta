@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SectionHeader } from '@/components/admin/shared/section-header';
 import { MovementReasonBadge } from '@/components/admin/shared/status-badges';
-import { MovementFormDialog } from '@/components/admin/inventory/movement-form-dialog';
+import { MovementFormDialog, type MovementFormValues } from '@/components/admin/inventory/movement-form-dialog';
 import { InitialStockDialog } from '@/components/admin/inventory/initial-stock-dialog';
 import { GiftMovementDialog } from '@/components/admin/inventory/gift-movement-dialog';
 import { SaleFormDialog, type SaleFormValues } from '@/components/admin/sales/sale-form-dialog';
@@ -43,6 +43,7 @@ export default function InventarioPage() {
   const { toast } = useToast();
   const [openDialog, setOpenDialog] = useState(false);
   const [openInitialStockDialog, setOpenInitialStockDialog] = useState(false);
+  const [movementInitialValues, setMovementInitialValues] = useState<Partial<MovementFormValues> | undefined>();
   const [openGiftDialog, setOpenGiftDialog] = useState(false);
   const [openSaleDialog, setOpenSaleDialog] = useState(false);
   const [selectedProductForSaleId, setSelectedProductForSaleId] = useState<string | null>(null);
@@ -243,7 +244,13 @@ export default function InventarioPage() {
               >
                 <Gift className="mr-2 h-4 w-4" /> Registrar obsequio
               </Button>
-              <Button onClick={() => setOpenDialog(true)} className="w-full rounded-xl sm:w-auto">
+              <Button
+                onClick={() => {
+                  setMovementInitialValues(undefined);
+                  setOpenDialog(true);
+                }}
+                className="w-full rounded-xl sm:w-auto"
+              >
                 <Plus className="mr-2 h-4 w-4" /> Registrar movimiento
               </Button>
             </div>
@@ -920,9 +927,31 @@ export default function InventarioPage() {
                 });
               } catch (error) {
                 console.error('Error registrando carga inicial en Firestore:', error);
+                const message = error instanceof Error ? error.message : '';
+                if (message.toLowerCase().includes('historial de inventario')) {
+                  const firstItem = values.items.find((item) => Number(item.quantity) > 0);
+                  setMovementInitialValues({
+                    productId: values.productId,
+                    variantId: firstItem?.variantId ?? '',
+                    type: 'adjustment',
+                    reason: 'manual-adjustment',
+                    quantity: Number(firstItem?.quantity ?? 1),
+                    occurredAt: values.occurredAt,
+                    notes: `Ajuste por conteo fisico. ${values.notes}`.trim(),
+                    responsibleUser: currentResponsibleUser,
+                  });
+                  setOpenInitialStockDialog(false);
+                  setOpenDialog(true);
+                  toast({
+                    title: 'Usa Registrar movimiento',
+                    description:
+                      'Ese producto ya tenia historial. Te deje el movimiento prellenado para corregir el stock sin duplicar la carga inicial.',
+                  });
+                  return;
+                }
                 toast({
                   title: 'No se pudo registrar la carga inicial',
-                  description: error instanceof Error ? error.message : 'Revisa la configuracion y permisos de Firebase.',
+                  description: message || 'Revisa la configuracion y permisos de Firebase.',
                   variant: 'destructive',
                 });
                 throw error;
@@ -987,8 +1016,14 @@ export default function InventarioPage() {
 
           <MovementFormDialog
             open={openDialog}
-            onOpenChange={setOpenDialog}
+            onOpenChange={(nextOpen) => {
+              setOpenDialog(nextOpen);
+              if (!nextOpen) {
+                setMovementInitialValues(undefined);
+              }
+            }}
             products={products}
+            initialValues={movementInitialValues}
             onSubmit={async (values) => {
               try {
                 await registerMovement({
