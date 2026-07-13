@@ -42,6 +42,7 @@ import type { AuthorizationRequest, AuthorizationRequestType, Sale } from '@/lib
 function getAuthorizationTypeLabel(requestType: AuthorizationRequestType) {
   if (requestType === 'sale-return') return 'devolucion';
   if (requestType === 'sale-discount') return 'descuento';
+  if (requestType === 'sale-gift') return 'obsequio';
   return 'edicion';
 }
 
@@ -1102,6 +1103,21 @@ export default function VentasPage() {
                 } => Boolean(item)
               );
 
+            const giftLines = values.items.flatMap((item, index) => {
+              const saleProduct = products.find((productItem) => productItem.id === item.productId);
+              return (item.giftItems ?? [])
+                .filter((giftItem) => giftItem.productId && Number(giftItem.quantity ?? 0) > 0)
+                .map((giftItem) => {
+                  const giftProduct = products.find((productItem) => productItem.id === giftItem.productId);
+                  return {
+                    index: index + 1,
+                    productName: saleProduct?.name ?? 'Producto',
+                    giftName: giftProduct?.name ?? 'Obsequio',
+                    quantity: Number(giftItem.quantity ?? 0),
+                  };
+                });
+            });
+
             if (!editingSaleBatchId && isSalesUser && discountedLines.length > 0) {
               const draftRequestId = `discount-${Date.now()}`;
               const saleSummary = values.items
@@ -1133,6 +1149,41 @@ export default function VentasPage() {
               setOpenDialog(false);
               toast({
                 title: 'Solicitud de descuento enviada',
+                description: 'La venta no se registro aun. Quedo pendiente de aprobacion del administrador.',
+              });
+              return;
+            }
+            if (!editingSaleBatchId && isSalesUser && giftLines.length > 0) {
+              const draftRequestId = `gift-${Date.now()}`;
+              const saleSummary = values.items
+                .map((item) => {
+                  const product = products.find((productItem) => productItem.id === item.productId);
+                  return `${product?.name ?? 'Producto'} x${formatNumber(item.quantity)}`;
+                })
+                .join(' | ');
+              const reason = giftLines
+                .map(
+                  (line) =>
+                    `Linea ${line.index}: ${line.productName} incluye ${formatNumber(line.quantity)} ${line.giftName}`
+                )
+                .join(' | ');
+
+              await createAuthorizationRequest({
+                saleId: draftRequestId,
+                saleBatchId: draftRequestId,
+                requestType: 'sale-gift',
+                customerName: customerNameForSale,
+                saleSummary,
+                reason,
+                requestedBy:
+                  profile?.nombre?.trim() || user?.displayName || user?.email || 'Usuario de ventas',
+                requestedByRole: role ?? 'sales',
+                draftSalePayload: payload,
+              });
+
+              setOpenDialog(false);
+              toast({
+                title: 'Solicitud de obsequio enviada',
                 description: 'La venta no se registro aun. Quedo pendiente de aprobacion del administrador.',
               });
               return;

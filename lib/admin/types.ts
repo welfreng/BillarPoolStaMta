@@ -287,7 +287,7 @@ export interface AuthorizationDraftSalePayload {
   actorRole?: UserRole;
 }
 
-export type AuthorizationRequestType = 'sale-edit' | 'sale-return' | 'sale-discount';
+export type AuthorizationRequestType = 'sale-edit' | 'sale-return' | 'sale-discount' | 'sale-gift';
 export type AuthorizationRequestStatus = 'pending' | 'approved' | 'rejected' | 'completed';
 
 export interface AuthorizationRequest {
