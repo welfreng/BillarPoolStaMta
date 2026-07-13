@@ -1143,6 +1143,8 @@ function mapAuthorizationRequestDocument(documentId: string, data: DocumentData)
         ? 'sale-return'
         : data.requestType === 'sale-discount'
           ? 'sale-discount'
+          : data.requestType === 'sale-gift'
+            ? 'sale-gift'
           : 'sale-edit',
     status:
       data.status === 'approved' ||
@@ -1779,14 +1781,19 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   const buildPublicStockMap = (
     sourceProducts: Product[],
     touchedProductIds: string[],
-    addedMovements: Array<{ productId: string; quantity: number }> = []
+    addedMovements: Array<{ productId: string; quantity: number }> = [],
+    baseMovements: InventoryMovement[] = movements
   ) => {
     const uniqueProductIds = Array.from(new Set(touchedProductIds.filter(Boolean)));
 
     return new Map(
       uniqueProductIds.map((productId) => {
         const product = sourceProducts.find((item) => item.id === productId);
-        const currentStock = getStoredProductStock(product);
+        const movementStock = baseMovements
+          .filter((movement) => movement.productId === productId)
+          .reduce((total, movement) => total + Number(movement.quantity ?? 0), 0);
+        const hasMovementHistory = baseMovements.some((movement) => movement.productId === productId);
+        const currentStock = hasMovementHistory ? movementStock : getStoredProductStock(product);
         const delta = addedMovements
           .filter((movement) => movement.productId === productId)
           .reduce((total, movement) => total + movement.quantity, 0);
@@ -1801,13 +1808,12 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     addedMovements: Array<{ productId: string; quantity: number }> = [],
     baseMovements: InventoryMovement[] = movements
   ) => {
-    void baseMovements;
     const simpleProductIds = touchedProductIds.filter((productId) => {
       const product = sourceProducts.find((item) => item.id === productId);
       return product ? getProductSaleMode(product) !== 'varianted' : true;
     });
 
-    return buildPublicStockMap(sourceProducts, simpleProductIds, addedMovements);
+    return buildPublicStockMap(sourceProducts, simpleProductIds, addedMovements, baseMovements);
   };
 
   const applyPublicStockMapToBatch = (
@@ -2394,9 +2400,14 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const publicStock = getStoredProductStock(product);
+      const movementStock = movements
+        .filter((movement) => movement.productId === product.id)
+        .reduce((total, movement) => total + Number(movement.quantity ?? 0), 0);
+      const hasMovementHistory = movements.some((movement) => movement.productId === product.id);
+      const publicStock = Math.max(hasMovementHistory ? movementStock : getStoredProductStock(product), 0);
+      const currentPublicStock = Math.max(Number(product.publicStock ?? 0), 0);
       const shouldForcePublicStatus = publicStock > 0 && product.status !== 'active';
-      if (!shouldForcePublicStatus) {
+      if (currentPublicStock === publicStock && !shouldForcePublicStatus) {
         return;
       }
 
@@ -3664,7 +3675,9 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       batch,
       buildPublicStockMap(
         projectedProducts,
-        removedMovements.map((movement) => movement.productId)
+        removedMovements.map((movement) => movement.productId),
+        [],
+        remainingMovements
       )
     );
     applyVariantStockMapToBatch(
@@ -3698,7 +3711,9 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       batch,
       buildPublicStockMap(
         projectedProducts,
-        removedMovements.map((movement) => movement.productId)
+        removedMovements.map((movement) => movement.productId),
+        [],
+        remainingMovements
       )
     );
     applyVariantStockMapToBatch(
@@ -5097,6 +5112,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
           ? 'Solicitud de devolucion'
           : input.requestType === 'sale-discount'
             ? 'Solicitud de descuento'
+            : input.requestType === 'sale-gift'
+              ? 'Solicitud de obsequio'
           : 'Solicitud de edicion de venta',
       message: `${input.requestedBy} solicito autorizacion para ${input.customerName || 'cliente'}.`,
       href: '/dashboard/autorizaciones',

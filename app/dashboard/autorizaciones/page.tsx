@@ -18,6 +18,7 @@ import type { AuthorizationRequest } from '@/lib/admin/types';
 function getRequestTypeLabel(requestType: AuthorizationRequest['requestType']) {
   if (requestType === 'sale-return') return 'Devolucion';
   if (requestType === 'sale-discount') return 'Descuento';
+  if (requestType === 'sale-gift') return 'Obsequio';
   return 'Edicion';
 }
 
@@ -94,6 +95,40 @@ function buildDiscountApprovalSummary(
   };
 }
 
+function buildGiftApprovalSummary(
+  request: AuthorizationRequest,
+  products: ReturnType<typeof useAdminData>['products']
+) {
+  const lines = request.draftSalePayload?.items.flatMap((item, index) => {
+    const saleProduct = getProductById(products, item.productId);
+    return (item.giftItems ?? [])
+      .map((giftItem, giftIndex) => {
+        const giftProduct = getProductById(products, giftItem.productId);
+        if (!giftProduct) return null;
+        return {
+          key: `${item.productId}-${giftItem.productId}-${giftIndex}`,
+          lineNumber: index + 1,
+          saleProductName: saleProduct?.name ?? 'Producto',
+          giftProductName: giftProduct.name,
+          quantity: Number(giftItem.quantity ?? 0),
+        };
+      })
+      .filter(
+        (
+          gift
+        ): gift is {
+          key: string;
+          lineNumber: number;
+          saleProductName: string;
+          giftProductName: string;
+          quantity: number;
+        } => Boolean(gift)
+      );
+  }) ?? [];
+
+  return { lines };
+}
+
 export default function AutorizacionesPage() {
   const { role, profile, user } = useAuth();
   const { authorizationRequests, reviewAuthorizationRequest, completeAuthorizationRequest, registerSale, products } = useAdminData();
@@ -120,6 +155,10 @@ export default function AutorizacionesPage() {
     selectedRequest?.requestType === 'sale-discount'
       ? buildDiscountApprovalSummary(selectedRequest, products)
       : { lines: [], totalDiscount: 0 };
+  const selectedGiftSummary =
+    selectedRequest?.requestType === 'sale-gift'
+      ? buildGiftApprovalSummary(selectedRequest, products)
+      : { lines: [] };
 
   if (role !== 'admin' && role !== 'superadmin') {
     return (
@@ -136,7 +175,11 @@ export default function AutorizacionesPage() {
     if (!selectedRequest) return;
 
     try {
-      if (status === 'approved' && selectedRequest.requestType === 'sale-discount' && selectedRequest.draftSalePayload) {
+      if (
+        status === 'approved' &&
+        (selectedRequest.requestType === 'sale-discount' || selectedRequest.requestType === 'sale-gift') &&
+        selectedRequest.draftSalePayload
+      ) {
         await reviewAuthorizationRequest(selectedRequest.id, {
           status: 'approved',
           reviewNote,
@@ -148,8 +191,11 @@ export default function AutorizacionesPage() {
           completedBy: profile?.nombre?.trim() || user?.displayName || user?.email || 'Superadmin',
         });
         toast({
-          title: 'Descuento aprobado y venta registrada',
-          description: 'La venta con descuento ya quedo aplicada en el sistema.',
+          title:
+            selectedRequest.requestType === 'sale-gift'
+              ? 'Obsequio aprobado y venta registrada'
+              : 'Descuento aprobado y venta registrada',
+          description: 'La venta ya quedo aplicada en el sistema.',
         });
         setSelectedRequest(null);
         setReviewNote('');
@@ -181,7 +227,7 @@ export default function AutorizacionesPage() {
       <SectionHeader
         eyebrow="Control de aprobaciones"
         title="Autorizaciones"
-        description="Aprueba o rechaza las solicitudes que envian los vendedores para editar o devolver ventas."
+        description="Aprueba o rechaza solicitudes de vendedores para descuentos, obsequios, ediciones o devoluciones."
       />
 
       <div className="grid gap-3.5 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
@@ -225,7 +271,7 @@ export default function AutorizacionesPage() {
           <div>
             <h2 className="text-lg font-semibold text-foreground">Bandeja de solicitudes</h2>
             <p className="hidden text-sm text-muted-foreground sm:block">
-              Aqui revisas quien solicita editar o devolver una venta antes de autorizarla.
+              Aqui revisas las acciones sensibles antes de que afecten ventas e inventario.
             </p>
           </div>
           <Input
@@ -393,6 +439,24 @@ export default function AutorizacionesPage() {
                         </p>
                         <p className="mt-1 text-xs font-medium text-amber-800 dark:text-amber-200">
                           Descuento linea: {formatCurrency(line.lineDiscount)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {selectedRequest.requestType === 'sale-gift' && selectedGiftSummary.lines.length > 0 ? (
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 p-3 dark:border-emerald-900/60 dark:bg-emerald-950/20 sm:p-4">
+                  <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">Obsequio solicitado</p>
+                  <div className="mt-3 space-y-2">
+                    {selectedGiftSummary.lines.map((line) => (
+                      <div key={line.key} className="rounded-xl bg-white/70 px-3 py-2 dark:bg-slate-950/40">
+                        <p className="font-medium text-slate-900 dark:text-slate-100">
+                          Linea {line.lineNumber}: {line.saleProductName}
+                        </p>
+                        <p className="text-xs text-slate-600 dark:text-slate-300">
+                          Obsequio: {formatNumber(line.quantity)} uds de {line.giftProductName}
                         </p>
                       </div>
                     ))}
