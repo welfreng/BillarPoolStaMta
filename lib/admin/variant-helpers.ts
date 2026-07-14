@@ -92,8 +92,17 @@ export function getProductVariantStock(
   variantId: string | undefined,
   movements: InventoryMovement[]
 ) {
-  void movements;
   if (!product || !variantId) return 0;
+  const variantMovements = movements.filter(
+    (movement) => movement.productId === product.id && movement.variantId === variantId
+  );
+  if (variantMovements.length > 0) {
+    return Math.max(
+      variantMovements.reduce((total, movement) => total + Number(movement.quantity ?? 0), 0),
+      0
+    );
+  }
+
   const variant = (product.variants ?? []).find((item) => item.id === variantId);
   const directStock = Number(variant?.stock ?? variant?.publicStock ?? 0);
   if (Number.isFinite(directStock)) return Math.max(directStock, 0);
