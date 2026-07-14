@@ -763,15 +763,21 @@ function getProductVariantById(product: Product, variantId?: string) {
 }
 
 function buildVariantStockMap(products: Product[], sourceMovements: InventoryMovement[] = []) {
-  void sourceMovements;
   return new Map(
     products.map((product) => [
       product.id,
       new Map(
-        (product.variants ?? []).map((variant) => [
-          variant.id,
-          Math.max(Number(variant.stock ?? variant.publicStock ?? 0), 0),
-        ])
+        (product.variants ?? []).map((variant) => {
+          const variantMovements = sourceMovements.filter(
+            (movement) => movement.productId === product.id && movement.variantId === variant.id
+          );
+          const stock =
+            variantMovements.length > 0
+              ? variantMovements.reduce((total, movement) => total + Number(movement.quantity ?? 0), 0)
+              : Number(variant.stock ?? variant.publicStock ?? 0);
+
+          return [variant.id, Math.max(stock, 0)];
+        })
       ),
     ])
   );
@@ -789,6 +795,47 @@ function buildVariantStockMapFromProductState(products: Product[]) {
       ),
     ])
   );
+}
+
+function getMovementStockForProduct(productId: string, sourceMovements: InventoryMovement[]) {
+  return sourceMovements
+    .filter((movement) => movement.productId === productId)
+    .reduce((total, movement) => total + Number(movement.quantity ?? 0), 0);
+}
+
+function getSimpleProductAvailableStock(product: Product | undefined, sourceMovements: InventoryMovement[]) {
+  if (!product) return 0;
+  const hasMovementHistory = sourceMovements.some((movement) => movement.productId === product.id);
+  return Math.max(hasMovementHistory ? getMovementStockForProduct(product.id, sourceMovements) : getStoredProductStock(product), 0);
+}
+
+function getProductWithComputedStock(product: Product, sourceMovements: InventoryMovement[]) {
+  if (getProductSaleMode(product) !== 'varianted') {
+    const hasMovementHistory = sourceMovements.some((movement) => movement.productId === product.id);
+    if (!hasMovementHistory) return product;
+    const computedStock = getSimpleProductAvailableStock(product, sourceMovements);
+    return {
+      ...product,
+      publicStock: computedStock,
+    };
+  }
+
+  const variantStockMap = buildVariantStockMap([product], sourceMovements).get(product.id) ?? new Map<string, number>();
+  const variants = (product.variants ?? []).map((variant) => {
+    const stock = Math.max(Number(variantStockMap.get(variant.id) ?? variant.stock ?? variant.publicStock ?? 0), 0);
+    return {
+      ...variant,
+      stock,
+      publicStock: stock,
+    };
+  });
+  const publicStock = variants.reduce((total, variant) => total + Math.max(Number(variant.publicStock ?? 0), 0), 0);
+
+  return {
+    ...product,
+    variants,
+    publicStock,
+  };
 }
 
 function mapSupplierDocument(documentId: string, data: DocumentData): Supplier {
@@ -1835,6 +1882,29 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const getFreshMovementsForProductIds = async (productIds: string[]) => {
+    const uniqueProductIds = Array.from(new Set(productIds.filter(Boolean)));
+    if (uniqueProductIds.length === 0) return movements;
+
+    const freshMovementSnapshots = await Promise.all(
+      uniqueProductIds.map((productId) =>
+        getDocs(query(collection(db, 'movements'), where('productId', '==', productId)))
+      )
+    );
+    const freshMovementsById = new Map<string, InventoryMovement>();
+    freshMovementSnapshots.forEach((snapshot) => {
+      snapshot.docs.forEach((item) => {
+        freshMovementsById.set(item.id, mapMovementDocument(item.id, item.data()));
+      });
+    });
+
+    const touchedProductIdSet = new Set(uniqueProductIds);
+    return [
+      ...movements.filter((movement) => !touchedProductIdSet.has(movement.productId)),
+      ...Array.from(freshMovementsById.values()),
+    ];
+  };
+
   const applyVariantStockMapToBatch = (
     batch: ReturnType<typeof writeBatch>,
     variantStockMap: Map<string, Map<string, number>>,
@@ -2369,7 +2439,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     let changedCount = 0;
     products.forEach((product) => {
       if (getProductSaleMode(product) === 'varianted') {
-        const variantStockMap = buildVariantStockMap([product]).get(product.id) ?? new Map<string, number>();
+        const variantStockMap = buildVariantStockMap([product], movements).get(product.id) ?? new Map<string, number>();
         const computedPublicStock = Array.from(variantStockMap.values()).reduce((total, stock) => total + stock, 0);
         const currentPublicStock = Math.max(Number(product.publicStock ?? 0), 0);
         const hasVariantPublicStockMismatch = (product.variants ?? []).some(
@@ -2927,6 +2997,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     if (!targetProduct) {
       throw new Error('No se encontro el producto para registrar el movimiento.');
     }
+    const freshMovements = await getFreshMovementsForProductIds([input.productId]);
     const selectedVariant = input.variantId ? getProductVariantById(targetProduct, input.variantId) : null;
     if (getProductSaleMode(targetProduct) === 'varianted' && !selectedVariant) {
       throw new Error(`Selecciona una variante valida para ${targetProduct.name}.`);
@@ -2944,8 +3015,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       input.type === 'exit' ? -Math.abs(inputQuantity) : inputQuantity;
     if (input.type === 'exit') {
       const availableStock = selectedVariant
-        ? getProductVariantStock(targetProduct, selectedVariant.id, movements)
-        : getStoredProductStock(targetProduct);
+        ? getProductVariantStock(targetProduct, selectedVariant.id, freshMovements)
+        : getSimpleProductAvailableStock(targetProduct, freshMovements);
       if (inputQuantity > availableStock) {
         throw new Error(
           `No hay stock suficiente para ${targetProduct.name}. Disponible: ${availableStock}, solicitado: ${inputQuantity}.`
@@ -2987,10 +3058,10 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       batch,
       buildForwardPublicStockMap(products, [input.productId], [
         { productId: input.productId, quantity: normalizedQuantity },
-      ])
+      ], freshMovements)
     );
     if (selectedVariant) {
-      const variantStockMap = buildVariantStockMap(products, movements);
+      const variantStockMap = buildVariantStockMap(products, freshMovements);
       const productVariantMap = variantStockMap.get(input.productId);
       const currentVariantStock = productVariantMap?.get(selectedVariant.id) ?? selectedVariant.stock ?? 0;
       productVariantMap?.set(selectedVariant.id, Math.max(currentVariantStock + normalizedQuantity, 0));
@@ -3025,7 +3096,9 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
 
   const registerPurchase = async (input: RegisterPurchaseInput) => {
     const freshProducts = await getFreshProductsForPurchase(input);
-    return createPurchaseBatch(input, undefined, movements, freshProducts);
+    const touchedProductIds = input.items.map((item) => item.productId).filter(Boolean);
+    const freshMovements = await getFreshMovementsForProductIds(touchedProductIds);
+    return createPurchaseBatch(input, undefined, freshMovements, freshProducts);
   };
 
   const registerInitialStock = async (input: RegisterInitialStockInput) => {
@@ -3033,6 +3106,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     if (!targetProduct) {
       throw new Error('No se encontro el producto para cargar inventario inicial.');
     }
+    const freshMovements = await getFreshMovementsForProductIds([input.productId]);
     const selectedVariant = input.variantId ? getProductVariantById(targetProduct, input.variantId) : null;
     if (getProductSaleMode(targetProduct) === 'varianted' && !selectedVariant) {
       throw new Error(`Selecciona una variante valida para cargar inventario inicial de ${targetProduct.name}.`);
@@ -3046,7 +3120,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     if (!Number.isFinite(estimatedUnitCost) || estimatedUnitCost < 0) {
       throw new Error('El costo estimado debe ser un valor valido.');
     }
-    const alreadyHasInventoryHistory = movements.some(
+    const alreadyHasInventoryHistory = freshMovements.some(
       (movement) =>
         movement.productId === input.productId &&
         (selectedVariant ? movement.variantId === selectedVariant.id : !movement.variantId)
@@ -3136,10 +3210,10 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       batch,
       buildForwardPublicStockMap(products, [input.productId], [
         { productId: input.productId, quantity },
-      ])
+      ], freshMovements)
     );
     if (selectedVariant) {
-      const variantStockMap = buildVariantStockMap(products, movements);
+      const variantStockMap = buildVariantStockMap(products, freshMovements);
       const productVariantMap = variantStockMap.get(input.productId);
       const currentVariantStock = productVariantMap?.get(selectedVariant.id) ?? selectedVariant.stock ?? 0;
       productVariantMap?.set(selectedVariant.id, currentVariantStock + quantity);
@@ -3174,8 +3248,9 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       throw new Error('Agrega al menos una linea con cantidad mayor a cero.');
     }
 
+    const freshMovements = await getFreshMovementsForProductIds([input.productId]);
     const isVarianted = getProductSaleMode(targetProduct) === 'varianted';
-    const variantStockMap = buildVariantStockMap(products, movements);
+    const variantStockMap = buildVariantStockMap(products, freshMovements);
     const productVariantMap = variantStockMap.get(input.productId);
     const batchId = doc(collection(db, 'purchase-batches')).id;
     const stockDeltas: Array<{ productId: string; quantity: number }> = [];
@@ -3195,7 +3270,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       if (!Number.isFinite(item.estimatedUnitCost) || item.estimatedUnitCost < 0) {
         throw new Error('El costo estimado debe ser un valor valido.');
       }
-      const alreadyHasInventoryHistory = movements.some(
+      const alreadyHasInventoryHistory = freshMovements.some(
         (movement) =>
           movement.productId === input.productId &&
           (selectedVariant ? movement.variantId === selectedVariant.id : !movement.variantId)
@@ -3310,7 +3385,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       buildForwardPublicStockMap(
         products,
         [input.productId],
-        stockDeltas
+        stockDeltas,
+        freshMovements
       )
     );
     if (isVarianted) {
@@ -3377,6 +3453,9 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     }
     if (normalizedItemsWithConvertedPrice.some((item) => item.presentationQuantity <= 0)) {
       throw new Error('Cada linea debe tener una cantidad comprada mayor a cero.');
+    }
+    if (normalizedItemsWithConvertedPrice.some((item) => !Number.isInteger(item.presentationQuantity))) {
+      throw new Error('Cada linea debe tener una cantidad comprada entera, sin decimales.');
     }
     if (normalizedItemsWithConvertedPrice.some((item) => item.suggestedSalePrice < 0)) {
       throw new Error('El precio sugerido no puede ser negativo.');
@@ -3597,20 +3676,27 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     if (targetPurchases.length === 0) {
       throw new Error('No se encontro la compra agrupada a editar.');
     }
+    const freshTouchedProductIds = Array.from(
+      new Set([
+        ...targetPurchases.map((purchase) => purchase.productId),
+        ...input.items.map((item) => item.productId),
+      ].filter(Boolean))
+    );
+    const freshMovements = await getFreshMovementsForProductIds(freshTouchedProductIds);
 
     const batch = writeBatch(db);
     targetPurchases.forEach((purchase) => {
       batch.delete(doc(db, 'purchases', purchase.id));
       batch.delete(doc(db, 'purchase_items', purchase.id));
     });
-    movements
+    freshMovements
       .filter((movement) => movement.purchaseBatchId === batchId)
       .forEach((movement) => {
         batch.delete(doc(db, 'movements', movement.id));
         batch.delete(doc(db, 'inventory_movements', movement.id));
       });
 
-    const remainingMovements = movements.filter((movement) => movement.purchaseBatchId !== batchId);
+    const remainingMovements = freshMovements.filter((movement) => movement.purchaseBatchId !== batchId);
     const projectedProducts = projectProductsWithoutPurchases(products, targetPurchases);
     const updatedPurchases = addPurchaseBatchWritesToBatch(
       batch,
@@ -3631,18 +3717,22 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     if (input.items.length !== 1) {
       throw new Error('La edicion de producto debe contener una sola linea.');
     }
+    const freshTouchedProductIds = Array.from(
+      new Set([targetPurchase.productId, ...input.items.map((item) => item.productId)].filter(Boolean))
+    );
+    const freshMovements = await getFreshMovementsForProductIds(freshTouchedProductIds);
 
     const batch = writeBatch(db);
     batch.delete(doc(db, 'purchases', purchaseId));
     batch.delete(doc(db, 'purchase_items', purchaseId));
-    movements
+    freshMovements
       .filter((movement) => movement.purchaseId === purchaseId)
       .forEach((movement) => {
         batch.delete(doc(db, 'movements', movement.id));
         batch.delete(doc(db, 'inventory_movements', movement.id));
       });
 
-    const remainingMovements = movements.filter((movement) => movement.purchaseId !== purchaseId);
+    const remainingMovements = freshMovements.filter((movement) => movement.purchaseId !== purchaseId);
     const projectedProducts = projectProductsWithoutPurchases(products, [targetPurchase]);
     const [updatedPurchase] = addPurchaseBatchWritesToBatch(
       batch,
@@ -3660,16 +3750,17 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     if (!targetPurchase) {
       throw new Error('No se encontro la compra a eliminar.');
     }
+    const freshMovements = await getFreshMovementsForProductIds([targetPurchase.productId]);
 
     const batch = writeBatch(db);
     batch.delete(doc(db, 'purchases', purchaseId));
     batch.delete(doc(db, 'purchase_items', purchaseId));
-    const removedMovements = movements.filter((movement) => movement.purchaseId === purchaseId);
+    const removedMovements = freshMovements.filter((movement) => movement.purchaseId === purchaseId);
     removedMovements.forEach((movement) => {
       batch.delete(doc(db, 'movements', movement.id));
       batch.delete(doc(db, 'inventory_movements', movement.id));
     });
-    const remainingMovements = movements.filter((movement) => movement.purchaseId !== purchaseId);
+    const remainingMovements = freshMovements.filter((movement) => movement.purchaseId !== purchaseId);
     const projectedProducts = projectProductsWithoutPurchases(products, [targetPurchase]);
     applyPublicStockMapToBatch(
       batch,
@@ -3694,18 +3785,19 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     if (targetPurchases.length === 0) {
       throw new Error('No se encontro la compra agrupada a eliminar.');
     }
+    const freshMovements = await getFreshMovementsForProductIds(targetPurchases.map((purchase) => purchase.productId));
 
     const batch = writeBatch(db);
     targetPurchases.forEach((purchase) => {
       batch.delete(doc(db, 'purchases', purchase.id));
       batch.delete(doc(db, 'purchase_items', purchase.id));
     });
-    const removedMovements = movements.filter((movement) => movement.purchaseBatchId === batchId);
+    const removedMovements = freshMovements.filter((movement) => movement.purchaseBatchId === batchId);
     removedMovements.forEach((movement) => {
       batch.delete(doc(db, 'movements', movement.id));
       batch.delete(doc(db, 'inventory_movements', movement.id));
     });
-    const remainingMovements = movements.filter((movement) => movement.purchaseBatchId !== batchId);
+    const remainingMovements = freshMovements.filter((movement) => movement.purchaseBatchId !== batchId);
     const projectedProducts = projectProductsWithoutPurchases(products, targetPurchases);
     applyPublicStockMapToBatch(
       batch,
@@ -3782,7 +3874,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       } else {
         const availableStock = simpleStockMap.has(item.productId)
           ? Number(simpleStockMap.get(item.productId) ?? 0)
-          : getStoredProductStock(targetProduct);
+          : getSimpleProductAvailableStock(targetProduct, baseMovements);
         if (quantity > availableStock) {
           throw new Error(`La cantidad vendida supera el stock disponible de ${targetProduct.name}.`);
         }
@@ -3838,7 +3930,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
           } else {
             const availableStock = simpleStockMap.has(materialProduct.id)
               ? Number(simpleStockMap.get(materialProduct.id) ?? 0)
-              : getStoredProductStock(materialProduct);
+              : getSimpleProductAvailableStock(materialProduct, baseMovements);
             if (quantity > availableStock) {
               throw new Error(`La cantidad usada supera el stock disponible de ${materialProduct.name}.`);
             }
@@ -3881,7 +3973,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
 
     for (const [productId, requestedQuantity] of requestedGiftTotals) {
       const giftProduct = baseProducts.find((product) => product.id === productId);
-      const availableGiftStock = getStoredProductStock(giftProduct);
+      const availableGiftStock = getSimpleProductAvailableStock(giftProduct, baseMovements);
       const stockReservedBySale = lineRecords
         .filter((record) => record.lineItem.productId === productId)
         .reduce((sum, record) => sum + record.lineItem.quantity, 0);
@@ -4167,7 +4259,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     return createdSales;
   };
 
-  const getFreshProductsForSale = async (input: RegisterSaleInput) => {
+  const getTouchedProductIdsForSale = (input: RegisterSaleInput) => {
     const touchedProductIds = new Set<string>();
     input.items.forEach((item) => {
       if (item.productId) touchedProductIds.add(item.productId);
@@ -4181,12 +4273,18 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       });
     });
 
-    if (touchedProductIds.size === 0) {
+    return Array.from(touchedProductIds);
+  };
+
+  const getFreshProductsForSale = async (input: RegisterSaleInput) => {
+    const touchedProductIds = getTouchedProductIdsForSale(input);
+
+    if (touchedProductIds.length === 0) {
       return products;
     }
 
     const freshProductDocs = await Promise.all(
-      Array.from(touchedProductIds).map((productId) => getDoc(doc(db, 'products', productId)))
+      touchedProductIds.map((productId) => getDoc(doc(db, 'products', productId)))
     );
     const freshProductsById = new Map(
       freshProductDocs
@@ -4215,7 +4313,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
 
   const registerSale = async (input: RegisterSaleInput) => {
     const freshProducts = await getFreshProductsForSale(input);
-    return registerSaleInternal(input, movements, freshProducts);
+    const freshMovements = await getFreshMovementsForProductIds(getTouchedProductIdsForSale(input));
+    return registerSaleInternal(input, freshMovements, freshProducts);
   };
 
   const updateSaleBatch = async (saleBatchId: string, input: RegisterSaleInput) => {
@@ -4223,7 +4322,17 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     if (existingSales.length === 0) {
       throw new Error('No se encontro la venta a editar.');
     }
-    const giftMovementsToUpdate = existingSales.flatMap((sale) => findGiftMovementForSale(movements, sale));
+    const freshTouchedProductIds = Array.from(
+      new Set([
+        ...existingSales.flatMap((sale) => [
+          ...sale.lineItems.map((item) => item.productId),
+          ...sale.giftItems.map((item) => item.productId),
+        ]),
+        ...getTouchedProductIdsForSale(input),
+      ].filter(Boolean))
+    );
+    const freshMovements = await getFreshMovementsForProductIds(freshTouchedProductIds);
+    const giftMovementsToUpdate = existingSales.flatMap((sale) => findGiftMovementForSale(freshMovements, sale));
     const linkedServiceOrders = services.filter(
       (service) => service.source === 'sale-addon' && service.saleBatchId === saleBatchId
     );
@@ -4292,7 +4401,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         totalCost: quantity * realUnitCost,
       };
 
-      const giftItems = buildSaleGiftItems(item, targetProduct, restoredProducts, purchases, movements);
+      const giftItems = buildSaleGiftItems(item, targetProduct, restoredProducts, purchases, freshMovements);
       giftItems.forEach((giftItem) => {
         requestedGiftTotals.set(giftItem.productId, (requestedGiftTotals.get(giftItem.productId) ?? 0) + giftItem.quantity);
       });
@@ -4322,7 +4431,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       const restoredStock =
         restoredProduct && getProductSaleMode(restoredProduct) === 'varianted'
           ? getStoredProductStock(restoredProduct)
-          : getStoredProductStock(currentProduct) + restoredExistingQuantity;
+          : getSimpleProductAvailableStock(currentProduct, freshMovements) + restoredExistingQuantity;
       const requestedStock =
         nextLineRecords
           .filter((record) => record.lineItem.productId === productId)
@@ -4342,7 +4451,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     existingSales.forEach((sale) => batch.delete(doc(db, 'sales', sale.id)));
     linkedServiceOrders.forEach((service) => batch.delete(doc(db, 'services', service.id)));
     const saleMovementsToDelete = new Map<string, InventoryMovement>();
-    movements
+    freshMovements
       .filter((movement) => existingSales.some((sale) => sale.id === movement.saleId))
       .forEach((movement) => saleMovementsToDelete.set(movement.id, movement));
     giftMovementsToUpdate.forEach((movement) => saleMovementsToDelete.set(movement.id, movement));
@@ -4350,7 +4459,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       batch.delete(doc(db, 'movements', movement.id));
       batch.delete(doc(db, 'inventory_movements', movement.id));
     });
-    const remainingMovements = movements.filter(
+    const remainingMovements = freshMovements.filter(
       (movement) =>
         !existingSales.some((sale) => sale.id === movement.saleId) &&
         !saleMovementsToDelete.has(movement.id)
@@ -4389,6 +4498,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     if (!sale) {
       throw new Error('No se encontro la venta para registrar la devolucion.');
     }
+    const freshMovements = await getFreshMovementsForProductIds([sale.productId]);
 
     const remainingQuantity = sale.quantity - (sale.returnedQuantity ?? 0);
     if (input.quantity <= 0) {
@@ -4445,10 +4555,10 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       batch,
       buildForwardPublicStockMap(products, [sale.productId], [
         { productId: sale.productId, quantity: Math.abs(input.quantity) },
-      ])
+      ], freshMovements)
     );
     if (sale.lineItems[0]?.variantId) {
-      const variantStockMap = buildVariantStockMap(products, movements);
+      const variantStockMap = buildVariantStockMap(products, freshMovements);
       const productVariantMap = variantStockMap.get(sale.productId);
       const currentVariantStock = productVariantMap?.get(sale.lineItems[0].variantId!) ?? 0;
       productVariantMap?.set(sale.lineItems[0].variantId!, currentVariantStock + Math.abs(input.quantity));
@@ -4496,6 +4606,9 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       }
       saleMap.set(item.saleId, sale);
     });
+    const freshMovements = await getFreshMovementsForProductIds(
+      Array.from(saleMap.values()).map((sale) => sale.productId)
+    );
 
     const batch = writeBatch(db);
     const stockDeltas: Array<{ productId: string; quantity: number }> = [];
@@ -4563,10 +4676,11 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       buildForwardPublicStockMap(
         products,
         stockDeltas.map((item) => item.productId),
-        stockDeltas
+        stockDeltas,
+        freshMovements
       )
     );
-    const variantStockMap = buildVariantStockMap(products, movements);
+    const variantStockMap = buildVariantStockMap(products, freshMovements);
     updatedSales.forEach((sale) => {
       const variantId = sale.lineItems[0]?.variantId;
       if (!variantId) return;
@@ -4642,7 +4756,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
 
       const availableStock = selectedVariant
         ? getProductVariantStock(product, selectedVariant.id, baseMovements)
-        : getStoredProductStock(product);
+        : getSimpleProductAvailableStock(product, baseMovements);
       if (quantity > availableStock) {
         throw new Error(
           `La cantidad usada supera el stock disponible de ${selectedVariant ? `${product.name} - ${selectedVariant.name}` : product.name}.`
@@ -4798,8 +4912,12 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     return plan.service;
   };
 
+  const getTouchedProductIdsForService = (input: RegisterServiceInput) =>
+    Array.from(new Set(input.materials.map((material) => material.productId).filter(Boolean)));
+
   const registerService = async (input: RegisterServiceInput) => {
-    return registerServiceInternal(input);
+    const freshMovements = await getFreshMovementsForProductIds(getTouchedProductIdsForService(input));
+    return registerServiceInternal(input, freshMovements, products);
   };
 
   const updateService = async (serviceId: string, input: RegisterServiceInput) => {
@@ -4811,8 +4929,16 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       throw new Error('Los servicios asociados a una venta deben editarse desde la venta original.');
     }
 
-    const linkedMovements = movements.filter((movement) => movement.serviceOrderId === serviceId);
-    const restoredProducts = products.map((product) => {
+    const touchedProductIds = Array.from(
+      new Set([
+        ...existingService.materials.map((material) => material.productId),
+        ...getTouchedProductIdsForService(input),
+      ].filter(Boolean))
+    );
+    const freshMovements = await getFreshMovementsForProductIds(touchedProductIds);
+    const linkedMovements = freshMovements.filter((movement) => movement.serviceOrderId === serviceId);
+    const computedProducts = products.map((product) => getProductWithComputedStock(product, freshMovements));
+    const restoredProducts = computedProducts.map((product) => {
       const variantRestorations = new Map<string, number>();
       existingService.materials
         .filter((item) => item.productId === product.id && item.variantId)
@@ -4836,7 +4962,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       };
     });
 
-    const remainingMovements = movements.filter((movement) => movement.serviceOrderId !== serviceId);
+    const remainingMovements = freshMovements.filter((movement) => movement.serviceOrderId !== serviceId);
     const plan = buildServiceWritePlan(input, remainingMovements, restoredProducts, { serviceId });
 
     const batch = writeBatch(db);
@@ -5183,9 +5309,13 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     };
   };
 
+  const productsWithComputedStock = useMemo(
+    () => products.map((product) => getProductWithComputedStock(product, movements)),
+    [movements, products]
+  );
   const summary = useMemo(
-    () => getDashboardSummary(products, movements, purchases, sales, services),
-    [movements, products, purchases, sales, services]
+    () => getDashboardSummary(productsWithComputedStock, movements, purchases, sales, services),
+    [movements, productsWithComputedStock, purchases, sales, services]
   );
   const latestMovements = useMemo(() => getLatestMovements(movements), [movements]);
 
@@ -5194,7 +5324,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       value={{
         loading,
         categories,
-        products,
+        products: productsWithComputedStock,
         suppliers,
         movements,
         purchases,
