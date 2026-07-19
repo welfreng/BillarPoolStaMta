@@ -432,7 +432,7 @@ export default function WebPageManagementPage() {
       />
 
       <div className="grid gap-4 sm:gap-6 2xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
-        <section className="rounded-3xl border border-border bg-card/88 p-3.5 shadow-sm dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-[0_18px_40px_rgba(2,6,23,0.24)] sm:p-5">
+        <section className="rounded-2xl border border-border bg-card/88 p-3.5 shadow-sm dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-[0_14px_34px_rgba(2,6,23,0.22)] sm:p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
             <div className="rounded-2xl bg-cyan-50 p-3 dark:bg-cyan-950/50">
               <Globe className="h-5 w-5 text-cyan-700 dark:text-cyan-300" />
@@ -445,7 +445,7 @@ export default function WebPageManagementPage() {
             </div>
           </div>
 
-          <div className="mt-4 rounded-3xl border border-dashed border-border bg-muted/70 p-3.5 dark:border-slate-800 dark:bg-slate-900/70 sm:mt-5 sm:p-5">
+          <div className="mt-4 rounded-2xl border border-dashed border-border bg-muted/70 p-3.5 dark:border-slate-800 dark:bg-slate-900/70 sm:mt-5 sm:p-4">
             <p className="text-sm font-medium text-foreground">Recomendacion</p>
             <p className="mt-2 hidden text-sm leading-6 text-slate-600 dark:text-slate-300 sm:block">
               Lo mejor es concentrar aqui todo lo visual de la web: fotos del catalogo, galeria de servicios y luego textos destacados si decides cambiarlos despues.
@@ -464,9 +464,9 @@ export default function WebPageManagementPage() {
           </div>
         </section>
 
-        <section className="relative rounded-3xl border border-border bg-card/88 p-3.5 shadow-sm dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-[0_18px_40px_rgba(2,6,23,0.24)] sm:p-5">
+        <section className="relative rounded-2xl border border-border bg-card/88 p-3.5 shadow-sm dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-[0_14px_34px_rgba(2,6,23,0.22)] sm:p-5">
           {savingPromotions ? (
-            <div className="absolute inset-0 z-20 grid place-items-center rounded-3xl bg-background/82 px-4 text-center backdrop-blur-sm">
+            <div className="absolute inset-0 z-20 grid place-items-center rounded-2xl bg-background/82 px-4 text-center backdrop-blur-sm">
               <div className="grid max-w-sm place-items-center gap-3 rounded-xl border bg-card p-5 shadow-lg">
                 <Spinner className="h-7 w-7 text-primary" />
                 <div className="space-y-1">
@@ -506,7 +506,7 @@ export default function WebPageManagementPage() {
           </div>
 
           {draftPromotions.length > 0 ? (
-            <div className="mt-4 overflow-hidden rounded-3xl border border-border bg-background/72 dark:border-slate-800 dark:bg-slate-950/50">
+            <div className="mt-4 overflow-hidden rounded-2xl border border-border bg-background/72 dark:border-slate-800 dark:bg-slate-950/50">
               <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground dark:border-slate-800 sm:grid-cols-[minmax(0,1fr)_120px_150px_110px]">
                 <span>Promocion</span>
                 <span className="hidden sm:block">Estado</span>
@@ -571,7 +571,7 @@ export default function WebPageManagementPage() {
               const promotion = selectedPromotion;
               const index = Math.max(draftPromotions.findIndex((item) => item.id === promotion.id), 0);
               return (
-              <div key={promotion.id} className="rounded-3xl border border-border bg-muted/60 p-3.5 dark:border-slate-800 dark:bg-slate-900/70 sm:p-4">
+              <div key={promotion.id} className="rounded-2xl border border-border bg-muted/60 p-3.5 dark:border-slate-800 dark:bg-slate-900/70 sm:p-4">
                 <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm font-semibold text-foreground">Promocion {index + 1}</p>
@@ -608,9 +608,9 @@ export default function WebPageManagementPage() {
                 <div className="grid gap-3 lg:grid-cols-2">
                   <div className="space-y-2 lg:col-span-2">
                     <Label>Imagen de la promocion</Label>
-                    <div className="flex flex-col gap-3 rounded-2xl border border-border bg-background/72 p-3 dark:border-slate-800 dark:bg-slate-950/50 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-col gap-3 rounded-xl border border-border bg-background/72 p-3 dark:border-slate-800 dark:bg-slate-950/50 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex min-w-0 items-center gap-3">
-                        <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 sm:h-28 sm:w-36">
+                        <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 sm:h-24 sm:w-32">
                           {promotion.productImage ? (
                             <Image
                               src={promotion.productImage}
@@ -800,7 +800,7 @@ export default function WebPageManagementPage() {
             })() : null}
 
             {draftPromotions.length === 0 ? (
-              <div className="rounded-3xl border border-dashed border-border bg-muted/70 p-5 text-center text-sm text-muted-foreground dark:border-slate-800 dark:bg-slate-900/70">
+              <div className="rounded-2xl border border-dashed border-border bg-muted/70 p-5 text-center text-sm text-muted-foreground dark:border-slate-800 dark:bg-slate-900/70">
                 No hay promociones configuradas. Agrega una para mostrarla en la pagina publica.
               </div>
             ) : null}
@@ -827,9 +827,9 @@ export default function WebPageManagementPage() {
           </div>
         </section>
 
-        <section className="relative rounded-3xl border border-border bg-card/88 p-3.5 shadow-sm dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-[0_18px_40px_rgba(2,6,23,0.24)] sm:p-5">
+        <section className="relative rounded-2xl border border-border bg-card/88 p-3.5 shadow-sm dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-[0_14px_34px_rgba(2,6,23,0.22)] sm:p-5">
           {savingServices ? (
-            <div className="absolute inset-0 z-20 grid place-items-center rounded-3xl bg-background/82 px-4 text-center backdrop-blur-sm">
+            <div className="absolute inset-0 z-20 grid place-items-center rounded-2xl bg-background/82 px-4 text-center backdrop-blur-sm">
               <div className="grid max-w-sm place-items-center gap-3 rounded-xl border bg-card p-5 shadow-lg">
                 <Spinner className="h-7 w-7 text-primary" />
                 <div className="space-y-1">
@@ -853,10 +853,10 @@ export default function WebPageManagementPage() {
               return (
                 <div
                   key={slot}
-                  className="flex flex-col gap-3 rounded-2xl border border-border bg-muted/70 p-3 dark:border-slate-800 dark:bg-slate-900/70 sm:flex-row sm:items-center sm:justify-between"
+                  className="flex flex-col gap-3 rounded-xl border border-border bg-muted/70 p-3 dark:border-slate-800 dark:bg-slate-900/70 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="flex min-w-0 items-center gap-3">
-                    <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 sm:h-24 sm:w-28">
+                    <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 sm:h-20 sm:w-24">
                       {image ? (
                         <Image
                           src={image}

@@ -215,9 +215,9 @@ export default function Promotions() {
   if (!loading && visiblePromotions.length === 0) return null
 
   return (
-    <section id="promociones" className="relative z-10 bg-white py-20">
-      <div className="mx-auto max-w-7xl px-4 lg:px-8">
-        <div className="mb-10 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <section id="promociones" className="relative z-10 bg-white py-16 sm:py-18">
+      <div className="mx-auto max-w-6xl px-4 lg:px-8">
+        <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="mb-2 text-sm font-semibold uppercase tracking-widest text-[#d4a017]">Promociones</p>
             <h2 className="font-mono text-3xl font-bold tracking-tight text-[#08162f] sm:text-4xl">
@@ -230,11 +230,11 @@ export default function Promotions() {
         </div>
 
         {loading && visiblePromotions.length === 0 ? (
-          <div className="rounded-3xl border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">
             Cargando promociones...
           </div>
         ) : (
-          <div className="grid gap-5 lg:grid-cols-2">
+          <div className="grid gap-5 xl:grid-cols-2">
             {visiblePromotions.map((promotion, index) => {
               const productUrl = "/tienda-virtual"
               const promotionCode = getPromotionCode(index)
@@ -253,13 +253,13 @@ export default function Promotions() {
               return (
                 <article
                   key={promotion.id}
-                  className="overflow-hidden rounded-3xl border border-slate-200 bg-[linear-gradient(135deg,#08162f_0%,#0a2472_62%,#0b1d3f_100%)] shadow-[0_20px_55px_rgba(8,22,47,0.16)]"
+                  className="overflow-hidden rounded-2xl border border-slate-200 bg-[linear-gradient(135deg,#08162f_0%,#0a2472_62%,#0b1d3f_100%)] shadow-[0_18px_42px_rgba(8,22,47,0.14)]"
                 >
-                  <div className="grid md:grid-cols-[0.82fr_1.18fr]">
-                    <div className="relative bg-white p-4">
+                  <div className="grid md:grid-cols-[0.74fr_1.26fr]">
+                    <div className="relative bg-white p-3">
                       <button
                         type="button"
-                        className="relative block h-64 w-full cursor-zoom-in rounded-2xl bg-white md:h-full md:min-h-[310px]"
+                        className="relative block h-56 w-full cursor-zoom-in rounded-xl bg-white sm:h-64 md:h-full md:min-h-[292px]"
                         onClick={() => setPreviewPromotion(promotion)}
                         aria-label={`Ampliar ${promotion.title}`}
                       >
@@ -267,7 +267,7 @@ export default function Promotions() {
                           src={promotion.productImage || SITE_LOGO}
                           alt={promotion.title || promotion.productName || "Promocion"}
                           fill
-                          className="object-contain p-2"
+                          className="object-contain p-1.5"
                           unoptimized={(promotion.productImage || SITE_LOGO).startsWith("data:")}
                         />
                         <div className="absolute left-2 top-2 inline-flex items-center gap-1.5 rounded-full bg-[#d4a017] px-2.5 py-1 text-[11px] font-bold text-[#08162f] shadow-sm">
@@ -276,14 +276,14 @@ export default function Promotions() {
                         </div>
                       </button>
                       {timeLeft ? (
-                        <div className="mt-3 rounded-2xl border border-slate-200 bg-[#08162f] p-2.5 text-white shadow-lg md:absolute md:bottom-4 md:left-4 md:right-4 md:z-10 md:mt-0 md:bg-[#08162f]/92 md:backdrop-blur-md">
+                        <div className="mt-3 rounded-xl border border-slate-200 bg-[#08162f] p-2.5 text-white shadow-lg md:absolute md:bottom-3 md:left-3 md:right-3 md:z-10 md:mt-0 md:bg-[#08162f]/92 md:backdrop-blur-md">
                           <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#d4a017]">
                             <Clock3 className="h-3.5 w-3.5" />
                             Termina en
                           </div>
                           <div className="grid grid-cols-3 gap-2">
                             {countdownItems.slice(-3).map((item) => (
-                              <div key={item.label} className="rounded-xl bg-white/12 px-2 py-1.5 text-center">
+                              <div key={item.label} className="rounded-lg bg-white/12 px-2 py-1.5 text-center">
                                 <p className="font-mono text-lg font-bold leading-none">
                                   {formatCountdownPart(item.value)}
                                 </p>
@@ -297,14 +297,14 @@ export default function Promotions() {
                       ) : null}
                     </div>
 
-                    <div className="flex flex-col justify-between p-5 text-white">
+                    <div className="flex flex-col justify-between p-5 text-white sm:p-6">
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-200">
                           {promotionCode}
                         </p>
                         <h3 className="mt-2 font-mono text-xl font-bold leading-tight sm:text-2xl">{promotion.title}</h3>
                         <p className="mt-2 text-sm leading-6 text-white/72">{promotion.description}</p>
-                        <div className="mt-3 rounded-2xl border border-[#d4a017]/35 bg-[#d4a017]/12 px-3.5 py-3">
+                        <div className="mt-3 rounded-xl border border-[#d4a017]/35 bg-[#d4a017]/12 px-3.5 py-3">
                           <p className="text-sm font-bold text-[#f4d169]">
                             {promotion.urgencyText || "No dejes pasar esta oportunidad"}
                           </p>
@@ -317,7 +317,7 @@ export default function Promotions() {
 
                         <div className="mt-3 grid gap-2">
                           {priceText ? (
-                            <div className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/8 p-3">
+                            <div className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/8 p-3">
                               <Tag className="mt-0.5 h-4 w-4 text-[#d4a017]" />
                               <div>
                                 <p className="text-xs uppercase tracking-[0.16em] text-white/45">Oferta</p>
@@ -326,7 +326,7 @@ export default function Promotions() {
                             </div>
                           ) : null}
                           {promotion.giftText ? (
-                            <div className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/8 p-3">
+                            <div className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/8 p-3">
                               <Gift className="mt-0.5 h-4 w-4 text-[#d4a017]" />
                               <div>
                                 <p className="text-xs uppercase tracking-[0.16em] text-white/45">Incluye</p>
@@ -345,14 +345,14 @@ export default function Promotions() {
                           href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#d4a017] px-4 py-2.5 text-sm font-bold text-[#08162f] transition-colors hover:bg-[#d4a017]/90"
+                          className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#d4a017] px-4 py-2.5 text-sm font-bold text-[#08162f] transition-colors hover:bg-[#d4a017]/90"
                         >
                           <MessageCircle className="h-4 w-4" />
                           {promotion.ctaText || "Quiero esta promocion"}
                         </a>
                         <a
                           href={productUrl}
-                          className="inline-flex items-center justify-center rounded-xl border border-white/16 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-white/10"
+                          className="inline-flex items-center justify-center rounded-lg border border-white/16 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-white/10"
                         >
                           Ver productos
                         </a>
@@ -367,7 +367,7 @@ export default function Promotions() {
       </div>
       <Dialog open={Boolean(previewPromotion)} onOpenChange={(open) => !open && setPreviewPromotion(null)}>
         {previewPromotion ? (
-          <DialogContent className="max-w-5xl bg-white p-0 sm:rounded-[28px]" showCloseButton>
+          <DialogContent className="max-w-5xl bg-white p-0 sm:rounded-2xl" showCloseButton>
             <DialogHeader className="border-b border-slate-200 px-4 py-4 sm:px-6">
               <DialogTitle className="text-left text-xl text-slate-950">{previewPromotion.title}</DialogTitle>
               <DialogDescription className="text-left">

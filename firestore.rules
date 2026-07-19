@@ -26,15 +26,88 @@ service cloud.firestore {
         get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.role == 'sales';
     }
 
+    function isOwnerBootstrap(userId) {
+      return signedIn() &&
+        request.auth.uid == userId &&
+        request.auth.token.email == 'welfreng@gmail.com' &&
+        request.resource.data.uid == userId &&
+        request.resource.data.email == request.auth.token.email &&
+        request.resource.data.role == 'superadmin' &&
+        request.resource.data.status == 'active';
+    }
+
+    function isValidUserRole(role) {
+      return role in ['sales', 'admin', 'superadmin'];
+    }
+
+    function isValidUserStatus(status) {
+      return status in ['active', 'inactive'];
+    }
+
+    function isValidUserWrite(userId) {
+      return request.resource.data.keys().hasOnly([
+          'uid',
+          'nombre',
+          'email',
+          'telefono',
+          'role',
+          'status',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        request.resource.data.uid == userId &&
+        isValidUserRole(request.resource.data.role) &&
+        isValidUserStatus(request.resource.data.status);
+    }
+
+    function isAdminUserWrite(userId) {
+      return isValidUserWrite(userId) &&
+        request.resource.data.role in ['sales', 'admin'] &&
+        (!exists(/databases/$(database)/documents/usuarios/$(userId)) ||
+          get(/databases/$(database)/documents/usuarios/$(userId)).data.role != 'superadmin');
+    }
+
+    function isSelfProfileUpdate(userId) {
+      return signedIn() &&
+        request.auth.uid == userId &&
+        resource != null &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nombre', 'telefono', 'updatedAt']);
+    }
+
     function isPublicStockSyncUpdate() {
       return resource != null &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['publicStock', 'updatedAt']);
     }
 
+    function isSaleReturnAccountingUpdate() {
+      return resource != null &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'returnedQuantity',
+          'returnedSaleAmount',
+          'returnedCostAmount'
+        ]);
+    }
+
+    function isSalesAuthorizationCompletion() {
+      return resource != null &&
+        resource.data.status == 'approved' &&
+        request.resource.data.status == 'completed' &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status',
+          'reviewedBy',
+          'completedAt',
+          'updatedAt'
+        ]);
+    }
+
     match /usuarios/{userId} {
       allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
-      allow create: if signedIn() && (request.auth.uid == userId || isAdmin());
-      allow update: if signedIn() && (request.auth.uid == userId || isAdmin());
+      allow create: if isOwnerBootstrap(userId) ||
+        (isSuperAdmin() && isValidUserWrite(userId)) ||
+        (isAdmin() && isAdminUserWrite(userId));
+      allow update: if isSelfProfileUpdate(userId) ||
+        (isSuperAdmin() && isValidUserWrite(userId)) ||
+        (isAdmin() && isAdminUserWrite(userId));
       allow delete: if isSuperAdmin();
     }
 
@@ -71,8 +144,7 @@ service cloud.firestore {
     match /movements/{movementId} {
       allow read: if signedIn();
       allow create: if isAdmin() || isSales();
-      allow update: if isAdmin() || isSales();
-      allow delete: if isAdmin() || isSales();
+      allow update, delete: if isAdmin();
     }
 
     match /purchases/{purchaseId} {
@@ -88,15 +160,14 @@ service cloud.firestore {
     match /inventory_movements/{movementId} {
       allow read: if signedIn();
       allow create: if isAdmin() || isSales();
-      allow update: if isAdmin() || isSales();
-      allow delete: if isAdmin() || isSales();
+      allow update, delete: if isAdmin();
     }
 
     match /sales/{saleId} {
       allow read: if signedIn();
       allow create: if isAdmin() || isSales();
-      allow update: if isAdmin() || isSales();
-      allow delete: if isAdmin() || isSales();
+      allow update: if isAdmin() || (isSales() && isSaleReturnAccountingUpdate());
+      allow delete: if isAdmin();
     }
 
     match /customers/{customerId} {
@@ -130,7 +201,7 @@ service cloud.firestore {
     match /authorization-requests/{requestId} {
       allow read: if isAdmin() || isSales();
       allow create: if isAdmin() || isSales();
-      allow update: if isAdmin() || isSales();
+      allow update: if isAdmin() || (isSales() && isSalesAuthorizationCompletion());
       allow delete: if isAdmin();
     }
 

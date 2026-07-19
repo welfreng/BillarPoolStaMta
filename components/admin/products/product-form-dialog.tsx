@@ -16,7 +16,6 @@ import {
 } from '@/lib/admin/variant-helpers';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog } from '@/components/ui/dialog';
 import {
   Form,
   FormControl,
@@ -565,6 +564,7 @@ export function ProductFormDialog({
   const canCorrectLockedVariantLabels =
     structureLocked && saleMode === 'varianted' && normalizedAttributeDefinitions.length > 0;
   const canAppendLockedVariants = canCorrectLockedVariantLabels;
+  const isPersistedVariantRow = (index: number) => Boolean(form.getValues(`variants.${index}.id`)?.trim());
   const existingSingleAxisValues: string[] = [];
   const normalizedExistingSingleAxisValues = new Set<string>();
   const availableSingleAxisOptions: string[] = [];
@@ -1008,6 +1008,22 @@ export function ProductFormDialog({
     templateAllowsAttributeEditing &&
     normalizedAttributeDefinitions.length > 0 &&
     !hasIncompleteManualAttributes;
+  const canShowManualVariantAddButton =
+    saleMode === 'varianted' &&
+    !usesCompactVariantEditor &&
+    ((!usesSingleAxisTemplate && !usesAutoCombinationTemplate) || !variantTemplate);
+  const addManualVariantCombination = () => {
+    appendVariant({
+      id: '',
+      name: '',
+      sku: '',
+      salePrice: Number(form.getValues('salePrice') ?? 0),
+      stock: 0,
+      status: 'active',
+      attributeValues: normalizedAttributeDefinitions.map(() => ''),
+      colorHex: '',
+    });
+  };
   const toggleCompactAttributeValue = (attributeKey: string, value: string) => {
     const currentSelectedValues = compactSelectedAttributeValues[attributeKey] ?? [];
     const nextSelectedValues = currentSelectedValues.some((item) => item.toLowerCase() === value.toLowerCase())
@@ -1277,7 +1293,7 @@ export function ProductFormDialog({
       busyDescription="Espera la confirmacion antes de continuar."
       description={
         structureLocked
-          ? 'Este producto ya tiene historial. Puedes corregir nombres visibles de variantes existentes, pero no agregar, quitar ni cambiar la estructura para proteger compras e inventario.'
+          ? 'Este producto ya tiene historial. Puedes agregar variantes nuevas y corregir nombres visibles; las variantes existentes quedan protegidas.'
           : 'Registra la informacion esencial del producto y carga su imagen desde tu equipo.'
       }
       desktopContentClassName="lg:max-w-[58rem] xl:max-w-[62rem]"
@@ -1567,7 +1583,7 @@ export function ProductFormDialog({
                       <div className="grid gap-2.5">
                         {structureLocked ? (
                           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-100">
-                            Este producto ya tiene historial. Solo corrige nombres mal escritos de variantes existentes; no uses esta opcion para cambiar una variante por otro producto real.
+                            Este producto ya tiene historial. Puedes agregar variantes nuevas y corregir nombres visibles, pero no elimines ni cambies el stock de variantes que ya tienen movimientos.
                           </div>
                         ) : null}
 
@@ -1608,6 +1624,23 @@ export function ProductFormDialog({
                               <div className="min-w-0">
                                 <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Atributos de la variante</p>
                               </div>
+                              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                              {canShowManualVariantAddButton ? (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-9 w-full rounded-xl bg-card/88 dark:bg-slate-950/70 sm:h-10 sm:w-auto"
+                                  disabled={
+                                    (structureLocked && !canAppendLockedVariants) ||
+                                    (templateAllowsAttributeEditing && !canAddManualVariants)
+                                  }
+                                  onClick={addManualVariantCombination}
+                                >
+                                  <Plus className="mr-2 h-4 w-4" />
+                                  Agregar variante
+                                </Button>
+                              ) : null}
                               {templateAllowsAttributeEditing ? (
                                 <Button
                                   type="button"
@@ -1621,6 +1654,7 @@ export function ProductFormDialog({
                                   {attributeFields.length > 0 ? 'Agregar otro atributo' : 'Agregar atributo'}
                                 </Button>
                               ) : null}
+                              </div>
                             </div>
 
                             {templateAllowsAttributeEditing ? (
@@ -1810,6 +1844,7 @@ export function ProductFormDialog({
                               stock: Number(variant.stock ?? 0),
                               sku: variant.sku ?? '',
                               status: variant.status === 'inactive' ? 'inactive' : 'active',
+                              persisted: Boolean(variant.id?.trim()),
                             }))}
                             structureLocked={structureLocked}
                             globalPrice={
@@ -1917,7 +1952,7 @@ export function ProductFormDialog({
                                               variant="ghost"
                                               size="sm"
                                               className="h-8 w-8 rounded-md p-0 text-slate-500 hover:bg-muted hover:text-rose-600 dark:text-slate-400 dark:hover:bg-slate-900"
-                                              disabled={structureLocked}
+                                              disabled={structureLocked && isPersistedVariantRow(index)}
                                               onClick={() => removeVariant(index)}
                                               aria-label="Eliminar variante"
                                             >
@@ -1990,7 +2025,7 @@ export function ProductFormDialog({
                                             variant="ghost"
                                             size="sm"
                                             className="h-9 w-full rounded-lg px-0 text-slate-500 hover:bg-slate-100 hover:text-rose-600"
-                                            disabled={structureLocked}
+                                            disabled={structureLocked && isPersistedVariantRow(index)}
                                             onClick={() => removeVariant(index)}
                                             aria-label="Eliminar variante"
                                           >
@@ -2022,7 +2057,7 @@ export function ProductFormDialog({
                                         type="button"
                                         variant="outline"
                                         className="h-10 w-full rounded-xl"
-                                        disabled={structureLocked}
+                                        disabled={structureLocked && isPersistedVariantRow(index)}
                                         onClick={() => removeVariant(index)}
                                       >
                                         Quitar
@@ -2047,34 +2082,6 @@ export function ProductFormDialog({
                               ))}
                             </div>
                             )
-                          ) : null}
-
-                          {saleMode === 'varianted' &&
-                          !usesCompactVariantEditor &&
-                          ((!usesSingleAxisTemplate && !usesAutoCombinationTemplate) || !variantTemplate) ? (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              className="h-10 rounded-xl bg-white"
-                              disabled={
-                                (structureLocked && !canAppendLockedVariants) ||
-                                (templateAllowsAttributeEditing && !canAddManualVariants)
-                              }
-                              onClick={() =>
-                                appendVariant({
-                                  id: '',
-                                  name: '',
-                                  sku: '',
-                                  salePrice: Number(form.getValues('salePrice') ?? 0),
-                                  stock: 0,
-                                  status: 'active',
-                                  attributeValues: normalizedAttributeDefinitions.map(() => ''),
-                                  colorHex: '',
-                                })
-                              }
-                            >
-                              Agregar combinacion
-                            </Button>
                           ) : null}
 
                         </div>

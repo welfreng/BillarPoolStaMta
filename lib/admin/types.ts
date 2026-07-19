@@ -255,8 +255,12 @@ export interface Customer {
   documentNumber?: string;
   lastSaleAt?: string;
   lastSaleBatchId?: string;
+  lastServiceAt?: string;
+  lastServiceOrderId?: string;
   saleCount: number;
   totalRevenue: number;
+  serviceCount?: number;
+  totalServiceRevenue?: number;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -368,6 +372,8 @@ export interface ServiceOrder {
   saleBatchId?: string;
   performedAt: string;
   customerName: string;
+  customerPhone?: string;
+  customerDocument?: string;
   cueReference: string;
   paymentMethod?: string;
   paymentReference?: string;

@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { AdminResponsiveDialog } from '@/components/admin/admin-responsive-dialog';
+import { CustomerAutocomplete } from '@/components/admin/shared/customer-autocomplete';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -29,7 +30,7 @@ import { filterProductsByCategoryFamily } from '@/lib/admin/category-rules';
 import { serviceTypeLabels } from '@/lib/admin/catalogs';
 import { getTodayDateInputValue } from '@/lib/admin/date-utils';
 import { buildVariantDisplayName, getProductSaleMode, getProductVariantStock } from '@/lib/admin/variant-helpers';
-import type { InventoryMovement, Product, Purchase, ServiceType } from '@/lib/admin/types';
+import type { Customer, InventoryMovement, Product, Purchase, ServiceType } from '@/lib/admin/types';
 
 const serviceTypeOptions = [
   'tip-installation',
@@ -47,6 +48,8 @@ const serviceSchema = z.object({
   serviceCategory: z.string().default('torno'),
   performedAt: z.string().min(1, 'Selecciona la fecha'),
   customerName: z.string().min(2, 'Ingresa el cliente'),
+  customerPhone: z.string().default(''),
+  customerDocument: z.string().default(''),
   cueReference: z.string().min(2, 'Describe el taco o referencia'),
   paymentMethod: z.string().min(1, 'Selecciona el metodo de pago'),
   paymentReference: z.string().default(''),
@@ -65,6 +68,15 @@ const serviceSchema = z.object({
   bumperVariantId: z.string().default(''),
   notes: z.string().default(''),
 }).superRefine((values, context) => {
+  const normalizedCustomerPhone = values.customerPhone.trim();
+  if (normalizedCustomerPhone && normalizedCustomerPhone.length < 7) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['customerPhone'],
+      message: 'Ingresa un telefono valido o dejalo vacio.',
+    });
+  }
+
   if (!values.tipProductId && (values.serviceType === 'tip-installation' || values.serviceType === 'tip-ferrule-installation')) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ['tipProductId'], message: 'Selecciona el casquillo.' });
   }
@@ -96,6 +108,8 @@ const defaultValues: ServiceFormValues = {
   serviceCategory: 'torno',
   performedAt: getTodayDateInputValue(),
   customerName: '',
+  customerPhone: '',
+  customerDocument: '',
   cueReference: '',
   paymentMethod: 'efectivo',
   paymentReference: '',
@@ -135,6 +149,7 @@ export function ServiceFormDialog({
   products,
   purchases,
   movements,
+  customers,
   hideFinancialSummary = false,
   initialValues,
   submitLabel,
@@ -145,6 +160,7 @@ export function ServiceFormDialog({
   products: Product[];
   purchases: Purchase[];
   movements: InventoryMovement[];
+  customers?: Customer[];
   hideFinancialSummary?: boolean;
   initialValues?: ServiceFormValues;
   submitLabel?: string;
@@ -164,6 +180,11 @@ export function ServiceFormDialog({
   }, [form, initialValues, open]);
 
   const values = form.watch();
+  const updateCustomerFields = (nextCustomer: { name: string; phone: string; documentNumber: string }) => {
+    form.setValue('customerName', nextCustomer.name, { shouldValidate: true, shouldDirty: true });
+    form.setValue('customerPhone', nextCustomer.phone, { shouldValidate: true, shouldDirty: true });
+    form.setValue('customerDocument', nextCustomer.documentNumber, { shouldValidate: true, shouldDirty: true });
+  };
   const needsTip = values.serviceType === 'tip-installation' || values.serviceType === 'tip-ferrule-installation';
   const needsFerrule = values.serviceType === 'ferrule-installation' || values.serviceType === 'tip-ferrule-installation';
   const needsExtension = values.serviceType === 'extension-installation';
@@ -397,18 +418,17 @@ export function ServiceFormDialog({
                 />
               )}
 
-              <FormField
-                control={form.control}
-                name="customerName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Cliente</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Nombre del cliente" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+              <CustomerAutocomplete
+                customers={customers}
+                name={values.customerName}
+                phone={values.customerPhone}
+                documentNumber={values.customerDocument}
+                onChange={updateCustomerFields}
+                nameError={form.formState.errors.customerName?.message}
+                phoneError={form.formState.errors.customerPhone?.message}
+                documentError={form.formState.errors.customerDocument?.message}
+                requiredName
+                className="sm:col-span-2"
               />
 
               <FormField

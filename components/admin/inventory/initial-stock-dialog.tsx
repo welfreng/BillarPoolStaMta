@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useId, useMemo, useState } from 'react';
-import { PlusCircle } from 'lucide-react';
+import { Coins, PackageCheck, PlusCircle, ReceiptText } from 'lucide-react';
 import { AdminResponsiveDialog } from '@/components/admin/admin-responsive-dialog';
 import type { Product } from '@/lib/admin/types';
 import { Button } from '@/components/ui/button';
@@ -222,17 +222,49 @@ export function InitialStockDialog({
       description="Registra en una sola operacion el stock fisico inicial de un producto simple o varias variantes del mismo producto."
       desktopContentClassName="lg:max-w-5xl"
       footer={
-        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <div className="grid gap-2 sm:flex sm:items-center sm:justify-between">
+          <div className="hidden min-w-[190px] rounded-xl border border-border bg-muted/50 px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-900/60 md:block">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Unidades</p>
+            <p className="font-semibold text-foreground">{summaryTotals.units.toLocaleString('es-CO')}</p>
+          </div>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
             Cancelar
           </Button>
           <Button form={initialStockFormId} type="submit" disabled={isSubmitting}>
             {isSubmitting ? 'Guardando...' : 'Guardar carga inicial'}
           </Button>
+          </div>
         </div>
       }
     >
       <form id={initialStockFormId} onSubmit={handleSubmit} className="space-y-4">
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-[linear-gradient(135deg,#071a3d_0%,#0d2b78_54%,#102b4e_100%)] text-white shadow-[0_18px_44px_rgba(8,22,47,0.22)] dark:border-slate-800">
+          <div className="grid gap-3 p-4 sm:grid-cols-3 sm:p-5">
+            <div className="sm:col-span-3">
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-100">
+                <ReceiptText className="h-3.5 w-3.5" />
+                Carga inicial
+              </div>
+              <p className="mt-3 line-clamp-1 text-xl font-semibold tracking-[-0.02em]">
+                {selectedProduct?.name ?? 'Selecciona un producto'}
+              </p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/10 px-3 py-2">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-100">Unidades</p>
+              <p className="mt-1 text-sm font-semibold">{summaryTotals.units.toLocaleString('es-CO')}</p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/10 px-3 py-2">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-100">Inversion</p>
+              <p className="mt-1 text-sm font-semibold">${summaryTotals.estimatedInvestment.toLocaleString('es-CO')}</p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/10 px-3 py-2">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-100">Venta estimada</p>
+              <p className="mt-1 text-sm font-semibold">${summaryTotals.estimatedSalesValue.toLocaleString('es-CO')}</p>
+            </div>
+          </div>
+        </div>
+
         <div className="space-y-2">
           <Label>Producto</Label>
           <SearchableSelect
@@ -272,10 +304,11 @@ export function InitialStockDialog({
         </div>
 
         {selectedProduct ? (
-          <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-900/70">
+          <div className="rounded-2xl border border-slate-200 bg-card/92 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/78">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-slate-950 dark:text-slate-50">
+                <p className="inline-flex items-center gap-2 text-sm font-semibold text-slate-950 dark:text-slate-50">
+                  <PackageCheck className="h-4 w-4 text-primary" />
                   {selectedProduct.name}
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -371,7 +404,10 @@ export function InitialStockDialog({
                 <p className="mt-1 text-lg font-semibold">{summaryTotals.units.toLocaleString('es-CO')}</p>
               </div>
               <div>
-                <p className="text-xs uppercase tracking-[0.12em] text-cyan-800/80 dark:text-cyan-200/80">Inversion estimada</p>
+                <p className="inline-flex items-center gap-1.5 text-xs uppercase tracking-[0.12em] text-cyan-800/80 dark:text-cyan-200/80">
+                  <Coins className="h-3.5 w-3.5" />
+                  Inversion estimada
+                </p>
                 <p className="mt-1 text-lg font-semibold">${summaryTotals.estimatedInvestment.toLocaleString('es-CO')}</p>
               </div>
               <div>

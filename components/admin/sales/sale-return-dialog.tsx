@@ -1,19 +1,12 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Minus, Plus, Trash2 } from 'lucide-react';
+import { AdminResponsiveDialog } from '@/components/admin/admin-responsive-dialog';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import {
   Form,
   FormControl,
@@ -30,7 +23,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
 import { formatNumber, getProductById } from '@/lib/admin/calculations';
 import { getTodayDateInputValue } from '@/lib/admin/date-utils';
@@ -80,6 +72,7 @@ export function SaleReturnDialog({
   customerName: string;
   onSubmit: (values: SaleReturnFormValues) => Promise<void> | void;
 }) {
+  const returnFormId = useId();
   const form = useForm<SaleReturnFormValues>({
     resolver: zodResolver(saleReturnSchema),
     defaultValues,
@@ -132,51 +125,52 @@ export function SaleReturnDialog({
   };
 
   return (
-    <Dialog
+    <AdminResponsiveDialog
       open={open}
       onOpenChange={(nextOpen) => {
         if (isSubmitting) return;
         onOpenChange(nextOpen);
       }}
-    >
-      <DialogContent
-        className="h-[100dvh] max-h-[100dvh] w-screen max-w-none overflow-y-auto rounded-none border-0 px-4 pb-24 pt-4 sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:w-[calc(100vw-2rem)] sm:max-w-[96vw] sm:rounded-[26px] sm:border sm:px-5 sm:pb-6 sm:pt-6 lg:max-w-4xl lg:px-6"
-        showCloseButton={!isSubmitting}
-      >
-        {isSubmitting ? (
-          <div className="fixed inset-0 z-[100] grid cursor-wait place-items-center bg-background/86 px-4 text-center backdrop-blur-md dark:bg-slate-950/86" aria-live="assertive" aria-busy="true">
-            <div className="grid w-full max-w-sm place-items-center gap-3 rounded-2xl border border-border bg-card p-5 shadow-[0_24px_70px_rgba(15,23,42,0.2)] dark:border-slate-800 dark:bg-slate-950">
-              <Spinner className="h-8 w-8 text-primary" />
-              <div className="space-y-1">
-                <p className="text-base font-semibold text-foreground">Guardando devolucion...</p>
-                <p className="text-sm leading-5 text-muted-foreground">
-                  Espera la confirmacion para evitar duplicados o cierres accidentales.
-                </p>
-              </div>
-            </div>
+      title="Registrar devolucion"
+      description="Selecciona los productos que vuelven, valida cantidades pendientes y deja la trazabilidad de la devolucion."
+      busy={isSubmitting}
+      busyTitle="Guardando devolucion..."
+      busyDescription="Espera la confirmacion para evitar duplicados o cierres accidentales."
+      desktopContentClassName="lg:max-w-4xl"
+      footer={
+        <div className="grid gap-2 sm:flex sm:items-center sm:justify-between">
+          <div className="hidden min-w-[190px] rounded-xl border border-border bg-muted/50 px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-900/60 md:block">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">A devolver</p>
+            <p className="font-semibold text-foreground">
+              {formatNumber(selectedUnitsCount)} uds · {formatNumber(selectedProductsCount)} productos
+            </p>
           </div>
-        ) : null}
-        <DialogHeader>
-          <DialogTitle>Registrar devolucion</DialogTitle>
-          <DialogDescription>
-            Selecciona un producto de la venta, mira cuantas unidades compro el cliente y ajusta la devolucion con botones rapidos.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-          <p className="font-medium text-slate-900">Cliente: {customerName}</p>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+              Cancelar
+            </Button>
+            <Button form={returnFormId} type="submit" disabled={fields.length === 0 || isSubmitting}>
+              {isSubmitting ? 'Guardando...' : 'Guardar devolucion'}
+            </Button>
+          </div>
+        </div>
+      }
+    >
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300">
+          <p className="font-medium text-slate-900 dark:text-slate-100">Cliente: {customerName}</p>
           <p className="mt-1">Puedes agregar varios productos a la misma devolucion sin llenar una lista larga.</p>
         </div>
 
         <Form {...form}>
           <form
+            id={returnFormId}
             onSubmit={form.handleSubmit(async (values) => {
               await onSubmit(values);
               form.reset(defaultValues);
             })}
             className="space-y-4"
           >
-            <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="rounded-2xl border border-border bg-card/92 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/78">
               <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_auto] lg:items-end">
                 <div className="space-y-2">
                   <FormLabel>Producto a devolver</FormLabel>
@@ -205,18 +199,18 @@ export function SaleReturnDialog({
               </div>
 
               {selectedSale ? (
-                <div className="mt-4 grid gap-3 rounded-2xl border border-cyan-100 bg-cyan-50/70 p-4 sm:grid-cols-3">
+                <div className="mt-4 grid gap-3 rounded-2xl border border-cyan-100 bg-cyan-50/70 p-4 dark:border-cyan-900/60 dark:bg-cyan-950/20 sm:grid-cols-3">
                   <div>
-                    <p className="text-xs font-medium uppercase tracking-wide text-cyan-700">Producto</p>
-                    <p className="mt-1 font-medium text-slate-900">{selectedSaleProduct?.name ?? 'Producto'}</p>
+                    <p className="text-xs font-medium uppercase tracking-wide text-cyan-700 dark:text-cyan-200">Producto</p>
+                    <p className="mt-1 font-medium text-slate-900 dark:text-slate-100">{selectedSaleProduct?.name ?? 'Producto'}</p>
                   </div>
                   <div>
-                    <p className="text-xs font-medium uppercase tracking-wide text-cyan-700">Unidades compradas</p>
-                    <p className="mt-1 font-semibold text-slate-900">{formatNumber(selectedSale.quantity)} uds</p>
+                    <p className="text-xs font-medium uppercase tracking-wide text-cyan-700 dark:text-cyan-200">Unidades compradas</p>
+                    <p className="mt-1 font-semibold text-slate-900 dark:text-slate-100">{formatNumber(selectedSale.quantity)} uds</p>
                   </div>
                   <div>
-                    <p className="text-xs font-medium uppercase tracking-wide text-cyan-700">Pendiente por devolver</p>
-                    <p className="mt-1 font-semibold text-slate-900">{formatNumber(selectedSalePending)} uds</p>
+                    <p className="text-xs font-medium uppercase tracking-wide text-cyan-700 dark:text-cyan-200">Pendiente por devolver</p>
+                    <p className="mt-1 font-semibold text-slate-900 dark:text-slate-100">{formatNumber(selectedSalePending)} uds</p>
                   </div>
                 </div>
               ) : null}
@@ -224,9 +218,9 @@ export function SaleReturnDialog({
 
             {fields.length > 0 ? (
               <div className="space-y-3">
-                <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-3">
-                  <p className="text-sm font-medium text-emerald-950">Resumen de la devolucion</p>
-                  <p className="mt-1 text-sm text-emerald-800">
+                <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-3 dark:border-emerald-900/60 dark:bg-emerald-950/22">
+                  <p className="text-sm font-medium text-emerald-950 dark:text-emerald-100">Resumen de la devolucion</p>
+                  <p className="mt-1 text-sm text-emerald-800 dark:text-emerald-200/80">
                     {formatNumber(selectedProductsCount)} producto(s) agregados · {formatNumber(selectedUnitsCount)} unidad(es) a devolver
                   </p>
                 </div>
@@ -240,11 +234,11 @@ export function SaleReturnDialog({
                   const selectedQuantity = Number(form.watch(`items.${index}.quantity`) ?? 1);
 
                   return (
-                    <div key={field.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div key={field.id} className="rounded-2xl border border-border bg-card/92 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/78">
                       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                         <div className="min-w-0">
-                          <p className="font-medium text-slate-900">{product?.name ?? 'Producto'}</p>
-                          <p className="mt-1 text-sm text-slate-500">
+                          <p className="font-medium text-slate-900 dark:text-slate-100">{product?.name ?? 'Producto'}</p>
+                          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                             Compradas: {formatNumber(sale.quantity)} uds · Pendiente: {formatNumber(pending)} uds
                           </p>
                         </div>
@@ -327,7 +321,7 @@ export function SaleReturnDialog({
                 })}
               </div>
             ) : (
-              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 px-4 py-8 text-center text-sm text-slate-500">
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-400">
                 Agrega uno o varios productos para empezar la devolucion.
               </div>
             )}
@@ -368,17 +362,8 @@ export function SaleReturnDialog({
               )}
             />
 
-            <DialogFooter className="sticky bottom-0 -mx-4 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:border-t-0 sm:bg-transparent sm:px-0 sm:py-0">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={fields.length === 0 || isSubmitting}>
-                {isSubmitting ? 'Guardando...' : 'Guardar devolucion'}
-              </Button>
-            </DialogFooter>
           </form>
         </Form>
-      </DialogContent>
-    </Dialog>
+    </AdminResponsiveDialog>
   );
 }

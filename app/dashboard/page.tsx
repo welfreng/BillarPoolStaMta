@@ -261,7 +261,7 @@ function SectionCard({
   return (
     <section
       className={cn(
-        'rounded-[28px] border border-border bg-card/88 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-card/88 dark:shadow-[0_20px_48px_rgba(2,6,23,0.28)] sm:p-6',
+        'rounded-2xl border border-border bg-card/88 p-4 shadow-[0_14px_34px_rgba(15,23,42,0.06)] dark:border-slate-800 dark:bg-card/88 dark:shadow-[0_16px_38px_rgba(2,6,23,0.24)] sm:p-5',
         className
       )}
     >
@@ -300,13 +300,13 @@ function KpiCard({
           : 'border-border bg-background/88 dark:border-slate-800 dark:bg-background/60';
 
   return (
-    <div className={cn('rounded-[24px] border p-4 shadow-sm', toneClasses)}>
+    <div className={cn('rounded-2xl border p-4 shadow-sm', toneClasses)}>
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{title}</p>
           <p className="mt-2 text-xl font-semibold tracking-[-0.03em] text-foreground sm:text-2xl">{value}</p>
         </div>
-        <div className="rounded-2xl border border-border bg-background/88 p-2.5 dark:border-slate-700 dark:bg-background/72">
+        <div className="rounded-xl border border-border bg-background/88 p-2.5 dark:border-slate-700 dark:bg-background/72">
           <Icon className="h-4 w-4 text-muted-foreground" />
         </div>
       </div>
@@ -330,7 +330,7 @@ function QuickActionLink({
 }) {
   const content = (
     <>
-      <span className="rounded-xl border border-border bg-muted/60 p-2 dark:border-slate-700">
+      <span className="rounded-lg border border-border bg-muted/60 p-2 dark:border-slate-700">
         <Icon className="h-3.5 w-3.5" />
       </span>
       <span className="min-w-0 flex-1">
@@ -346,7 +346,7 @@ function QuickActionLink({
         asChild
         variant="outline"
         className={cn(
-          'h-auto min-h-[62px] w-full justify-start gap-3 overflow-hidden rounded-2xl px-3.5 py-3 text-left',
+          'h-auto min-h-[58px] w-full justify-start gap-3 overflow-hidden rounded-xl px-3.5 py-3 text-left',
           className
         )}
       >
@@ -360,7 +360,7 @@ function QuickActionLink({
       type="button"
       variant="outline"
       className={cn(
-        'h-auto min-h-[62px] w-full justify-start gap-3 overflow-hidden rounded-2xl px-3.5 py-3 text-left',
+        'h-auto min-h-[58px] w-full justify-start gap-3 overflow-hidden rounded-xl px-3.5 py-3 text-left',
         className
       )}
       onClick={onClick}
@@ -371,7 +371,7 @@ function QuickActionLink({
 }
 
 export default function DashboardPage() {
-  const { products, movements, purchases, sales, services, registerSale, authorizationRequests } = useAdminData();
+  const { products, movements, purchases, sales, services, customers, registerSale, authorizationRequests } = useAdminData();
   const { role, profile, user } = useAuth();
   const { toast } = useToast();
   const isSalesUser = role === 'sales';
@@ -800,7 +800,7 @@ export default function DashboardPage() {
           value: formatCurrency(periodProfit),
           helper: `Ventas ${formatCurrency(profitBreakdown.sales)} - Servicios ${formatCurrency(profitBreakdown.services)}.`,
           icon: TrendingUp,
-          tone: periodProfit >= 0 ? ('warning' as const) : ('danger' as const),
+          tone: periodProfit >= 0 ? ('success' as const) : ('danger' as const),
         },
         {
           title: 'Capital fisico actual',
@@ -813,7 +813,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <section className="overflow-hidden rounded-[32px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.24),transparent_24%),linear-gradient(140deg,#08162f_0%,#0a2472_48%,#0b1d3f_100%)] p-5 text-white shadow-[0_30px_80px_rgba(8,22,47,0.34)] sm:p-6 lg:p-7">
+      <section className="overflow-hidden rounded-2xl border border-white/10 bg-[linear-gradient(140deg,#08162f_0%,#0a2472_48%,#0b1d3f_100%)] p-5 text-white shadow-[0_22px_58px_rgba(8,22,47,0.28)] sm:p-6">
         <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
           <div className="min-w-0">
             <p className="text-sm font-medium text-cyan-300">Dashboard ejecutivo</p>
@@ -841,7 +841,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="rounded-[28px] border border-white/10 bg-white/8 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur">
+          <div className="rounded-2xl border border-white/10 bg-white/8 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <p className="text-sm font-medium text-slate-100">{isSalesUser ? 'Resumen operativo' : 'Periodo visible'}</p>
@@ -943,12 +943,12 @@ export default function DashboardPage() {
               </div>
             ) : null}
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-[22px] border border-white/10 bg-black/10 p-3">
+              <div className="rounded-xl border border-white/10 bg-black/10 p-3">
                 <p className="text-xs uppercase tracking-[0.16em] text-slate-300">{isSalesUser ? 'Agotados' : 'Inventario critico'}</p>
                 <p className="mt-2 text-2xl font-semibold">{formatNumber(outProducts.length + outVariants.length)}</p>
                 <p className="mt-1 text-xs text-slate-300">Productos y variantes sin stock.</p>
               </div>
-              <div className="rounded-[22px] border border-white/10 bg-black/10 p-3">
+              <div className="rounded-xl border border-white/10 bg-black/10 p-3">
                 <p className="text-xs uppercase tracking-[0.16em] text-slate-300">{isSalesUser ? 'Disponibles' : 'Autorizaciones'}</p>
                 <p className="mt-2 text-2xl font-semibold">
                   {formatNumber(isSalesUser ? availableProducts.length : pendingAuthorizationRequests.length)}
@@ -1028,7 +1028,7 @@ export default function DashboardPage() {
               {quickResults.map((product) => (
                 <div
                   key={product.id}
-                  className="flex flex-col gap-3 rounded-[22px] border border-border bg-background/72 px-4 py-3 dark:border-slate-800 dark:bg-background/48 sm:flex-row sm:items-center sm:justify-between"
+                  className="flex flex-col gap-3 rounded-xl border border-border bg-background/72 px-4 py-3 dark:border-slate-800 dark:bg-background/48 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="min-w-0">
                     <p className="line-clamp-1 text-sm font-medium text-foreground">{product.name}</p>
@@ -1072,7 +1072,7 @@ export default function DashboardPage() {
             description={`Resumen comercial para ${periodLabel.toLowerCase()}.`}
           >
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-1">
-              <div className="rounded-[24px] border border-emerald-200/80 bg-emerald-50/70 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/20">
+              <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/70 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/20">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">Producto mas vendido</p>
@@ -1094,7 +1094,7 @@ export default function DashboardPage() {
                 ) : null}
               </div>
 
-              <div className="rounded-[24px] border border-amber-200/80 bg-amber-50/70 p-4 dark:border-amber-900/60 dark:bg-amber-950/20">
+              <div className="rounded-2xl border border-amber-200/80 bg-amber-50/70 p-4 dark:border-amber-900/60 dark:bg-amber-950/20">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Producto menos vendido</p>
@@ -1116,7 +1116,7 @@ export default function DashboardPage() {
                 ) : null}
               </div>
 
-              <div className="rounded-[24px] border border-violet-200/80 bg-violet-50/70 p-4 dark:border-violet-900/60 dark:bg-violet-950/20 md:col-span-2 xl:col-span-1">
+              <div className="rounded-2xl border border-violet-200/80 bg-violet-50/70 p-4 dark:border-violet-900/60 dark:bg-violet-950/20 md:col-span-2 xl:col-span-1">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-violet-800 dark:text-violet-200">Servicio mas solicitado</p>
@@ -1145,24 +1145,24 @@ export default function DashboardPage() {
             description={`Ingresos, costos y utilidad de servicios para ${periodLabel.toLowerCase()}.`}
           >
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-[24px] border border-violet-200/80 bg-violet-50/70 p-4 dark:border-violet-900/60 dark:bg-violet-950/20">
+              <div className="rounded-2xl border border-violet-200/80 bg-violet-50/70 p-4 dark:border-violet-900/60 dark:bg-violet-950/20">
                 <p className="text-sm font-medium text-violet-800 dark:text-violet-200">Servicios hechos</p>
                 <p className="mt-2 text-2xl font-semibold text-foreground">{formatNumber(serviceSummary.count)}</p>
                 <p className="mt-1 text-xs text-muted-foreground">Trabajos registrados en el periodo.</p>
               </div>
-              <div className="rounded-[24px] border border-emerald-200/80 bg-emerald-50/70 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/20">
+              <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/70 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/20">
                 <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">Ingreso servicios</p>
                 <p className="mt-2 text-2xl font-semibold text-foreground">{formatCurrency(serviceSummary.totalRevenue)}</p>
                 <p className="mt-1 text-xs text-muted-foreground">Cobro total por mano de obra y materiales.</p>
               </div>
-              <div className="rounded-[24px] border border-amber-200/80 bg-amber-50/70 p-4 dark:border-amber-900/60 dark:bg-amber-950/20">
+              <div className="rounded-2xl border border-amber-200/80 bg-amber-50/70 p-4 dark:border-amber-900/60 dark:bg-amber-950/20">
                 <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Costo servicios</p>
                 <p className="mt-2 text-2xl font-semibold text-foreground">{formatCurrency(serviceSummary.totalCost)}</p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {formatCurrency(serviceSummary.materialCost)} materiales · {formatCurrency(serviceSummary.operationalCost)} operativo
                 </p>
               </div>
-              <div className="rounded-[24px] border border-cyan-200/80 bg-cyan-50/70 p-4 dark:border-cyan-900/60 dark:bg-cyan-950/20">
+              <div className="rounded-2xl border border-cyan-200/80 bg-cyan-50/70 p-4 dark:border-cyan-900/60 dark:bg-cyan-950/20">
                 <p className="text-sm font-medium text-cyan-800 dark:text-cyan-200">Utilidad servicios</p>
                 <p className="mt-2 text-2xl font-semibold text-foreground">{formatCurrency(serviceSummary.totalProfit)}</p>
                 <p className="mt-1 text-xs text-muted-foreground">Ingreso menos materiales y costo operativo.</p>
@@ -1211,7 +1211,7 @@ export default function DashboardPage() {
         description="Lectura ejecutiva del inventario que requiere accion inmediata."
       >
         <div className={cn('grid gap-4', isSalesUser ? 'lg:grid-cols-2' : 'lg:grid-cols-3')}>
-          <div className="rounded-[24px] border border-rose-200/80 bg-rose-50/70 p-4 dark:border-rose-900/60 dark:bg-rose-950/20">
+          <div className="rounded-2xl border border-rose-200/80 bg-rose-50/70 p-4 dark:border-rose-900/60 dark:bg-rose-950/20">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-medium text-rose-800 dark:text-rose-200">Productos agotados</p>
@@ -1254,7 +1254,7 @@ export default function DashboardPage() {
             ) : null}
           </div>
 
-          <div className="rounded-[24px] border border-amber-200/80 bg-amber-50/70 p-4 dark:border-amber-900/60 dark:bg-amber-950/20">
+          <div className="rounded-2xl border border-amber-200/80 bg-amber-50/70 p-4 dark:border-amber-900/60 dark:bg-amber-950/20">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Variantes agotadas</p>
@@ -1296,7 +1296,7 @@ export default function DashboardPage() {
           </div>
 
           {!isSalesUser ? (
-            <div className="rounded-[24px] border border-cyan-200/80 bg-cyan-50/70 p-4 dark:border-cyan-900/60 dark:bg-cyan-950/20">
+            <div className="rounded-2xl border border-cyan-200/80 bg-cyan-50/70 p-4 dark:border-cyan-900/60 dark:bg-cyan-950/20">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-cyan-800 dark:text-cyan-200">Stock bajo</p>
@@ -1380,6 +1380,7 @@ export default function DashboardPage() {
         products={products}
         purchases={purchases}
         movements={movements}
+        customers={customers}
         initialValues={initialSaleValues}
         mode="create"
         hideFinancialSummary={role === 'sales'}

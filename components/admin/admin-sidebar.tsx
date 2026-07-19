@@ -36,10 +36,10 @@ export function AdminSidebar() {
 
   return (
     <Sidebar collapsible="icon" variant="inset" className="border-r-0">
-      <SidebarHeader className="px-4 py-5">
-        <div className="rounded-[24px] border border-white/10 bg-[linear-gradient(145deg,#08162f_0%,#0a2472_58%,#0ea5e9_140%)] px-4 py-4 text-white shadow-[0_24px_50px_rgba(10,22,40,0.32)]">
-          <div className="mb-3 flex items-center gap-3">
-            <div className="flex h-12 w-16 items-center justify-center rounded-2xl border border-white/15 bg-white/12 p-1 shadow-lg shadow-black/15">
+      <SidebarHeader className="px-3 py-4">
+        <div className="rounded-2xl border border-white/10 bg-[linear-gradient(145deg,#08162f_0%,#0a2472_58%,#0ea5e9_140%)] px-3.5 py-3.5 text-white shadow-[0_18px_38px_rgba(10,22,40,0.28)]">
+          <div className="mb-2.5 flex items-center gap-3">
+            <div className="flex h-11 w-14 items-center justify-center rounded-lg border border-white/15 bg-white/12 p-1 shadow-lg shadow-black/15">
               <Image
                 src={SITE_LOGO}
                 alt="Billar Pool Santa Marta"
@@ -53,7 +53,7 @@ export function AdminSidebar() {
               <p className="text-[11px] uppercase tracking-[0.14em] text-cyan-100/80">Centro administrativo</p>
             </div>
           </div>
-          <p className="text-xs leading-5 text-slate-200/90">
+          <p className="text-xs leading-5 text-slate-200/86">
             Bienvenido al panel de control.
           </p>
         </div>
@@ -78,7 +78,7 @@ export function AdminSidebar() {
                       isActive={active}
                       tooltip={item.label}
                       className={cn(
-                        'h-auto rounded-2xl px-3 py-3 transition-all duration-200',
+                        'h-auto rounded-xl px-3 py-2.5 transition-all duration-200',
                         active
                           ? 'bg-[linear-gradient(135deg,#0a2472_0%,#12389b_100%)] text-white shadow-[0_16px_30px_rgba(10,36,114,0.24)] hover:text-white focus-visible:text-white'
                           : 'bg-transparent text-slate-700 hover:bg-card/72 hover:text-slate-950 hover:shadow-sm dark:text-slate-200 dark:hover:bg-slate-900/80 dark:hover:text-slate-50'

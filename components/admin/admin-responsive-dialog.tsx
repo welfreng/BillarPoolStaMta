@@ -11,6 +11,7 @@ import {
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
@@ -90,8 +91,13 @@ export function AdminResponsiveDialog({
             <SheetTitle className="pr-10 text-[1rem] font-semibold tracking-[-0.01em] text-slate-950 dark:text-slate-50 sm:text-[1.05rem]">
               {title}
             </SheetTitle>
+            {description ? (
+              <SheetDescription className="pr-8 text-[13px] leading-5 text-slate-500 dark:text-slate-400">
+                {description}
+              </SheetDescription>
+            ) : null}
           </SheetHeader>
-          <div className={cn('min-h-0 flex-1 overflow-y-auto px-2.5 py-2.5 pb-4 sm:px-4 sm:py-4 sm:pb-6', bodyClassName)}>{children}</div>
+          <div className={cn('min-h-0 flex-1 overflow-y-auto overscroll-contain px-2.5 py-2.5 pb-4 sm:px-4 sm:py-4 sm:pb-6', bodyClassName)}>{children}</div>
           {footer ? (
             <div
               className={cn(
@@ -112,7 +118,7 @@ export function AdminResponsiveDialog({
       <DialogContent
         showCloseButton={!busy}
         className={cn(
-          '!fixed !top-4 !left-1/2 !z-[60] flex max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-[96vw] !-translate-x-1/2 !translate-y-0 flex-col overflow-hidden rounded-[28px] border-border bg-gradient-to-b from-background via-card to-background px-0 shadow-[0_24px_80px_rgba(15,23,42,0.18)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 dark:shadow-[0_24px_80px_rgba(2,6,23,0.45)]',
+          '!fixed !top-4 !left-1/2 !z-[60] flex max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-[96vw] !-translate-x-1/2 !translate-y-0 flex-col overflow-hidden rounded-2xl border-border bg-gradient-to-b from-background via-card to-background px-0 shadow-[0_24px_80px_rgba(15,23,42,0.18)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 dark:shadow-[0_24px_80px_rgba(2,6,23,0.45)]',
           desktopContentClassName
         )}
       >
@@ -123,7 +129,7 @@ export function AdminResponsiveDialog({
           </DialogTitle>
           {description ? <DialogDescription>{description}</DialogDescription> : null}
         </DialogHeader>
-        <div className={cn('min-h-0 flex-1 overflow-y-auto px-5 py-4 pb-6 lg:px-6', bodyClassName)}>{children}</div>
+        <div className={cn('min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4 pb-6 lg:px-6', bodyClassName)}>{children}</div>
         {footer ? (
           <div
             className={cn(

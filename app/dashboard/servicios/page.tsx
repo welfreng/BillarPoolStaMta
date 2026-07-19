@@ -17,7 +17,7 @@ import { getDateKeyInBogota, getTodayDateInputValue, toOperationalDateISOString 
 import { serviceTypeLabels } from '@/lib/admin/catalogs';
 
 export default function ServiciosPage() {
-  const { services, products, purchases, movements, registerService, updateService } = useAdminData();
+  const { services, products, purchases, movements, customers, registerService, updateService } = useAdminData();
   const { profile, role, user } = useAuth();
   const { toast } = useToast();
   const [openDialog, setOpenDialog] = useState(false);
@@ -42,6 +42,8 @@ export default function ServiciosPage() {
         serviceCategory: editableService.serviceCategory ?? 'torno',
         performedAt: editableService.performedAt.slice(0, 10),
         customerName: editableService.customerName,
+        customerPhone: editableService.customerPhone ?? '',
+        customerDocument: editableService.customerDocument ?? '',
         cueReference: editableService.cueReference,
         paymentMethod: editableService.paymentMethod ?? 'efectivo',
         paymentReference: editableService.paymentReference ?? '',
@@ -71,7 +73,7 @@ export default function ServiciosPage() {
           return item.variantName ? `${productName} ${item.variantName}`.trim() : productName;
         })
         .join(' ');
-      const content = `${getServiceDisplayLabel(service)} ${service.customerName} ${service.cueReference} ${service.notes} ${materialNames}`.toLowerCase();
+      const content = `${getServiceDisplayLabel(service)} ${service.customerName} ${service.customerPhone ?? ''} ${service.customerDocument ?? ''} ${service.cueReference} ${service.notes} ${materialNames}`.toLowerCase();
       return !normalizedQuery || content.includes(normalizedQuery);
     });
   }, [products, query, services]);
@@ -408,6 +410,7 @@ export default function ServiciosPage() {
         products={products}
         purchases={purchases}
         movements={movements}
+        customers={customers}
         hideFinancialSummary={isSalesUser}
         initialValues={editingInitialValues}
         submitLabel={editableService ? 'Guardar cambios' : 'Guardar servicio'}
@@ -467,6 +470,8 @@ export default function ServiciosPage() {
             serviceCategory: values.serviceCategory,
             performedAt: toOperationalDateISOString(values.performedAt),
             customerName: values.customerName,
+            customerPhone: values.customerPhone,
+            customerDocument: values.customerDocument,
             cueReference: values.cueReference,
             paymentMethod: 'efectivo',
             paymentReference: '',
