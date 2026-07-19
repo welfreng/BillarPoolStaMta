@@ -38,7 +38,7 @@ import type { StockAlert } from '@/lib/admin/types';
 type StockStatusFilter = 'all' | 'in-stock' | 'out-of-stock';
 
 export default function InventarioPage() {
-  const { categories, movements, products, purchases, sales, services, registerMovement, registerInitialStockBatch, registerSale } = useAdminData();
+  const { categories, movements, products, purchases, sales, services, customers, registerMovement, registerInitialStockBatch, registerSale } = useAdminData();
   const { role, profile, user } = useAuth();
   const { toast } = useToast();
   const [openDialog, setOpenDialog] = useState(false);
@@ -1080,6 +1080,7 @@ export default function InventarioPage() {
         products={products}
         purchases={purchases}
         movements={movements}
+        customers={customers}
         initialValues={initialSaleValues}
         mode="create"
         hideFinancialSummary

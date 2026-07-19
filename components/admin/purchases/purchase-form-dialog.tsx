@@ -4,7 +4,14 @@ import { useEffect, useId, useMemo, useState, type KeyboardEvent as ReactKeyboar
 import { useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { MinusCircle, Pencil, PlusCircle } from 'lucide-react';
+import {
+  Building2,
+  MinusCircle,
+  Pencil,
+  PlusCircle,
+  ReceiptText,
+  ShoppingBag,
+} from 'lucide-react';
 import {
   calculatePurchaseTotals,
   formatCurrency,
@@ -213,6 +220,10 @@ export function PurchaseFormDialog({
     control: form.control,
     name: 'supplierId',
   });
+  const watchedSupplier = useWatch({
+    control: form.control,
+    name: 'supplier',
+  });
   const watchedPurchaseType = useWatch({
     control: form.control,
     name: 'purchaseType',
@@ -257,6 +268,7 @@ export function PurchaseFormDialog({
   const values = {
     purchaseType: watchedPurchaseType,
     supplierId: watchedSupplierId,
+    supplier: watchedSupplier,
     discountPercent: watchedDiscountPercent,
     shippingValueTotal: watchedShippingValueTotal,
     internationalVendorName: watchedInternationalVendorName,
@@ -343,6 +355,13 @@ export function PurchaseFormDialog({
     (sum, item) => sum + (Number(item.presentationQuantity) || 0),
     0
   );
+  const purchaseLineCount = values.items.filter((item) => Boolean(item.productId)).length;
+  const totalInvestmentValue = totalPurchaseValue + (Number(values.shippingValueTotal) || 0);
+  const supplierLabel =
+    (values.purchaseType === 'international'
+      ? String(values.internationalVendorName ?? '').trim()
+      : selectedSupplier?.name?.trim() || String(values.supplier ?? '').trim()) || 'Proveedor pendiente';
+  const purchaseReady = purchaseLineCount > 0 && totalPurchasedUnits > 0 && supplierLabel !== 'Proveedor pendiente';
 
   const previewItems = useMemo(
     () =>
@@ -751,15 +770,21 @@ export function PurchaseFormDialog({
       busyTitle={initialValues ? 'Actualizando compra...' : 'Registrando compra...'}
       busyDescription="Espera la confirmacion para evitar duplicados o cierres accidentales."
       description="Registra una compra con uno o varios productos del mismo proveedor."
-      desktopContentClassName="lg:max-w-4xl"
+      desktopContentClassName="lg:max-w-5xl xl:max-w-[1120px]"
       footer={
-        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <div className="grid gap-2 sm:flex sm:items-center sm:justify-between">
+          <div className="hidden min-w-[190px] rounded-xl border border-border bg-muted/50 px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-900/60 md:block">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Inversion</p>
+            <p className="font-semibold text-foreground">{formatCurrency(totalInvestmentValue)}</p>
+          </div>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
             Cancelar
           </Button>
           <Button form={purchaseFormId} type="submit" disabled={isSubmitting}>
             {isSubmitting ? 'Guardando...' : initialValues ? 'Guardar cambios' : 'Registrar compra'}
           </Button>
+          </div>
         </div>
       }
     >
@@ -798,12 +823,51 @@ export function PurchaseFormDialog({
             onKeyDown={moveFocusToNextField}
             className="space-y-3.5 sm:space-y-6"
           >
+            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-[linear-gradient(135deg,#071a3d_0%,#0d2b78_54%,#102b4e_100%)] text-white shadow-[0_18px_44px_rgba(8,22,47,0.22)] dark:border-slate-800">
+              <div className="grid gap-4 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center sm:p-5">
+                <div className="min-w-0">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-100">
+                    <ReceiptText className="h-3.5 w-3.5" />
+                    {initialValues ? 'Edicion de compra' : 'Nueva compra'}
+                  </div>
+                  <p className="mt-3 text-2xl font-semibold tracking-[-0.02em] sm:text-3xl">
+                    {formatCurrency(totalInvestmentValue)}
+                  </p>
+                  <p className="mt-1 line-clamp-1 text-sm text-slate-200">
+                    {supplierLabel} · {formatNumber(totalPurchasedUnits)} unidades · {formatNumber(purchaseLineCount)} lineas
+                  </p>
+                </div>
+                <div className="grid grid-cols-3 gap-2 md:min-w-[360px]">
+                  <div className="rounded-xl border border-white/10 bg-white/10 px-3 py-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-100">Estado</p>
+                    <p className={purchaseReady ? 'mt-1 text-sm font-semibold text-emerald-200' : 'mt-1 text-sm font-semibold text-amber-200'}>
+                      {purchaseReady ? 'Lista' : 'En proceso'}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-white/10 px-3 py-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-100">Envio</p>
+                    <p className="mt-1 text-sm font-semibold">{formatCurrency(Number(values.shippingValueTotal) || 0)}</p>
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-white/10 px-3 py-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-100">Desc.</p>
+                    <p className="mt-1 text-sm font-semibold">{formatNumber(normalizedDiscountPercent)}%</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <AdminMobileSection
               value="purchase-general"
-              title="Datos generales de la compra"
+              title={
+                <span className="inline-flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-primary" />
+                  Datos generales
+                </span>
+              }
               description="Selecciona o escribe el proveedor, define la fecha y luego registra el envio total del pedido."
               defaultOpen
-              className="rounded-3xl border border-border bg-muted/60 p-3 dark:border-slate-800 dark:bg-slate-900/55 sm:p-6"
+              className="rounded-2xl border border-border bg-card/92 p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950/78 sm:p-5"
+              contentClassName="pt-3 sm:pt-4"
             >
                 <div className="grid gap-4">
                   <FormField
@@ -1103,20 +1167,29 @@ export function PurchaseFormDialog({
 
             <AdminMobileSection
               value="purchase-items"
-              title="Productos de la compra"
+              title={
+                <span className="inline-flex items-center gap-2">
+                  <ShoppingBag className="h-4 w-4 text-primary" />
+                  Productos de la compra
+                </span>
+              }
+              description="Carga productos, variantes, costos y precio sugerido sin perder el resumen de inversion."
               defaultOpen
-              className="min-w-0 rounded-3xl border border-border bg-muted/60 p-3 dark:border-slate-800 dark:bg-slate-900/55 sm:p-5 lg:p-6"
+              className="min-w-0 rounded-2xl border border-border bg-muted/45 p-3 dark:border-slate-800 dark:bg-slate-900/45 sm:p-5"
               contentClassName="space-y-3.5 sm:space-y-5"
             >
 
               {fields.length <= 1 ? (
-                  <div className="rounded-2xl border border-border bg-card/88 p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950/72 sm:p-4">
-                  <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                  <div className="rounded-2xl border border-border bg-card/94 p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950/76 sm:p-4">
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-border/70 pb-3 dark:border-slate-800">
                     <div className="flex items-center gap-2">
-                      <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full bg-muted px-2 text-xs font-semibold text-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                      <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg bg-primary/10 px-2 text-xs font-semibold text-primary">
                         #1
                       </span>
-                      <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Producto principal</p>
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Producto principal</p>
+                        <p className="text-xs text-muted-foreground">La primera linea queda visible para cargar rapido.</p>
+                      </div>
                     </div>
                     {firstItemProduct ? (
                       <span className="rounded-full bg-cyan-50/85 px-3 py-1 text-xs font-medium text-cyan-800 dark:bg-cyan-950/25 dark:text-cyan-200">

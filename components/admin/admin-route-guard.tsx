@@ -25,6 +25,7 @@ export function AdminRouteGuard({ children }: { children: React.ReactNode }) {
       const allowedRoutes = new Set([
         '/dashboard',
         '/dashboard/ventas',
+        '/dashboard/clientes',
         '/dashboard/servicios',
         '/dashboard/inventario',
       ]);
@@ -58,6 +59,7 @@ export function AdminRouteGuard({ children }: { children: React.ReactNode }) {
     role === 'sales' &&
     pathname !== '/dashboard' &&
     pathname !== '/dashboard/ventas' &&
+    pathname !== '/dashboard/clientes' &&
     pathname !== '/dashboard/servicios' &&
     pathname !== '/dashboard/inventario'
   ) {

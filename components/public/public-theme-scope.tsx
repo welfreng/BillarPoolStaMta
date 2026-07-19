@@ -20,12 +20,5 @@ export function PublicThemeScope() {
     };
   }, []);
 
-  return (
-    <script
-      dangerouslySetInnerHTML={{
-        __html:
-          "document.documentElement.classList.remove('dark');document.documentElement.classList.add('light');document.documentElement.style.colorScheme='light';document.body&&document.body.classList.remove('admin-dashboard');document.body&&document.body.classList.add('public-site');",
-      }}
-    />
-  );
+  return null;
 }

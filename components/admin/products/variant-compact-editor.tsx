@@ -43,6 +43,7 @@ export interface CompactVariantRow {
   stock: number;
   sku: string;
   status: 'active' | 'inactive';
+  persisted?: boolean;
 }
 
 const OPTIONAL_ATTRIBUTE_EMPTY_VALUE = '__optional_empty__';
@@ -103,6 +104,7 @@ export function VariantCompactEditor({
   const showDeleteColumn = manualRows && Boolean(onRemoveRow);
   const showStockColumn = !hideStockColumn;
   const attributeControlsDisabled = structureLocked && !allowAttributeCorrectionWhenLocked;
+  const attributeManagerDisabled = structureLocked && !allowAddRowsWhenLocked;
 
   return (
     <div className="min-w-0 space-y-2.5">
@@ -176,7 +178,7 @@ export function VariantCompactEditor({
                           type="button"
                           variant="outline"
                           className="rounded-xl bg-card/88"
-                          disabled={structureLocked}
+                          disabled={attributeManagerDisabled}
                         >
                           Gestionar {attribute.label.toLowerCase()}
                         </Button>
@@ -221,6 +223,9 @@ export function VariantCompactEditor({
                                 <CommandItem
                                   key={option}
                                   value={option}
+                                  disabled={structureLocked && attribute.selectedValues.some(
+                                    (value) => value.toLowerCase() === option.toLowerCase()
+                                  )}
                                   onSelect={() => onToggleAttributeValue(attribute.key, option)}
                                 >
                                   <Check
@@ -277,7 +282,10 @@ export function VariantCompactEditor({
           </TableHeader>
           <TableBody>
             {rows.length > 0 ? (
-              rows.map((row, index) => (
+              rows.map((row, index) => {
+                const canRemoveRow = !structureLocked || !row.persisted;
+
+                return (
                 <TableRow key={row.id || `${index}-${Object.values(row.values).join('-')}`}>
                   {attributes.map((attribute) => (
                     <TableCell key={`${row.id}-${attribute.key}`} className="align-top">
@@ -413,7 +421,7 @@ export function VariantCompactEditor({
                         type="button"
                         variant="ghost"
                         size="icon"
-                        disabled={structureLocked}
+                        disabled={!canRemoveRow}
                         onClick={() => onRemoveRow?.(index)}
                         aria-label="Eliminar variante"
                       >
@@ -422,7 +430,8 @@ export function VariantCompactEditor({
                     </TableCell>
                   ) : null}
                 </TableRow>
-              ))
+                );
+              })
             ) : (
               <TableRow>
                 <TableCell

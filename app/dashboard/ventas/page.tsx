@@ -6,17 +6,10 @@ import { SectionHeader } from '@/components/admin/shared/section-header';
 import { SaleDetailsDialog } from '@/components/admin/sales/sale-details-dialog';
 import { SaleFormDialog, type SaleFormValues } from '@/components/admin/sales/sale-form-dialog';
 import { SaleReturnDialog, type SaleReturnFormValues } from '@/components/admin/sales/sale-return-dialog';
+import { AdminResponsiveDialog } from '@/components/admin/admin-responsive-dialog';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,7 +19,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Spinner } from '@/components/ui/spinner';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { useAdminData } from '@/components/admin/admin-data-context';
@@ -1303,7 +1295,7 @@ export default function VentasPage() {
         }}
       />
 
-      <Dialog
+      <AdminResponsiveDialog
         open={Boolean(authorizationDialogState)}
         onOpenChange={(nextOpen) => {
           if (isSubmittingAuthorizationRequest) return;
@@ -1312,51 +1304,16 @@ export default function VentasPage() {
             setAuthorizationReason('');
           }
         }}
-      >
-        <DialogContent className="sm:max-w-xl" showCloseButton={!isSubmittingAuthorizationRequest}>
-          {isSubmittingAuthorizationRequest ? (
-            <div className="fixed inset-0 z-[100] grid cursor-wait place-items-center bg-background/86 px-4 text-center backdrop-blur-md dark:bg-slate-950/86" aria-live="assertive" aria-busy="true">
-              <div className="grid w-full max-w-sm place-items-center gap-3 rounded-2xl border border-border bg-card p-5 shadow-[0_24px_70px_rgba(15,23,42,0.2)] dark:border-slate-800 dark:bg-slate-950">
-                <Spinner className="h-8 w-8 text-primary" />
-                <div className="space-y-1">
-                  <p className="text-base font-semibold text-foreground">Enviando solicitud...</p>
-                  <p className="text-sm leading-5 text-muted-foreground">Espera la confirmacion antes de continuar.</p>
-                </div>
-              </div>
-            </div>
-          ) : null}
-          <DialogHeader>
-            <DialogTitle>Solicitar autorizacion</DialogTitle>
-            <DialogDescription>
-              El administrador recibira esta solicitud y podra aprobar la {authorizationDialogState
-                ? getAuthorizationTypeLabel(authorizationDialogState.requestType)
-                : 'accion'}.
-            </DialogDescription>
-          </DialogHeader>
-
-          {authorizationDialogState ? (
-            <div className="space-y-4">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/70">
-                <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Venta</p>
-                <p className="mt-1 font-medium text-slate-900 dark:text-slate-100">{authorizationDialogState.saleSummary}</p>
-                <p className="mt-3 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Cliente</p>
-                <p className="mt-1 text-sm text-slate-700">{authorizationDialogState.customerName || 'Cliente'}</p>
-              </div>
-
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Motivo de la solicitud</p>
-                <Textarea
-                  value={authorizationReason}
-                  onChange={(event) => setAuthorizationReason(event.target.value)}
-                  placeholder="Explica por que necesitas editar o devolver esta venta."
-                  rows={4}
-                  disabled={isSubmittingAuthorizationRequest}
-                />
-              </div>
-            </div>
-          ) : null}
-
-          <DialogFooter>
+        title="Solicitar autorizacion"
+        description={`El administrador recibira esta solicitud y podra aprobar la ${
+          authorizationDialogState ? getAuthorizationTypeLabel(authorizationDialogState.requestType) : 'accion'
+        }.`}
+        busy={isSubmittingAuthorizationRequest}
+        busyTitle="Enviando solicitud..."
+        busyDescription="Espera la confirmacion antes de continuar."
+        desktopContentClassName="sm:max-w-xl"
+        footer={
+          <>
             <Button
               variant="outline"
               className="rounded-xl"
@@ -1409,9 +1366,31 @@ export default function VentasPage() {
             >
               {isSubmittingAuthorizationRequest ? 'Enviando...' : 'Enviar solicitud'}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </>
+        }
+      >
+        {authorizationDialogState ? (
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/70">
+              <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Venta</p>
+              <p className="mt-1 font-medium text-slate-900 dark:text-slate-100">{authorizationDialogState.saleSummary}</p>
+              <p className="mt-3 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Cliente</p>
+              <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">{authorizationDialogState.customerName || 'Cliente'}</p>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Motivo de la solicitud</p>
+              <Textarea
+                value={authorizationReason}
+                onChange={(event) => setAuthorizationReason(event.target.value)}
+                placeholder="Explica por que necesitas editar o devolver esta venta."
+                rows={4}
+                disabled={isSubmittingAuthorizationRequest}
+              />
+            </div>
+          </div>
+        ) : null}
+      </AdminResponsiveDialog>
     </div>
   );
 }

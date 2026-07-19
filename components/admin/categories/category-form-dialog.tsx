@@ -1,21 +1,13 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useId } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { AdminResponsiveDialog } from '@/components/admin/admin-responsive-dialog';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Spinner } from '@/components/ui/spinner';
 import type { ProductCategoryRecord } from '@/lib/admin/types';
 
 const schema = z.object({
@@ -36,6 +28,7 @@ export function CategoryFormDialog({
   category?: ProductCategoryRecord;
   onSubmit: (values: CategoryFormValues) => Promise<void> | void;
 }) {
+  const categoryFormId = useId();
   const form = useForm<CategoryFormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -70,36 +63,31 @@ export function CategoryFormDialog({
   }, [category, form, open]);
 
   return (
-    <Dialog
+    <AdminResponsiveDialog
       open={open}
       onOpenChange={(nextOpen) => {
         if (isSubmitting) return;
         onOpenChange(nextOpen);
       }}
+      title={category ? 'Editar categoria' : 'Nueva categoria'}
+      description="Crea una categoria base reutilizable para el catalogo de productos."
+      busy={isSubmitting}
+      busyTitle={category ? 'Guardando categoria...' : 'Creando categoria...'}
+      busyDescription="Espera la confirmacion antes de continuar."
+      desktopContentClassName="sm:max-w-md"
+      footer={
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+            Cancelar
+          </Button>
+          <Button form={categoryFormId} type="submit" disabled={isSubmitting}>
+            {isSubmitting ? 'Guardando...' : category ? 'Guardar cambios' : 'Crear categoria'}
+          </Button>
+        </div>
+      }
     >
-      <DialogContent className="z-[90] sm:max-w-md" overlayClassName="z-[80]" showCloseButton={!isSubmitting}>
-        {isSubmitting ? (
-          <div className="fixed inset-0 z-[100] grid cursor-wait place-items-center bg-background/86 px-4 text-center backdrop-blur-md dark:bg-slate-950/86" aria-live="assertive" aria-busy="true">
-            <div className="grid w-full max-w-sm place-items-center gap-3 rounded-2xl border border-border bg-card p-5 shadow-[0_24px_70px_rgba(15,23,42,0.2)] dark:border-slate-800 dark:bg-slate-950">
-              <Spinner className="h-8 w-8 text-primary" />
-              <div className="space-y-1">
-                <p className="text-base font-semibold text-foreground">
-                  {category ? 'Guardando categoria...' : 'Creando categoria...'}
-                </p>
-                <p className="text-sm leading-5 text-muted-foreground">Espera la confirmacion antes de continuar.</p>
-              </div>
-            </div>
-          </div>
-        ) : null}
-        <DialogHeader>
-          <DialogTitle>{category ? 'Editar categoria' : 'Nueva categoria'}</DialogTitle>
-          <DialogDescription>
-            Crea una categoria base reutilizable para el catalogo de productos.
-          </DialogDescription>
-        </DialogHeader>
-
         <Form {...form}>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form id={categoryFormId} onSubmit={handleSubmit} className="space-y-4">
             <FormField
               control={form.control}
               name="label"
@@ -136,18 +124,8 @@ export function CategoryFormDialog({
                 )}
               />
             ) : null}
-
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Guardando...' : category ? 'Guardar cambios' : 'Crear categoria'}
-              </Button>
-            </DialogFooter>
           </form>
         </Form>
-      </DialogContent>
-    </Dialog>
+    </AdminResponsiveDialog>
   );
 }

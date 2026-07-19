@@ -147,6 +147,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         doc(db, 'usuarios', currentUser.uid),
         (snapshot) => {
           if (!snapshot.exists()) {
+            const ownerUser = isOwnerEmail(currentUser.email);
+            if (!ownerUser) {
+              setProfile(null);
+              setLoading(false);
+              toast({
+                title: 'Cuenta sin acceso autorizado',
+                description: 'Un administrador debe crear tu perfil antes de entrar al panel.',
+                variant: 'destructive',
+              });
+              void performLogout('inactive-profile');
+              return;
+            }
+
             const recoveredProfile = buildFallbackProfile(currentUser);
             setProfile(recoveredProfile);
             setLoading(false);
@@ -172,10 +185,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               })
               .catch(() => {
                 toast({
-                  title: 'Perfil temporal recuperado',
-                  description: 'Pudimos mantener la sesion, pero revisa el usuario en el panel para confirmar sus datos.',
+                  title: 'No se pudo recuperar el perfil dueno',
+                  description: 'Revisa las reglas de Firestore o crea el perfil del dueno desde Firebase.',
                   variant: 'destructive',
                 });
+                void performLogout('inactive-profile');
               });
             return;
           }
@@ -225,11 +239,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         },
         () => {
+          if (!isOwnerEmail(currentUser.email)) {
+            setProfile(null);
+            setLoading(false);
+            toast({
+              title: 'No se pudo validar el perfil',
+              description: 'Por seguridad se cerro la sesion hasta poder confirmar permisos.',
+              variant: 'destructive',
+            });
+            void performLogout('inactive-profile');
+            return;
+          }
+
           setProfile(buildFallbackProfile(currentUser));
           setLoading(false);
           toast({
             title: 'No se pudo validar el perfil',
-            description: 'Se usara un perfil de recuperacion mientras Firestore vuelve a responder. Revisa luego el usuario en el panel.',
+            description: 'Se usara el perfil de recuperacion del dueno mientras Firestore vuelve a responder.',
             variant: 'destructive',
           });
         }

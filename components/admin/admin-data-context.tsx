@@ -230,6 +230,8 @@ interface RegisterServiceInput {
   serviceCategory?: string;
   performedAt: string;
   customerName: string;
+  customerPhone?: string;
+  customerDocument?: string;
   cueReference: string;
   paymentMethod: string;
   paymentReference?: string;
@@ -449,7 +451,7 @@ function getAdminLiveCollectionsForPath(pathname: string | null): AdminLiveColle
   }
 
   if (normalizedPathname === '/dashboard') {
-    return ['products', 'movements', 'purchases', 'sales', 'services', 'authorization-requests'];
+    return ['products', 'movements', 'purchases', 'sales', 'services', 'customers', 'authorization-requests'];
   }
 
   if (normalizedPathname === '/dashboard/compras') {
@@ -473,7 +475,7 @@ function getAdminLiveCollectionsForPath(pathname: string | null): AdminLiveColle
   }
 
   if (normalizedPathname === '/dashboard/inventario') {
-    return ['product_categories', 'products', 'movements', 'purchases', 'sales', 'services'];
+    return ['product_categories', 'products', 'movements', 'purchases', 'sales', 'services', 'customers'];
   }
 
   if (normalizedPathname === '/dashboard/ventas') {
@@ -481,7 +483,7 @@ function getAdminLiveCollectionsForPath(pathname: string | null): AdminLiveColle
   }
 
   if (normalizedPathname === '/dashboard/servicios') {
-    return ['products', 'movements', 'purchases', 'services', 'service-visits'];
+    return ['products', 'movements', 'purchases', 'services', 'service-visits', 'customers'];
   }
 
   if (normalizedPathname === '/dashboard/reportes') {
@@ -764,22 +766,28 @@ function getProductVariantById(product: Product, variantId?: string) {
 
 function buildVariantStockMap(products: Product[], sourceMovements: InventoryMovement[] = []) {
   return new Map(
-    products.map((product) => [
-      product.id,
-      new Map(
-        (product.variants ?? []).map((variant) => {
+    products.map((product) => {
+      const productMovements = sourceMovements.filter((movement) => movement.productId === product.id);
+      const hasUnassignedVariantHistory = productMovements.some((movement) => !movement.variantId);
+
+      return [
+        product.id,
+        new Map(
+          (product.variants ?? []).map((variant) => {
           const variantMovements = sourceMovements.filter(
             (movement) => movement.productId === product.id && movement.variantId === variant.id
           );
+          const storedStock = Number(variant.stock ?? variant.publicStock ?? 0);
           const stock =
-            variantMovements.length > 0
+            variantMovements.length > 0 && !hasUnassignedVariantHistory
               ? variantMovements.reduce((total, movement) => total + Number(movement.quantity ?? 0), 0)
-              : Number(variant.stock ?? variant.publicStock ?? 0);
+              : storedStock;
 
           return [variant.id, Math.max(stock, 0)];
-        })
-      ),
-    ])
+          })
+        ),
+      ];
+    })
   );
 }
 
@@ -1046,8 +1054,12 @@ function mapCustomerDocument(documentId: string, data: DocumentData): Customer {
     documentNumber: data.documentNumber ? String(data.documentNumber) : undefined,
     lastSaleAt: data.lastSaleAt ? normalizeDateValue(data.lastSaleAt) : undefined,
     lastSaleBatchId: data.lastSaleBatchId ? String(data.lastSaleBatchId) : undefined,
+    lastServiceAt: data.lastServiceAt ? normalizeDateValue(data.lastServiceAt) : undefined,
+    lastServiceOrderId: data.lastServiceOrderId ? String(data.lastServiceOrderId) : undefined,
     saleCount: Number(data.saleCount ?? 0),
     totalRevenue: Number(data.totalRevenue ?? 0),
+    serviceCount: Number(data.serviceCount ?? 0),
+    totalServiceRevenue: Number(data.totalServiceRevenue ?? 0),
     createdAt: data.createdAt ? normalizeDateValue(data.createdAt) : undefined,
     updatedAt: data.updatedAt ? normalizeDateValue(data.updatedAt) : undefined,
   };
@@ -1092,6 +1104,8 @@ function mapServiceDocument(documentId: string, data: DocumentData): ServiceOrde
     saleBatchId: data.saleBatchId ? String(data.saleBatchId) : undefined,
     performedAt: normalizeDateValue(data.performedAt),
     customerName: String(data.customerName ?? ''),
+    customerPhone: data.customerPhone ? String(data.customerPhone) : undefined,
+    customerDocument: data.customerDocument ? String(data.customerDocument) : undefined,
     cueReference: String(data.cueReference ?? ''),
     paymentMethod: String(data.paymentMethod ?? ''),
     paymentReference: String(data.paymentReference ?? ''),
@@ -1165,6 +1179,8 @@ function serializeServiceForFirestore(service: ServiceOrder, performedAt: Timest
     saleBatchId: service.saleBatchId ?? null,
     performedAt,
     customerName: service.customerName ?? '',
+    customerPhone: service.customerPhone ?? null,
+    customerDocument: service.customerDocument ?? null,
     cueReference: service.cueReference ?? '',
     paymentMethod: service.paymentMethod ?? 'efectivo',
     paymentReference: service.paymentReference ?? null,
@@ -1903,6 +1919,101 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       ...movements.filter((movement) => !touchedProductIdSet.has(movement.productId)),
       ...Array.from(freshMovementsById.values()),
     ];
+  };
+
+  const syncProductStocksFromCommittedMovements = async (productIds: string[]) => {
+    const uniqueProductIds = Array.from(new Set(productIds.filter(Boolean)));
+    if (uniqueProductIds.length === 0) return 0;
+
+    const [freshProductDocs, freshMovementSnapshots] = await Promise.all([
+      Promise.all(uniqueProductIds.map((productId) => getDoc(doc(db, 'products', productId)))),
+      Promise.all(
+        uniqueProductIds.map((productId) =>
+          getDocs(query(collection(db, 'movements'), where('productId', '==', productId)))
+        )
+      ),
+    ]);
+    const freshProducts = freshProductDocs
+      .filter((snapshot) => snapshot.exists())
+      .map((snapshot) => mapProductDocument(snapshot.id, snapshot.data()));
+    const freshMovements = freshMovementSnapshots.flatMap((snapshot) =>
+      snapshot.docs.map((item) => mapMovementDocument(item.id, item.data()))
+    );
+
+    const syncBatch = writeBatch(db);
+    let changedCount = 0;
+
+    freshProducts.forEach((product) => {
+      const computedProduct = getProductWithComputedStock(product, freshMovements);
+      if (getProductSaleMode(computedProduct) !== 'varianted') {
+        const computedStock = Math.max(Number(computedProduct.publicStock ?? 0), 0);
+        const currentStock = Math.max(Number(product.publicStock ?? 0), 0);
+        const shouldForcePublicStatus = computedStock > 0 && product.status !== 'active';
+        if (computedStock === currentStock && !shouldForcePublicStatus) return;
+
+        syncBatch.set(
+          doc(db, 'products', product.id),
+          {
+            publicStock: computedStock,
+            stock: computedStock,
+            stockOnHand: computedStock,
+            ...(shouldForcePublicStatus ? { status: 'active' } : {}),
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
+        changedCount += 1;
+        return;
+      }
+
+      const nextVariants = computedProduct.variants ?? [];
+      const computedStock = Math.max(Number(computedProduct.publicStock ?? 0), 0);
+      const currentStock = Math.max(Number(product.publicStock ?? 0), 0);
+      const variantsChanged = nextVariants.some((nextVariant) => {
+        const currentVariant = product.variants?.find((variant) => variant.id === nextVariant.id);
+        return (
+          Math.max(Number(currentVariant?.stock ?? currentVariant?.publicStock ?? 0), 0) !==
+            Math.max(Number(nextVariant.stock ?? 0), 0) ||
+          Math.max(Number(currentVariant?.publicStock ?? currentVariant?.stock ?? 0), 0) !==
+            Math.max(Number(nextVariant.publicStock ?? 0), 0)
+        );
+      });
+      const shouldForcePublicStatus = computedStock > 0 && product.status !== 'active';
+      if (computedStock === currentStock && !variantsChanged && !shouldForcePublicStatus) return;
+
+      syncBatch.set(
+        doc(db, 'products', product.id),
+        {
+          variants: nextVariants,
+          publicStock: computedStock,
+          ...(shouldForcePublicStatus ? { status: 'active' } : {}),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+      nextVariants.forEach((variant) => {
+        syncBatch.set(
+          doc(db, 'product_variants', variant.id),
+          {
+            ...variant,
+            productId: product.id,
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
+      });
+      changedCount += 1;
+    });
+
+    if (changedCount > 0) {
+      await runFirestoreWriteWithBackoff(() => syncBatch.commit(), {
+        retries: 0,
+        initialDelayMs: 700,
+        timeoutMs: 12000,
+      });
+    }
+
+    return changedCount;
   };
 
   const applyVariantStockMapToBatch = (
@@ -3072,6 +3183,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       initialDelayMs: 700,
       timeoutMs: 9000,
     });
+    await syncProductStocksFromCommittedMovements([input.productId]);
 
     return movement;
   };
@@ -3221,6 +3333,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     }
 
     await batch.commit();
+    await syncProductStocksFromCommittedMovements([input.productId]);
 
     return {
       movement,
@@ -3394,6 +3507,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     }
 
     await batch.commit();
+    await syncProductStocksFromCommittedMovements([input.productId]);
 
     return {
       movements: movementsCreated,
@@ -3668,6 +3782,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       initialDelayMs: 700,
       timeoutMs: 12000,
     });
+    await syncProductStocksFromCommittedMovements(input.items.map((item) => item.productId));
     return purchasesCreated;
   };
 
@@ -3706,6 +3821,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       projectedProducts
     );
     await batch.commit();
+    await syncProductStocksFromCommittedMovements(freshTouchedProductIds);
     return updatedPurchases;
   };
 
@@ -3742,6 +3858,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       projectedProducts
     );
     await batch.commit();
+    await syncProductStocksFromCommittedMovements(freshTouchedProductIds);
     return updatedPurchase;
   };
 
@@ -3778,6 +3895,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       removedMovements.map((movement) => movement.productId)
     );
     await batch.commit();
+    await syncProductStocksFromCommittedMovements(removedMovements.map((movement) => movement.productId));
   };
 
   const deletePurchaseBatch = async (batchId: string) => {
@@ -3815,6 +3933,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       removedMovements.map((movement) => movement.productId)
     );
     await batch.commit();
+    await syncProductStocksFromCommittedMovements(removedMovements.map((movement) => movement.productId));
   };
 
   const addSaleWritesToBatch = (
@@ -4139,6 +4258,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
           saleBatchId,
           performedAt: input.soldAt,
           customerName: normalizedCustomerName,
+          customerPhone: normalizedCustomerPhone || undefined,
+          customerDocument: normalizedCustomerDocument || undefined,
           cueReference: serviceItem.cueReference,
           paymentMethod: normalizedPaymentMethod,
           paymentReference: normalizedPaymentReference,
@@ -4308,6 +4429,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       initialDelayMs: 700,
       timeoutMs: 12000,
     });
+    await syncProductStocksFromCommittedMovements(getTouchedProductIdsForSale(input));
     return createdSales;
   };
 
@@ -4490,6 +4612,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       }
     );
     await batch.commit();
+    await syncProductStocksFromCommittedMovements(freshTouchedProductIds);
     return updatedSales;
   };
 
@@ -4566,6 +4689,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     }
 
     await batch.commit();
+    await syncProductStocksFromCommittedMovements([sale.productId]);
 
     return {
       ...sale,
@@ -4698,6 +4822,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     );
 
     await batch.commit();
+    await syncProductStocksFromCommittedMovements(stockDeltas.map((item) => item.productId));
 
     return updatedSales;
   };
@@ -4779,6 +4904,9 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     const totalRevenue = Number(input.servicePrice) || 0;
     const totalCost = totalMaterialCost + directServiceCost;
     const grossProfit = totalRevenue - totalCost;
+    const normalizedCustomerName = normalizeCustomerName(input.customerName);
+    const normalizedCustomerPhone = input.customerPhone?.trim() ?? '';
+    const normalizedCustomerDocument = input.customerDocument?.trim() ?? '';
     const service: ServiceOrder = {
       id: serviceRef.id,
       serviceType: input.serviceType,
@@ -4788,7 +4916,9 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       saleId: input.saleId?.trim() || undefined,
       saleBatchId: input.saleBatchId?.trim() || undefined,
       performedAt: input.performedAt,
-      customerName: input.customerName,
+      customerName: normalizedCustomerName,
+      customerPhone: normalizedCustomerPhone || undefined,
+      customerDocument: normalizedCustomerDocument || undefined,
       cueReference: input.cueReference,
       paymentMethod: normalizedPaymentMethod,
       paymentReference: normalizedPaymentReference,
@@ -4813,13 +4943,45 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     baseProducts: Product[],
     baseMovements: InventoryMovement[],
     extraTouchedProductIds: string[] = [],
-    extraTouchedVariantProductIds: string[] = []
+    extraTouchedVariantProductIds: string[] = [],
+    customerWriteMode: 'count' | 'touch' | 'skip' = 'count'
   ) => {
     const { service, materials } = plan;
     batch.set(
       doc(db, 'services', service.id),
       serializeServiceForFirestore(service, Timestamp.fromDate(new Date(input.performedAt)))
     );
+    if (
+      customerWriteMode !== 'skip' &&
+      service.source !== 'sale-addon' &&
+      !isAnonymousCustomerName(service.customerName)
+    ) {
+      const customerId = buildCustomerId(
+        service.customerName,
+        service.customerPhone ?? '',
+        service.customerDocument ?? ''
+      );
+      const serviceCountIncrement = customerWriteMode === 'count' ? 1 : 0;
+      const serviceRevenueIncrement = customerWriteMode === 'count' ? Number(service.totalRevenue ?? 0) : 0;
+      batch.set(
+        doc(db, 'customers', customerId),
+        {
+          id: customerId,
+          fullName: service.customerName,
+          normalizedName: normalizeSearchText(service.customerName),
+          phone: service.customerPhone ?? null,
+          documentNumber: service.customerDocument ?? null,
+          lastServiceAt: Timestamp.fromDate(new Date(input.performedAt)),
+          lastServiceOrderId: service.id,
+          serviceCount: increment(serviceCountIncrement),
+          totalServiceRevenue: increment(serviceRevenueIncrement),
+          saleCount: increment(0),
+          totalRevenue: increment(0),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+    }
 
     const stockDeltas: Array<{ productId: string; quantity: number }> = [];
     const variantStockMap = buildVariantStockMap(baseProducts, baseMovements);
@@ -4909,6 +5071,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     const batch = writeBatch(db);
     addServiceWritesToBatch(batch, input, plan, baseProducts, baseMovements);
     await batch.commit();
+    await syncProductStocksFromCommittedMovements(getTouchedProductIdsForService(input));
     return plan.service;
   };
 
@@ -4977,9 +5140,11 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       restoredProducts,
       remainingMovements,
       linkedMovements.map((movement) => movement.productId),
-      linkedMovements.filter((movement) => movement.variantId).map((movement) => movement.productId)
+      linkedMovements.filter((movement) => movement.variantId).map((movement) => movement.productId),
+      'touch'
     );
     await batch.commit();
+    await syncProductStocksFromCommittedMovements(touchedProductIds);
 
     return plan.service;
   };

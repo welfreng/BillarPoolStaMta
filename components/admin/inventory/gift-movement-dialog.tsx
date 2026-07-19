@@ -4,6 +4,7 @@ import { useEffect, useId } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { Gift, PackageCheck, ReceiptText } from 'lucide-react';
 import { AdminResponsiveDialog } from '@/components/admin/admin-responsive-dialog';
 import { Button } from '@/components/ui/button';
 import {
@@ -146,13 +147,19 @@ export function GiftMovementDialog({
       busyDescription="Espera la confirmacion para evitar salidas duplicadas."
       desktopContentClassName="lg:max-w-3xl"
       footer={
-        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <div className="grid gap-2 sm:flex sm:items-center sm:justify-between">
+          <div className="hidden min-w-[190px] rounded-xl border border-border bg-muted/50 px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-900/60 md:block">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Costo obsequio</p>
+            <p className="font-semibold text-foreground">{formatCurrency(selectedTotalCost)}</p>
+          </div>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
             Cancelar
           </Button>
           <Button form={giftFormId} type="submit" disabled={isSubmitting}>
             {isSubmitting ? 'Guardando...' : 'Registrar obsequio'}
           </Button>
+          </div>
         </div>
       }
     >
@@ -168,7 +175,33 @@ export function GiftMovementDialog({
           })}
           className="space-y-4"
         >
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-[linear-gradient(135deg,#071a3d_0%,#0d2b78_54%,#102b4e_100%)] text-white shadow-[0_18px_44px_rgba(8,22,47,0.22)] dark:border-slate-800">
+            <div className="grid gap-3 p-4 sm:grid-cols-3 sm:p-5">
+              <div className="sm:col-span-3">
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-100">
+                  <Gift className="h-3.5 w-3.5" />
+                  Obsequio
+                </div>
+                <p className="mt-3 line-clamp-1 text-xl font-semibold tracking-[-0.02em]">
+                  {selectedProduct?.name ?? 'Selecciona un producto'}
+                </p>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/10 px-3 py-2">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-100">Stock</p>
+                <p className="mt-1 text-sm font-semibold">{formatNumber(selectedStock)}</p>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/10 px-3 py-2">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-100">Cantidad</p>
+                <p className="mt-1 text-sm font-semibold">{formatNumber(selectedQuantity || 0)}</p>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/10 px-3 py-2">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-100">Costo</p>
+                <p className="mt-1 text-sm font-semibold">{formatCurrency(selectedTotalCost)}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-4 rounded-2xl border border-border bg-card/92 p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950/78 sm:p-5 md:grid-cols-2">
             <FormField
               control={form.control}
               name="productId"
@@ -342,7 +375,10 @@ export function GiftMovementDialog({
 
           <div className="grid gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/80 p-3 text-sm dark:border-emerald-900/60 dark:bg-emerald-950/22 sm:grid-cols-3">
             <div>
-              <Label className="text-xs text-emerald-800 dark:text-emerald-200">Stock disponible</Label>
+              <Label className="inline-flex items-center gap-1.5 text-xs text-emerald-800 dark:text-emerald-200">
+                <PackageCheck className="h-3.5 w-3.5" />
+                Stock disponible
+              </Label>
               <p className="mt-1 font-semibold text-emerald-950 dark:text-emerald-100">{formatNumber(selectedStock)}</p>
             </div>
             <div>
@@ -350,7 +386,10 @@ export function GiftMovementDialog({
               <p className="mt-1 font-semibold text-emerald-950 dark:text-emerald-100">{formatCurrency(selectedUnitCost)}</p>
             </div>
             <div>
-              <Label className="text-xs text-emerald-800 dark:text-emerald-200">Costo total obsequio</Label>
+              <Label className="inline-flex items-center gap-1.5 text-xs text-emerald-800 dark:text-emerald-200">
+                <ReceiptText className="h-3.5 w-3.5" />
+                Costo total obsequio
+              </Label>
               <p className="mt-1 font-semibold text-emerald-950 dark:text-emerald-100">{formatCurrency(selectedTotalCost)}</p>
             </div>
           </div>

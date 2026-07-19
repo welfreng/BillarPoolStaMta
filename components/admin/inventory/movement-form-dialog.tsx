@@ -4,6 +4,7 @@ import { useEffect, useId, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { Activity, CalendarDays, PackageCheck } from 'lucide-react';
 import { AdminResponsiveDialog } from '@/components/admin/admin-responsive-dialog';
 import { movementReasonLabels, movementReasonsByType, movementTypeLabels } from '@/lib/admin/catalogs';
 import type { Product } from '@/lib/admin/types';
@@ -84,6 +85,8 @@ export function MovementFormDialog({
   const isSubmitting = form.formState.isSubmitting;
   const selectedType = form.watch('type');
   const selectedProductId = form.watch('productId');
+  const selectedReason = form.watch('reason');
+  const selectedQuantity = Number(form.watch('quantity') || 0);
   const selectedProduct = products.find((product) => product.id === selectedProductId);
   const selectedVariantOptions = selectedProduct?.variants ?? [];
   const availableReasons = useMemo(
@@ -130,13 +133,39 @@ export function MovementFormDialog({
         <Form {...form}>
           <form
             id={movementFormId}
-            onSubmit={form.handleSubmit(async (values) => {
+          onSubmit={form.handleSubmit(async (values) => {
               await onSubmit(values);
               form.reset(createDefaultValues());
             })}
             className="space-y-4"
           >
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-[linear-gradient(135deg,#071a3d_0%,#0d2b78_54%,#102b4e_100%)] text-white shadow-[0_18px_44px_rgba(8,22,47,0.22)] dark:border-slate-800">
+              <div className="grid gap-3 p-4 sm:grid-cols-3 sm:p-5">
+                <div className="sm:col-span-3">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-100">
+                    <Activity className="h-3.5 w-3.5" />
+                    Movimiento
+                  </div>
+                  <p className="mt-3 line-clamp-1 text-xl font-semibold tracking-[-0.02em]">
+                    {selectedProduct?.name ?? 'Selecciona un producto'}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-white/10 px-3 py-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-100">Tipo</p>
+                  <p className="mt-1 text-sm font-semibold">{movementTypeLabels[selectedType]}</p>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-white/10 px-3 py-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-100">Motivo</p>
+                  <p className="mt-1 line-clamp-1 text-sm font-semibold">{movementReasonLabels[selectedReason]}</p>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-white/10 px-3 py-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-100">Cantidad</p>
+                  <p className="mt-1 text-sm font-semibold">{selectedQuantity || 0} uds</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-4 rounded-2xl border border-border bg-card/92 p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950/78 sm:p-5 md:grid-cols-2">
               <FormField
                 control={form.control}
                 name="productId"
@@ -193,6 +222,19 @@ export function MovementFormDialog({
                   )}
                 />
               ) : null}
+              {selectedProduct ? (
+                <div className="rounded-xl border border-border bg-muted/45 px-3 py-2.5 text-sm dark:border-slate-800 dark:bg-slate-900/55 md:col-span-2">
+                  <p className="inline-flex items-center gap-2 font-medium text-foreground">
+                    <PackageCheck className="h-4 w-4 text-primary" />
+                    {selectedProduct.name}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {selectedVariantOptions.length > 0
+                      ? 'Este producto maneja variantes; confirma la opcion exacta antes de guardar.'
+                      : 'Producto simple; el movimiento afectara el stock general.'}
+                  </p>
+                </div>
+              ) : null}
               <FormField
                 control={form.control}
                 name="type"
@@ -217,7 +259,7 @@ export function MovementFormDialog({
               />
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-4 rounded-2xl border border-border bg-muted/45 p-3 dark:border-slate-800 dark:bg-slate-900/45 sm:grid-cols-2 sm:p-5 xl:grid-cols-3">
               <FormField
                 control={form.control}
                 name="reason"
@@ -263,7 +305,10 @@ export function MovementFormDialog({
                 name="occurredAt"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Fecha</FormLabel>
+                    <FormLabel className="inline-flex items-center gap-2">
+                      <CalendarDays className="h-4 w-4 text-primary" />
+                      Fecha
+                    </FormLabel>
                     <FormControl>
                       <Input type="date" {...field} />
                     </FormControl>

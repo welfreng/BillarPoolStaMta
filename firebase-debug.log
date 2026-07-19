@@ -686,3 +686,95 @@ To learn about active projects for the CLI, visit https://firebase.google.com/do
 [info] +  Deploy complete! 
 [info] 
 [info] Project Console: https://console.firebase.google.com/project/billarpoolstamta-5d4ac/overview
+[debug] [2026-07-19T14:42:30.750Z] ----------------------------------------------------------------------
+[debug] [2026-07-19T14:42:30.755Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\HP\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js deploy --only firestore:rules --project billarpoolstamta-5d4ac --dry-run
+[debug] [2026-07-19T14:42:30.756Z] CLI Version:   15.19.0
+[debug] [2026-07-19T14:42:30.756Z] Platform:      win32
+[debug] [2026-07-19T14:42:30.756Z] Node Version:  v24.14.0
+[debug] [2026-07-19T14:42:30.756Z] Time:          Sun Jul 19 2026 09:42:30 GMT-0500 (hora estándar de Colombia)
+[debug] [2026-07-19T14:42:30.756Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-07-19T14:42:30.761Z] >>> [apiv2][query] GET https://firebase-public.firebaseio.com/cli.json [none]
+[debug] [2026-07-19T14:42:34.240Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-07-19T14:42:34.241Z] > authorizing via signed-in user (webnextwave@gmail.com)
+[debug] [2026-07-19T14:42:34.241Z] [iam] checking project billarpoolstamta-5d4ac for permissions ["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]
+[debug] [2026-07-19T14:42:34.243Z] Checked if tokens are valid: false, expires at: 1783101054550
+[debug] [2026-07-19T14:42:34.243Z] Checked if tokens are valid: false, expires at: 1783101054550
+[debug] [2026-07-19T14:42:34.244Z] > refreshing access token with scopes: []
+[debug] [2026-07-19T14:42:34.245Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2026-07-19T14:42:34.246Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-07-19T14:42:34.487Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2026-07-19T14:42:34.488Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-07-19T14:42:34.499Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/billarpoolstamta-5d4ac:testIamPermissions [none]
+[debug] [2026-07-19T14:42:34.499Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/billarpoolstamta-5d4ac:testIamPermissions  x-goog-user-project=billarpoolstamta-5d4ac
+[debug] [2026-07-19T14:42:34.500Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/billarpoolstamta-5d4ac:testIamPermissions {"permissions":["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]}
+[debug] [2026-07-19T14:42:34.555Z] <<< [apiv2][status] GET https://firebase-public.firebaseio.com/cli.json 200
+[debug] [2026-07-19T14:42:34.556Z] <<< [apiv2][body] GET https://firebase-public.firebaseio.com/cli.json {"cloudBuildErrorAfter":1594252800000,"cloudBuildWarnAfter":1590019200000,"defaultNode10After":1594252800000,"minVersion":"3.0.5","node8DeploysDisabledAfter":1613390400000,"node8RuntimeDisabledAfter":1615809600000,"node8WarnAfter":1600128000000}
+[debug] [2026-07-19T14:42:35.125Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/billarpoolstamta-5d4ac:testIamPermissions 200
+[debug] [2026-07-19T14:42:35.126Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/billarpoolstamta-5d4ac:testIamPermissions {"permissions":["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]}
+[info] 
+[info] === Deploying to 'billarpoolstamta-5d4ac'...
+[info] 
+[info] i  deploying firestore 
+[info] i  firestore: ensuring required API firestore.googleapis.com is enabled... 
+[info] i  firestore: ensuring required API firestore.googleapis.com is enabled... 
+[debug] [2026-07-19T14:42:35.138Z] Checked if tokens are valid: true, expires at: 1784475753488
+[debug] [2026-07-19T14:42:35.138Z] Checked if tokens are valid: true, expires at: 1784475753488
+[debug] [2026-07-19T14:42:35.139Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/billarpoolstamta-5d4ac/databases/(default) [none]
+[debug] [2026-07-19T14:42:35.979Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/billarpoolstamta-5d4ac/databases/(default) 200
+[debug] [2026-07-19T14:42:35.979Z] <<< [apiv2][body] GET https://firestore.googleapis.com/v1/projects/billarpoolstamta-5d4ac/databases/(default) {"name":"projects/billarpoolstamta-5d4ac/databases/(default)","uid":"b8576ef2-6dab-4d4b-8b6e-027d4f039fe3","createTime":"2026-03-17T16:40:34.303799Z","updateTime":"2026-03-17T16:40:34.303799Z","locationId":"nam5","type":"FIRESTORE_NATIVE","concurrencyMode":"PESSIMISTIC","versionRetentionPeriod":"3600s","earliestVersionTime":"2026-07-19T13:42:35.700601Z","appEngineIntegrationMode":"DISABLED","keyPrefix":"s","pointInTimeRecoveryEnablement":"POINT_IN_TIME_RECOVERY_DISABLED","deleteProtectionState":"DELETE_PROTECTION_DISABLED","databaseEdition":"STANDARD","freeTier":true,"realtimeUpdatesMode":"REALTIME_UPDATES_MODE_ENABLED","etag":"IOLyzuf83pUDMPS+5Ly5p5MD"}
+[info] i  firestore: reading indexes from firestore.indexes.json... 
+[info] i  cloud.firestore: checking firestore.rules for compilation errors... 
+[debug] [2026-07-19T14:42:35.985Z] Checked if tokens are valid: true, expires at: 1784475753488
+[debug] [2026-07-19T14:42:35.986Z] Checked if tokens are valid: true, expires at: 1784475753488
+[debug] [2026-07-19T14:42:35.986Z] >>> [apiv2][query] POST https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac:test [none]
+[debug] [2026-07-19T14:42:35.987Z] >>> [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac:test [omitted]
+[debug] [2026-07-19T14:42:36.423Z] <<< [apiv2][status] POST https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac:test 200
+[debug] [2026-07-19T14:42:36.424Z] <<< [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac:test {}
+[info] +  cloud.firestore: rules file firestore.rules compiled successfully 
+[info] 
+[info] +  Dry run complete! 
+[info] 
+[info] Project Console: https://console.firebase.google.com/project/billarpoolstamta-5d4ac/overview
+[debug] [2026-07-19T14:48:44.397Z] ----------------------------------------------------------------------
+[debug] [2026-07-19T14:48:44.400Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\HP\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js deploy --only firestore:rules --project billarpoolstamta-5d4ac --dry-run
+[debug] [2026-07-19T14:48:44.401Z] CLI Version:   15.19.0
+[debug] [2026-07-19T14:48:44.401Z] Platform:      win32
+[debug] [2026-07-19T14:48:44.401Z] Node Version:  v24.14.0
+[debug] [2026-07-19T14:48:44.401Z] Time:          Sun Jul 19 2026 09:48:44 GMT-0500 (hora estándar de Colombia)
+[debug] [2026-07-19T14:48:44.402Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-07-19T14:48:47.369Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-07-19T14:48:47.370Z] > authorizing via signed-in user (webnextwave@gmail.com)
+[debug] [2026-07-19T14:48:47.371Z] [iam] checking project billarpoolstamta-5d4ac for permissions ["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]
+[debug] [2026-07-19T14:48:47.373Z] Checked if tokens are valid: true, expires at: 1784475753488
+[debug] [2026-07-19T14:48:47.374Z] Checked if tokens are valid: true, expires at: 1784475753488
+[debug] [2026-07-19T14:48:47.376Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/billarpoolstamta-5d4ac:testIamPermissions [none]
+[debug] [2026-07-19T14:48:47.376Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/billarpoolstamta-5d4ac:testIamPermissions  x-goog-user-project=billarpoolstamta-5d4ac
+[debug] [2026-07-19T14:48:47.377Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/billarpoolstamta-5d4ac:testIamPermissions {"permissions":["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]}
+[debug] [2026-07-19T14:48:48.011Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/billarpoolstamta-5d4ac:testIamPermissions 200
+[debug] [2026-07-19T14:48:48.012Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/billarpoolstamta-5d4ac:testIamPermissions {"permissions":["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]}
+[info] 
+[info] === Deploying to 'billarpoolstamta-5d4ac'...
+[info] 
+[info] i  deploying firestore 
+[info] i  firestore: ensuring required API firestore.googleapis.com is enabled... 
+[info] i  firestore: ensuring required API firestore.googleapis.com is enabled... 
+[debug] [2026-07-19T14:48:48.024Z] Checked if tokens are valid: true, expires at: 1784475753488
+[debug] [2026-07-19T14:48:48.024Z] Checked if tokens are valid: true, expires at: 1784475753488
+[debug] [2026-07-19T14:48:48.025Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/billarpoolstamta-5d4ac/databases/(default) [none]
+[debug] [2026-07-19T14:48:48.805Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/billarpoolstamta-5d4ac/databases/(default) 200
+[debug] [2026-07-19T14:48:48.806Z] <<< [apiv2][body] GET https://firestore.googleapis.com/v1/projects/billarpoolstamta-5d4ac/databases/(default) {"name":"projects/billarpoolstamta-5d4ac/databases/(default)","uid":"b8576ef2-6dab-4d4b-8b6e-027d4f039fe3","createTime":"2026-03-17T16:40:34.303799Z","updateTime":"2026-03-17T16:40:34.303799Z","locationId":"nam5","type":"FIRESTORE_NATIVE","concurrencyMode":"PESSIMISTIC","versionRetentionPeriod":"3600s","earliestVersionTime":"2026-07-19T13:48:48.570809Z","appEngineIntegrationMode":"DISABLED","keyPrefix":"s","pointInTimeRecoveryEnablement":"POINT_IN_TIME_RECOVERY_DISABLED","deleteProtectionState":"DELETE_PROTECTION_DISABLED","databaseEdition":"STANDARD","freeTier":true,"realtimeUpdatesMode":"REALTIME_UPDATES_MODE_ENABLED","etag":"INeOtZn+3pUDMPS+5Ly5p5MD"}
+[info] i  firestore: reading indexes from firestore.indexes.json... 
+[info] i  cloud.firestore: checking firestore.rules for compilation errors... 
+[debug] [2026-07-19T14:48:48.813Z] Checked if tokens are valid: true, expires at: 1784475753488
+[debug] [2026-07-19T14:48:48.813Z] Checked if tokens are valid: true, expires at: 1784475753488
+[debug] [2026-07-19T14:48:48.813Z] >>> [apiv2][query] POST https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac:test [none]
+[debug] [2026-07-19T14:48:48.813Z] >>> [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac:test [omitted]
+[debug] [2026-07-19T14:48:49.241Z] <<< [apiv2][status] POST https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac:test 200
+[debug] [2026-07-19T14:48:49.241Z] <<< [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/billarpoolstamta-5d4ac:test {}
+[info] +  cloud.firestore: rules file firestore.rules compiled successfully 
+[info] 
+[info] +  Dry run complete! 
+[info] 
+[info] Project Console: https://console.firebase.google.com/project/billarpoolstamta-5d4ac/overview

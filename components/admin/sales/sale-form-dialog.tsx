@@ -5,9 +5,23 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Check, Gift, MinusCircle, Pencil, PlusCircle } from 'lucide-react';
+import {
+  CalendarDays,
+  Check,
+  ClipboardList,
+  Coins,
+  Gift,
+  MinusCircle,
+  PackageCheck,
+  Pencil,
+  PlusCircle,
+  ReceiptText,
+  ShoppingBag,
+  UserRound,
+} from 'lucide-react';
 import { AdminMobileSection } from '@/components/admin/admin-mobile-section';
 import { AdminResponsiveDialog } from '@/components/admin/admin-responsive-dialog';
+import { CustomerAutocomplete } from '@/components/admin/shared/customer-autocomplete';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -843,17 +857,14 @@ function SaleServiceSection({
     : [];
 
   return (
-    <div className="space-y-4 rounded-2xl border border-cyan-200/80 bg-cyan-50/75 p-3 dark:border-cyan-900/60 dark:bg-cyan-950/20 sm:p-4">
-      <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-        <div className="flex min-w-0 items-start gap-3">
+    <div className="space-y-3 rounded-2xl border border-cyan-200/80 bg-cyan-50/75 p-3 dark:border-cyan-900/60 dark:bg-cyan-950/20">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
           <div className="rounded-xl bg-cyan-100 p-2 text-cyan-800 dark:bg-cyan-950/70 dark:text-cyan-100">
             <Gift className="h-4 w-4" />
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-slate-950 dark:text-cyan-50">Instalacion en esta venta</p>
-            <p className="mt-1 max-w-2xl text-xs leading-5 text-cyan-800/85 dark:text-cyan-100/75 sm:text-sm">
-              Usalo cuando esta compra tambien incluye un trabajo de torno. Si el material ya esta agregado como producto, no lo repitas aqui.
-            </p>
+            <p className="text-sm font-semibold text-slate-950 dark:text-cyan-50">Instalacion</p>
           </div>
         </div>
 
@@ -1184,7 +1195,6 @@ export function SaleFormDialog({
 }) {
   const saleFormId = useId();
   const lineFormId = useId();
-  const customerListId = useId();
   const isEditingSale = mode === 'edit';
   const form = useForm<SaleFormValues>({
     resolver: zodResolver(saleSchema),
@@ -1276,30 +1286,10 @@ export function SaleFormDialog({
   }, [draftLine.productId, draftLine.quantity, draftLine.unitPrice, draftLine.variantId, products]);
 
   const firstItem = values.items[0] ?? createDefaultLineItem();
-  const normalizedCustomerPhone = values.customerPhone?.trim() ?? '';
-  const customerOptions = useMemo(
-    () =>
-      [...(customers ?? [])]
-        .filter((customer) => customer.fullName.trim())
-        .sort((left, right) => left.fullName.localeCompare(right.fullName, 'es')),
-    [customers]
-  );
-
-  const applyCustomerMemory = (rawValue: string) => {
-    const normalizedValue = rawValue.trim().toLowerCase();
-    if (!normalizedValue) return;
-
-    const matchedCustomer = customerOptions.find((customer) => {
-      const fullName = customer.fullName.trim().toLowerCase();
-      const phone = customer.phone?.trim().toLowerCase() ?? '';
-      const documentNumber = customer.documentNumber?.trim().toLowerCase() ?? '';
-      return fullName === normalizedValue || phone === normalizedValue || documentNumber === normalizedValue;
-    });
-    if (!matchedCustomer) return;
-
-    form.setValue('customerName', matchedCustomer.fullName, { shouldValidate: true, shouldDirty: true });
-    form.setValue('customerPhone', matchedCustomer.phone ?? '', { shouldValidate: true, shouldDirty: true });
-    form.setValue('customerDocument', matchedCustomer.documentNumber ?? '', { shouldValidate: true, shouldDirty: true });
+  const updateCustomerFields = (nextCustomer: { name: string; phone: string; documentNumber: string }) => {
+    form.setValue('customerName', nextCustomer.name, { shouldValidate: true, shouldDirty: true });
+    form.setValue('customerPhone', nextCustomer.phone, { shouldValidate: true, shouldDirty: true });
+    form.setValue('customerDocument', nextCustomer.documentNumber, { shouldValidate: true, shouldDirty: true });
   };
 
   const saleSummaries = values.items.map((saleItem) => {
@@ -1390,6 +1380,11 @@ export function SaleFormDialog({
       grossProfit: totalSale - totalCost,
     };
   }, [saleSummaries]);
+  const saleUnits = saleSummaries.reduce((sum, item) => sum + item.quantity, 0);
+  const selectedLineCount = values.items.filter((item) => Boolean(item.productId)).length;
+  const saleProductCost = saleSummaries.reduce((sum, item) => sum + item.totalCost, 0);
+  const saleReady = hasSaleProduct && saleUnits > 0;
+  const customerLabel = values.customerName.trim() || 'Cliente NN';
   const firstLineSummary = saleSummaries[0] ?? null;
   const firstItemProduct = products.find((product) => product.id === firstItem.productId) ?? null;
   const firstItemHasService = firstItem.serviceItems.length > 0;
@@ -1421,6 +1416,9 @@ export function SaleFormDialog({
   const draftAllowedGiftCategories = draftProduct ? getAllowedSaleGiftCategories(draftProduct) : [];
   const draftCanHaveGift = draftAllowedGiftCategories.length > 0;
   const draftHasGiftSelection = hasSelectedGiftItems(draftLine.giftItems, products);
+  const draftQuantity = Math.max(Number(draftLine.quantity) || 0, 0);
+  const draftUnitPrice = Math.max(Number(draftLine.unitPrice) || 0, 0);
+  const draftLineTotal = draftQuantity * draftUnitPrice;
 
   const availableGiftOptionsByCategory = useMemo(() => {
     const baseOptions = products.filter((product) => product.status === 'active');
@@ -1634,29 +1632,30 @@ export function SaleFormDialog({
             ? 'Guardando cambios de inventario y venta. El formulario queda bloqueado para evitar duplicados.'
             : 'Guardando la venta y preparando la factura. El formulario queda bloqueado para evitar duplicados.'
         }
-        description={
-          hideFinancialSummary
-            ? 'Cada venta descuenta stock y mantiene actualizado el inventario.'
-            : 'Cada venta descuenta stock y deja trazabilidad para los reportes del negocio.'
-        }
-        desktopContentClassName="lg:max-w-5xl xl:max-w-6xl"
+        desktopContentClassName="lg:max-w-6xl xl:max-w-[1180px]"
         mobileContentClassName="rounded-none border-0 bg-background dark:bg-slate-950"
         headerClassName="px-4 pt-3 pb-3 sm:px-5 lg:px-6"
         bodyClassName="px-3 py-3 pb-4 sm:px-5 lg:px-6"
         footerClassName="px-3 py-3 sm:px-5 lg:px-6"
         footer={
           <div className="grid gap-2 sm:flex sm:items-center sm:justify-between">
-            <Button
-              type="button"
-              variant="outline"
-              className="h-11 w-full rounded-xl bg-card/90 sm:h-9 sm:w-auto"
-              onClick={openNewLineDialog}
-              disabled={isSubmitting || !hasSaleProduct}
-              title={!hasSaleProduct ? 'Selecciona primero el producto principal.' : undefined}
-            >
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Agregar producto
-            </Button>
+            <div className="grid gap-2 sm:flex sm:items-center">
+              <div className="hidden min-w-[170px] rounded-xl border border-border bg-muted/50 px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-900/60 md:block">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Total</p>
+                <p className="font-semibold text-foreground">{formatCurrency(totals.totalSale)}</p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 w-full rounded-xl bg-card/90 sm:h-9 sm:w-auto"
+                onClick={openNewLineDialog}
+                disabled={isSubmitting || !hasSaleProduct}
+                title={!hasSaleProduct ? 'Selecciona primero el producto principal.' : undefined}
+              >
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Agregar producto
+              </Button>
+            </div>
             <div className="grid grid-cols-[0.82fr_1.18fr] gap-2 sm:flex">
               <Button
                 type="button"
@@ -1692,106 +1691,65 @@ export function SaleFormDialog({
               })}
               className="space-y-3.5 sm:space-y-6"
             >
-              <fieldset disabled={isSubmitting} className="space-y-3.5 disabled:pointer-events-none disabled:opacity-70 sm:space-y-6">
-              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border border-emerald-200/80 bg-emerald-50/90 px-3.5 py-3 shadow-sm dark:border-emerald-900/60 dark:bg-emerald-950/24 md:hidden">
-                <div className="min-w-0">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-200/80">
-                    Venta actual
-                  </p>
-                  <p className="mt-1 truncate text-sm font-medium text-emerald-950 dark:text-emerald-100">
-                    {formatNumber(saleSummaries.reduce((sum, item) => sum + item.quantity, 0))} unidades · {formatNumber(fields.length)} lineas
-                  </p>
+              <fieldset disabled={isSubmitting} className="space-y-4 disabled:pointer-events-none disabled:opacity-70 sm:space-y-5">
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-[linear-gradient(135deg,#071a3d_0%,#0d2b78_52%,#102b4e_100%)] text-white shadow-[0_18px_44px_rgba(8,22,47,0.22)] dark:border-slate-800">
+                <div className="grid gap-4 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center sm:p-5">
+                  <div className="min-w-0">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-100">
+                      <ReceiptText className="h-3.5 w-3.5" />
+                      {isEditingSale ? 'Edicion de venta' : 'Nueva venta'}
+                    </div>
+                    <p className="mt-3 text-2xl font-semibold tracking-[-0.02em] sm:text-3xl">
+                      {formatCurrency(totals.totalSale)}
+                    </p>
+                    <p className="mt-1 line-clamp-1 text-sm text-slate-200">
+                      {customerLabel} · {formatNumber(saleUnits)} unidades · {formatNumber(selectedLineCount)} lineas
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 md:min-w-[340px]">
+                    <div className="rounded-xl border border-white/10 bg-white/10 px-3 py-2">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-100">Estado</p>
+                      <p className={cn('mt-1 text-sm font-semibold', saleReady ? 'text-emerald-200' : 'text-amber-200')}>
+                        {saleReady ? 'Lista' : 'En proceso'}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-white/10 bg-white/10 px-3 py-2">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-100">Items</p>
+                      <p className="mt-1 text-sm font-semibold">{formatNumber(saleUnits)} uds</p>
+                    </div>
+                    <div className="rounded-xl border border-white/10 bg-white/10 px-3 py-2">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-100">Lineas</p>
+                      <p className="mt-1 text-sm font-semibold">{formatNumber(selectedLineCount)}</p>
+                    </div>
+                  </div>
                 </div>
-                <p className="text-right text-lg font-semibold text-emerald-950 dark:text-emerald-100">{formatCurrency(totals.totalSale)}</p>
               </div>
+
+              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-start">
+                <div className="min-w-0 space-y-4">
               <AdminMobileSection
                 value="sale-customer"
-                title="Cliente y fecha"
+                title={
+                  <span className="inline-flex items-center gap-2">
+                    <UserRound className="h-4 w-4 text-primary" />
+                    Cliente y fecha
+                  </span>
+                }
                 defaultOpen
-                className="rounded-3xl border border-border bg-card/88 p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950/72 sm:p-6"
+                className="rounded-2xl border border-border bg-card/92 p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950/78 sm:p-5"
+                contentClassName="pt-3 sm:pt-4"
               >
               <div className="grid gap-4 sm:grid-cols-2 sm:items-start">
-                <FormField
-                  control={form.control}
-                  name="customerName"
-                  render={({ field }) => (
-                    <FormItem className="min-w-0">
-                      <FormLabel>Nombre del cliente</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Cliente NN"
-                          list={customerListId}
-                          {...field}
-                          onChange={(event) => {
-                            field.onChange(event);
-                            applyCustomerMemory(event.target.value);
-                          }}
-                          onBlur={(event) => {
-                            field.onBlur();
-                            applyCustomerMemory(event.target.value);
-                          }}
-                        />
-                      </FormControl>
-                      <datalist id={customerListId}>
-                        {customerOptions.map((customer) => (
-                          <option
-                            key={customer.id}
-                            value={customer.fullName}
-                            label={[customer.documentNumber, customer.phone].filter(Boolean).join(' - ')}
-                          />
-                        ))}
-                      </datalist>
-                      {normalizedCustomerPhone.length >= 7 ? (
-                        <p className="hidden text-xs text-slate-500 sm:block">
-                          El telefono es opcional. Si agregas nombre real, el sistema crea o actualiza el cliente.
-                        </p>
-                      ) : (
-                        <p className="hidden text-xs text-slate-500 sm:block">
-                          Si no sabes el nombre, deja este campo vacio y se guardara como Cliente NN sin crear ficha.
-                        </p>
-                      )}
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="customerPhone"
-                  render={({ field }) => (
-                    <FormItem className="min-w-0">
-                      <FormLabel>Telefono del cliente</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Ingresa numero de telefono Ej: 3002565865" inputMode="numeric" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="customerDocument"
-                  render={({ field }) => (
-                    <FormItem className="min-w-0">
-                      <FormLabel>Cedula o NIT</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Opcional"
-                          inputMode="numeric"
-                          {...field}
-                          onBlur={(event) => {
-                            field.onBlur();
-                            applyCustomerMemory(event.target.value);
-                          }}
-                        />
-                      </FormControl>
-                      <p className="hidden text-xs text-slate-500 sm:block">
-                        Usalo cuando el cliente necesite quedar identificado en la factura.
-                      </p>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                <CustomerAutocomplete
+                  customers={customers}
+                  name={values.customerName}
+                  phone={values.customerPhone}
+                  documentNumber={values.customerDocument ?? ''}
+                  onChange={updateCustomerFields}
+                  nameError={form.formState.errors.customerName?.message}
+                  phoneError={form.formState.errors.customerPhone?.message}
+                  documentError={form.formState.errors.customerDocument?.message}
+                  className="sm:col-span-2"
                 />
 
                 <FormField
@@ -1813,21 +1771,27 @@ export function SaleFormDialog({
 
               <AdminMobileSection
                 value="sale-items"
-                title="Productos de la venta"
-                description="El primer producto se elige aqui. Usa `Agregar producto` solo cuando la venta tenga mas lineas."
+                title={
+                  <span className="inline-flex items-center gap-2">
+                    <ShoppingBag className="h-4 w-4 text-primary" />
+                    Productos de la venta
+                  </span>
+                }
                 defaultOpen
-                className="min-w-0 rounded-3xl border border-border bg-muted/60 p-3 dark:border-slate-800 dark:bg-slate-900/55 sm:p-5 lg:p-6"
+                className="min-w-0 rounded-2xl border border-border bg-muted/45 p-3 dark:border-slate-800 dark:bg-slate-900/45 sm:p-5"
                 contentClassName="space-y-3.5 sm:space-y-5"
               >
 
                 {fields.length <= 1 ? (
-                  <div className="rounded-2xl border border-border bg-card/88 p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950/72 sm:p-4">
-                  <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                  <div className="rounded-2xl border border-border bg-card/94 p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950/76 sm:p-4">
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-border/70 pb-3 dark:border-slate-800">
                     <div className="flex items-center gap-2">
-                      <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full bg-muted px-2 text-xs font-semibold text-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                      <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg bg-primary/10 px-2 text-xs font-semibold text-primary">
                         #1
                       </span>
-                      <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Producto principal</p>
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Producto principal</p>
+                      </div>
                     </div>
                   </div>
 
@@ -1902,21 +1866,30 @@ export function SaleFormDialog({
                     />
 
                     {firstLineSummary?.product ? (
-                      <div className="space-y-3 rounded-2xl border border-border bg-card/88 px-3.5 py-3 shadow-sm dark:bg-slate-900/82 md:px-4 md:shadow-none">
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-700 dark:text-cyan-300">
-                              Stock disponible
-                            </p>
-                            <p className="mt-1 text-2xl font-semibold text-foreground">
-                              {formatNumber(firstItemDisplayStock)} unidades
-                            </p>
-                            <p className="mt-1 text-sm text-muted-foreground">
-                              {firstLineSummary.product.name} - {firstLineSummary.product.brand || 'Sin marca'}
-                            </p>
+                      <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3.5 py-3 dark:border-slate-800 dark:bg-slate-900/60 md:px-4">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="flex min-w-0 items-center gap-3">
+                            <span
+                              className={cn(
+                                'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border',
+                                firstItemDisplayStock <= 0
+                                  ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-200'
+                                  : 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200'
+                              )}
+                            >
+                              <PackageCheck className="h-4 w-4" />
+                            </span>
+                            <div className="min-w-0">
+                              <p className="line-clamp-1 text-sm font-semibold text-foreground">
+                                {firstLineSummary.product.name} - {firstLineSummary.product.brand || 'Sin marca'}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                Stock disponible: <span className="font-semibold text-foreground">{formatNumber(firstItemDisplayStock)} uds</span>
+                              </p>
+                            </div>
                           </div>
                           {firstItemSelectedVariant ? (
-                            <div className="rounded-2xl border border-border/80 bg-muted/60 px-3 py-2.5 sm:min-w-[220px]">
+                            <div className="rounded-xl border border-border/80 bg-background/80 px-3 py-2 sm:min-w-[200px]">
                               <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                                 {firstItemProduct?.variantLabel || 'Variante'} elegida
                               </p>
@@ -1932,9 +1905,6 @@ export function SaleFormDialog({
                             </div>
                           ) : null}
                         </div>
-                        <p className="text-sm text-muted-foreground">
-                          {firstItemDisplayStock > 0 ? 'Inventario disponible para esta seleccion.' : 'Sin unidades disponibles para esta seleccion.'}
-                        </p>
                       </div>
                     ) : null}
 
@@ -1945,19 +1915,6 @@ export function SaleFormDialog({
                             <p className="text-sm font-medium text-slate-900">
                               {firstItemProduct?.variantLabel || 'Variante'} disponible
                             </p>
-                            <p className="hidden text-sm text-slate-500 sm:block">
-                              Selecciona la opcion que le queda al cliente y revisa cuantas unidades hay.
-                            </p>
-                            {firstItemUsedVariantIds.size > 0 ? (
-                              <p className="hidden text-xs text-slate-500 sm:block">
-                                Las variantes ya usadas en otras lineas no aparecen aqui.
-                              </p>
-                            ) : null}
-                            {firstItemVariantOptions.length > 1 ? (
-                              <p className="hidden text-xs text-amber-700 sm:block">
-                                El precio se define cuando eliges la variante.
-                              </p>
-                            ) : null}
                           </div>
                           <div className="flex flex-wrap gap-2">
                             {firstItemVariantOptions.map((variant) => (
@@ -2059,7 +2016,7 @@ export function SaleFormDialog({
                             {unitPriceHelpText ? <p className="text-xs text-muted-foreground">{unitPriceHelpText}</p> : null}
                             {!canEditUnitPrice ? (
                               <p className="text-xs text-muted-foreground">
-                                Solo `admin` o `superadmin` pueden modificar el precio manualmente.
+                                Solo admin o superadmin pueden modificar el precio manualmente.
                               </p>
                             ) : null}
                             <FormMessage />
@@ -2299,7 +2256,7 @@ export function SaleFormDialog({
                       <p className="text-sm font-medium text-emerald-950 dark:text-emerald-100">Total acumulado de la venta</p>
                       <p className="text-xs text-emerald-800 dark:text-emerald-200/80">
                         {formatNumber(saleSummaries.reduce((sum, item) => sum + item.quantity, 0))} unidades en {
-                          formatNumber(fields.length)
+                          formatNumber(selectedLineCount)
                         } lineas
                       </p>
                     </div>
@@ -2310,8 +2267,14 @@ export function SaleFormDialog({
 
               <AdminMobileSection
                 value="sale-notes"
-                title="Notas"
-                className="rounded-3xl border border-border bg-card/88 p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950/72 sm:p-6"
+                title={
+                  <span className="inline-flex items-center gap-2">
+                    <ClipboardList className="h-4 w-4 text-primary" />
+                    Notas internas
+                  </span>
+                }
+                className="rounded-2xl border border-border bg-card/92 p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950/78 sm:p-5"
+                contentClassName="pt-3 sm:pt-4"
               >
                 <FormField
                   control={form.control}
@@ -2328,43 +2291,93 @@ export function SaleFormDialog({
                 />
               </AdminMobileSection>
 
+                </div>
+
+                <aside className="min-w-0 xl:sticky xl:top-0">
               <AdminMobileSection
                 value="sale-summary"
-                title="Resumen de la venta"
+                title={
+                  <span className="inline-flex items-center gap-2">
+                    <ReceiptText className="h-4 w-4 text-primary" />
+                    Resumen
+                  </span>
+                }
                 defaultOpen
-                className="rounded-2xl border border-cyan-200/70 bg-cyan-50/70 p-3.5 dark:border-cyan-900/60 dark:bg-cyan-950/18 sm:p-6"
+                className="rounded-2xl border border-border bg-card/94 p-3.5 shadow-sm dark:border-slate-800 dark:bg-slate-950/82 sm:p-5"
+                contentClassName="pt-3 sm:pt-4"
               >
-                <div className={`mt-4 grid gap-3 ${hideFinancialSummary ? 'sm:grid-cols-1 lg:grid-cols-1' : 'sm:grid-cols-2 lg:grid-cols-5'}`}>
-                  <div className="rounded-2xl border border-border/70 bg-card/88 p-3 dark:border-slate-800 dark:bg-slate-950/68 sm:p-4">
-                    <p className="text-xs text-muted-foreground">Unidades en venta</p>
-                    <p className="mt-1 font-semibold text-foreground">
-                      {formatNumber(saleSummaries.reduce((sum, item) => sum + item.quantity, 0))} uds
+                <div className="space-y-4">
+                  <div className="rounded-2xl border border-primary/15 bg-primary/5 p-4 dark:border-primary/25 dark:bg-primary/10">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Total venta</p>
+                    <p className="mt-2 text-3xl font-semibold tracking-[-0.03em] text-foreground">
+                      {formatCurrency(totals.totalSale)}
                     </p>
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                      <div className="rounded-xl bg-background/70 px-3 py-2 dark:bg-slate-950/45">
+                        <p className="text-xs text-muted-foreground">Unidades</p>
+                        <p className="font-semibold text-foreground">{formatNumber(saleUnits)}</p>
+                      </div>
+                      <div className="rounded-xl bg-background/70 px-3 py-2 dark:bg-slate-950/45">
+                        <p className="text-xs text-muted-foreground">Lineas</p>
+                        <p className="font-semibold text-foreground">{formatNumber(selectedLineCount)}</p>
+                      </div>
+                    </div>
                   </div>
+
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center justify-between gap-3 rounded-xl border border-border/70 bg-muted/45 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900/50">
+                      <span className="inline-flex items-center gap-2 text-muted-foreground">
+                        <UserRound className="h-4 w-4" />
+                        Cliente
+                      </span>
+                      <span className="max-w-[150px] truncate font-medium text-foreground">{customerLabel}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 rounded-xl border border-border/70 bg-muted/45 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900/50">
+                      <span className="inline-flex items-center gap-2 text-muted-foreground">
+                        <CalendarDays className="h-4 w-4" />
+                        Fecha
+                      </span>
+                      <span className="font-medium text-foreground">{values.soldAt || 'Sin fecha'}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 rounded-xl border border-border/70 bg-muted/45 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900/50">
+                      <span className="inline-flex items-center gap-2 text-muted-foreground">
+                        <PackageCheck className="h-4 w-4" />
+                        Estado
+                      </span>
+                      <span className={cn('font-semibold', saleReady ? 'text-emerald-700 dark:text-emerald-300' : 'text-amber-700 dark:text-amber-300')}>
+                        {saleReady ? 'Lista para registrar' : 'Completa producto y cantidad'}
+                      </span>
+                    </div>
+                  </div>
+
                   {!hideFinancialSummary && (
-                    <>
-                      <div className="rounded-2xl border border-border/70 bg-card/88 p-3 dark:border-slate-800 dark:bg-slate-950/68 sm:p-4">
-                        <p className="text-xs text-muted-foreground">Costo total productos</p>
-                        <p className="mt-1 font-semibold text-foreground">
-                          {formatCurrency(saleSummaries.reduce((sum, item) => sum + item.totalCost, 0))}
-                        </p>
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-slate-900/55">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                        <Coins className="h-4 w-4 text-primary" />
+                        Margen estimado
                       </div>
-                      <div className="rounded-2xl border border-border/70 bg-card/88 p-3 dark:border-slate-800 dark:bg-slate-950/68 sm:p-4">
-                        <p className="text-xs text-muted-foreground">Ingreso total</p>
-                        <p className="mt-1 font-semibold text-foreground">{formatCurrency(totals.totalSale)}</p>
+                      <div className="mt-3 space-y-2 text-sm">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-muted-foreground">Costo productos</span>
+                          <span className="font-medium text-foreground">{formatCurrency(saleProductCost)}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-muted-foreground">Costo obsequios</span>
+                          <span className="font-medium text-foreground">{formatCurrency(totals.totalGiftCost)}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-3 border-t border-border/70 pt-2 dark:border-slate-800">
+                          <span className="font-medium text-foreground">Utilidad neta</span>
+                          <span className={cn('font-semibold', totals.grossProfit >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300')}>
+                            {formatCurrency(totals.grossProfit)}
+                          </span>
+                        </div>
                       </div>
-                      <div className="rounded-2xl border border-border/70 bg-card/88 p-3 dark:border-slate-800 dark:bg-slate-950/68 sm:p-4">
-                        <p className="text-xs text-muted-foreground">Costo total obsequios</p>
-                        <p className="mt-1 font-semibold text-foreground">{formatCurrency(totals.totalGiftCost)}</p>
-                      </div>
-                      <div className="rounded-2xl border border-emerald-200/70 bg-emerald-50/75 p-3 dark:border-emerald-900/60 dark:bg-emerald-950/22 sm:p-4">
-                        <p className="text-xs text-emerald-700 dark:text-emerald-100/75">Utilidad neta</p>
-                        <p className="mt-1 font-semibold text-emerald-900 dark:text-emerald-100">{formatCurrency(totals.grossProfit)}</p>
-                      </div>
-                    </>
+                    </div>
                   )}
                 </div>
               </AdminMobileSection>
+                </aside>
+              </div>
               </fieldset>
             </form>
           </Form>
@@ -2377,8 +2390,7 @@ export function SaleFormDialog({
           setLineDialogOpen(nextOpen);
         }}
         title={editingLineIndex === null ? 'Agregar producto a la venta' : 'Editar producto de la venta'}
-        description="Configura esta linea y al guardarla quedara en la lista de productos solicitados."
-        desktopContentClassName="lg:max-w-4xl"
+        desktopContentClassName="lg:max-w-5xl"
         mobileContentClassName="rounded-none border-0 bg-background dark:bg-slate-950"
         headerClassName="px-4 pt-3 pb-3 sm:px-5 lg:px-6"
         bodyClassName="px-3 py-3 pb-4 sm:px-5 lg:px-6"
@@ -2406,8 +2418,33 @@ export function SaleFormDialog({
               event.preventDefault();
               saveDraftLine();
             }}
-            className="space-y-3.5"
+            className="space-y-4"
           >
+            <div className="rounded-2xl border border-slate-200 bg-[linear-gradient(135deg,rgba(248,250,252,0.98)_0%,rgba(239,246,255,0.9)_100%)] p-3 shadow-sm dark:border-slate-800 dark:bg-[linear-gradient(135deg,rgba(15,23,42,0.94)_0%,rgba(8,47,73,0.52)_100%)] sm:p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <ShoppingBag className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground">
+                      {draftProduct?.name ?? 'Selecciona el producto'}
+                    </p>
+                    <p className="line-clamp-1 text-xs text-muted-foreground">
+                      {draftProduct
+                        ? `${draftProduct.brand || 'Sin marca'} · Stock ${formatNumber(draftDisplayStock)}`
+                        : 'Producto pendiente'}
+                    </p>
+                  </div>
+                </div>
+                <div className="rounded-xl border border-border/70 bg-background/80 px-3 py-2 text-right dark:border-slate-800 dark:bg-slate-950/50">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Total linea</p>
+                  <p className="text-base font-semibold text-foreground">{formatCurrency(draftLineTotal)}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4 rounded-2xl border border-border bg-card/92 p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950/78 sm:p-4">
             <div className="space-y-2">
               <Label>Producto</Label>
                 <SearchableSelect
@@ -2485,21 +2522,30 @@ export function SaleFormDialog({
                 </div>
               ) : null}
               {draftLine.productId ? (
-                <div className="space-y-3 rounded-2xl border border-border bg-card/88 px-3.5 py-3 shadow-sm dark:bg-slate-900/82 sm:col-span-2 md:px-4 md:shadow-none">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-700 dark:text-cyan-300">
-                        Stock disponible
-                      </p>
-                      <p className="mt-1 text-2xl font-semibold text-foreground">
-                        {formatNumber(draftDisplayStock)} unidades
-                      </p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {draftDisplayStock > 0 ? 'Inventario listo para esta linea.' : 'Sin unidades disponibles para esta seleccion.'}
-                      </p>
+                <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3.5 py-3 dark:border-slate-800 dark:bg-slate-900/60 sm:col-span-2 md:px-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span
+                        className={cn(
+                          'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border',
+                          draftDisplayStock <= 0
+                            ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-200'
+                            : 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200'
+                        )}
+                      >
+                        <PackageCheck className="h-4 w-4" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="line-clamp-1 text-sm font-semibold text-foreground">
+                          {draftProduct?.name ?? 'Producto'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Stock disponible: <span className="font-semibold text-foreground">{formatNumber(draftDisplayStock)} uds</span>
+                        </p>
+                      </div>
                     </div>
                     {draftSelectedVariant ? (
-                      <div className="rounded-2xl border border-border/80 bg-muted/60 px-3 py-2.5 sm:min-w-[220px]">
+                      <div className="rounded-xl border border-border/80 bg-background/80 px-3 py-2 sm:min-w-[200px]">
                         <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                           {draftProduct?.variantLabel || 'Variante'} elegida
                         </p>
@@ -2564,10 +2610,11 @@ export function SaleFormDialog({
                 {unitPriceHelpText ? <p className="text-xs text-muted-foreground">{unitPriceHelpText}</p> : null}
                 {!canEditUnitPrice ? (
                   <p className="text-xs text-muted-foreground">
-                    El precio manual requiere permiso de `admin` o `superadmin`.
+                    El precio manual requiere permiso de admin o superadmin.
                   </p>
                 ) : null}
               </div>
+            </div>
             </div>
 
             {draftDiscountPreview ? (

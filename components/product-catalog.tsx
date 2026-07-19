@@ -520,12 +520,12 @@ export default function ProductCatalog({
       id={sectionId}
       className={`relative z-10 bg-[linear-gradient(180deg,#f8fbff_0%,#eef5ff_48%,#f8fafc_100%)] ${
         featuredOnly
-          ? "-mt-10 rounded-t-[40px] border-t border-white/80 pb-28 pt-20 shadow-[0_-24px_70px_rgba(8,22,47,0.18)]"
-          : "py-24"
+          ? "-mt-8 rounded-t-[28px] border-t border-white/80 pb-24 pt-18 shadow-[0_-18px_52px_rgba(8,22,47,0.14)]"
+          : "py-20"
       }`}
     >
       <div className="mx-auto max-w-7xl px-4 lg:px-8">
-        <div className="mb-16 text-center">
+        <div className="mb-12 text-center">
           <p className="mb-2 text-sm font-semibold uppercase tracking-widest text-[#d4a017]">
             {featuredOnly ? "Productos destacados" : "Catalogo de productos"}
           </p>
@@ -620,16 +620,16 @@ export default function ProductCatalog({
                       productCardRefs.current[product.id] = element
                     }}
                     onMouseEnter={() => setPreviewSideFromViewport(product.id)}
-                    className={`group relative overflow-visible rounded-2xl border border-[#c8d3e6] bg-white shadow-sm transition-all duration-300 hover:z-20 hover:-translate-y-1 hover:border-[#0a2472]/35 hover:shadow-[0_20px_45px_rgba(10,36,114,0.16)] ${
+                  className={`group relative overflow-visible rounded-xl border border-[#c8d3e6] bg-white shadow-sm transition-all duration-300 hover:z-20 hover:-translate-y-1 hover:border-[#0a2472]/35 hover:shadow-[0_18px_38px_rgba(10,36,114,0.14)] ${
                       product.publicStock <= 0 ? "border-slate-200 bg-slate-50/80 opacity-80" : ""
                     }`}
                   >
-                    <div className="relative h-28 overflow-hidden bg-gradient-to-br from-white via-slate-50 to-slate-100 sm:h-32">
+                    <div className="relative h-36 overflow-hidden rounded-t-xl bg-gradient-to-br from-white via-slate-50 to-slate-100 sm:h-40">
                       <Image
                         src={currentCardImage}
                         alt={product.name}
                         fill
-                        className={`object-cover transition-transform duration-500 group-hover:scale-110 ${
+                        className={`object-contain p-2 transition-transform duration-500 group-hover:scale-105 ${
                           product.publicStock <= 0 ? "grayscale-[0.45] saturate-50" : ""
                         }`}
                         unoptimized={currentCardImage.startsWith("data:")}
@@ -637,14 +637,14 @@ export default function ProductCatalog({
                       {product.publicStock <= 0 ? (
                         <div className="absolute inset-0 bg-white/35" />
                       ) : null}
-                      <div className="absolute inset-0 bg-gradient-to-t from-[#0a1628]/70 via-transparent to-transparent" />
+                      <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#0a1628]/58 via-transparent to-transparent" />
                       <div className="absolute left-2.5 top-2.5 z-10 inline-flex items-center rounded-full bg-[#0a2472] px-2 py-1 text-[10px] font-semibold text-white">
                         {product.publicStock > 0 ? product.tag : "Agotado"}
                       </div>
                     </div>
 
                     <div
-                      className={`pointer-events-none absolute top-1/2 z-30 hidden w-[280px] -translate-y-1/2 rounded-[28px] border border-slate-200 bg-white/98 p-3 opacity-0 shadow-2xl shadow-slate-900/20 transition-all delay-0 duration-300 group-hover:opacity-100 group-hover:delay-300 lg:block ${
+                      className={`pointer-events-none absolute top-1/2 z-30 hidden w-[280px] -translate-y-1/2 rounded-2xl border border-slate-200 bg-white/98 p-3 opacity-0 shadow-2xl shadow-slate-900/20 transition-all delay-0 duration-300 group-hover:opacity-100 group-hover:delay-300 lg:block ${
                         previewSide === "left"
                           ? "left-auto right-full mr-4 ml-0 group-hover:-translate-x-2"
                           : "left-full right-auto ml-4 mr-0 group-hover:translate-x-2"
@@ -724,7 +724,7 @@ export default function ProductCatalog({
                           ) : null}
                       </div>
 
-                      <div className="flex items-center justify-between rounded-2xl bg-[#0a2472]/5 px-2.5 py-2">
+                      <div className="flex items-center justify-between rounded-xl bg-[#0a2472]/5 px-2.5 py-2">
                         <div>
                           <p className="text-[11px] uppercase tracking-wide text-slate-500">Precio</p>
                           {product.variants.length > 0 ? (
@@ -743,7 +743,7 @@ export default function ProductCatalog({
 
                       <button
                         onClick={() => openProductDetail(product)}
-                        className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-[linear-gradient(135deg,#0a2472_0%,#12389b_100%)] px-2.5 py-2 text-[11px] font-semibold text-white transition-colors hover:bg-[#d4a017] hover:text-[#08162f] sm:text-xs"
+                        className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-[linear-gradient(135deg,#0a2472_0%,#12389b_100%)] px-2.5 py-2 text-[11px] font-semibold text-white transition-colors hover:bg-[#d4a017] hover:text-[#08162f] sm:text-xs"
                       >
                         Ver producto
                         <ShoppingBag className="h-3.5 w-3.5" />
@@ -779,16 +779,16 @@ export default function ProductCatalog({
                             productCardRefs.current[product.id] = element
                           }}
                           onMouseEnter={() => setPreviewSideFromViewport(product.id)}
-                          className={`group relative overflow-visible rounded-2xl border border-[#c8d3e6] bg-white shadow-sm transition-all duration-300 hover:z-20 hover:-translate-y-1 hover:border-[#0a2472]/35 hover:shadow-[0_20px_45px_rgba(10,36,114,0.16)] ${
+                          className={`group relative overflow-visible rounded-xl border border-[#c8d3e6] bg-white shadow-sm transition-all duration-300 hover:z-20 hover:-translate-y-1 hover:border-[#0a2472]/35 hover:shadow-[0_18px_38px_rgba(10,36,114,0.14)] ${
                             product.publicStock <= 0 ? "border-slate-200 bg-slate-50/80 opacity-80" : ""
                           }`}
                         >
-                          <div className="relative h-28 overflow-hidden bg-gradient-to-br from-white via-slate-50 to-slate-100 sm:h-32">
+                          <div className="relative h-36 overflow-hidden rounded-t-xl bg-gradient-to-br from-white via-slate-50 to-slate-100 sm:h-40">
                             <Image
                               src={currentCardImage}
                               alt={product.name}
                               fill
-                              className={`object-cover transition-transform duration-500 group-hover:scale-110 ${
+                              className={`object-contain p-2 transition-transform duration-500 group-hover:scale-105 ${
                                 product.publicStock <= 0 ? "grayscale-[0.45] saturate-50" : ""
                               }`}
                               unoptimized={currentCardImage.startsWith("data:")}
@@ -796,14 +796,14 @@ export default function ProductCatalog({
                             {product.publicStock <= 0 ? (
                               <div className="absolute inset-0 bg-white/35" />
                             ) : null}
-                            <div className="absolute inset-0 bg-gradient-to-t from-[#0a1628]/70 via-transparent to-transparent" />
+                            <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#0a1628]/58 via-transparent to-transparent" />
                             <div className="absolute left-2.5 top-2.5 z-10 inline-flex items-center rounded-full bg-[#0a2472] px-2 py-1 text-[10px] font-semibold text-white">
                               {product.publicStock > 0 ? product.tag : "Agotado"}
                             </div>
                           </div>
 
                           <div
-                            className={`pointer-events-none absolute top-1/2 z-30 hidden w-[280px] -translate-y-1/2 rounded-[28px] border border-slate-200 bg-white/98 p-3 opacity-0 shadow-2xl shadow-slate-900/20 transition-all delay-0 duration-300 group-hover:opacity-100 group-hover:delay-300 lg:block ${
+                            className={`pointer-events-none absolute top-1/2 z-30 hidden w-[280px] -translate-y-1/2 rounded-2xl border border-slate-200 bg-white/98 p-3 opacity-0 shadow-2xl shadow-slate-900/20 transition-all delay-0 duration-300 group-hover:opacity-100 group-hover:delay-300 lg:block ${
                               previewSide === "left"
                                 ? "left-auto right-full mr-4 ml-0 group-hover:-translate-x-2"
                                 : "left-full right-auto ml-4 mr-0 group-hover:translate-x-2"
@@ -883,7 +883,7 @@ export default function ProductCatalog({
                             ) : null}
                             </div>
 
-                            <div className="flex items-center justify-between rounded-2xl bg-[#0a2472]/5 px-2.5 py-2">
+                            <div className="flex items-center justify-between rounded-xl bg-[#0a2472]/5 px-2.5 py-2">
                               <div>
                                 <p className="text-[11px] uppercase tracking-wide text-slate-500">Precio</p>
                                 {product.variants.length > 0 ? (
@@ -902,7 +902,7 @@ export default function ProductCatalog({
 
                             <button
                               onClick={() => openProductDetail(product)}
-                              className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-[linear-gradient(135deg,#0a2472_0%,#12389b_100%)] px-2.5 py-2 text-[11px] font-semibold text-white transition-colors hover:bg-[#d4a017] hover:text-[#08162f] sm:text-xs"
+                              className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-[linear-gradient(135deg,#0a2472_0%,#12389b_100%)] px-2.5 py-2 text-[11px] font-semibold text-white transition-colors hover:bg-[#d4a017] hover:text-[#08162f] sm:text-xs"
                             >
                               Ver producto
                               <ShoppingBag className="h-3.5 w-3.5" />
@@ -917,7 +917,7 @@ export default function ProductCatalog({
             </div>
           )
         ) : (
-          <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 px-6 py-12 text-center text-slate-600">
+          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-6 py-12 text-center text-slate-600">
             {featuredOnly
               ? "No hay productos activos para mostrar en destacados."
               : "No hay productos activos para mostrar en esta categoria."}
@@ -925,7 +925,7 @@ export default function ProductCatalog({
         )}
 
         <div className="mt-16 text-center">
-          <div className="inline-flex flex-col items-center gap-4 rounded-3xl bg-[linear-gradient(135deg,#08162f_0%,#0a2472_58%,#12389b_100%)] p-8 shadow-[0_24px_60px_rgba(10,36,114,0.22)] sm:flex-row">
+          <div className="inline-flex flex-col items-center gap-4 rounded-2xl bg-[linear-gradient(135deg,#08162f_0%,#0a2472_58%,#12389b_100%)] p-6 shadow-[0_20px_48px_rgba(10,36,114,0.18)] sm:flex-row">
             <div className="text-left">
               <p className="font-mono text-xl font-bold text-white">
                 {featuredOnly ? "¿Quieres ver todo el catalogo?" : "¿Quieres ayuda para escoger?"}
@@ -971,7 +971,7 @@ export default function ProductCatalog({
         }}
       >
         {selectedProduct ? (
-          <DialogContent className="flex max-h-[calc(100dvh-1.5rem)] w-[calc(100vw-1rem)] max-w-5xl flex-col overflow-hidden rounded-3xl px-0 py-0 sm:w-[calc(100vw-2rem)]">
+          <DialogContent className="flex max-h-[calc(100dvh-1.5rem)] w-[calc(100vw-1rem)] max-w-5xl flex-col overflow-hidden rounded-2xl px-0 py-0 sm:w-[calc(100vw-2rem)]">
             <DialogHeader className="shrink-0 border-b border-slate-200 px-4 py-4 sm:px-6">
               <DialogTitle className="text-2xl font-semibold text-slate-950">{selectedProduct.name}</DialogTitle>
               <DialogDescription>
@@ -980,7 +980,7 @@ export default function ProductCatalog({
             </DialogHeader>
 
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-6 lg:space-y-5">
-              <div className="relative min-h-[260px] overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-100 sm:min-h-[320px] lg:min-h-[340px] xl:min-h-[360px]">
+              <div className="relative min-h-[260px] overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-100 sm:min-h-[320px] lg:min-h-[340px] xl:min-h-[360px]">
                 <Image
                   src={selectedProductImage}
                   alt={selectedVariant ? `${selectedProduct.name} ${selectedVariant.name}` : selectedProduct.name}
@@ -991,7 +991,7 @@ export default function ProductCatalog({
               </div>
 
               <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-                <div className="rounded-3xl border border-slate-200 bg-white p-5">
+                <div className="rounded-2xl border border-slate-200 bg-white p-5">
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Producto</p>
@@ -1089,7 +1089,7 @@ export default function ProductCatalog({
                   ) : null}
 
                   {selectedProduct.details.length > 0 ? (
-                    <div className="rounded-3xl border border-slate-200 bg-white p-5">
+                    <div className="rounded-2xl border border-slate-200 bg-white p-5">
                       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Detalle rapido</p>
                       <div className="mt-3 space-y-2">
                         {selectedProduct.details.map((detail) => (

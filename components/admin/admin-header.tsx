@@ -159,12 +159,12 @@ export function AdminHeader() {
 
   return (
     <header className="admin-glass sticky top-0 z-30 border-b backdrop-blur-2xl">
-      <div className="flex flex-col gap-4 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-6">
+      <div className="flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between md:px-6">
         <div className="flex items-center gap-3">
-          <SidebarTrigger className="rounded-2xl border border-border bg-card/88 text-foreground shadow-sm hover:bg-muted md:hidden dark:border-slate-800 dark:bg-slate-950/78 dark:text-slate-100 dark:hover:bg-slate-900" />
+          <SidebarTrigger className="rounded-xl border border-border bg-card/88 text-foreground shadow-sm hover:bg-muted md:hidden dark:border-slate-800 dark:bg-slate-950/78 dark:text-slate-100 dark:hover:bg-slate-900" />
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-700">Billar Pool Santa Marta</p>
-            <h1 className="text-2xl font-semibold tracking-[-0.02em] text-slate-950 dark:text-slate-50">{title}</h1>
+            <h1 className="text-xl font-semibold tracking-[-0.02em] text-slate-950 dark:text-slate-50 sm:text-2xl">{title}</h1>
           </div>
         </div>
 
@@ -185,10 +185,10 @@ export function AdminHeader() {
                 navigateToItem(filteredItems[0].href);
               }}
               placeholder="Buscar modulo o accion..."
-              className="rounded-2xl border-border bg-background/84 pl-9 shadow-sm dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-100 dark:placeholder:text-slate-400"
+              className="rounded-xl border-border bg-background/84 pl-9 shadow-sm dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-100 dark:placeholder:text-slate-400"
             />
             {isFocused && filteredItems.length > 0 ? (
-              <div className="admin-glass-strong absolute left-0 right-0 top-[calc(100%+0.5rem)] z-40 overflow-hidden rounded-[22px] border">
+              <div className="admin-glass-strong absolute left-0 right-0 top-[calc(100%+0.5rem)] z-40 overflow-hidden rounded-2xl border">
                 {filteredItems.slice(0, 7).map((item) => (
                   <button
                     key={`${item.href}-${item.label}`}
@@ -216,7 +216,7 @@ export function AdminHeader() {
               }}
             >
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" className="relative self-start rounded-2xl md:self-auto">
+                <Button variant="outline" size="icon" className="relative self-start rounded-xl md:self-auto">
                   <Bell className="h-4 w-4" />
                   {unreadNotifications.length > 0 ? (
                     <span className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-rose-600 px-1.5 text-[10px] font-semibold text-white">
@@ -225,7 +225,7 @@ export function AdminHeader() {
                   ) : null}
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-[320px] rounded-[22px] p-0">
+              <DropdownMenuContent align="end" className="w-[320px] rounded-2xl p-0">
                 <DropdownMenuLabel className="px-4 py-3">
                   <div>
                     <p className="text-sm font-semibold text-slate-950 dark:text-slate-50">Notificaciones</p>
@@ -265,9 +265,9 @@ export function AdminHeader() {
             </DropdownMenu>
           ) : null}
 
-          <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card/86 px-3 py-3 dark:border-slate-800 dark:bg-slate-950/80 sm:flex-row sm:items-center">
-            <Avatar className="h-10 w-10 rounded-xl">
-              <AvatarFallback className="rounded-2xl bg-primary text-primary-foreground dark:bg-slate-800">
+          <div className="flex flex-col gap-3 rounded-xl border border-border bg-card/86 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-950/80 sm:flex-row sm:items-center">
+            <Avatar className="h-9 w-9 rounded-lg">
+              <AvatarFallback className="rounded-lg bg-primary text-primary-foreground dark:bg-slate-800">
                 {initials}
               </AvatarFallback>
             </Avatar>
