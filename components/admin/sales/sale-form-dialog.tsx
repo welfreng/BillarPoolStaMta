@@ -1,7 +1,7 @@
 ﻿'use client';
 
 import Image from 'next/image';
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -641,7 +641,7 @@ function getGiftProductIdByCategory(
   category: SaleGiftCategory
 ) {
   return (
-    items.find((item) => {
+    (items ?? []).find((item) => {
       const product = products.find((current) => current.id === item.productId);
       return product ? getSaleGiftCategoryKey(product) === category : false;
     })?.productId ?? ''
@@ -649,7 +649,7 @@ function getGiftProductIdByCategory(
 }
 
 function hasSelectedGiftItems(items: SaleLineFormValue['giftItems'], products: Product[]) {
-  return items.some((item) => {
+  return (items ?? []).some((item) => {
     const product = products.find((current) => current.id === item.productId);
     return Boolean(product && getSaleGiftCategoryKey(product));
   });
@@ -661,7 +661,7 @@ function getGiftQuantityByCategory(
   category: SaleGiftCategory
 ) {
   return (
-    items.find((item) => {
+    (items ?? []).find((item) => {
       const product = products.find((current) => current.id === item.productId);
       return product ? getSaleGiftCategoryKey(product) === category : false;
     })?.quantity ?? 0
@@ -677,9 +677,10 @@ function setGiftSelectionByCategory<T extends { giftItems: SaleLineFormValue['gi
   enabled: boolean
 ): T {
   const maxQuantity = Math.max(Math.trunc(Number(line.quantity ?? 0) || 0), 1);
-  const preservedQuantity = getGiftQuantityByCategory(line.giftItems, products, category);
+  const currentGiftItems = line.giftItems ?? [];
+  const preservedQuantity = getGiftQuantityByCategory(currentGiftItems, products, category);
   const nextItems = normalizeGiftItems(
-    line.giftItems.filter((item) => {
+    currentGiftItems.filter((item) => {
       const product = products.find((current) => current.id === item.productId);
       return product ? getSaleGiftCategoryKey(product) !== category : true;
     }),
@@ -711,11 +712,12 @@ function setGiftQuantityByCategory<T extends { giftItems: SaleLineFormValue['gif
   category: SaleGiftCategory,
   quantity: number | string
 ): T {
-  const selectedProductId = getGiftProductIdByCategory(line.giftItems, products, category);
+  const currentGiftItems = line.giftItems ?? [];
+  const selectedProductId = getGiftProductIdByCategory(currentGiftItems, products, category);
   if (!selectedProductId) return line;
 
   const maxQuantity = Math.max(Math.trunc(Number(line.quantity ?? 0) || 0), 1);
-  const nextItems = line.giftItems.map((item) => {
+  const nextItems = currentGiftItems.map((item) => {
     const product = products.find((current) => current.id === item.productId);
     if (!product || getSaleGiftCategoryKey(product) !== category) return item;
     return {
@@ -758,8 +760,9 @@ function SaleGiftSection({
   availableGiftOptionsByCategory: Record<SaleGiftCategory, Product[]>;
 }) {
   if (allowedCategories.length === 0) return null;
+  const giftItems = line.giftItems ?? [];
   const soldQuantity = Math.max(Math.trunc(Number(line.quantity ?? 0) || 0), 0);
-  const selectedGiftQuantity = line.giftItems.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+  const selectedGiftQuantity = giftItems.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
 
   return (
     <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/70 sm:p-4">
@@ -797,8 +800,8 @@ function SaleGiftSection({
 
           <div className="grid gap-3 md:grid-cols-2">
           {allowedCategories.map((category) => {
-            const selectedProductId = getGiftProductIdByCategory(line.giftItems, products, category);
-            const selectedQuantity = getGiftQuantityByCategory(line.giftItems, products, category);
+            const selectedProductId = getGiftProductIdByCategory(giftItems, products, category);
+            const selectedQuantity = getGiftQuantityByCategory(giftItems, products, category);
             const options = availableGiftOptionsByCategory[category];
             const maxQuantity = Math.max(Math.trunc(Number(line.quantity ?? 0) || 0), 1);
 
@@ -820,24 +823,21 @@ function SaleGiftSection({
                 </div>
 
                 <div className="mt-3">
-                  <Select
+                  <select
                     value={selectedProductId}
-                    onValueChange={(value) =>
-                      onLineChange(setGiftSelectionByCategory(line, products, movements, category, value, true))
+                    onChange={(event) =>
+                      onLineChange(setGiftSelectionByCategory(line, products, movements, category, event.target.value, true))
                     }
                     disabled={!selectedProductId || options.length === 0}
+                    className="h-11 w-full min-w-0 rounded-xl border border-input bg-background/88 px-3.5 py-2 text-base text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.04)] outline-none transition-[color,box-shadow,background-color] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900/72 dark:text-slate-100 sm:h-9 sm:text-sm"
                   >
-                    <SelectTrigger className="h-10 w-full max-w-full bg-card/88 dark:border-slate-700 dark:bg-slate-950/70 dark:text-slate-100">
-                      <SelectValue placeholder={giftCategoryCopy[category].placeholder} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {options.map((product) => (
-                        <SelectItem key={product.id} value={product.id}>
-                          {product.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    <option value="">{giftCategoryCopy[category].placeholder}</option>
+                    {options.map((product) => (
+                      <option key={product.id} value={product.id}>
+                        {product.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 {selectedProductId ? (
@@ -848,6 +848,7 @@ function SaleGiftSection({
                       min="1"
                       max={maxQuantity}
                       value={selectedQuantity || maxQuantity}
+                      className="text-base sm:text-sm"
                       onChange={(event) =>
                         onLineChange(
                           setGiftQuantityByCategory(line, products, movements, category, event.target.value)
@@ -891,9 +892,14 @@ function SaleServiceSection({
   movements: InventoryMovement[];
   hideFinancialSummary: boolean;
 }) {
+  const sectionRef = useRef<HTMLDivElement | null>(null);
   const serviceItems = line.serviceItems ?? [];
   const serviceItem = serviceItems[0] ? normalizeSaleServiceItemForForm(serviceItems[0], serviceProduct) : undefined;
   const enabled = Boolean(serviceItem);
+  const serviceProductIsMaterial =
+    matchesProductCategoryFamily(serviceProduct, 'casquillos') ||
+    matchesProductCategoryFamily(serviceProduct, 'virolas') ||
+    matchesProductCategoryFamily(serviceProduct, 'extensiones');
   const selectedServiceType =
     serviceItem && saleServiceTypeOptions.includes(serviceItem.serviceType)
       ? serviceItem.serviceType
@@ -908,9 +914,38 @@ function SaleServiceSection({
         matchesProductCategoryFamily(serviceProduct, slot.family)
       )
     : [];
+  const handleServiceTypeChange = (nextServiceType: typeof selectedServiceType) => {
+    if (!serviceItem) return;
+    const nextSlots = serviceMaterialSlots[nextServiceType] ?? [];
+    onLineChange({
+      ...line,
+      serviceItems: [
+        {
+          ...serviceItem,
+          serviceType: nextServiceType,
+          materials: (serviceItem.materials ?? []).filter((material) => {
+            const product = products.find((item) => item.id === material.productId);
+            return nextSlots.some((slot) => matchesProductCategoryFamily(product, slot.family));
+          }),
+        },
+      ],
+    });
+  };
+  const scrollSectionIntoView = () => {
+    window.requestAnimationFrame(() => {
+      sectionRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    });
+  };
 
   return (
-    <div className="space-y-3 rounded-2xl border border-cyan-200/80 bg-cyan-50/75 p-3 dark:border-cyan-900/60 dark:bg-cyan-950/20">
+    <div
+      ref={sectionRef}
+      data-sale-service-section
+      className={cn(
+        'space-y-3 rounded-2xl border border-cyan-200/80 bg-cyan-50/75 p-3 dark:border-cyan-900/60 dark:bg-cyan-950/20',
+        serviceProductIsMaterial ? 'sm:p-4' : ''
+      )}
+    >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-center gap-3">
           <div className="rounded-xl bg-cyan-100 p-2 text-cyan-800 dark:bg-cyan-950/70 dark:text-cyan-100">
@@ -932,6 +967,9 @@ function SaleServiceSection({
                 ...line,
                 serviceItems: nextEnabled ? [serviceItem ?? createDefaultSaleServiceItem(cueReferenceSuggestion, serviceProduct)] : [],
               });
+              if (nextEnabled) {
+                scrollSectionIntoView();
+              }
             }}
           />
           <span
@@ -949,7 +987,103 @@ function SaleServiceSection({
         </label>
       </div>
 
-      {enabled && serviceItem ? (
+      {enabled && serviceItem && serviceProductIsMaterial ? (
+        <div className="grid gap-3">
+          <div className="grid gap-2">
+            <div className="flex items-center justify-between gap-2">
+              <Label>Referencia del taco</Label>
+              <button
+                type="button"
+                className="shrink-0 text-xs font-medium text-cyan-800 underline-offset-4 hover:underline dark:text-cyan-200"
+                onClick={() =>
+                  onLineChange({
+                    ...line,
+                    serviceItems: [{ ...serviceItem, cueReference: cueReferenceSuggestion }],
+                  })
+                }
+              >
+                Usar sugerencia
+              </button>
+            </div>
+            <Input
+              value={serviceItem.cueReference}
+              placeholder={cueReferenceSuggestion}
+              className="text-base sm:text-sm"
+              onChange={(event) =>
+                onLineChange({
+                  ...line,
+                  serviceItems: [{ ...serviceItem, cueReference: event.target.value }],
+                })
+              }
+            />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Tipo</Label>
+              <select
+                value={selectedServiceType}
+                onChange={(event) => handleServiceTypeChange(event.target.value as typeof selectedServiceType)}
+                className="h-11 w-full min-w-0 rounded-xl border border-input bg-background/88 px-3.5 py-2 text-base text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.04)] outline-none transition-[color,box-shadow,background-color] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:border-slate-700 dark:bg-slate-900/72 dark:text-slate-100 sm:h-9 sm:text-sm"
+              >
+                {saleServiceTypeOptions.map((value) => (
+                  <option key={value} value={value}>
+                    {serviceTypeLabels[value]}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Cobro</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={serviceItem.price}
+                  className="text-base sm:text-sm"
+                  onChange={(event) =>
+                    onLineChange({
+                      ...line,
+                      serviceItems: [{ ...serviceItem, price: Number(event.target.value || 0) }],
+                    })
+                  }
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Costo</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={serviceItem.cost}
+                  className="text-base sm:text-sm"
+                  onChange={(event) =>
+                    onLineChange({
+                      ...line,
+                      serviceItems: [{ ...serviceItem, cost: Number(event.target.value || 0) }],
+                    })
+                  }
+                />
+              </div>
+            </div>
+          </div>
+
+          <Input
+            value={serviceItem.notes}
+            placeholder="Nota opcional"
+            className="text-base sm:text-sm"
+            onChange={(event) =>
+              onLineChange({
+                ...line,
+                serviceItems: [{ ...serviceItem, notes: event.target.value }],
+              })
+            }
+          />
+        </div>
+      ) : enabled && serviceItem ? (
         <div className="grid gap-4">
           <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_minmax(280px,0.85fr)]">
             <div className="space-y-2">
@@ -971,6 +1105,7 @@ function SaleServiceSection({
               <Input
                 value={serviceItem.cueReference}
                 placeholder={cueReferenceSuggestion}
+                className="text-base sm:text-sm"
                 onChange={(event) =>
                   onLineChange({
                     ...line,
@@ -982,37 +1117,17 @@ function SaleServiceSection({
 
             <div className="min-w-0 space-y-2">
               <Label>Tipo de servicio</Label>
-              <Select
+              <select
                 value={selectedServiceType}
-                onValueChange={(value) => {
-                  const nextServiceType = value as typeof selectedServiceType;
-                  const nextSlots = serviceMaterialSlots[nextServiceType] ?? [];
-                  onLineChange({
-                    ...line,
-                    serviceItems: [
-                      {
-                        ...serviceItem,
-                        serviceType: nextServiceType,
-                        materials: (serviceItem.materials ?? []).filter((material) => {
-                          const product = products.find((item) => item.id === material.productId);
-                          return nextSlots.some((slot) => matchesProductCategoryFamily(product, slot.family));
-                        }),
-                      },
-                    ],
-                  });
-                }}
+                onChange={(event) => handleServiceTypeChange(event.target.value as typeof selectedServiceType)}
+                className="h-11 w-full min-w-0 rounded-xl border border-input bg-background/88 px-3.5 py-2 text-base text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.04)] outline-none transition-[color,box-shadow,background-color] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:border-slate-700 dark:bg-slate-900/72 dark:text-slate-100 sm:h-9 sm:text-sm"
               >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {saleServiceTypeOptions.map((value) => (
-                    <SelectItem key={value} value={value}>
-                      {serviceTypeLabels[value]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                {saleServiceTypeOptions.map((value) => (
+                  <option key={value} value={value}>
+                    {serviceTypeLabels[value]}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -1075,9 +1190,10 @@ function SaleServiceSection({
                       {materialProduct && (materialProduct.variants?.length ?? 0) > 0 ? (
                         <div className="space-y-2">
                           <Label>{materialProduct.variantLabel || 'Variante'}</Label>
-                          <Select
+                          <select
                             value={material?.variantId ?? ''}
-                            onValueChange={(value) =>
+                            onChange={(event) => {
+                              const value = event.target.value;
                               onLineChange({
                                 ...line,
                                 serviceItems: [
@@ -1090,22 +1206,19 @@ function SaleServiceSection({
                                     })),
                                   },
                                 ],
-                              })
-                            }
+                              });
+                            }}
+                            className="h-11 w-full min-w-0 rounded-xl border border-input bg-background/88 px-3.5 py-2 text-base text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.04)] outline-none transition-[color,box-shadow,background-color] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:border-slate-700 dark:bg-slate-900/72 dark:text-slate-100 sm:h-9 sm:text-sm"
                           >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecciona variante" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {(materialProduct.variants ?? [])
-                                .filter((variant) => variant.status !== 'inactive')
-                                .map((variant) => (
-                                  <SelectItem key={variant.id} value={variant.id}>
-                                    {variant.name} ({formatNumber(getProductVariantStock(materialProduct, variant.id, movements))})
-                                  </SelectItem>
-                                ))}
-                            </SelectContent>
-                          </Select>
+                            <option value="">Selecciona variante</option>
+                            {(materialProduct.variants ?? [])
+                              .filter((variant) => variant.status !== 'inactive')
+                              .map((variant) => (
+                                <option key={variant.id} value={variant.id}>
+                                  {variant.name} ({formatNumber(getProductVariantStock(materialProduct, variant.id, movements))})
+                                </option>
+                              ))}
+                          </select>
                         </div>
                       ) : null}
 
@@ -1118,6 +1231,7 @@ function SaleServiceSection({
                               min="1"
                               max={Math.max(materialStock, 1)}
                               value={materialQuantity}
+                              className="text-base sm:text-sm"
                               onChange={(event) =>
                                 onLineChange({
                                   ...line,
@@ -1150,7 +1264,7 @@ function SaleServiceSection({
             </div>
           ) : null}
 
-          <div className="grid gap-4 xl:grid-cols-2">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
             <div className="space-y-2">
               <Label>Cobro adicional</Label>
               <Input
@@ -1158,6 +1272,7 @@ function SaleServiceSection({
                 min="0"
                 step="0.01"
                 value={serviceItem.price}
+                className="text-base sm:text-sm"
                 onChange={(event) =>
                   onLineChange({
                     ...line,
@@ -1165,7 +1280,7 @@ function SaleServiceSection({
                   })
                 }
               />
-              <p className="text-xs text-cyan-800/75 dark:text-cyan-100/70">
+              <p className="hidden text-xs text-cyan-800/75 dark:text-cyan-100/70 sm:block">
                 Dejalo en 0 cuando la instalacion vaya incluida con el producto.
               </p>
             </div>
@@ -1177,6 +1292,7 @@ function SaleServiceSection({
                 min="0"
                 step="0.01"
                 value={serviceItem.cost}
+                className="text-base sm:text-sm"
                 onChange={(event) =>
                   onLineChange({
                     ...line,
@@ -1184,18 +1300,18 @@ function SaleServiceSection({
                   })
                 }
               />
-              <p className="text-xs text-cyan-800/75 dark:text-cyan-100/70">
+              <p className="hidden text-xs text-cyan-800/75 dark:text-cyan-100/70 sm:block">
                 Costo operativo del servicio: mano de obra, luz, lija, pegante o comision.
               </p>
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label>Notas del servicio</Label>
-            <Textarea
+            <Label>Nota corta</Label>
+            <Input
               value={serviceItem.notes}
-              rows={2}
-              placeholder="Ej: instalar y ajustar punta antes de entregar."
+              placeholder="Opcional: instalar y ajustar antes de entregar."
+              className="text-base sm:text-sm"
               onChange={(event) =>
                 onLineChange({
                   ...line,
@@ -2346,7 +2462,12 @@ export function SaleFormDialog({
                     <FormItem>
                      
                       <FormControl>
-                        <Textarea rows={4} placeholder="Ejemplo: venta en mostrador o pedido especial" {...field} />
+                        <Textarea
+                          rows={4}
+                          placeholder="Ejemplo: venta en mostrador o pedido especial"
+                          className="h-24 min-h-24 max-h-28 text-base sm:text-sm"
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -2458,7 +2579,7 @@ export function SaleFormDialog({
         headerClassName="px-4 pt-3 pb-3 sm:px-5 lg:px-6"
         bodyClassName="px-3 py-3 pb-4 sm:px-5 lg:px-6"
         footerClassName="px-3 py-3 sm:px-5 lg:px-6"
-        mobileFooterMode="inline"
+        mobileFooterMode="fixed"
         footer={
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button
