@@ -42,7 +42,7 @@ export function AdminMobileSection({
 
   return (
     <Accordion type="single" collapsible defaultValue={defaultOpen ? value : undefined} className={className}>
-      <AccordionItem value={value} className="overflow-hidden rounded-2xl border border-border bg-card/90 shadow-[0_12px_30px_rgba(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-950/78 dark:shadow-[0_14px_34px_rgba(2,6,23,0.34)]">
+      <AccordionItem value={value} className="rounded-2xl border border-border bg-card/90 shadow-[0_12px_30px_rgba(15,23,42,0.06)] data-[state=closed]:overflow-hidden data-[state=open]:overflow-visible dark:border-slate-800 dark:bg-slate-950/78 dark:shadow-[0_14px_34px_rgba(2,6,23,0.34)]">
         <AccordionTrigger className={cn('items-start px-4 py-3.5 hover:no-underline data-[state=open]:bg-muted/70 dark:data-[state=open]:bg-slate-900/80', headerClassName)}>
           <div className="pr-2 text-left">
             <h3 className="text-sm font-semibold tracking-[-0.01em] text-slate-950 dark:text-slate-50">{title}</h3>
