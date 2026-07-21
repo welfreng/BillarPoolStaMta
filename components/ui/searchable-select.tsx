@@ -11,7 +11,6 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 
@@ -189,7 +188,7 @@ export function SearchableSelect({
     <Command
       className={cn(
         'w-full min-w-0 overflow-hidden',
-        isMobile ? 'h-full' : 'max-h-[min(26rem,calc(100vh-8rem))]'
+        isMobile ? 'max-h-[min(24rem,calc(100dvh-12rem))]' : 'max-h-[min(26rem,calc(100vh-8rem))]'
       )}
     >
         <div className="shrink-0 w-full min-w-0 border-b">
@@ -223,7 +222,7 @@ export function SearchableSelect({
       <CommandList
         className={cn(
           'min-h-0 w-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain touch-pan-y',
-          isMobile ? 'max-h-none' : 'max-h-[min(22rem,calc(100vh-12rem))]'
+          isMobile ? 'max-h-[min(18rem,calc(100dvh-17rem))]' : 'max-h-[min(22rem,calc(100vh-12rem))]'
         )}
         ref={listRef}
         onWheel={handleListWheel}
@@ -310,7 +309,7 @@ export function SearchableSelect({
           variant="outline"
           role="combobox"
           disabled={disabled}
-          onClick={() => setOpen(true)}
+          onClick={() => setOpen((currentOpen) => !currentOpen)}
           className={cn('w-full min-w-0 justify-between overflow-hidden px-3 font-normal', triggerClassName)}
         >
           <span className="truncate text-left">
@@ -318,31 +317,24 @@ export function SearchableSelect({
           </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogContent
-            showCloseButton={false}
-            className="inset-0 left-0 top-0 !z-[100] !flex h-[100dvh] !h-[100dvh] w-screen !w-screen max-w-none !max-w-none translate-x-0 !translate-x-0 translate-y-0 !translate-y-0 flex-col items-stretch rounded-none !rounded-none border-0 p-0"
-          >
-            <DialogHeader className="w-full min-w-0 border-b px-4 py-3 text-left">
-              <div className="flex items-center justify-between gap-3">
-                <DialogTitle className="min-w-0 flex-1 truncate text-[15px] font-semibold">{placeholder}</DialogTitle>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-9 w-9 shrink-0 rounded-xl"
-                  onClick={() => setOpen(false)}
-                >
-                  <X className="h-4 w-4" />
-                  <span className="sr-only">Cerrar</span>
-                </Button>
-              </div>
-            </DialogHeader>
-            <div className="min-h-0 w-full min-w-0 flex-1 overflow-hidden p-0">
-              {commandContent}
+        {open ? (
+          <div className="mt-2 min-w-0 overflow-hidden rounded-2xl border border-border bg-popover text-popover-foreground shadow-xl dark:border-slate-800">
+            <div className="flex items-center justify-between gap-3 border-b px-3 py-2">
+              <p className="min-w-0 flex-1 truncate text-sm font-semibold">{placeholder}</p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0 rounded-xl"
+                onClick={() => setOpen(false)}
+              >
+                <X className="h-4 w-4" />
+                <span className="sr-only">Cerrar</span>
+              </Button>
             </div>
-          </DialogContent>
-        </Dialog>
+            {commandContent}
+          </div>
+        ) : null}
       </>
     ) : (
       <Popover open={open} onOpenChange={setOpen}>
