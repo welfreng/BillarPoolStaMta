@@ -143,7 +143,10 @@ const saleSchema = z
         });
       }
 
-      item.giftItems.forEach((giftItem, giftIndex) => {
+      const giftItems = item.giftItems ?? [];
+      const serviceItems = item.serviceItems ?? [];
+
+      giftItems.forEach((giftItem, giftIndex) => {
         if (!giftItem.productId) {
           context.addIssue({
             code: z.ZodIssueCode.custom,
@@ -179,7 +182,7 @@ const saleSchema = z
         selectedGiftCategories.add(giftCategory);
       });
 
-      item.serviceItems.forEach((serviceItem, serviceIndex) => {
+      serviceItems.forEach((serviceItem, serviceIndex) => {
         if ((Number(serviceItem.price) || 0) < 0) {
           context.addIssue({
             code: z.ZodIssueCode.custom,
@@ -194,7 +197,7 @@ const saleSchema = z
             message: 'Ingresa un costo valido para el servicio',
           });
         }
-        if (!serviceItem.cueReference.trim()) {
+        if (!String(serviceItem.cueReference ?? '').trim()) {
           context.addIssue({
             code: z.ZodIssueCode.custom,
             path: ['items', index, 'serviceItems', serviceIndex, 'cueReference'],
@@ -203,7 +206,7 @@ const saleSchema = z
         }
 
         const seenMaterials = new Set<string>();
-        serviceItem.materials.forEach((material, materialIndex) => {
+        (serviceItem.materials ?? []).forEach((material, materialIndex) => {
           if (!material.productId) {
             context.addIssue({
               code: z.ZodIssueCode.custom,
@@ -329,6 +332,51 @@ function createDefaultSaleServiceItem(
     notes: '',
     cueReference,
     materials: [],
+  };
+}
+
+function normalizeSaleServiceItemForForm(
+  item?: Partial<SaleLineFormValue['serviceItems'][number]>,
+  product?: Pick<Product, 'category'> | null
+): SaleLineFormValue['serviceItems'][number] {
+  const fallback = createDefaultSaleServiceItem('', product);
+  const serviceType = saleServiceTypeOptions.includes(item?.serviceType as (typeof saleServiceTypeOptions)[number])
+    ? (item?.serviceType as (typeof saleServiceTypeOptions)[number])
+    : fallback.serviceType;
+
+  return {
+    ...fallback,
+    ...item,
+    serviceType,
+    serviceCategory: String(item?.serviceCategory ?? fallback.serviceCategory).trim() || fallback.serviceCategory,
+    price: Number(item?.price ?? fallback.price) || 0,
+    cost: Number(item?.cost ?? fallback.cost) || 0,
+    cueReference: String(item?.cueReference ?? fallback.cueReference),
+    notes: String(item?.notes ?? fallback.notes),
+    materials: (item?.materials ?? []).map((material) => ({
+      productId: String(material.productId ?? ''),
+      variantId: String(material.variantId ?? ''),
+      variantName: String(material.variantName ?? ''),
+      quantity: Math.max(Number(material.quantity) || 1, 1),
+    })),
+  };
+}
+
+function normalizeSaleLineForForm(line?: Partial<SaleLineFormValue>): SaleLineFormValue {
+  const fallback = createDefaultLineItem();
+
+  return {
+    ...fallback,
+    ...line,
+    productId: String(line?.productId ?? fallback.productId),
+    variantId: String(line?.variantId ?? fallback.variantId),
+    quantity: Number(line?.quantity ?? fallback.quantity) || 0,
+    unitPrice: Number(line?.unitPrice ?? fallback.unitPrice) || 0,
+    serviceItems: (line?.serviceItems ?? []).map((item) => normalizeSaleServiceItemForForm(item)),
+    giftItems: (line?.giftItems ?? []).map((item) => ({
+      productId: String(item.productId ?? ''),
+      quantity: Number(item.quantity) || 0,
+    })),
   };
 }
 
@@ -843,8 +891,9 @@ function SaleServiceSection({
   movements: InventoryMovement[];
   hideFinancialSummary: boolean;
 }) {
+  const sectionRef = useRef<HTMLDivElement | null>(null);
   const serviceItems = line.serviceItems ?? [];
-  const serviceItem = serviceItems[0];
+  const serviceItem = serviceItems[0] ? normalizeSaleServiceItemForForm(serviceItems[0], serviceProduct) : undefined;
   const enabled = Boolean(serviceItem);
   const selectedServiceType =
     serviceItem && saleServiceTypeOptions.includes(serviceItem.serviceType)
@@ -860,9 +909,17 @@ function SaleServiceSection({
         matchesProductCategoryFamily(serviceProduct, slot.family)
       )
     : [];
+  const revealServiceSection = () => {
+    if (typeof window === 'undefined') return;
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        sectionRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      });
+    });
+  };
 
   return (
-    <div className="space-y-3 rounded-2xl border border-cyan-200/80 bg-cyan-50/75 p-3 dark:border-cyan-900/60 dark:bg-cyan-950/20">
+    <div ref={sectionRef} className="space-y-3 rounded-2xl border border-cyan-200/80 bg-cyan-50/75 p-3 dark:border-cyan-900/60 dark:bg-cyan-950/20">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-center gap-3">
           <div className="rounded-xl bg-cyan-100 p-2 text-cyan-800 dark:bg-cyan-950/70 dark:text-cyan-100">
@@ -884,6 +941,9 @@ function SaleServiceSection({
                 ...line,
                 serviceItems: nextEnabled ? [serviceItem ?? createDefaultSaleServiceItem(cueReferenceSuggestion, serviceProduct)] : [],
               });
+              if (nextEnabled) {
+                revealServiceSection();
+              }
             }}
           />
           <span
@@ -1219,7 +1279,12 @@ export function SaleFormDialog({
   const [draftGiftSectionEnabled, setDraftGiftSectionEnabled] = useState(false);
   const isSubmitting = form.formState.isSubmitting;
 
-  const values = form.watch();
+  const watchedValues = form.watch();
+  const values: SaleFormValues = {
+    ...defaultValues,
+    ...watchedValues,
+    items: (watchedValues.items ?? []).map((item) => normalizeSaleLineForForm(item)),
+  };
   const hasSaleProduct = values.items.some((item) => Boolean(item.productId));
   const discountSummary = useMemo(() => {
     const lines = values.items
@@ -1392,7 +1457,7 @@ export function SaleFormDialog({
   const customerLabel = values.customerName.trim() || 'Cliente NN';
   const firstLineSummary = saleSummaries[0] ?? null;
   const firstItemProduct = products.find((product) => product.id === firstItem.productId) ?? null;
-  const firstItemHasService = firstItem.serviceItems.length > 0;
+  const firstItemHasService = (firstItem.serviceItems ?? []).length > 0;
   const firstItemUsedVariantIds = getUsedVariantIdsForProduct(values.items, firstItem.productId, 0);
   const firstItemVariantOptions = getSelectableSaleVariants(firstItemProduct, movements, {
     usedVariantIds: firstItemUsedVariantIds,
@@ -1448,7 +1513,7 @@ export function SaleFormDialog({
             initialValues.items.length > 0
               ? initialValues.items.map((item) => ({
                   ...item,
-                  giftItems: normalizeGiftItems(item.giftItems, products, movements, {
+                  giftItems: normalizeGiftItems(item.giftItems ?? [], products, movements, {
                     defaultQuantity: Number(item.quantity) || 1,
                     maxQuantity: Number(item.quantity) || 1,
                   }),
@@ -1528,29 +1593,33 @@ export function SaleFormDialog({
   };
 
   const saveDraftLine = () => {
+    const draftLineProduct = products.find((product) => product.id === draftLine.productId);
     const normalizedDraftLine = {
       productId: draftLine.productId,
       variantId: draftLine.variantId,
       quantity: Number(draftLine.quantity) || 0,
       unitPrice: Number(draftLine.unitPrice) || 0,
-      serviceItems: (draftLine.serviceItems ?? []).map((item) => ({
-        ...item,
-        price: Number(item.price) || 0,
-        cost: Number(item.cost) || 0,
-        cueReference: item.cueReference?.trim() ?? '',
-        serviceCategory: item.serviceCategory?.trim() ?? 'torno',
-        notes: item.notes?.trim() ?? '',
-        materials: (item.materials ?? []).map((material) => {
-          const materialProduct = products.find((product) => product.id === material.productId);
-          const selectedVariant = materialProduct?.variants?.find((variant) => variant.id === material.variantId);
-          return {
-            productId: material.productId,
-            variantId: material.variantId?.trim() ?? '',
-            variantName: selectedVariant?.name ?? material.variantName?.trim() ?? '',
-            quantity: Number(material.quantity) || 1,
-          };
-        }),
-      })),
+      serviceItems: (draftLine.serviceItems ?? []).map((item) => {
+        const normalizedServiceItem = normalizeSaleServiceItemForForm(item, draftLineProduct);
+        return {
+          ...normalizedServiceItem,
+          price: Number(normalizedServiceItem.price) || 0,
+          cost: Number(normalizedServiceItem.cost) || 0,
+          cueReference: normalizedServiceItem.cueReference.trim(),
+          serviceCategory: normalizedServiceItem.serviceCategory.trim() || 'torno',
+          notes: normalizedServiceItem.notes.trim(),
+          materials: (normalizedServiceItem.materials ?? []).map((material) => {
+            const materialProduct = products.find((product) => product.id === material.productId);
+            const selectedVariant = materialProduct?.variants?.find((variant) => variant.id === material.variantId);
+            return {
+              productId: material.productId,
+              variantId: material.variantId?.trim() ?? '',
+              variantName: selectedVariant?.name ?? material.variantName?.trim() ?? '',
+              quantity: Number(material.quantity) || 1,
+            };
+          }),
+        };
+      }),
       giftItems: normalizeGiftItems(draftLine.giftItems, products, movements, {
         defaultQuantity: Number(draftLine.quantity) || 1,
         maxQuantity: Number(draftLine.quantity) || 1,
@@ -1565,7 +1634,6 @@ export function SaleFormDialog({
       setLineError('La cantidad debe ser mayor a cero.');
       return;
     }
-    const draftLineProduct = products.find((product) => product.id === normalizedDraftLine.productId);
     if ((draftLineProduct?.variants?.length ?? 0) > 0 && !normalizedDraftLine.variantId) {
       setLineError(`Selecciona ${draftLineProduct?.variantLabel?.toLowerCase() || 'la variante'} del producto.`);
       return;
@@ -1598,8 +1666,8 @@ export function SaleFormDialog({
       normalizedDraftLine.serviceItems.some(
         (item) =>
           (Number(item.price) || 0) < 0 ||
-          !item.cueReference.trim() ||
-          item.materials.some((material) => !material.productId || (Number(material.quantity) || 0) <= 0)
+          !String(item.cueReference ?? '').trim() ||
+          (item.materials ?? []).some((material) => !material.productId || (Number(material.quantity) || 0) <= 0)
       )
     ) {
       setLineError('Completa el servicio asociado antes de guardar la linea.');
@@ -1841,7 +1909,7 @@ export function SaleFormDialog({
                                 const nextGiftItems =
                                   product && getAllowedSaleGiftCategories(product).length > 0
                                     ? normalizeGiftItems(
-                                        form.getValues('items.0.giftItems').filter((giftItem) => giftItem.productId !== value),
+                                        (form.getValues('items.0.giftItems') ?? []).filter((giftItem) => giftItem.productId !== value),
                                         products,
                                         movements,
                                         {
@@ -1996,7 +2064,7 @@ export function SaleFormDialog({
                                   const currentLine = form.getValues('items.0');
                                   form.setValue(
                                     'items.0.giftItems',
-                                    normalizeGiftItems(currentLine.giftItems, products, movements, {
+                                    normalizeGiftItems(currentLine.giftItems ?? [], products, movements, {
                                       defaultQuantity: nextQuantity,
                                       maxQuantity: nextQuantity,
                                     }),
@@ -2471,7 +2539,7 @@ export function SaleFormDialog({
                       giftItems:
                         product && getAllowedSaleGiftCategories(product).length > 0
                           ? normalizeGiftItems(
-                              current.giftItems.filter((giftItem) => giftItem.productId !== value),
+                              (current.giftItems ?? []).filter((giftItem) => giftItem.productId !== value),
                               products,
                               movements,
                               {
@@ -2590,7 +2658,7 @@ export function SaleFormDialog({
                       return {
                         ...current,
                         quantity: event.target.value,
-                        giftItems: normalizeGiftItems(current.giftItems, products, movements, {
+                        giftItems: normalizeGiftItems(current.giftItems ?? [], products, movements, {
                           defaultQuantity: nextQuantity,
                           maxQuantity: nextQuantity,
                         }),

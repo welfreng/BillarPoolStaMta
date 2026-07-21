@@ -24,5 +24,6 @@ export function createDefaultInstallationServiceItem(product?: Pick<Product, 'ca
     cost: 0,
     cueReference: '',
     notes: '',
+    materials: [],
   };
 }
