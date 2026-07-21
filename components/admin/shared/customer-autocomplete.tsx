@@ -62,9 +62,12 @@ export function CustomerAutocomplete({
   className,
 }: CustomerAutocompleteProps) {
   const [open, setOpen] = useState(false);
+  const [activeField, setActiveField] = useState<'name' | 'phone' | 'document' | null>(null);
   const normalizedName = normalizeSearch(name);
   const normalizedPhone = normalizeSearch(phone);
   const normalizedDocument = normalizeSearch(documentNumber);
+  const compactPhone = normalizedPhone.replace(/[^a-z0-9]/g, '');
+  const compactDocument = normalizedDocument.replace(/[^a-z0-9]/g, '');
 
   const customerOptions = useMemo(
     () =>
@@ -89,23 +92,46 @@ export function CustomerAutocomplete({
         const customerName = normalizeSearch(customer.fullName);
         const customerPhone = normalizeSearch(customer.phone ?? '');
         const customerDocument = normalizeSearch(customer.documentNumber ?? '');
+        const customerCompactPhone = customerPhone.replace(/[^a-z0-9]/g, '');
+        const customerCompactDocument = customerDocument.replace(/[^a-z0-9]/g, '');
         return (
           (normalizedName && customerName === normalizedName) ||
           (normalizedPhone && customerPhone === normalizedPhone) ||
-          (normalizedDocument && customerDocument === normalizedDocument)
+          (normalizedDocument && customerDocument === normalizedDocument) ||
+          (compactPhone.length >= 7 && customerCompactPhone === compactPhone) ||
+          (compactDocument.length >= 5 && customerCompactDocument === compactDocument)
         );
       }) ?? null,
-    [customerOptions, normalizedDocument, normalizedName, normalizedPhone]
+    [compactDocument, compactPhone, customerOptions, normalizedDocument, normalizedName, normalizedPhone]
   );
 
+  const activeQuery =
+    activeField === 'phone'
+      ? phone
+      : activeField === 'document'
+        ? documentNumber
+        : activeField === 'name'
+          ? name
+          : [name, phone, documentNumber].filter(Boolean).join(' ');
+
   const visibleOptions = useMemo(() => {
-    const query = normalizeSearch([name, phone, documentNumber].filter(Boolean).join(' '));
+    const query = normalizeSearch(activeQuery);
+    const compactQuery = query.replace(/[^a-z0-9]/g, '');
     if (!query) return customerOptions.slice(0, 6);
 
     return customerOptions
-      .filter((customer) => getCustomerSearchText(customer).includes(query))
+      .filter((customer) => {
+        const customerText = getCustomerSearchText(customer);
+        const customerCompactPhone = normalizeSearch(customer.phone ?? '').replace(/[^a-z0-9]/g, '');
+        const customerCompactDocument = normalizeSearch(customer.documentNumber ?? '').replace(/[^a-z0-9]/g, '');
+        return (
+          customerText.includes(query) ||
+          (compactQuery.length >= 3 &&
+            (customerCompactPhone.includes(compactQuery) || customerCompactDocument.includes(compactQuery)))
+        );
+      })
       .slice(0, 8);
-  }, [customerOptions, documentNumber, name, phone]);
+  }, [activeQuery, customerOptions]);
 
   const selectCustomer = (customer: Customer) => {
     onChange({
@@ -114,16 +140,31 @@ export function CustomerAutocomplete({
       documentNumber: customer.documentNumber ?? '',
     });
     setOpen(false);
+    setActiveField(null);
+  };
+
+  const findExactCustomer = (value: string) => {
+    const normalizedValue = normalizeSearch(value);
+    const compactValue = normalizedValue.replace(/[^a-z0-9]/g, '');
+    if (!normalizedValue) return null;
+    return (
+      customerOptions.find((customer) => {
+        const customerName = normalizeSearch(customer.fullName);
+        const customerPhone = normalizeSearch(customer.phone ?? '');
+        const customerDocument = normalizeSearch(customer.documentNumber ?? '');
+        return (
+          customerName === normalizedValue ||
+          customerPhone === normalizedValue ||
+          customerDocument === normalizedValue ||
+          (compactValue.length >= 7 && customerPhone.replace(/[^a-z0-9]/g, '') === compactValue) ||
+          (compactValue.length >= 5 && customerDocument.replace(/[^a-z0-9]/g, '') === compactValue)
+        );
+      }) ?? null
+    );
   };
 
   const applyExactMatch = (value: string) => {
-    const normalizedValue = normalizeSearch(value);
-    if (!normalizedValue) return;
-    const exactCustomer = customerOptions.find((customer) =>
-      [customer.fullName, customer.phone ?? '', customer.documentNumber ?? '']
-        .map(normalizeSearch)
-        .some((item) => item === normalizedValue)
-    );
+    const exactCustomer = findExactCustomer(value);
     if (exactCustomer) selectCustomer(exactCustomer);
   };
 
@@ -144,55 +185,23 @@ export function CustomerAutocomplete({
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <Input
               value={name}
-              onFocus={() => setOpen(true)}
+              onFocus={() => {
+                setActiveField('name');
+                setOpen(true);
+              }}
               onBlur={(event) => {
                 window.setTimeout(() => setOpen(false), 140);
                 applyExactMatch(event.target.value);
               }}
               onChange={(event) => {
                 onChange({ name: event.target.value, phone, documentNumber });
+                setActiveField('name');
                 setOpen(true);
               }}
               placeholder={requiredName ? 'Busca o escribe el cliente' : 'Cliente NN o busca historial'}
               autoComplete="off"
               className="pl-9"
             />
-
-            {open ? (
-              <div className="absolute left-0 right-0 top-[calc(100%+0.35rem)] z-50 max-h-72 overflow-y-auto rounded-2xl border border-border bg-popover p-1.5 text-popover-foreground shadow-xl dark:border-slate-800">
-                {visibleOptions.length > 0 ? (
-                  visibleOptions.map((customer) => (
-                    <button
-                      key={customer.id}
-                      type="button"
-                      className="flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left hover:bg-muted"
-                      onMouseDown={(event) => event.preventDefault()}
-                      onClick={() => selectCustomer(customer)}
-                    >
-                      <span className="mt-0.5 rounded-lg bg-primary/10 p-2 text-primary">
-                        <UserRound className="h-4 w-4" />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-semibold">{customer.fullName}</span>
-                        <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                          {[customer.phone, customer.documentNumber].filter(Boolean).join(' - ') || 'Sin telefono ni documento'}
-                        </span>
-                        <span className="mt-0.5 block text-[11px] text-muted-foreground">
-                          {[
-                            customer.saleCount > 0 ? `${customer.saleCount} compras` : '',
-                            Number(customer.serviceCount ?? 0) > 0 ? `${customer.serviceCount} servicios` : '',
-                          ].filter(Boolean).join(' - ') || 'Cliente guardado'}
-                        </span>
-                      </span>
-                    </button>
-                  ))
-                ) : (
-                  <div className="rounded-xl px-3 py-3 text-sm text-muted-foreground">
-                    Cliente nuevo. Al guardar, queda registrado para proximas ventas o servicios.
-                  </div>
-                )}
-              </div>
-            ) : null}
           </div>
           {nameError ? <p className="text-xs font-medium text-destructive">{nameError}</p> : null}
         </div>
@@ -205,8 +214,25 @@ export function CustomerAutocomplete({
               value={phone}
               inputMode="numeric"
               placeholder="3002565865"
-              onBlur={(event) => applyExactMatch(event.target.value)}
-              onChange={(event) => onChange({ name, phone: event.target.value, documentNumber })}
+              onFocus={() => {
+                setActiveField('phone');
+                setOpen(true);
+              }}
+              onBlur={(event) => {
+                window.setTimeout(() => setOpen(false), 140);
+                applyExactMatch(event.target.value);
+              }}
+              onChange={(event) => {
+                const nextPhone = event.target.value;
+                const exactCustomer = findExactCustomer(nextPhone);
+                if (exactCustomer) {
+                  selectCustomer(exactCustomer);
+                  return;
+                }
+                onChange({ name, phone: nextPhone, documentNumber });
+                setActiveField('phone');
+                setOpen(true);
+              }}
               className="pl-9"
             />
           </div>
@@ -219,18 +245,68 @@ export function CustomerAutocomplete({
             value={documentNumber}
             inputMode="numeric"
             placeholder="Opcional"
-            onBlur={(event) => applyExactMatch(event.target.value)}
-            onChange={(event) => onChange({ name, phone, documentNumber: event.target.value })}
+            onFocus={() => {
+              setActiveField('document');
+              setOpen(true);
+            }}
+            onBlur={(event) => {
+              window.setTimeout(() => setOpen(false), 140);
+              applyExactMatch(event.target.value);
+            }}
+            onChange={(event) => {
+              const nextDocument = event.target.value;
+              const exactCustomer = findExactCustomer(nextDocument);
+              if (exactCustomer) {
+                selectCustomer(exactCustomer);
+                return;
+              }
+              onChange({ name, phone, documentNumber: nextDocument });
+              setActiveField('document');
+              setOpen(true);
+            }}
           />
           {documentError ? <p className="text-xs font-medium text-destructive">{documentError}</p> : null}
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-        <span>
-          Busca por nombre, telefono o documento. Al seleccionar, el sistema rellena los datos.
-        </span>
-        {name || phone || documentNumber ? (
+      {open ? (
+        <div className="max-h-72 overflow-y-auto rounded-2xl border border-border bg-popover p-1.5 text-popover-foreground shadow-xl dark:border-slate-800">
+          {visibleOptions.length > 0 ? (
+            visibleOptions.map((customer) => (
+              <button
+                key={customer.id}
+                type="button"
+                className="flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left hover:bg-muted"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => selectCustomer(customer)}
+              >
+                <span className="mt-0.5 rounded-lg bg-primary/10 p-2 text-primary">
+                  <UserRound className="h-4 w-4" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold">{customer.fullName}</span>
+                  <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                    {[customer.phone, customer.documentNumber].filter(Boolean).join(' - ') || 'Sin telefono ni documento'}
+                  </span>
+                  <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                    {[
+                      customer.saleCount > 0 ? `${customer.saleCount} compras` : '',
+                      Number(customer.serviceCount ?? 0) > 0 ? `${customer.serviceCount} servicios` : '',
+                    ].filter(Boolean).join(' - ') || 'Cliente guardado'}
+                  </span>
+                </span>
+              </button>
+            ))
+          ) : (
+            <div className="rounded-xl px-3 py-3 text-sm text-muted-foreground">
+              Cliente nuevo. Al guardar, queda registrado para proximas ventas o servicios.
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      {name || phone || documentNumber ? (
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <Button
             type="button"
             variant="ghost"
@@ -240,8 +316,8 @@ export function CustomerAutocomplete({
           >
             Limpiar cliente
           </Button>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 }

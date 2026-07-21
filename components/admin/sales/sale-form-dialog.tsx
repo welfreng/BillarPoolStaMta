@@ -843,15 +843,20 @@ function SaleServiceSection({
   movements: InventoryMovement[];
   hideFinancialSummary: boolean;
 }) {
-  const serviceItem = line.serviceItems[0];
+  const serviceItems = line.serviceItems ?? [];
+  const serviceItem = serviceItems[0];
   const enabled = Boolean(serviceItem);
+  const selectedServiceType =
+    serviceItem && saleServiceTypeOptions.includes(serviceItem.serviceType)
+      ? serviceItem.serviceType
+      : 'tip-installation';
   const materialSlots = serviceItem
-    ? serviceMaterialSlots[serviceItem.serviceType].filter(
+    ? (serviceMaterialSlots[selectedServiceType] ?? []).filter(
         (slot) => !matchesProductCategoryFamily(serviceProduct, slot.family)
       )
     : [];
   const skippedMaterialSlots = serviceItem
-    ? serviceMaterialSlots[serviceItem.serviceType].filter((slot) =>
+    ? (serviceMaterialSlots[selectedServiceType] ?? []).filter((slot) =>
         matchesProductCategoryFamily(serviceProduct, slot.family)
       )
     : [];
@@ -930,25 +935,25 @@ function SaleServiceSection({
             <div className="min-w-0 space-y-2">
               <Label>Tipo de servicio</Label>
               <Select
-                value={serviceItem.serviceType}
-              onValueChange={(value) =>
-                onLineChange({
-                  ...line,
-                  serviceItems: [
-                    {
-                      ...serviceItem,
-                      serviceType: value as typeof serviceItem.serviceType,
-                      materials: (serviceItem.materials ?? []).filter((material) => {
-                        const product = products.find((item) => item.id === material.productId);
-                        return serviceMaterialSlots[value as typeof serviceItem.serviceType].some((slot) =>
-                          matchesProductCategoryFamily(product, slot.family)
-                        );
-                      }),
-                    },
-                  ],
-                })
-              }
-            >
+                value={selectedServiceType}
+                onValueChange={(value) => {
+                  const nextServiceType = value as typeof selectedServiceType;
+                  const nextSlots = serviceMaterialSlots[nextServiceType] ?? [];
+                  onLineChange({
+                    ...line,
+                    serviceItems: [
+                      {
+                        ...serviceItem,
+                        serviceType: nextServiceType,
+                        materials: (serviceItem.materials ?? []).filter((material) => {
+                          const product = products.find((item) => item.id === material.productId);
+                          return nextSlots.some((slot) => matchesProductCategoryFamily(product, slot.family));
+                        }),
+                      },
+                    ],
+                  });
+                }}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
@@ -1637,6 +1642,7 @@ export function SaleFormDialog({
         headerClassName="px-4 pt-3 pb-3 sm:px-5 lg:px-6"
         bodyClassName="px-3 py-3 pb-4 sm:px-5 lg:px-6"
         footerClassName="px-3 py-3 sm:px-5 lg:px-6"
+        mobileFooterMode="inline"
         footer={
           <div className="grid gap-2 sm:flex sm:items-center sm:justify-between">
             <div className="grid gap-2 sm:flex sm:items-center">
@@ -2395,6 +2401,7 @@ export function SaleFormDialog({
         headerClassName="px-4 pt-3 pb-3 sm:px-5 lg:px-6"
         bodyClassName="px-3 py-3 pb-4 sm:px-5 lg:px-6"
         footerClassName="px-3 py-3 sm:px-5 lg:px-6"
+        mobileFooterMode="inline"
         footer={
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button
