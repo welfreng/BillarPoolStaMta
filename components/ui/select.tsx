@@ -28,6 +28,7 @@ function SelectTrigger({
   className,
   size = 'default',
   children,
+  type,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Trigger> & {
   size?: 'sm' | 'default'
@@ -36,6 +37,7 @@ function SelectTrigger({
     <SelectPrimitive.Trigger
       data-slot="select-trigger"
       data-size={size}
+      type={type ?? 'button'}
       className={cn(
         "border-input data-[placeholder]:text-muted-foreground [&_svg:not([class*='text-'])]:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive flex w-fit items-center justify-between gap-2 rounded-xl border bg-background/88 px-3.5 py-2 text-sm whitespace-nowrap text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[color,box-shadow,background-color] outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900/72 dark:text-slate-100 dark:hover:bg-slate-800/88 dark:shadow-[0_1px_2px_rgba(2,6,23,0.24)] data-[size=default]:h-10 data-[size=sm]:h-9 sm:data-[size=default]:h-9 sm:data-[size=sm]:h-8 *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-2 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className,

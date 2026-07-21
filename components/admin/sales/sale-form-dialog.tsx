@@ -1840,6 +1840,7 @@ export function SaleFormDialog({
                   </span>
                 }
                 defaultOpen
+                mobileMode="section"
                 className="min-w-0 rounded-2xl border border-border bg-muted/45 p-3 dark:border-slate-800 dark:bg-slate-900/45 sm:p-5"
                 contentClassName="space-y-3.5 sm:space-y-5"
               >
