@@ -8,13 +8,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
 import { Spinner } from '@/components/ui/spinner';
 import { useIsMobile } from '@/components/ui/use-mobile';
 import { cn } from '@/lib/utils';
@@ -54,7 +47,25 @@ export function AdminResponsiveDialog({
   busyTitle = 'Guardando...',
   busyDescription = 'Espera la confirmacion antes de continuar.',
 }: AdminResponsiveDialogProps) {
-  const isMobile = useIsMobile();
+  const titleId = React.useId();
+  const descriptionId = React.useId();
+  const detectedIsMobile = useIsMobile();
+  const [renderMode, setRenderMode] = React.useState<'mobile' | 'desktop'>(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches ? 'mobile' : 'desktop'
+  );
+  const wasOpenRef = React.useRef(open);
+  const isMobile = renderMode === 'mobile';
+
+  React.useEffect(() => {
+    const nextMode = detectedIsMobile ? 'mobile' : 'desktop';
+    const wasOpen = wasOpenRef.current;
+
+    if (!open || !wasOpen) {
+      setRenderMode(nextMode);
+    }
+
+    wasOpenRef.current = open;
+  }, [detectedIsMobile, open]);
 
   const busyOverlay = busy ? (
     <div
@@ -76,8 +87,20 @@ export function AdminResponsiveDialog({
     if (busy) return;
     onOpenChange(nextOpen);
   };
+  const descriptionProps = description ? {} : { 'aria-describedby': undefined };
+
+  React.useEffect(() => {
+    if (!open || !isMobile || typeof document === 'undefined') return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isMobile, open]);
 
   if (isMobile) {
+    if (!open) return null;
+
     const mobileFooter = footer ? (
       <div
         className={cn(
@@ -91,33 +114,51 @@ export function AdminResponsiveDialog({
     ) : null;
 
     return (
-      <Sheet open={open} onOpenChange={handleOpenChange}>
-        <SheetContent
-          side="bottom"
+      <div className="fixed inset-0 z-[70] overflow-hidden bg-slate-950/45 dark:bg-black/65">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={titleId}
+          aria-describedby={description ? descriptionId : undefined}
           className={cn(
-            '!fixed !inset-0 flex h-[100dvh] max-h-[100dvh] w-screen flex-col gap-0 overflow-hidden rounded-none border-0 bg-gradient-to-b from-background via-card to-background px-0 shadow-none dark:border-slate-800 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900',
+            'fixed inset-x-0 top-0 flex max-h-[100dvh] w-screen flex-col overflow-hidden rounded-b-[24px] bg-gradient-to-b from-background via-card to-background shadow-[0_18px_60px_rgba(15,23,42,0.22)] dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 dark:shadow-[0_18px_60px_rgba(2,6,23,0.5)]',
             mobileContentClassName
           )}
         >
           {busyOverlay}
-          <SheetHeader className={cn('shrink-0 border-b border-slate-200/80 px-3 pt-2.5 pb-2.5 text-left dark:border-slate-800 sm:px-4 sm:pt-4 sm:pb-3', headerClassName)}>
+          <div className={cn('shrink-0 border-b border-slate-200/80 px-3 pt-2.5 pb-2.5 text-left dark:border-slate-800 sm:px-4 sm:pt-4 sm:pb-3', headerClassName)}>
             <div className="mx-auto mb-2.5 h-1.5 w-14 rounded-full bg-slate-300/80 dark:bg-slate-700/80" />
-            <SheetTitle className="pr-10 text-[1rem] font-semibold tracking-[-0.01em] text-slate-950 dark:text-slate-50 sm:text-[1.05rem]">
+            <h2 id={titleId} className="pr-10 text-[1rem] font-semibold tracking-[-0.01em] text-slate-950 dark:text-slate-50 sm:text-[1.05rem]">
               {title}
-            </SheetTitle>
+            </h2>
             {description ? (
-              <SheetDescription className="pr-8 text-[13px] leading-5 text-slate-500 dark:text-slate-400">
+              <p id={descriptionId} className="pr-8 text-[13px] leading-5 text-slate-500 dark:text-slate-400">
                 {description}
-              </SheetDescription>
+              </p>
             ) : null}
-          </SheetHeader>
-          <div className={cn('min-h-0 flex-1 overflow-y-auto overscroll-contain px-2.5 py-2.5 pb-4 sm:px-4 sm:py-4 sm:pb-6', bodyClassName)}>
+            {!busy ? (
+              <button
+                type="button"
+                className="absolute right-3 top-3 rounded-lg p-2 text-slate-500 transition hover:bg-muted hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-ring dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-slate-100"
+                onClick={() => handleOpenChange(false)}
+                aria-label="Cerrar"
+              >
+                x
+              </button>
+            ) : null}
+          </div>
+          <div
+            className={cn(
+              'max-h-[calc(100dvh-7rem)] overflow-y-auto overscroll-contain px-2.5 py-2.5 pb-4 sm:px-4 sm:py-4 sm:pb-6',
+              bodyClassName
+            )}
+          >
             {children}
             {mobileFooterMode === 'inline' ? mobileFooter : null}
           </div>
           {mobileFooterMode === 'fixed' ? mobileFooter : null}
-        </SheetContent>
-      </Sheet>
+        </div>
+      </div>
     );
   }
 
@@ -125,6 +166,7 @@ export function AdminResponsiveDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         showCloseButton={!busy}
+        {...descriptionProps}
         className={cn(
           '!fixed !top-4 !left-1/2 !z-[60] flex max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-[96vw] !-translate-x-1/2 !translate-y-0 flex-col overflow-hidden rounded-2xl border-border bg-gradient-to-b from-background via-card to-background px-0 shadow-[0_24px_80px_rgba(15,23,42,0.18)] dark:border-slate-800 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 dark:shadow-[0_24px_80px_rgba(2,6,23,0.45)]',
           desktopContentClassName
