@@ -1,7 +1,7 @@
 ﻿'use client';
 
 import Image from 'next/image';
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -891,7 +891,6 @@ function SaleServiceSection({
   movements: InventoryMovement[];
   hideFinancialSummary: boolean;
 }) {
-  const sectionRef = useRef<HTMLDivElement | null>(null);
   const serviceItems = line.serviceItems ?? [];
   const serviceItem = serviceItems[0] ? normalizeSaleServiceItemForForm(serviceItems[0], serviceProduct) : undefined;
   const enabled = Boolean(serviceItem);
@@ -909,17 +908,9 @@ function SaleServiceSection({
         matchesProductCategoryFamily(serviceProduct, slot.family)
       )
     : [];
-  const revealServiceSection = () => {
-    if (typeof window === 'undefined') return;
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        sectionRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-      });
-    });
-  };
 
   return (
-    <div ref={sectionRef} className="space-y-3 rounded-2xl border border-cyan-200/80 bg-cyan-50/75 p-3 dark:border-cyan-900/60 dark:bg-cyan-950/20">
+    <div className="space-y-3 rounded-2xl border border-cyan-200/80 bg-cyan-50/75 p-3 dark:border-cyan-900/60 dark:bg-cyan-950/20">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-center gap-3">
           <div className="rounded-xl bg-cyan-100 p-2 text-cyan-800 dark:bg-cyan-950/70 dark:text-cyan-100">
@@ -941,9 +932,6 @@ function SaleServiceSection({
                 ...line,
                 serviceItems: nextEnabled ? [serviceItem ?? createDefaultSaleServiceItem(cueReferenceSuggestion, serviceProduct)] : [],
               });
-              if (nextEnabled) {
-                revealServiceSection();
-              }
             }}
           />
           <span
