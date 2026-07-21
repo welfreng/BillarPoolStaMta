@@ -817,6 +817,31 @@ function getSimpleProductAvailableStock(product: Product | undefined, sourceMove
   return Math.max(hasMovementHistory ? getMovementStockForProduct(product.id, sourceMovements) : getStoredProductStock(product), 0);
 }
 
+function sortMovementsByDateDesc(items: InventoryMovement[]) {
+  return [...items].sort((left, right) => {
+    const leftTime = new Date(left.occurredAt).getTime();
+    const rightTime = new Date(right.occurredAt).getTime();
+    return (Number.isFinite(rightTime) ? rightTime : 0) - (Number.isFinite(leftTime) ? leftTime : 0);
+  });
+}
+
+function mergeFreshMovementsForProducts(
+  currentMovements: InventoryMovement[],
+  productIds: string[],
+  freshMovements: InventoryMovement[]
+) {
+  const touchedProductIds = new Set(productIds.filter(Boolean));
+  if (touchedProductIds.size === 0) return currentMovements;
+
+  const nextMovementsById = new Map<string, InventoryMovement>();
+  currentMovements
+    .filter((movement) => !touchedProductIds.has(movement.productId))
+    .forEach((movement) => nextMovementsById.set(movement.id, movement));
+  freshMovements.forEach((movement) => nextMovementsById.set(movement.id, movement));
+
+  return sortMovementsByDateDesc(Array.from(nextMovementsById.values()));
+}
+
 function getProductWithComputedStock(product: Product, sourceMovements: InventoryMovement[]) {
   if (getProductSaleMode(product) !== 'varianted') {
     const hasMovementHistory = sourceMovements.some((movement) => movement.productId === product.id);
@@ -2012,6 +2037,16 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         timeoutMs: 12000,
       });
     }
+
+    setMovements((currentMovements) =>
+      mergeFreshMovementsForProducts(currentMovements, uniqueProductIds, freshMovements)
+    );
+    setProducts((currentProducts) => {
+      const freshProductMap = new Map(
+        freshProducts.map((product) => [product.id, getProductWithComputedStock(product, freshMovements)])
+      );
+      return currentProducts.map((product) => freshProductMap.get(product.id) ?? product);
+    });
 
     return changedCount;
   };

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type WheelEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type TouchEvent, type WheelEvent } from 'react';
 import { Check, ChevronsUpDown, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -136,6 +136,11 @@ export function SearchableSelect({
     return () => window.clearTimeout(timeoutId);
   }, [open]);
 
+  useEffect(() => {
+    if (!open || !listRef.current) return;
+    listRef.current.scrollTop = 0;
+  }, [open, query]);
+
   const persistRecentValue = (nextValue: string) => {
     if (!recentStorageKey || typeof window === 'undefined' || !nextValue) return;
     const nextUsageStats: SearchableSelectUsageStats = {
@@ -170,9 +175,24 @@ export function SearchableSelect({
     event.stopPropagation();
   };
 
+  const handleListTouchMove = (event: TouchEvent<HTMLDivElement>) => {
+    const listElement = listRef.current;
+    if (!listElement) return;
+
+    const canScrollVertically = listElement.scrollHeight > listElement.clientHeight;
+    if (!canScrollVertically) return;
+
+    event.stopPropagation();
+  };
+
   const commandContent = (
-    <Command className="h-full w-full min-w-0">
-        <div className="w-full min-w-0 border-b">
+    <Command
+      className={cn(
+        'w-full min-w-0 overflow-hidden',
+        isMobile ? 'h-full' : 'max-h-[min(26rem,calc(100vh-8rem))]'
+      )}
+    >
+        <div className="shrink-0 w-full min-w-0 border-b">
           <CommandInput
             ref={inputRef}
             className={cn('min-w-0', isMobile ? 'text-[14px]' : '')}
@@ -202,11 +222,15 @@ export function SearchableSelect({
       </div>
       <CommandList
         className={cn(
-          'w-full min-w-0 overflow-y-auto overscroll-contain touch-pan-y',
-          isMobile ? 'max-h-[calc(100dvh-10rem)]' : 'max-h-[min(22rem,60vh)]'
+          'min-h-0 w-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain touch-pan-y',
+          isMobile ? 'max-h-none' : 'max-h-[min(22rem,calc(100vh-12rem))]'
         )}
         ref={listRef}
         onWheel={handleListWheel}
+        onWheelCapture={handleListWheel}
+        onTouchMove={handleListTouchMove}
+        onTouchMoveCapture={handleListTouchMove}
+        style={{ WebkitOverflowScrolling: 'touch' }}
       >
         <CommandEmpty>
           {allowCreate && onCreate && query.trim() ? (
@@ -336,7 +360,7 @@ export function SearchableSelect({
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="!z-[100] w-[min(var(--radix-popover-trigger-width),calc(100vw-2rem))] min-w-[min(260px,calc(100vw-2rem))] p-0" align="start" sideOffset={6}>
+        <PopoverContent className="!z-[100] max-h-[min(26rem,calc(100vh-6rem))] w-[min(var(--radix-popover-trigger-width),calc(100vw-2rem))] min-w-[min(260px,calc(100vw-2rem))] overflow-hidden p-0" align="start" sideOffset={6}>
           {commandContent}
         </PopoverContent>
       </Popover>

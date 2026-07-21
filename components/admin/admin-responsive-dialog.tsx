@@ -31,6 +31,7 @@ type AdminResponsiveDialogProps = {
   headerClassName?: string;
   bodyClassName?: string;
   footerClassName?: string;
+  mobileFooterMode?: 'fixed' | 'inline';
   busy?: boolean;
   busyTitle?: React.ReactNode;
   busyDescription?: React.ReactNode;
@@ -48,6 +49,7 @@ export function AdminResponsiveDialog({
   headerClassName,
   bodyClassName,
   footerClassName,
+  mobileFooterMode = 'fixed',
   busy = false,
   busyTitle = 'Guardando...',
   busyDescription = 'Espera la confirmacion antes de continuar.',
@@ -76,6 +78,18 @@ export function AdminResponsiveDialog({
   };
 
   if (isMobile) {
+    const mobileFooter = footer ? (
+      <div
+        className={cn(
+          'border-t border-border bg-background/90 px-2.5 py-2.5 shadow-[0_-8px_24px_rgba(15,23,42,0.06)] backdrop-blur supports-[padding:max(0px)]:pb-[max(0.65rem,env(safe-area-inset-bottom))] dark:border-slate-800 dark:bg-slate-950/90 dark:shadow-[0_-8px_24px_rgba(2,6,23,0.35)] sm:px-4 sm:py-3',
+          mobileFooterMode === 'fixed' ? 'shrink-0' : 'mt-4 rounded-2xl border bg-card/95 shadow-none dark:bg-slate-950/80',
+          footerClassName
+        )}
+      >
+        {footer}
+      </div>
+    ) : null;
+
     return (
       <Sheet open={open} onOpenChange={handleOpenChange}>
         <SheetContent
@@ -97,17 +111,11 @@ export function AdminResponsiveDialog({
               </SheetDescription>
             ) : null}
           </SheetHeader>
-          <div className={cn('min-h-0 flex-1 overflow-y-auto overscroll-contain px-2.5 py-2.5 pb-4 sm:px-4 sm:py-4 sm:pb-6', bodyClassName)}>{children}</div>
-          {footer ? (
-            <div
-              className={cn(
-                'shrink-0 border-t border-border bg-background/90 px-2.5 py-2.5 shadow-[0_-8px_24px_rgba(15,23,42,0.06)] backdrop-blur supports-[padding:max(0px)]:pb-[max(0.65rem,env(safe-area-inset-bottom))] dark:border-slate-800 dark:bg-slate-950/90 dark:shadow-[0_-8px_24px_rgba(2,6,23,0.35)] sm:px-4 sm:py-3',
-                footerClassName
-              )}
-            >
-              {footer}
-            </div>
-          ) : null}
+          <div className={cn('min-h-0 flex-1 overflow-y-auto overscroll-contain px-2.5 py-2.5 pb-4 sm:px-4 sm:py-4 sm:pb-6', bodyClassName)}>
+            {children}
+            {mobileFooterMode === 'inline' ? mobileFooter : null}
+          </div>
+          {mobileFooterMode === 'fixed' ? mobileFooter : null}
         </SheetContent>
       </Sheet>
     );
