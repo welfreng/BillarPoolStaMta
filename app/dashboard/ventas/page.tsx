@@ -276,6 +276,8 @@ export default function VentasPage() {
             }),
           giftItems: sale.giftItems.map((giftItem) => ({
             productId: giftItem.productId,
+            variantId: giftItem.variantId ?? '',
+            variantName: giftItem.variantName ?? '',
             quantity: giftItem.quantity,
           })),
         }))

@@ -30,7 +30,23 @@ import { filterProductsByCategoryFamily } from '@/lib/admin/category-rules';
 import { serviceTypeLabels } from '@/lib/admin/catalogs';
 import { getTodayDateInputValue } from '@/lib/admin/date-utils';
 import { buildVariantDisplayName, getProductSaleMode, getProductVariantStock } from '@/lib/admin/variant-helpers';
-import type { Customer, InventoryMovement, Product, Purchase, ServiceType } from '@/lib/admin/types';
+import type { Customer, InventoryMovement, Product, Purchase, ServiceOrderStatus, ServiceType } from '@/lib/admin/types';
+
+const serviceOrderStatusOptions = [
+  'pending',
+  'in_progress',
+  'ready',
+  'delivered',
+  'cancelled',
+] as const satisfies readonly ServiceOrderStatus[];
+
+const serviceOrderStatusLabels: Record<ServiceOrderStatus, string> = {
+  pending: 'Pendiente',
+  in_progress: 'En trabajo',
+  ready: 'Listo por entregar',
+  delivered: 'Entregado y cobrado',
+  cancelled: 'Cancelado',
+};
 
 const serviceTypeOptions = [
   'tip-installation',
@@ -46,14 +62,16 @@ const serviceSchema = z.object({
   serviceType: z.enum(serviceTypeOptions),
   serviceLabel: z.string().default(''),
   serviceCategory: z.string().default('torno'),
+  status: z.enum(serviceOrderStatusOptions).default('pending'),
   performedAt: z.string().min(1, 'Selecciona la fecha'),
-  customerName: z.string().min(2, 'Ingresa el cliente'),
+  customerName: z.string().default(''),
   customerPhone: z.string().default(''),
   customerDocument: z.string().default(''),
   cueReference: z.string().min(2, 'Describe el taco o referencia'),
   paymentMethod: z.string().min(1, 'Selecciona el metodo de pago'),
   paymentReference: z.string().default(''),
   servicePrice: z.coerce.number().positive('Ingresa un valor valido para el servicio'),
+  amountPaid: z.coerce.number().min(0, 'Ingresa un anticipo valido').default(0),
   serviceCost: z.coerce.number().min(0, 'Ingresa un costo valido').default(0),
   tipProductId: z.string().default(''),
   tipVariantId: z.string().default(''),
@@ -74,6 +92,21 @@ const serviceSchema = z.object({
       code: z.ZodIssueCode.custom,
       path: ['customerPhone'],
       message: 'Ingresa un telefono valido o dejalo vacio.',
+    });
+  }
+
+  if (values.amountPaid > values.servicePrice) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['amountPaid'],
+      message: 'El pago recibido no puede superar el valor acordado.',
+    });
+  }
+  if (values.status === 'delivered' && values.amountPaid < values.servicePrice) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['amountPaid'],
+      message: 'Para cerrar como entregado, registra el pago completo.',
     });
   }
 
@@ -106,6 +139,7 @@ const defaultValues: ServiceFormValues = {
   serviceType: 'tip-installation',
   serviceLabel: '',
   serviceCategory: 'torno',
+  status: 'pending',
   performedAt: getTodayDateInputValue(),
   customerName: '',
   customerPhone: '',
@@ -114,6 +148,7 @@ const defaultValues: ServiceFormValues = {
   paymentMethod: 'efectivo',
   paymentReference: '',
   servicePrice: 0,
+  amountPaid: 0,
   serviceCost: 0,
   tipProductId: '',
   tipVariantId: '',
@@ -180,6 +215,15 @@ export function ServiceFormDialog({
   }, [form, initialValues, open]);
 
   const values = form.watch();
+  useEffect(() => {
+    if (values.status !== 'delivered') return;
+    const servicePrice = Number(values.servicePrice) || 0;
+    const amountPaid = Number(values.amountPaid) || 0;
+    if (servicePrice > 0 && amountPaid < servicePrice) {
+      form.setValue('amountPaid', servicePrice, { shouldDirty: true, shouldValidate: true });
+    }
+  }, [form, values.amountPaid, values.servicePrice, values.status]);
+
   const updateCustomerFields = (nextCustomer: { name: string; phone: string; documentNumber: string }) => {
     form.setValue('customerName', nextCustomer.name, { shouldValidate: true, shouldDirty: true });
     form.setValue('customerPhone', nextCustomer.phone, { shouldValidate: true, shouldDirty: true });
@@ -313,7 +357,12 @@ export function ServiceFormDialog({
   const totalMaterialCost = materialSummary.reduce((sum, item) => sum + item.unitCost, 0);
   const operationalCost = Math.max(Number(values.serviceCost) || 0, 0);
   const estimatedTotalCost = totalMaterialCost + operationalCost;
-  const estimatedProfit = (Number(values.servicePrice) || 0) - estimatedTotalCost;
+  const agreedServicePrice = Math.max(Number(values.servicePrice) || 0, 0);
+  const amountPaid = Math.max(Number(values.amountPaid) || 0, 0);
+  const balanceDue = Math.max(agreedServicePrice - amountPaid, 0);
+  const recognizedRevenue = values.status === 'delivered' ? agreedServicePrice : 0;
+  const projectedProfit = agreedServicePrice - estimatedTotalCost;
+  const recognizedProfit = values.status === 'delivered' ? recognizedRevenue - estimatedTotalCost : 0;
 
   return (
     <AdminResponsiveDialog
@@ -322,11 +371,11 @@ export function ServiceFormDialog({
         if (isSubmitting) return;
         onOpenChange(nextOpen);
       }}
-      title="Registrar servicio de torno"
+      title="Orden de servicio de torno"
       busy={isSubmitting}
       busyTitle="Guardando servicio..."
-      busyDescription="Espera la confirmacion. Se esta registrando el servicio y descontando inventario."
-      description="Registra el valor del trabajo y descuenta del inventario los productos usados en el servicio."
+      busyDescription="Espera la confirmacion. Se esta guardando la orden y actualizando inventario."
+      description="Controla trabajos pendientes, anticipos, saldos y materiales consumidos."
       desktopContentClassName="lg:max-w-4xl"
       footer={
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -390,6 +439,40 @@ export function ServiceFormDialog({
 
               <FormField
                 control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Estado de la orden</FormLabel>
+                    <Select
+                      value={field.value}
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        if (value === 'delivered') {
+                          const servicePrice = Number(form.getValues('servicePrice')) || 0;
+                          form.setValue('amountPaid', servicePrice, { shouldDirty: true, shouldValidate: true });
+                        }
+                      }}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {serviceOrderStatusOptions.map((value) => (
+                          <SelectItem key={value} value={value}>
+                            {serviceOrderStatusLabels[value]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
                 name="serviceCategory"
                 render={({ field }) => (
                   <FormItem>
@@ -427,7 +510,6 @@ export function ServiceFormDialog({
                 nameError={form.formState.errors.customerName?.message}
                 phoneError={form.formState.errors.customerPhone?.message}
                 documentError={form.formState.errors.customerDocument?.message}
-                requiredName
                 className="sm:col-span-2"
               />
 
@@ -782,7 +864,21 @@ export function ServiceFormDialog({
                   name="servicePrice"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Valor del servicio</FormLabel>
+                      <FormLabel>Valor acordado</FormLabel>
+                      <FormControl>
+                        <Input type="number" min="0" step="0.01" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="amountPaid"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Anticipo / pago recibido</FormLabel>
                       <FormControl>
                         <Input type="number" min="0" step="0.01" {...field} />
                       </FormControl>
@@ -843,12 +939,21 @@ export function ServiceFormDialog({
                   )}
 
                   <div className="rounded-2xl bg-slate-950 px-4 py-3 text-white">
-                    <p className="text-sm">Valor servicio: {formatCurrency(Number(values.servicePrice) || 0)}</p>
+                    <p className="text-sm">Estado: {serviceOrderStatusLabels[values.status]}</p>
+                    <p className="mt-1 text-sm">Valor acordado: {formatCurrency(agreedServicePrice)}</p>
+                    <p className="mt-1 text-sm">Anticipo / pago recibido: {formatCurrency(amountPaid)}</p>
+                    <p className="mt-1 text-sm">Saldo por cobrar: {formatCurrency(balanceDue)}</p>
                     <p className="mt-1 text-sm">Costo operativo: {formatCurrency(operationalCost)}</p>
                     {!hideFinancialSummary ? <p className="mt-1 text-sm">Costo materiales: {formatCurrency(totalMaterialCost)}</p> : null}
                     <p className="mt-1 text-sm">Costo total: {formatCurrency(estimatedTotalCost)}</p>
-                    <p className="mt-2 text-lg font-semibold">Utilidad estimada: {formatCurrency(estimatedProfit)}</p>
-                    <p className="mt-2 text-sm text-slate-300">El sistema descontara automaticamente los materiales del inventario.</p>
+                    <p className="mt-2 text-lg font-semibold">
+                      {values.status === 'delivered'
+                        ? `Utilidad real: ${formatCurrency(recognizedProfit)}`
+                        : `Utilidad proyectada: ${formatCurrency(projectedProfit)}`}
+                    </p>
+                    <p className="mt-2 text-sm text-slate-300">
+                      El sistema descuenta los materiales al guardar. El ingreso solo cuenta cuando la orden esta entregada y cobrada.
+                    </p>
                   </div>
                 </div>
               </div>

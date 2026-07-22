@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { BadgeCheck, Phone, Search, UserRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -143,6 +143,12 @@ export function CustomerAutocomplete({
     setActiveField(null);
   };
 
+  const findExactNameCustomer = (value: string) => {
+    const normalizedValue = normalizeSearch(value);
+    if (!normalizedValue) return null;
+    return customerOptions.find((customer) => normalizeSearch(customer.fullName) === normalizedValue) ?? null;
+  };
+
   const findExactCustomer = (value: string) => {
     const normalizedValue = normalizeSearch(value);
     const compactValue = normalizedValue.replace(/[^a-z0-9]/g, '');
@@ -167,6 +173,24 @@ export function CustomerAutocomplete({
     const exactCustomer = findExactCustomer(value);
     if (exactCustomer) selectCustomer(exactCustomer);
   };
+
+  useEffect(() => {
+    if (!matchedCustomer) return;
+    if (normalizeSearch(name) !== normalizeSearch(matchedCustomer.fullName)) return;
+
+    const matchedPhone = matchedCustomer.phone ?? '';
+    const matchedDocument = matchedCustomer.documentNumber ?? '';
+    const shouldFillPhone = !phone.trim() && Boolean(matchedPhone);
+    const shouldFillDocument = !documentNumber.trim() && Boolean(matchedDocument);
+
+    if (!shouldFillPhone && !shouldFillDocument) return;
+
+    onChange({
+      name: matchedCustomer.fullName,
+      phone: shouldFillPhone ? matchedPhone : phone,
+      documentNumber: shouldFillDocument ? matchedDocument : documentNumber,
+    });
+  }, [documentNumber, matchedCustomer, name, onChange, phone]);
 
   return (
     <div className={cn('space-y-3', className)}>
@@ -194,7 +218,13 @@ export function CustomerAutocomplete({
                 applyExactMatch(event.target.value);
               }}
               onChange={(event) => {
-                onChange({ name: event.target.value, phone, documentNumber });
+                const nextName = event.target.value;
+                const exactCustomer = findExactNameCustomer(nextName);
+                if (exactCustomer) {
+                  selectCustomer(exactCustomer);
+                  return;
+                }
+                onChange({ name: nextName, phone, documentNumber });
                 setActiveField('name');
                 setOpen(true);
               }}

@@ -115,7 +115,7 @@ export function buildSalesReportDataset(input: {
 }): SalesReportDataset {
   const salesInMonth = input.sales.filter((sale) => sale.soldAt.slice(0, 7) === input.selectedMonth);
   const servicesInMonth = input.services.filter(
-    (service) => service.performedAt.slice(0, 7) === input.selectedMonth
+    (service) => (service.status ?? 'delivered') === 'delivered' && service.performedAt.slice(0, 7) === input.selectedMonth
   );
 
   const saleGroups = new Map<string, Sale[]>();

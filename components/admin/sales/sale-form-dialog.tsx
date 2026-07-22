@@ -57,13 +57,20 @@ import {
 } from '@/lib/admin/sale-gift-rules';
 import type { Customer, InventoryMovement, Product, Purchase } from '@/lib/admin/types';
 import { createDefaultInstallationServiceItem, supportsInstallationService } from '@/lib/admin/sale-service-helpers';
-import { getProductVariantStock, getVariantSalePrice } from '@/lib/admin/variant-helpers';
+import {
+  buildVariantDisplayName,
+  getProductSaleMode,
+  getProductVariantStock,
+  getVariantSalePrice,
+} from '@/lib/admin/variant-helpers';
 import { cn } from '@/lib/utils';
 import { SITE_LOGO } from '@/lib/branding';
 import { ResponsiveRowActions } from '@/components/admin/shared/responsive-row-actions';
 
 const saleGiftItemSchema = z.object({
   productId: z.string().default(''),
+  variantId: z.string().default(''),
+  variantName: z.string().default(''),
   quantity: z.coerce.number().min(0, 'Ingresa una cantidad valida').default(0),
 });
 
@@ -295,6 +302,7 @@ const giftCategoryCopy: Record<SaleGiftCategory, { toggle: string; placeholder: 
   estuches: { toggle: 'Incluir estuche', placeholder: 'Selecciona el estuche' },
   extensiones: { toggle: 'Incluir extension', placeholder: 'Selecciona la extension' },
   parachoques: { toggle: 'Incluir parachoque', placeholder: 'Selecciona el parachoque' },
+  supresores: { toggle: 'Incluir supresor', placeholder: 'Selecciona el supresor' },
 };
 
 function createDefaultLineItem(): SaleLineFormValue {
@@ -375,6 +383,8 @@ function normalizeSaleLineForForm(line?: Partial<SaleLineFormValue>): SaleLineFo
     serviceItems: (line?.serviceItems ?? []).map((item) => normalizeSaleServiceItemForForm(item)),
     giftItems: (line?.giftItems ?? []).map((item) => ({
       productId: String(item.productId ?? ''),
+      variantId: String(item.variantId ?? ''),
+      variantName: String(item.variantName ?? ''),
       quantity: Number(item.quantity) || 0,
     })),
   };
@@ -601,16 +611,39 @@ function getNormalizedGiftQuantity(value: number | string | undefined, maxQuanti
   return Math.min(normalized, safeMax);
 }
 
+function getSelectableGiftVariants(product: Product | null | undefined, movements: InventoryMovement[], currentVariantId = '') {
+  if (!product || getProductSaleMode(product) !== 'varianted') return [];
+  const normalizedCurrentVariantId = currentVariantId.trim();
+
+  return (product.variants ?? []).filter((variant) => {
+    const isCurrentVariant = variant.id === normalizedCurrentVariantId;
+    const hasStock = getProductVariantStock(product, variant.id, movements) > 0;
+    return variant.status !== 'inactive' && (hasStock || isCurrentVariant);
+  });
+}
+
+function getDefaultGiftVariantId(product: Product | null | undefined, movements: InventoryMovement[], currentVariantId = '') {
+  const variants = getSelectableGiftVariants(product, movements, currentVariantId);
+  return variants.find((variant) => variant.id === currentVariantId)?.id ?? variants[0]?.id ?? '';
+}
+
+function getGiftVariantDisplay(product: Product, variantId: string) {
+  const variant = (product.variants ?? []).find((item) => item.id === variantId);
+  return variant ? buildVariantDisplayName(variant, product.variantAttributes) : '';
+}
+
 function normalizeGiftItems(
   items: SaleLineFormValue['giftItems'],
   products: Product[],
-  _movements: InventoryMovement[],
+  movements: InventoryMovement[],
   options?: {
     defaultQuantity?: number;
     maxQuantity?: number;
+    allowedCategories?: SaleGiftCategory[];
   }
 ) {
   const seenCategories = new Set<string>();
+  const allowedCategorySet = options?.allowedCategories ? new Set(options.allowedCategories) : null;
   const maxQuantity = Math.max(Math.trunc(Number(options?.maxQuantity ?? options?.defaultQuantity ?? 1) || 0), 1);
   const defaultQuantity = getNormalizedGiftQuantity(options?.defaultQuantity ?? 1, maxQuantity, 1);
 
@@ -622,11 +655,19 @@ function normalizeGiftItems(
     if (!product) return accumulator;
     const categoryKey = getSaleGiftCategoryKey(product);
     if (!categoryKey) return accumulator;
+    if (allowedCategorySet && !allowedCategorySet.has(categoryKey)) return accumulator;
     if (seenCategories.has(categoryKey)) return accumulator;
+    const variantId =
+      getProductSaleMode(product) === 'varianted'
+        ? getDefaultGiftVariantId(product, movements, item.variantId ?? '')
+        : '';
+    if (getProductSaleMode(product) === 'varianted' && !variantId) return accumulator;
 
     seenCategories.add(categoryKey);
     accumulator.push({
       productId,
+      variantId,
+      variantName: variantId ? getGiftVariantDisplay(product, variantId) : '',
       quantity: getNormalizedGiftQuantity(item.quantity, maxQuantity, defaultQuantity),
     });
     return accumulator;
@@ -645,6 +686,19 @@ function getGiftProductIdByCategory(
       const product = products.find((current) => current.id === item.productId);
       return product ? getSaleGiftCategoryKey(product) === category : false;
     })?.productId ?? ''
+  );
+}
+
+function getGiftVariantIdByCategory(
+  items: SaleLineFormValue['giftItems'],
+  products: Product[],
+  category: SaleGiftCategory
+) {
+  return (
+    (items ?? []).find((item) => {
+      const product = products.find((current) => current.id === item.productId);
+      return product ? getSaleGiftCategoryKey(product) === category : false;
+    })?.variantId ?? ''
   );
 }
 
@@ -679,6 +733,7 @@ function setGiftSelectionByCategory<T extends { giftItems: SaleLineFormValue['gi
   const maxQuantity = Math.max(Math.trunc(Number(line.quantity ?? 0) || 0), 1);
   const currentGiftItems = line.giftItems ?? [];
   const preservedQuantity = getGiftQuantityByCategory(currentGiftItems, products, category);
+  const preservedVariantId = getGiftVariantIdByCategory(currentGiftItems, products, category);
   const nextItems = normalizeGiftItems(
     currentGiftItems.filter((item) => {
       const product = products.find((current) => current.id === item.productId);
@@ -690,8 +745,15 @@ function setGiftSelectionByCategory<T extends { giftItems: SaleLineFormValue['gi
   );
 
   if (enabled && productId) {
+    const giftProduct = products.find((product) => product.id === productId);
+    const variantId =
+      getProductSaleMode(giftProduct) === 'varianted'
+        ? getDefaultGiftVariantId(giftProduct, movements, preservedVariantId)
+        : '';
     nextItems.push({
       productId,
+      variantId,
+      variantName: giftProduct && variantId ? getGiftVariantDisplay(giftProduct, variantId) : '',
       quantity: getNormalizedGiftQuantity(preservedQuantity, maxQuantity, maxQuantity),
     });
   }
@@ -701,6 +763,34 @@ function setGiftSelectionByCategory<T extends { giftItems: SaleLineFormValue['gi
     giftItems: normalizeGiftItems(nextItems, products, movements, {
       defaultQuantity: maxQuantity,
       maxQuantity,
+    }),
+  };
+}
+
+function setGiftVariantByCategory<T extends { giftItems: SaleLineFormValue['giftItems']; quantity?: number | string }>(
+  line: T,
+  products: Product[],
+  movements: InventoryMovement[],
+  category: SaleGiftCategory,
+  variantId: string
+): T {
+  const currentGiftItems = line.giftItems ?? [];
+  const nextItems = currentGiftItems.map((item) => {
+    const product = products.find((current) => current.id === item.productId);
+    if (!product || getSaleGiftCategoryKey(product) !== category) return item;
+    const nextVariantId = getDefaultGiftVariantId(product, movements, variantId);
+    return {
+      ...item,
+      variantId: nextVariantId,
+      variantName: nextVariantId ? getGiftVariantDisplay(product, nextVariantId) : '',
+    };
+  });
+
+  return {
+    ...line,
+    giftItems: normalizeGiftItems(nextItems, products, movements, {
+      defaultQuantity: Math.max(Math.trunc(Number(line.quantity ?? 0) || 0), 1),
+      maxQuantity: Math.max(Math.trunc(Number(line.quantity ?? 0) || 0), 1),
     }),
   };
 }
@@ -801,6 +891,9 @@ function SaleGiftSection({
           <div className="grid gap-3 md:grid-cols-2">
           {allowedCategories.map((category) => {
             const selectedProductId = getGiftProductIdByCategory(giftItems, products, category);
+            const selectedGiftProduct = products.find((product) => product.id === selectedProductId);
+            const selectedVariantId = getGiftVariantIdByCategory(giftItems, products, category);
+            const variantOptions = getSelectableGiftVariants(selectedGiftProduct, movements, selectedVariantId);
             const selectedQuantity = getGiftQuantityByCategory(giftItems, products, category);
             const options = availableGiftOptionsByCategory[category];
             const maxQuantity = Math.max(Math.trunc(Number(line.quantity ?? 0) || 0), 1);
@@ -842,6 +935,27 @@ function SaleGiftSection({
 
                 {selectedProductId ? (
                   <div className="mt-3 space-y-2">
+                    {getProductSaleMode(selectedGiftProduct) === 'varianted' ? (
+                      <div className="space-y-2">
+                        <Label>Variante del obsequio</Label>
+                        <select
+                          value={selectedVariantId}
+                          onChange={(event) =>
+                            onLineChange(
+                              setGiftVariantByCategory(line, products, movements, category, event.target.value)
+                            )
+                          }
+                          className="h-11 w-full min-w-0 rounded-xl border border-input bg-background/88 px-3.5 py-2 text-base text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.04)] outline-none transition-[color,box-shadow,background-color] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900/72 dark:text-slate-100 sm:h-9 sm:text-sm"
+                        >
+                          <option value="">Selecciona la variante</option>
+                          {variantOptions.map((variant) => (
+                            <option key={variant.id} value={variant.id}>
+                              {buildVariantDisplayName(variant, selectedGiftProduct?.variantAttributes)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : null}
                     <Label>Cantidad obsequio</Label>
                     <Input
                       type="number"
@@ -1481,11 +1595,20 @@ export function SaleFormDialog({
     const unitPrice = Number(saleItem.unitPrice) || 0;
     const giftItems = saleItem.giftItems.map((giftItem) => {
       const giftProduct = products.find((item) => item.id === giftItem.productId);
-      const giftStock = giftProduct ? getStoredProductStock(giftProduct) : 0;
+      const giftVariant = giftProduct?.variants?.find((variant) => variant.id === giftItem.variantId) ?? null;
+      const giftStock = giftProduct
+        ? giftVariant
+          ? getProductVariantStock(giftProduct, giftVariant.id, movements)
+          : getStoredProductStock(giftProduct)
+        : 0;
       const giftQuantity = Number(giftItem.quantity) || 0;
-      const giftUnitCost = giftProduct ? getVariantOrProductRealUnitCost(purchases, giftProduct.id) : 0;
+      const giftUnitCost = giftProduct
+        ? getVariantOrProductRealUnitCost(purchases, giftProduct.id, giftVariant?.id)
+        : 0;
       return {
         productId: giftItem.productId,
+        variantId: giftVariant?.id ?? '',
+        variantName: giftVariant ? buildVariantDisplayName(giftVariant, giftProduct?.variantAttributes) : '',
         product: giftProduct,
         stock: giftStock,
         quantity: giftQuantity,
@@ -1605,6 +1728,7 @@ export function SaleFormDialog({
           matchesProductCategoryFamily(product, 'parachoques') &&
           product.subcategory.trim().toLowerCase() === 'parachoques'
       ),
+      supresores: baseOptions.filter((product) => matchesProductCategoryFamily(product, 'supresores')),
     } satisfies Record<SaleGiftCategory, Product[]>;
   }, [products]);
 
@@ -1615,13 +1739,17 @@ export function SaleFormDialog({
           ...initialValues,
           items:
             initialValues.items.length > 0
-              ? initialValues.items.map((item) => ({
-                  ...item,
-                  giftItems: normalizeGiftItems(item.giftItems ?? [], products, movements, {
-                    defaultQuantity: Number(item.quantity) || 1,
-                    maxQuantity: Number(item.quantity) || 1,
-                  }),
-                }))
+              ? initialValues.items.map((item) => {
+                  const itemProduct = products.find((product) => product.id === item.productId);
+                  return {
+                    ...item,
+                    giftItems: normalizeGiftItems(item.giftItems ?? [], products, movements, {
+                      defaultQuantity: Number(item.quantity) || 1,
+                      maxQuantity: Number(item.quantity) || 1,
+                      allowedCategories: itemProduct ? getAllowedSaleGiftCategories(itemProduct) : [],
+                    }),
+                  };
+                })
               : [createDefaultLineItem()],
         }
       : defaultValues;
@@ -1727,6 +1855,7 @@ export function SaleFormDialog({
       giftItems: normalizeGiftItems(draftLine.giftItems, products, movements, {
         defaultQuantity: Number(draftLine.quantity) || 1,
         maxQuantity: Number(draftLine.quantity) || 1,
+        allowedCategories: draftProduct ? getAllowedSaleGiftCategories(draftProduct) : [],
       }),
     };
 
@@ -1996,6 +2125,7 @@ export function SaleFormDialog({
                                 const defaultVariant = getDefaultSaleVariant(product, movements, {
                                   usedVariantIds: getUsedVariantIdsForProduct(form.getValues('items'), value, 0),
                                 });
+                                const allowedGiftCategories = product ? getAllowedSaleGiftCategories(product) : [];
                                 if (product) {
                                   form.setValue(
                                     'items.0.unitPrice',
@@ -2012,7 +2142,7 @@ export function SaleFormDialog({
                                   { shouldValidate: true }
                                 );
                                 const nextGiftItems =
-                                  product && getAllowedSaleGiftCategories(product).length > 0
+                                  allowedGiftCategories.length > 0
                                     ? normalizeGiftItems(
                                         (form.getValues('items.0.giftItems') ?? []).filter((giftItem) => giftItem.productId !== value),
                                         products,
@@ -2020,6 +2150,7 @@ export function SaleFormDialog({
                                         {
                                           defaultQuantity: Number(form.getValues('items.0.quantity')) || 1,
                                           maxQuantity: Number(form.getValues('items.0.quantity')) || 1,
+                                          allowedCategories: allowedGiftCategories,
                                         }
                                       )
                                     : [];
@@ -2172,6 +2303,9 @@ export function SaleFormDialog({
                                     normalizeGiftItems(currentLine.giftItems ?? [], products, movements, {
                                       defaultQuantity: nextQuantity,
                                       maxQuantity: nextQuantity,
+                                      allowedCategories: firstItemProduct
+                                        ? getAllowedSaleGiftCategories(firstItemProduct)
+                                        : [],
                                     }),
                                     { shouldValidate: true }
                                   );
@@ -2381,7 +2515,10 @@ export function SaleFormDialog({
                               ) : null}
                               {summary.giftItems.length > 0 ? (
                                 <p className="text-sm text-violet-700">
-                                  Obsequios: {summary.giftItems.map((giftItem) => `${giftItem.product?.name ?? 'Producto'} x ${formatNumber(giftItem.quantity)}`).join(', ')}
+                                  Obsequios: {summary.giftItems.map((giftItem) => {
+                                    const variantLabel = giftItem.variantName ? ` - ${giftItem.variantName}` : '';
+                                    return `${giftItem.product?.name ?? 'Producto'}${variantLabel} x ${formatNumber(giftItem.quantity)}`;
+                                  }).join(', ')}
                                 </p>
                               ) : (
                                 <p className="text-sm text-slate-400">Sin obsequio</p>
@@ -2639,6 +2776,7 @@ export function SaleFormDialog({
                   const defaultVariant = getDefaultSaleVariant(product, movements, {
                     usedVariantIds: getUsedVariantIdsForProduct(values.items, value, editingLineIndex),
                   });
+                  const allowedGiftCategories = product ? getAllowedSaleGiftCategories(product) : [];
                     setDraftLine((current) => ({
                       ...current,
                       productId: value,
@@ -2647,7 +2785,7 @@ export function SaleFormDialog({
                       unitPrice: product ? String(getInitialSaleUnitPrice(product, movements, defaultVariant?.id)) : current.unitPrice,
                       serviceItems: [],
                       giftItems:
-                        product && getAllowedSaleGiftCategories(product).length > 0
+                        allowedGiftCategories.length > 0
                           ? normalizeGiftItems(
                               (current.giftItems ?? []).filter((giftItem) => giftItem.productId !== value),
                               products,
@@ -2655,6 +2793,7 @@ export function SaleFormDialog({
                               {
                                 defaultQuantity: Number(current.quantity) || 1,
                                 maxQuantity: Number(current.quantity) || 1,
+                                allowedCategories: allowedGiftCategories,
                               }
                             )
                           : [],
@@ -2771,6 +2910,7 @@ export function SaleFormDialog({
                         giftItems: normalizeGiftItems(current.giftItems ?? [], products, movements, {
                           defaultQuantity: nextQuantity,
                           maxQuantity: nextQuantity,
+                          allowedCategories: draftProduct ? getAllowedSaleGiftCategories(draftProduct) : [],
                         }),
                       };
                     });

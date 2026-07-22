@@ -15,6 +15,31 @@ import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, formatDateTime, formatNumber, getProductById } from '@/lib/admin/calculations';
 import { getDateKeyInBogota, getTodayDateInputValue, toOperationalDateISOString } from '@/lib/admin/date-utils';
 import { serviceTypeLabels } from '@/lib/admin/catalogs';
+import type { ServiceOrderStatus } from '@/lib/admin/types';
+
+const serviceOrderStatusLabels: Record<ServiceOrderStatus, string> = {
+  pending: 'Pendiente',
+  in_progress: 'En trabajo',
+  ready: 'Listo por entregar',
+  delivered: 'Entregado y cobrado',
+  cancelled: 'Cancelado',
+};
+
+const serviceOrderStatusClasses: Record<ServiceOrderStatus, string> = {
+  pending: 'bg-amber-50 text-amber-700 border-amber-200',
+  in_progress: 'bg-cyan-50 text-cyan-700 border-cyan-200',
+  ready: 'bg-blue-50 text-blue-700 border-blue-200',
+  delivered: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  cancelled: 'bg-rose-50 text-rose-700 border-rose-200',
+};
+
+function getServiceStatus(service: { status?: ServiceOrderStatus }): ServiceOrderStatus {
+  return service.status ?? 'delivered';
+}
+
+function isOpenServiceStatus(status: ServiceOrderStatus) {
+  return status === 'pending' || status === 'in_progress' || status === 'ready';
+}
 
 export default function ServiciosPage() {
   const { services, products, purchases, movements, customers, registerService, updateService } = useAdminData();
@@ -40,6 +65,7 @@ export default function ServiciosPage() {
         serviceType: editableService.serviceType,
         serviceLabel: editableService.serviceLabel ?? '',
         serviceCategory: editableService.serviceCategory ?? 'torno',
+        status: getServiceStatus(editableService),
         performedAt: editableService.performedAt.slice(0, 10),
         customerName: editableService.customerName,
         customerPhone: editableService.customerPhone ?? '',
@@ -47,7 +73,8 @@ export default function ServiciosPage() {
         cueReference: editableService.cueReference,
         paymentMethod: editableService.paymentMethod ?? 'efectivo',
         paymentReference: editableService.paymentReference ?? '',
-        servicePrice: editableService.totalRevenue,
+        servicePrice: editableService.servicePrice,
+        amountPaid: Number(editableService.amountPaid ?? editableService.totalRevenue ?? 0),
         serviceCost: Number(editableService.totalOperationalCost ?? 0),
         tipProductId: editableService.materials.find((item) => tipProductIds.has(item.productId))?.productId ?? '',
         tipVariantId: editableService.materials.find((item) => tipProductIds.has(item.productId))?.variantId ?? '',
@@ -73,7 +100,8 @@ export default function ServiciosPage() {
           return item.variantName ? `${productName} ${item.variantName}`.trim() : productName;
         })
         .join(' ');
-      const content = `${getServiceDisplayLabel(service)} ${service.customerName} ${service.customerPhone ?? ''} ${service.customerDocument ?? ''} ${service.cueReference} ${service.notes} ${materialNames}`.toLowerCase();
+      const statusLabel = serviceOrderStatusLabels[getServiceStatus(service)];
+      const content = `${getServiceDisplayLabel(service)} ${statusLabel} ${service.customerName} ${service.customerPhone ?? ''} ${service.customerDocument ?? ''} ${service.cueReference} ${service.notes} ${materialNames}`.toLowerCase();
       return !normalizedQuery || content.includes(normalizedQuery);
     });
   }, [products, query, services]);
@@ -82,14 +110,34 @@ export default function ServiciosPage() {
     () =>
       filteredServices.reduce(
         (accumulator, service) => {
-          if (getDateKeyInBogota(service.performedAt).slice(0, 7) !== currentMonth) return accumulator;
-          accumulator.count += 1;
+          const status = getServiceStatus(service);
+          if (isOpenServiceStatus(status)) {
+            accumulator.openCount += 1;
+            accumulator.pendingBalance += Number(service.balanceDue ?? service.servicePrice ?? 0);
+            accumulator.pendingMaterialCost += Number(service.totalMaterialCost ?? 0);
+            accumulator.advances += Number(service.amountPaid ?? 0);
+          }
+
+          if (getDateKeyInBogota(service.performedAt).slice(0, 7) !== currentMonth || status !== 'delivered') {
+            return accumulator;
+          }
+
+          accumulator.deliveredCount += 1;
           accumulator.revenue += service.totalRevenue;
           accumulator.cost += service.totalCost ?? service.totalMaterialCost;
           accumulator.profit += service.grossProfit;
           return accumulator;
         },
-        { count: 0, revenue: 0, cost: 0, profit: 0 }
+        {
+          deliveredCount: 0,
+          openCount: 0,
+          pendingBalance: 0,
+          pendingMaterialCost: 0,
+          advances: 0,
+          revenue: 0,
+          cost: 0,
+          profit: 0,
+        }
       ),
     [currentMonth, filteredServices]
   );
@@ -131,7 +179,7 @@ export default function ServiciosPage() {
       <SectionHeader
         eyebrow="Torno y reparaciones"
         title="Servicios"
-        description="Gestiona los servicios registrados del negocio."
+        description="Gestiona ordenes pendientes, materiales consumidos, anticipos y servicios cobrados."
         actions={
           <Button onClick={() => setOpenDialog(true)} className="w-full rounded-xl sm:w-auto">
             <Plus className="mr-2 h-4 w-4" /> Registrar servicio
@@ -141,32 +189,32 @@ export default function ServiciosPage() {
 
       <div className={`grid gap-4 sm:gap-6 ${isSalesUser ? 'sm:grid-cols-2 lg:grid-cols-2' : 'sm:grid-cols-2 xl:grid-cols-4'}`}>
         <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-[linear-gradient(180deg,rgba(2,6,23,0.92)_0%,rgba(15,23,42,0.88)_100%)] dark:shadow-[0_20px_48px_rgba(2,6,23,0.28)] sm:p-6">
-          <p className="text-sm text-slate-500 dark:text-slate-400">Servicios registrados</p>
-          <p className="mt-3 text-3xl font-semibold text-slate-950 dark:text-slate-50">{formatNumber(filteredServices.length)}</p>
-          <p className="mt-2 hidden text-sm text-slate-500 dark:text-slate-400 sm:block">Trabajos visibles con el filtro actual.</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Ordenes abiertas</p>
+          <p className="mt-3 text-3xl font-semibold text-slate-950 dark:text-slate-50">{formatNumber(monthTotals.openCount)}</p>
+          <p className="mt-2 hidden text-sm text-slate-500 dark:text-slate-400 sm:block">Pendientes, en trabajo o listas por entregar.</p>
         </div>
         {isSalesUser ? (
           <div className="rounded-[28px] border border-cyan-200 bg-[linear-gradient(180deg,rgba(236,254,255,0.98)_0%,rgba(207,250,254,0.82)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-cyan-900/70 dark:bg-[linear-gradient(180deg,rgba(8,47,73,0.52)_0%,rgba(14,116,144,0.24)_100%)] sm:p-6">
-            <p className="text-sm text-cyan-800 dark:text-cyan-200">Servicios del mes</p>
-            <p className="mt-3 text-3xl font-semibold text-cyan-950 dark:text-cyan-50">{formatNumber(monthTotals.count)}</p>
-            <p className="mt-2 hidden text-sm text-cyan-900 dark:text-cyan-100 sm:block">Trabajos registrados en {currentMonth}.</p>
+            <p className="text-sm text-cyan-800 dark:text-cyan-200">Saldo por cobrar</p>
+            <p className="mt-3 text-3xl font-semibold text-cyan-950 dark:text-cyan-50">{formatCurrency(monthTotals.pendingBalance)}</p>
+            <p className="mt-2 hidden text-sm text-cyan-900 dark:text-cyan-100 sm:block">De ordenes abiertas.</p>
           </div>
         ) : (
           <>
             <div className="rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-[linear-gradient(180deg,rgba(2,6,23,0.92)_0%,rgba(15,23,42,0.88)_100%)] dark:shadow-[0_20px_48px_rgba(2,6,23,0.28)] sm:p-6">
-              <p className="text-sm text-slate-500 dark:text-slate-400">Ingresos del mes</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Ingresos reales del mes</p>
               <p className="mt-3 text-3xl font-semibold text-slate-950 dark:text-slate-50">{formatCurrency(monthTotals.revenue)}</p>
-              <p className="mt-2 hidden text-sm text-slate-500 dark:text-slate-400 sm:block">Total cobrado en {currentMonth}.</p>
+              <p className="mt-2 hidden text-sm text-slate-500 dark:text-slate-400 sm:block">Solo servicios entregados y cobrados en {currentMonth}.</p>
             </div>
             <div className="rounded-[28px] border border-amber-200 bg-[linear-gradient(180deg,rgba(255,251,235,0.98)_0%,rgba(254,243,199,0.82)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-amber-900/70 dark:bg-[linear-gradient(180deg,rgba(120,53,15,0.34)_0%,rgba(146,64,14,0.22)_100%)] sm:p-6">
-              <p className="text-sm text-amber-800 dark:text-amber-200">Costo del servicio</p>
-              <p className="mt-3 text-3xl font-semibold text-amber-950 dark:text-amber-50">{formatCurrency(monthTotals.cost)}</p>
-              <p className="mt-2 hidden text-sm text-amber-900 dark:text-amber-100 sm:block">Incluye materiales y costo operativo cuando aplique.</p>
+              <p className="text-sm text-amber-800 dark:text-amber-200">Saldo por cobrar</p>
+              <p className="mt-3 text-3xl font-semibold text-amber-950 dark:text-amber-50">{formatCurrency(monthTotals.pendingBalance)}</p>
+              <p className="mt-2 hidden text-sm text-amber-900 dark:text-amber-100 sm:block">Material comprometido: {formatCurrency(monthTotals.pendingMaterialCost)}.</p>
             </div>
             <div className="rounded-[28px] border border-emerald-200 bg-[linear-gradient(180deg,rgba(236,253,245,0.98)_0%,rgba(209,250,229,0.82)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-emerald-900/70 dark:bg-[linear-gradient(180deg,rgba(6,78,59,0.38)_0%,rgba(5,150,105,0.2)_100%)] sm:p-6">
               <p className="text-sm text-emerald-800 dark:text-emerald-200">Utilidad del torno</p>
               <p className="mt-3 text-3xl font-semibold text-emerald-950 dark:text-emerald-50">{formatCurrency(monthTotals.profit)}</p>
-              <p className="mt-2 hidden text-sm text-emerald-900 dark:text-emerald-100 sm:block">{formatNumber(monthTotals.count)} servicios en el mes actual.</p>
+              <p className="mt-2 hidden text-sm text-emerald-900 dark:text-emerald-100 sm:block">{formatNumber(monthTotals.deliveredCount)} servicios entregados en el mes actual.</p>
             </div>
           </>
         )}
@@ -188,16 +236,21 @@ export default function ServiciosPage() {
             <div className="space-y-3 md:hidden">
                 {filteredServices.map((service) => {
                   const { materialChips, hiddenCount, isSaleAddon } = buildMaterialMeta(service);
+                  const status = getServiceStatus(service);
                   const materialsSummary = materialChips.join(', ');
                   const operationalCost = Number(service.totalOperationalCost ?? 0);
                   const materialCost = Number(service.totalMaterialCost ?? 0);
                   const totalCost = Number(service.totalCost ?? materialCost + operationalCost);
                   const rowHoverSummary = [
                     getServiceDisplayLabel(service),
+                    `Estado: ${serviceOrderStatusLabels[status]}`,
                     `Cliente: ${service.customerName}`,
                     `Referencia: ${service.cueReference}`,
                     `Categoria: ${service.serviceCategory || 'General'}`,
-                    `Valor: ${formatCurrency(service.totalRevenue)}`,
+                    `Valor acordado: ${formatCurrency(service.servicePrice)}`,
+                    `Cobrado: ${formatCurrency(service.amountPaid ?? service.totalRevenue)}`,
+                    `Saldo: ${formatCurrency(service.balanceDue ?? 0)}`,
+                    `Ingreso reconocido: ${formatCurrency(service.totalRevenue)}`,
                     `Costo: ${formatCurrency(totalCost)}`,
                     `Materiales: ${formatCurrency(materialCost)}`,
                     `Operativo: ${formatCurrency(operationalCost)}`,
@@ -218,9 +271,14 @@ export default function ServiciosPage() {
                       <div className="min-w-0">
                         <p className="font-medium text-slate-900 dark:text-slate-100">{getServiceDisplayLabel(service)}</p>
                         <p className="truncate text-sm text-slate-500 dark:text-slate-400">{service.cueReference}</p>
+                        <span className={`mt-2 inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${serviceOrderStatusClasses[status]}`}>
+                          {serviceOrderStatusLabels[status]}
+                        </span>
                       </div>
                       <div className="flex shrink-0 items-start gap-2">
-                        <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{formatCurrency(service.totalRevenue)}</p>
+                        <p className="text-right text-sm font-semibold text-slate-900 dark:text-slate-100">
+                          {formatCurrency(service.servicePrice)}
+                        </p>
                         {canEditServices && service.source !== 'sale-addon' ? (
                           <Button
                             type="button"
@@ -239,6 +297,8 @@ export default function ServiciosPage() {
                     </div>
                     <div className="mt-3 space-y-1.5 text-sm text-slate-600">
                       <p><span className="font-medium text-slate-800">Cliente:</span> {service.customerName}</p>
+                      <p><span className="font-medium text-slate-800">Cobrado:</span> {formatCurrency(service.amountPaid ?? service.totalRevenue)}</p>
+                      <p><span className="font-medium text-slate-800">Saldo:</span> {formatCurrency(service.balanceDue ?? 0)}</p>
                       <p>
                         <span className="font-medium text-slate-800">Materiales:</span>{' '}
                         {isSaleAddon && hiddenCount > 0
@@ -274,9 +334,10 @@ export default function ServiciosPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className={isSalesUser ? 'w-[200px]' : undefined}>Servicio</TableHead>
+                  <TableHead>Estado</TableHead>
                   <TableHead className={isSalesUser ? 'w-[190px]' : undefined}>Cliente</TableHead>
                   <TableHead className={isSalesUser ? 'w-[360px]' : undefined}>Materiales</TableHead>
-                  <TableHead className={isSalesUser ? 'w-[150px] whitespace-nowrap' : undefined}>Valor cobrado</TableHead>
+                  <TableHead className={isSalesUser ? 'w-[150px] whitespace-nowrap' : undefined}>Valor</TableHead>
                   {!isSalesUser ? <TableHead>Costo</TableHead> : null}
                   {!isSalesUser ? <TableHead>Utilidad</TableHead> : null}
                   <TableHead className={isSalesUser ? 'w-[160px] whitespace-nowrap' : undefined}>Fecha</TableHead>
@@ -285,17 +346,22 @@ export default function ServiciosPage() {
               <TableBody>
                 {filteredServices.map((service) => {
                     const { materialChips, visibleChips, hiddenCount, detailLabel, isSaleAddon } = buildMaterialMeta(service);
+                    const status = getServiceStatus(service);
                     const materialsSummary = materialChips.join(', ');
                     const operationalCost = Number(service.totalOperationalCost ?? 0);
                     const materialCost = Number(service.totalMaterialCost ?? 0);
                     const totalCost = Number(service.totalCost ?? materialCost + operationalCost);
                     const rowHoverSummary = [
                       getServiceDisplayLabel(service),
+                      `Estado: ${serviceOrderStatusLabels[status]}`,
                       `Cliente: ${service.customerName}`,
                       `Responsable: ${service.responsibleUser}`,
                       `Referencia: ${service.cueReference}`,
                       `Categoria: ${service.serviceCategory || 'General'}`,
-                      `Valor: ${formatCurrency(service.totalRevenue)}`,
+                      `Valor acordado: ${formatCurrency(service.servicePrice)}`,
+                      `Cobrado: ${formatCurrency(service.amountPaid ?? service.totalRevenue)}`,
+                      `Saldo: ${formatCurrency(service.balanceDue ?? 0)}`,
+                      `Ingreso reconocido: ${formatCurrency(service.totalRevenue)}`,
                       `Costo: ${formatCurrency(totalCost)}`,
                       `Materiales: ${formatCurrency(materialCost)}`,
                       `Operativo: ${formatCurrency(operationalCost)}`,
@@ -314,6 +380,11 @@ export default function ServiciosPage() {
                           <p className="font-medium text-slate-900">{getServiceDisplayLabel(service)}</p>
                           <p className="text-xs text-slate-500">{service.cueReference}</p>
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${serviceOrderStatusClasses[status]}`}>
+                          {serviceOrderStatusLabels[status]}
+                        </span>
                       </TableCell>
                       <TableCell className={isSalesUser ? 'align-top' : undefined}>
                         <div>
@@ -342,7 +413,11 @@ export default function ServiciosPage() {
                         <p className="mt-1 text-[11px] text-slate-500">{detailLabel}</p>
                       </TableCell>
                       <TableCell className={isSalesUser ? 'align-top whitespace-nowrap font-semibold text-slate-900' : undefined}>
-                        {formatCurrency(service.totalRevenue)}
+                        <div>
+                          <p className="font-semibold text-slate-900">{formatCurrency(service.servicePrice)}</p>
+                          <p className="text-xs text-slate-500">Cobrado {formatCurrency(service.amountPaid ?? service.totalRevenue)}</p>
+                          <p className="text-xs text-slate-500">Saldo {formatCurrency(service.balanceDue ?? 0)}</p>
+                        </div>
                       </TableCell>
                       {!isSalesUser ? (
                         <TableCell>
@@ -468,7 +543,10 @@ export default function ServiciosPage() {
             serviceType: values.serviceType,
             serviceLabel: values.serviceLabel,
             serviceCategory: values.serviceCategory,
+            status: values.status,
             performedAt: toOperationalDateISOString(values.performedAt),
+            deliveredAt: values.status === 'delivered' ? toOperationalDateISOString(values.performedAt) : undefined,
+            cancelledAt: values.status === 'cancelled' ? toOperationalDateISOString(values.performedAt) : undefined,
             customerName: values.customerName,
             customerPhone: values.customerPhone,
             customerDocument: values.customerDocument,
@@ -476,6 +554,7 @@ export default function ServiciosPage() {
             paymentMethod: 'efectivo',
             paymentReference: '',
             servicePrice: values.servicePrice,
+            amountPaid: values.amountPaid,
             serviceCost: values.serviceCost,
             materials,
             notes: values.notes,
@@ -499,7 +578,9 @@ export default function ServiciosPage() {
             title: editableService ? 'Servicio actualizado' : 'Servicio registrado',
             description: editableService
               ? 'Los cambios del servicio ya quedaron aplicados y el inventario fue recalculado.'
-              : 'El trabajo del torno se guardo y el inventario ya fue descontado.',
+              : values.status === 'delivered'
+                ? 'El trabajo quedo entregado/cobrado y el inventario ya fue descontado.'
+                : 'La orden quedo abierta, el material fue descontado y el saldo queda por cobrar.',
           });
         }}
       />
