@@ -183,6 +183,8 @@ export interface PurchaseOrder {
 
 export interface SaleGiftItem {
   productId: string;
+  variantId?: string;
+  variantName?: string;
   quantity: number;
   unitCost: number;
   totalCost: number;
@@ -274,6 +276,8 @@ export type AuthorizationDraftSaleLine = {
   serviceItems?: SaleServiceItem[];
   giftItems?: Array<{
     productId: string;
+    variantId?: string;
+    variantName?: string;
     quantity: number;
   }>;
 };
@@ -330,6 +334,13 @@ export type ServiceVisitStatus =
   | 'completed'
   | 'cancelled';
 
+export type ServiceOrderStatus =
+  | 'pending'
+  | 'in_progress'
+  | 'ready'
+  | 'delivered'
+  | 'cancelled';
+
 export interface ServiceVisit {
   id: string;
   status: ServiceVisitStatus;
@@ -367,10 +378,13 @@ export interface ServiceOrder {
   serviceType: ServiceType;
   serviceLabel?: string;
   serviceCategory?: string;
+  status: ServiceOrderStatus;
   source?: 'standalone' | 'sale-addon';
   saleId?: string;
   saleBatchId?: string;
   performedAt: string;
+  deliveredAt?: string;
+  cancelledAt?: string;
   customerName: string;
   customerPhone?: string;
   customerDocument?: string;
@@ -378,6 +392,8 @@ export interface ServiceOrder {
   paymentMethod?: string;
   paymentReference?: string;
   servicePrice: number;
+  amountPaid: number;
+  balanceDue: number;
   totalRevenue: number;
   totalMaterialCost: number;
   totalOperationalCost?: number;

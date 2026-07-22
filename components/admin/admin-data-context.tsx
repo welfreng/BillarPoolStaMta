@@ -79,6 +79,7 @@ import type {
   SaleLineItem,
   ServiceMaterialItem,
   ServiceOrder,
+  ServiceOrderStatus,
   ServiceType,
   ServiceVisit,
   ServiceVisitStatus,
@@ -193,6 +194,8 @@ interface RegisterSaleInput {
     serviceItems?: SaleServiceItem[];
     giftItems?: Array<{
       productId: string;
+      variantId?: string;
+      variantName?: string;
       quantity: number;
     }>;
   }>;
@@ -228,7 +231,10 @@ interface RegisterServiceInput {
   serviceType: ServiceType;
   serviceLabel?: string;
   serviceCategory?: string;
+  status?: ServiceOrderStatus;
   performedAt: string;
+  deliveredAt?: string;
+  cancelledAt?: string;
   customerName: string;
   customerPhone?: string;
   customerDocument?: string;
@@ -236,6 +242,7 @@ interface RegisterServiceInput {
   paymentMethod: string;
   paymentReference?: string;
   servicePrice: number;
+  amountPaid?: number;
   serviceCost?: number;
   materials: Array<{
     productId: string;
@@ -593,10 +600,6 @@ function buildSaleGiftItems(
     return giftItems;
   }
 
-  if (!matchesProductCategoryFamily(targetProduct, 'tacos')) {
-    throw new Error(`Solo los tacos de billar pueden llevar obsequio. Revisa ${targetProduct.name}.`);
-  }
-
   const allowedGiftCategories = getAllowedSaleGiftCategories(targetProduct);
   if (allowedGiftCategories.length === 0) {
     throw new Error(`Este producto no admite obsequios. Revisa ${targetProduct.name}.`);
@@ -625,7 +628,7 @@ function buildSaleGiftItems(
     const giftCategoryKey = getSaleGiftCategoryKey(giftedProduct);
     if (!giftCategoryKey) {
       throw new Error(
-        `Los obsequios para ${targetProduct.name} solo pueden ser un guante, un estuche, una extension o un parachoque.`
+        `Los obsequios para ${targetProduct.name} solo pueden ser ${formatSaleGiftCategoryList(allowedGiftCategories)}.`
       );
     }
     if (!allowedGiftCategories.includes(giftCategoryKey)) {
@@ -638,9 +641,18 @@ function buildSaleGiftItems(
     }
     seenGiftCategories.add(giftCategoryKey);
 
-    const giftUnitCost = getProductRealUnitCost(purchases, giftProductId);
+    const selectedGiftVariant = giftItemInput.variantId
+      ? getProductVariantById(giftedProduct, giftItemInput.variantId)
+      : null;
+    if (getProductSaleMode(giftedProduct) === 'varianted' && !selectedGiftVariant) {
+      throw new Error(`Selecciona la variante del obsequio ${giftedProduct.name}.`);
+    }
+
+    const giftUnitCost = getVariantOrProductRealUnitCost(purchases, giftProductId, selectedGiftVariant?.id);
     giftItems.push({
       productId: giftProductId,
+      variantId: selectedGiftVariant?.id,
+      variantName: selectedGiftVariant?.name ?? giftItemInput.variantName?.trim() ?? undefined,
       quantity: giftQuantity,
       unitCost: giftUnitCost,
       totalCost: giftQuantity * giftUnitCost,
@@ -1019,6 +1031,8 @@ function mapSaleDocument(documentId: string, data: DocumentData): Sale {
   const giftItems: SaleGiftItem[] = Array.isArray(data.giftItems)
     ? data.giftItems.map((item): SaleGiftItem => ({
         productId: String(item?.productId ?? ''),
+        variantId: item?.variantId ? String(item.variantId) : undefined,
+        variantName: item?.variantName ? String(item.variantName) : undefined,
         quantity: Number(item?.quantity ?? 0),
         unitCost: Number(item?.unitCost ?? 0),
         totalCost: Number(item?.totalCost ?? 0),
@@ -1091,6 +1105,7 @@ function mapCustomerDocument(documentId: string, data: DocumentData): Customer {
 }
 
 function mapServiceDocument(documentId: string, data: DocumentData): ServiceOrder {
+  const source = data.source === 'sale-addon' ? 'sale-addon' : 'standalone';
   const materials: ServiceMaterialItem[] = Array.isArray(data.materials)
     ? data.materials
         .map((item) => ({
@@ -1109,6 +1124,19 @@ function mapServiceDocument(documentId: string, data: DocumentData): ServiceOrde
   const totalOperationalCost = Number(data.totalOperationalCost ?? data.serviceCost ?? 0);
   const totalCost = Number(data.totalCost ?? totalMaterialCost + totalOperationalCost);
   const totalRevenue = Number(data.totalRevenue ?? data.servicePrice ?? 0);
+  const servicePrice = Number(data.servicePrice ?? data.totalRevenue ?? 0);
+  const status: ServiceOrderStatus =
+    data.status === 'pending' ||
+    data.status === 'in_progress' ||
+    data.status === 'ready' ||
+    data.status === 'delivered' ||
+    data.status === 'cancelled'
+      ? data.status
+      : source === 'sale-addon'
+        ? 'delivered'
+        : 'delivered';
+  const amountPaid = Number(data.amountPaid ?? (status === 'delivered' ? servicePrice : 0));
+  const balanceDue = Math.max(Number(data.balanceDue ?? servicePrice - amountPaid), 0);
 
   return {
     id: documentId,
@@ -1124,17 +1152,22 @@ function mapServiceDocument(documentId: string, data: DocumentData): ServiceOrde
         : 'tip-installation',
     serviceLabel: data.serviceLabel ? String(data.serviceLabel) : undefined,
     serviceCategory: data.serviceCategory ? String(data.serviceCategory) : undefined,
-    source: data.source === 'sale-addon' ? 'sale-addon' : 'standalone',
+    status,
+    source,
     saleId: data.saleId ? String(data.saleId) : undefined,
     saleBatchId: data.saleBatchId ? String(data.saleBatchId) : undefined,
     performedAt: normalizeDateValue(data.performedAt),
+    deliveredAt: data.deliveredAt ? normalizeDateValue(data.deliveredAt) : undefined,
+    cancelledAt: data.cancelledAt ? normalizeDateValue(data.cancelledAt) : undefined,
     customerName: String(data.customerName ?? ''),
     customerPhone: data.customerPhone ? String(data.customerPhone) : undefined,
     customerDocument: data.customerDocument ? String(data.customerDocument) : undefined,
     cueReference: String(data.cueReference ?? ''),
     paymentMethod: String(data.paymentMethod ?? ''),
     paymentReference: String(data.paymentReference ?? ''),
-    servicePrice: Number(data.servicePrice ?? data.totalRevenue ?? 0),
+    servicePrice,
+    amountPaid,
+    balanceDue,
     totalRevenue,
     totalMaterialCost,
     totalOperationalCost,
@@ -1199,10 +1232,13 @@ function serializeServiceForFirestore(service: ServiceOrder, performedAt: Timest
     serviceType: service.serviceType,
     serviceLabel: service.serviceLabel ?? null,
     serviceCategory: service.serviceCategory ?? null,
+    status: service.status ?? 'delivered',
     source: service.source ?? 'standalone',
     saleId: service.saleId ?? null,
     saleBatchId: service.saleBatchId ?? null,
     performedAt,
+    deliveredAt: service.deliveredAt ? Timestamp.fromDate(new Date(service.deliveredAt)) : null,
+    cancelledAt: service.cancelledAt ? Timestamp.fromDate(new Date(service.cancelledAt)) : null,
     customerName: service.customerName ?? '',
     customerPhone: service.customerPhone ?? null,
     customerDocument: service.customerDocument ?? null,
@@ -1210,6 +1246,8 @@ function serializeServiceForFirestore(service: ServiceOrder, performedAt: Timest
     paymentMethod: service.paymentMethod ?? 'efectivo',
     paymentReference: service.paymentReference ?? null,
     servicePrice: Number(service.servicePrice ?? 0),
+    amountPaid: Number(service.amountPaid ?? 0),
+    balanceDue: Number(service.balanceDue ?? 0),
     totalRevenue: Number(service.totalRevenue ?? 0),
     totalMaterialCost: Number(service.totalMaterialCost ?? 0),
     totalOperationalCost: Number(service.totalOperationalCost ?? 0),
@@ -1291,6 +1329,8 @@ function mapAuthorizationRequestDocument(documentId: string, data: DocumentData)
                 giftItems: Array.isArray(item?.giftItems)
                   ? item.giftItems.map((giftItem: DocumentData) => ({
                       productId: String(giftItem?.productId ?? ''),
+                      variantId: giftItem?.variantId ? String(giftItem.variantId) : undefined,
+                      variantName: giftItem?.variantName ? String(giftItem.variantName) : undefined,
                       quantity: Number(giftItem?.quantity ?? 0),
                     }))
                   : [],
@@ -4115,26 +4155,46 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       return { lineItem, giftItems, serviceItems, targetProduct };
     });
 
-    const requestedGiftTotals = new Map<string, number>();
+    const requestedGiftTotals = new Map<
+      string,
+      { productId: string; variantId?: string; quantity: number }
+    >();
     lineRecords.forEach((record) => {
       record.giftItems.forEach((giftItem) => {
-        requestedGiftTotals.set(
-          giftItem.productId,
-          (requestedGiftTotals.get(giftItem.productId) ?? 0) + giftItem.quantity
-        );
+        const giftStockKey = `${giftItem.productId}::${giftItem.variantId ?? ''}`;
+        const currentGiftTotal = requestedGiftTotals.get(giftStockKey);
+        requestedGiftTotals.set(giftStockKey, {
+          productId: giftItem.productId,
+          variantId: giftItem.variantId,
+          quantity: (currentGiftTotal?.quantity ?? 0) + giftItem.quantity,
+        });
       });
     });
 
-    for (const [productId, requestedQuantity] of requestedGiftTotals) {
+    for (const { productId, variantId, quantity: requestedQuantity } of requestedGiftTotals.values()) {
       const giftProduct = baseProducts.find((product) => product.id === productId);
-      const availableGiftStock = getSimpleProductAvailableStock(giftProduct, baseMovements);
-      const stockReservedBySale = lineRecords
-        .filter((record) => record.lineItem.productId === productId)
-        .reduce((sum, record) => sum + record.lineItem.quantity, 0);
+      if (!giftProduct) {
+        throw new Error('No se encontro uno de los productos obsequiados.');
+      }
 
-      if (requestedQuantity > availableGiftStock - stockReservedBySale) {
+      if (variantId) {
+        const productVariantMap = variantStockMap.get(productId);
+        const currentVariantStock = productVariantMap?.get(variantId) ?? 0;
+        if (requestedQuantity > currentVariantStock) {
+          throw new Error('La cantidad de uno de los obsequios supera el stock disponible.');
+        }
+        productVariantMap?.set(variantId, currentVariantStock - requestedQuantity);
+        continue;
+      }
+
+      const availableGiftStock = simpleStockMap.has(productId)
+        ? Number(simpleStockMap.get(productId) ?? 0)
+        : getSimpleProductAvailableStock(giftProduct, baseMovements);
+
+      if (requestedQuantity > availableGiftStock) {
         throw new Error('La cantidad de uno de los obsequios supera el stock disponible.');
       }
+      simpleStockMap.set(productId, availableGiftStock - requestedQuantity);
     }
 
     const saleBatchId = options?.saleBatchId ?? doc(collection(db, 'sale-batches')).id;
@@ -4184,6 +4244,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         })),
         giftItems: sale.giftItems.map((item) => ({
           ...item,
+          variantId: item.variantId ?? null,
+          variantName: item.variantName ?? null,
           kind: item.kind ?? 'gift',
         })),
         variantId: lineItem.variantId ?? null,
@@ -4234,6 +4296,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
           id: giftMovementRef.id,
           saleId: sale.id,
           productId: giftItem.productId,
+          variantId: giftItem.variantId ?? null,
+          variantName: giftItem.variantName ?? null,
           type: 'exit',
           reason: 'gift',
           quantity: -Math.abs(giftItem.quantity),
@@ -4248,6 +4312,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
           id: giftMovementRef.id,
           saleId: sale.id,
           productId: giftItem.productId,
+          variantId: giftItem.variantId ?? null,
+          variantName: giftItem.variantName ?? null,
           sourceType: 'sale-gift',
           sourceId: sale.id,
           type: 'exit',
@@ -4288,10 +4354,12 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
           id: serviceRef.id,
           serviceType: serviceItem.serviceType,
           serviceCategory: serviceItem.serviceCategory,
+          status: 'delivered',
           source: 'sale-addon',
           saleId: linkedSale.id,
           saleBatchId,
           performedAt: input.soldAt,
+          deliveredAt: input.soldAt,
           customerName: normalizedCustomerName,
           customerPhone: normalizedCustomerPhone || undefined,
           customerDocument: normalizedCustomerDocument || undefined,
@@ -4299,6 +4367,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
           paymentMethod: normalizedPaymentMethod,
           paymentReference: normalizedPaymentReference,
           servicePrice: totalRevenue,
+          amountPaid: totalRevenue,
+          balanceDue: 0,
           totalRevenue,
           totalMaterialCost,
           totalOperationalCost: serviceItem.cost,
@@ -4504,6 +4574,14 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
               (variantRestorations.get(item.variantId!) ?? 0) + item.quantity
             );
           });
+        sale.giftItems
+          .filter((item) => item.productId === product.id && item.variantId)
+          .forEach((item) => {
+            variantRestorations.set(
+              item.variantId!,
+              (variantRestorations.get(item.variantId!) ?? 0) + item.quantity
+            );
+          });
       });
       linkedServiceOrders.forEach((service) => {
         service.materials
@@ -4635,6 +4713,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
           serviceItems: input.items[index]?.serviceItems ?? [],
           giftItems: record.giftItems.map((giftItem) => ({
             productId: giftItem.productId,
+            variantId: giftItem.variantId,
+            variantName: giftItem.variantName,
             quantity: giftItem.quantity,
           })),
         })),
@@ -4862,6 +4942,17 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     return updatedSales;
   };
 
+  const normalizeServiceOrderStatus = (input: RegisterServiceInput): ServiceOrderStatus => {
+    if (input.source === 'sale-addon') return 'delivered';
+
+    return input.status === 'in_progress' ||
+      input.status === 'ready' ||
+      input.status === 'delivered' ||
+      input.status === 'cancelled'
+      ? input.status
+      : 'pending';
+  };
+
   const buildServiceWritePlan = (
     input: RegisterServiceInput,
     baseMovements: InventoryMovement[] = movements,
@@ -4870,6 +4961,18 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   ) => {
     if ((Number(input.servicePrice) || 0) <= 0) {
       throw new Error('El valor del servicio debe ser mayor a cero.');
+    }
+    const serviceStatus = normalizeServiceOrderStatus(input);
+    const quotedServicePrice = Math.max(Number(input.servicePrice) || 0, 0);
+    const amountPaid = Math.max(
+      Number(input.amountPaid ?? (serviceStatus === 'delivered' ? quotedServicePrice : 0)) || 0,
+      0
+    );
+    if (amountPaid > quotedServicePrice) {
+      throw new Error('El valor pagado no puede superar el valor acordado del servicio.');
+    }
+    if (serviceStatus === 'delivered' && amountPaid < quotedServicePrice) {
+      throw new Error('Para marcar como entregado y cobrado, registra el pago completo del servicio.');
     }
     const normalizedPaymentMethod = SERVICES_PAYMENT_FIELDS_ENABLED
       ? input.paymentMethod.trim()
@@ -4936,9 +5039,10 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
 
     const serviceRef = options?.serviceId ? doc(db, 'services', options.serviceId) : doc(collection(db, 'services'));
     const totalMaterialCost = materials.reduce((sum, item) => sum + item.totalCost, 0);
-    const totalRevenue = Number(input.servicePrice) || 0;
+    const totalRevenue = serviceStatus === 'delivered' ? quotedServicePrice : 0;
     const totalCost = totalMaterialCost + directServiceCost;
-    const grossProfit = totalRevenue - totalCost;
+    const grossProfit = serviceStatus === 'delivered' ? totalRevenue - totalCost : 0;
+    const balanceDue = Math.max(quotedServicePrice - amountPaid, 0);
     const normalizedCustomerName = normalizeCustomerName(input.customerName);
     const normalizedCustomerPhone = input.customerPhone?.trim() ?? '';
     const normalizedCustomerDocument = input.customerDocument?.trim() ?? '';
@@ -4947,17 +5051,22 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       serviceType: input.serviceType,
       serviceLabel: input.serviceLabel?.trim() || undefined,
       serviceCategory: input.serviceCategory?.trim() || undefined,
+      status: serviceStatus,
       source: input.source === 'sale-addon' ? 'sale-addon' : 'standalone',
       saleId: input.saleId?.trim() || undefined,
       saleBatchId: input.saleBatchId?.trim() || undefined,
       performedAt: input.performedAt,
+      deliveredAt: serviceStatus === 'delivered' ? input.deliveredAt?.trim() || input.performedAt : undefined,
+      cancelledAt: serviceStatus === 'cancelled' ? input.cancelledAt?.trim() || input.performedAt : undefined,
       customerName: normalizedCustomerName,
       customerPhone: normalizedCustomerPhone || undefined,
       customerDocument: normalizedCustomerDocument || undefined,
       cueReference: input.cueReference,
       paymentMethod: normalizedPaymentMethod,
       paymentReference: normalizedPaymentReference,
-      servicePrice: totalRevenue,
+      servicePrice: quotedServicePrice,
+      amountPaid,
+      balanceDue,
       totalRevenue,
       totalMaterialCost,
       totalOperationalCost: directServiceCost,
@@ -4979,7 +5088,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     baseMovements: InventoryMovement[],
     extraTouchedProductIds: string[] = [],
     extraTouchedVariantProductIds: string[] = [],
-    customerWriteMode: 'count' | 'touch' | 'skip' = 'count'
+    customerWriteMode: 'count' | 'touch' | 'skip' = 'count',
+    customerRevenueIncrementOverride?: number
   ) => {
     const { service, materials } = plan;
     batch.set(
@@ -4997,7 +5107,9 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         service.customerDocument ?? ''
       );
       const serviceCountIncrement = customerWriteMode === 'count' ? 1 : 0;
-      const serviceRevenueIncrement = customerWriteMode === 'count' ? Number(service.totalRevenue ?? 0) : 0;
+      const serviceRevenueIncrement =
+        customerRevenueIncrementOverride ??
+        (customerWriteMode === 'count' ? Number(service.totalRevenue ?? 0) : 0);
       batch.set(
         doc(db, 'customers', customerId),
         {
@@ -5162,6 +5274,16 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
 
     const remainingMovements = freshMovements.filter((movement) => movement.serviceOrderId !== serviceId);
     const plan = buildServiceWritePlan(input, remainingMovements, restoredProducts, { serviceId });
+    const existingCustomerId = isAnonymousCustomerName(existingService.customerName)
+      ? ''
+      : buildCustomerId(existingService.customerName, existingService.customerPhone ?? '', existingService.customerDocument ?? '');
+    const nextCustomerId = isAnonymousCustomerName(plan.service.customerName)
+      ? ''
+      : buildCustomerId(plan.service.customerName, plan.service.customerPhone ?? '', plan.service.customerDocument ?? '');
+    const customerRevenueDelta =
+      existingCustomerId && existingCustomerId === nextCustomerId
+        ? Number(plan.service.totalRevenue ?? 0) - Number(existingService.totalRevenue ?? 0)
+        : undefined;
 
     const batch = writeBatch(db);
     linkedMovements.forEach((movement) => {
@@ -5176,7 +5298,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       remainingMovements,
       linkedMovements.map((movement) => movement.productId),
       linkedMovements.filter((movement) => movement.variantId).map((movement) => movement.productId),
-      'touch'
+      'touch',
+      customerRevenueDelta
     );
     await batch.commit();
     await syncProductStocksFromCommittedMovements(touchedProductIds);

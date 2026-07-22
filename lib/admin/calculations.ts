@@ -236,7 +236,9 @@ export function getDashboardSummary(
     return summary;
   }, inventorySummary);
 
-  return services.reduce<DashboardSummary>((summary, service) => {
+  return services
+    .filter((service) => (service.status ?? 'delivered') === 'delivered')
+    .reduce<DashboardSummary>((summary, service) => {
     summary.salesCount += 1;
     summary.totalRevenue += service.totalRevenue;
     summary.realizedProfit += service.grossProfit;

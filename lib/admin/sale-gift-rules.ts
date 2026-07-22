@@ -1,9 +1,17 @@
 import type { Product } from '@/lib/admin/types';
 import { matchesProductCategoryFamily } from '@/lib/admin/category-rules';
 
-export type SaleGiftCategory = 'guantes' | 'estuches' | 'extensiones' | 'parachoques';
+export type SaleGiftCategory = 'guantes' | 'estuches' | 'extensiones' | 'parachoques' | 'supresores';
 
-export const saleGiftCategories: SaleGiftCategory[] = ['guantes', 'estuches', 'extensiones', 'parachoques'];
+export const saleGiftCategories: SaleGiftCategory[] = [
+  'guantes',
+  'estuches',
+  'extensiones',
+  'parachoques',
+  'supresores',
+];
+
+const cueGiftCategories: SaleGiftCategory[] = ['guantes', 'estuches', 'extensiones', 'parachoques'];
 
 function normalizeProductGiftRuleSource(product: Pick<Product, 'name' | 'brand' | 'subcategory' | 'category'>) {
   return `${product.name} ${product.brand} ${product.subcategory} ${product.category}`
@@ -15,6 +23,7 @@ export function getSaleGiftCategoryKey(product: Pick<Product, 'category' | 'subc
   if (matchesProductCategoryFamily(product, 'guantes')) return 'guantes';
   if (matchesProductCategoryFamily(product, 'estuches')) return 'estuches';
   if (matchesProductCategoryFamily(product, 'extensiones')) return 'extensiones';
+  if (matchesProductCategoryFamily(product, 'supresores')) return 'supresores';
   if (
     matchesProductCategoryFamily(product, 'parachoques') &&
     product.subcategory.trim().toLowerCase() === 'parachoques'
@@ -28,6 +37,10 @@ export function getSaleGiftCategoryKey(product: Pick<Product, 'category' | 'subc
 export function getAllowedSaleGiftCategories(
   product: Pick<Product, 'category' | 'name' | 'brand' | 'subcategory'>
 ): SaleGiftCategory[] {
+  if (matchesProductCategoryFamily(product, 'casquillos')) {
+    return ['supresores'];
+  }
+
   if (!matchesProductCategoryFamily(product, 'tacos')) return [];
 
   const normalized = normalizeProductGiftRuleSource(product);
@@ -41,7 +54,7 @@ export function getAllowedSaleGiftCategories(
     return ['guantes', 'estuches'];
   }
 
-  return saleGiftCategories;
+  return cueGiftCategories;
 }
 
 export function formatSaleGiftCategoryList(categories: SaleGiftCategory[]) {
@@ -50,6 +63,7 @@ export function formatSaleGiftCategoryList(categories: SaleGiftCategory[]) {
     estuches: 'estuche',
     extensiones: 'extension',
     parachoques: 'parachoque',
+    supresores: 'supresor',
   };
 
   const items = categories.map((category) => labels[category]);
