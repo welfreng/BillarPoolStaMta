@@ -1,8 +1,9 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pencil, Plus, Search, Wrench } from 'lucide-react';
 import { SectionHeader } from '@/components/admin/shared/section-header';
+import { AdminListPagination } from '@/components/admin/shared/admin-list-pagination';
 import { ServiceFormDialog, type ServiceFormValues } from '@/components/admin/services/service-form-dialog';
 import { filterProductsByCategoryFamily } from '@/lib/admin/category-rules';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
@@ -32,6 +33,7 @@ const serviceOrderStatusClasses: Record<ServiceOrderStatus, string> = {
   delivered: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   cancelled: 'bg-rose-50 text-rose-700 border-rose-200',
 };
+const servicePageSize = 10;
 
 function getServiceStatus(service: { status?: ServiceOrderStatus }): ServiceOrderStatus {
   return service.status ?? 'delivered';
@@ -48,6 +50,7 @@ export default function ServiciosPage() {
   const [openDialog, setOpenDialog] = useState(false);
   const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [servicePage, setServicePage] = useState(1);
   const isSalesUser = role === 'sales';
   const canEditServices = role === 'admin' || role === 'superadmin';
   const currentMonth = getTodayDateInputValue().slice(0, 7);
@@ -105,6 +108,19 @@ export default function ServiciosPage() {
       return !normalizedQuery || content.includes(normalizedQuery);
     });
   }, [products, query, services]);
+  const serviceTotalPages = Math.max(Math.ceil(filteredServices.length / servicePageSize), 1);
+  const paginatedServices = useMemo(
+    () => filteredServices.slice((servicePage - 1) * servicePageSize, servicePage * servicePageSize),
+    [filteredServices, servicePage]
+  );
+
+  useEffect(() => {
+    setServicePage(1);
+  }, [query]);
+
+  useEffect(() => {
+    setServicePage((currentPage) => Math.min(currentPage, serviceTotalPages));
+  }, [serviceTotalPages]);
 
   const monthTotals = useMemo(
     () =>
@@ -234,7 +250,7 @@ export default function ServiciosPage() {
         {filteredServices.length > 0 ? (
           <>
             <div className="space-y-3 md:hidden">
-                {filteredServices.map((service) => {
+                {paginatedServices.map((service) => {
                   const { materialChips, hiddenCount, isSaleAddon } = buildMaterialMeta(service);
                   const status = getServiceStatus(service);
                   const materialsSummary = materialChips.join(', ');
@@ -344,7 +360,7 @@ export default function ServiciosPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredServices.map((service) => {
+                {paginatedServices.map((service) => {
                     const { materialChips, visibleChips, hiddenCount, detailLabel, isSaleAddon } = buildMaterialMeta(service);
                     const status = getServiceStatus(service);
                     const materialsSummary = materialChips.join(', ');
@@ -458,6 +474,14 @@ export default function ServiciosPage() {
             </Table>
             </div>
             </div>
+            <AdminListPagination
+              page={servicePage}
+              totalPages={serviceTotalPages}
+              totalItems={filteredServices.length}
+              pageSize={servicePageSize}
+              itemLabel="servicios"
+              onPageChange={setServicePage}
+            />
           </>
         ) : (
           <Empty className="rounded-3xl border border-dashed border-slate-200 bg-slate-50/60 py-12">

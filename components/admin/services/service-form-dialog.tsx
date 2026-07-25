@@ -377,6 +377,7 @@ export function ServiceFormDialog({
       busyDescription="Espera la confirmacion. Se esta guardando la orden y actualizando inventario."
       description="Controla trabajos pendientes, anticipos, saldos y materiales consumidos."
       desktopContentClassName="lg:max-w-4xl"
+      mobileFooterMode="inline"
       footer={
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
@@ -395,7 +396,7 @@ export function ServiceFormDialog({
               await onSubmit(submittedValues);
               form.reset(initialValues ?? defaultValues);
             })}
-            className="space-y-6"
+            className="space-y-3.5 sm:space-y-6"
           >
             <div className="grid gap-4 rounded-3xl border border-border bg-card/88 p-3.5 shadow-sm dark:border-slate-800 dark:bg-slate-950/70 dark:shadow-[0_18px_40px_rgba(2,6,23,0.22)] sm:grid-cols-2 sm:p-5">
               <FormField
@@ -951,7 +952,7 @@ export function ServiceFormDialog({
                         ? `Utilidad real: ${formatCurrency(recognizedProfit)}`
                         : `Utilidad proyectada: ${formatCurrency(projectedProfit)}`}
                     </p>
-                    <p className="mt-2 text-sm text-slate-300">
+                    <p className="mt-2 hidden text-sm text-slate-300 sm:block">
                       El sistema descuenta los materiales al guardar. El ingreso solo cuenta cuando la orden esta entregada y cobrada.
                     </p>
                   </div>

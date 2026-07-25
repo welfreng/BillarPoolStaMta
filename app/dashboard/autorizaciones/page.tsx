@@ -1,8 +1,9 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Clock3, ShieldCheck, XCircle } from 'lucide-react';
 import { SectionHeader } from '@/components/admin/shared/section-header';
+import { AdminListPagination } from '@/components/admin/shared/admin-list-pagination';
 import { AdminResponsiveDialog } from '@/components/admin/admin-responsive-dialog';
 import { useAdminData } from '@/components/admin/admin-data-context';
 import { useAuth } from '@/components/auth-context';
@@ -14,6 +15,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, formatNumber, getProductById } from '@/lib/admin/calculations';
 import type { AuthorizationRequest } from '@/lib/admin/types';
+
+const authorizationPageSize = 12;
 
 function getRequestTypeLabel(requestType: AuthorizationRequest['requestType']) {
   if (requestType === 'sale-return') return 'Devolucion';
@@ -136,6 +139,7 @@ export default function AutorizacionesPage() {
   const [query, setQuery] = useState('');
   const [selectedRequest, setSelectedRequest] = useState<AuthorizationRequest | null>(null);
   const [reviewNote, setReviewNote] = useState('');
+  const [authorizationPage, setAuthorizationPage] = useState(1);
 
   const filteredRequests = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -147,6 +151,11 @@ export default function AutorizacionesPage() {
         .includes(normalizedQuery)
     );
   }, [authorizationRequests, query]);
+  const authorizationTotalPages = Math.max(Math.ceil(filteredRequests.length / authorizationPageSize), 1);
+  const paginatedRequests = useMemo(
+    () => filteredRequests.slice((authorizationPage - 1) * authorizationPageSize, authorizationPage * authorizationPageSize),
+    [authorizationPage, filteredRequests]
+  );
 
   const pendingCount = authorizationRequests.filter((request) => request.status === 'pending').length;
   const approvedCount = authorizationRequests.filter((request) => request.status === 'approved').length;
@@ -159,6 +168,14 @@ export default function AutorizacionesPage() {
     selectedRequest?.requestType === 'sale-gift'
       ? buildGiftApprovalSummary(selectedRequest, products)
       : { lines: [] };
+
+  useEffect(() => {
+    setAuthorizationPage(1);
+  }, [query]);
+
+  useEffect(() => {
+    setAuthorizationPage((currentPage) => Math.min(currentPage, authorizationTotalPages));
+  }, [authorizationTotalPages]);
 
   if (role !== 'admin' && role !== 'superadmin') {
     return (
@@ -299,7 +316,7 @@ export default function AutorizacionesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredRequests.map((request) => {
+                {paginatedRequests.map((request) => {
                   const rowHoverSummary = [
                     getRequestTypeLabel(request.requestType),
                     `Vendedor: ${request.requestedBy}`,
@@ -358,6 +375,15 @@ export default function AutorizacionesPage() {
               </TableBody>
             </Table>
           </div>
+          <AdminListPagination
+            page={authorizationPage}
+            totalPages={authorizationTotalPages}
+            totalItems={filteredRequests.length}
+            pageSize={authorizationPageSize}
+            itemLabel="solicitudes"
+            onPageChange={setAuthorizationPage}
+            className="mt-3"
+          />
         </div>
       </div>
 

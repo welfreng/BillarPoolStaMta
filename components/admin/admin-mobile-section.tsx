@@ -35,7 +35,7 @@ export function AdminMobileSection({
       <section className={className}>
         <div className={headerClassName}>
           <h3 className="text-sm font-semibold tracking-[-0.01em] text-slate-950 dark:text-slate-50">{title}</h3>
-          {description ? <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">{description}</p> : null}
+          {!isMobile && description ? <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">{description}</p> : null}
         </div>
         <div className={contentClassName}>{children}</div>
       </section>
@@ -48,7 +48,6 @@ export function AdminMobileSection({
         <AccordionTrigger className={cn('items-start px-4 py-3.5 hover:no-underline data-[state=open]:bg-muted/70 dark:data-[state=open]:bg-slate-900/80', headerClassName)}>
           <div className="pr-2 text-left">
             <h3 className="text-sm font-semibold tracking-[-0.01em] text-slate-950 dark:text-slate-50">{title}</h3>
-            {description ? <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500 dark:text-slate-400">{description}</p> : null}
           </div>
         </AccordionTrigger>
         <AccordionContent className={cn('border-t border-border/70 px-4 pt-4 pb-4 dark:border-slate-800', contentClassName)}>{children}</AccordionContent>

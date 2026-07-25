@@ -65,6 +65,7 @@ const purchaseSchema = z.object({
   purchasedAt: z.string().min(1, 'Selecciona la fecha'),
   discountPercent: nonNegativeDecimalSchema,
   shippingValueTotal: nonNegativeDecimalSchema,
+  shippingAllocationMode: z.enum(['units', 'value']).default('units'),
   internationalVendorName: z.string().optional(),
   productsValueUsd: nonNegativeDecimalSchema,
   shippingValueUsd: nonNegativeDecimalSchema,
@@ -119,6 +120,7 @@ const defaultValues: PurchaseFormValues = {
   purchasedAt: getTodayDateInputValue(),
   discountPercent: 0,
   shippingValueTotal: 0,
+  shippingAllocationMode: 'units',
   internationalVendorName: '',
   productsValueUsd: 0,
   shippingValueUsd: 0,
@@ -236,6 +238,10 @@ export function PurchaseFormDialog({
     control: form.control,
     name: 'shippingValueTotal',
   });
+  const watchedShippingAllocationMode = useWatch({
+    control: form.control,
+    name: 'shippingAllocationMode',
+  });
   const watchedInternationalVendorName = useWatch({
     control: form.control,
     name: 'internationalVendorName',
@@ -271,6 +277,7 @@ export function PurchaseFormDialog({
     supplier: watchedSupplier,
     discountPercent: watchedDiscountPercent,
     shippingValueTotal: watchedShippingValueTotal,
+    shippingAllocationMode: watchedShippingAllocationMode ?? 'units',
     internationalVendorName: watchedInternationalVendorName,
     productsValueUsd: watchedProductsValueUsd,
     shippingValueUsd: watchedShippingValueUsd,
@@ -381,17 +388,29 @@ export function PurchaseFormDialog({
             ? Number((totalDiscountValue - previousDiscount).toFixed(2))
             : discountShareBase;
         const purchaseValueTotal = Number(Math.max(grossLineValue - discountShare, 0).toFixed(2));
+        const shippingWeight = values.shippingAllocationMode === 'value' ? purchaseValueTotal : quantityPurchased;
+        const totalShippingWeight = values.shippingAllocationMode === 'value' ? totalPurchaseValue : totalPurchasedUnits;
         const shippingShareBase =
-          totalPurchasedUnits > 0
-            ? Number((((Number(values.shippingValueTotal) || 0) * quantityPurchased) / totalPurchasedUnits).toFixed(2))
+          totalShippingWeight > 0
+            ? Number((((Number(values.shippingValueTotal) || 0) * shippingWeight) / totalShippingWeight).toFixed(2))
             : Number((((Number(values.shippingValueTotal) || 0) / Math.max(values.items.length, 1))).toFixed(2));
         const previousShipping = values.items
           .slice(0, index)
           .reduce((sum, previousItem) => {
             const previousUnits = Number(previousItem.presentationQuantity) || 0;
+            const previousGrossLineValue =
+              (Number(previousItem.purchaseUnitValue) || 0) * (Number(previousItem.presentationQuantity) || 0);
             const previousBase =
-              totalPurchasedUnits > 0
-                ? Number((((Number(values.shippingValueTotal) || 0) * previousUnits) / totalPurchasedUnits).toFixed(2))
+              totalShippingWeight > 0
+                ? Number(
+                    (
+                      ((Number(values.shippingValueTotal) || 0) *
+                        (values.shippingAllocationMode === 'value'
+                          ? Number(Math.max(previousGrossLineValue - Number(((previousGrossLineValue * normalizedDiscountPercent) / 100).toFixed(2)), 0).toFixed(2))
+                          : previousUnits)) /
+                      totalShippingWeight
+                    ).toFixed(2)
+                  )
                 : Number((((Number(values.shippingValueTotal) || 0) / Math.max(values.items.length, 1))).toFixed(2));
             return sum + previousBase;
           }, 0);
@@ -414,9 +433,16 @@ export function PurchaseFormDialog({
           totals,
         };
       }),
-    [normalizedDiscountPercent, totalDiscountValue, totalPurchasedUnits, values.items, values.shippingValueTotal]
+    [
+      normalizedDiscountPercent,
+      totalDiscountValue,
+      totalPurchaseValue,
+      totalPurchasedUnits,
+      values.items,
+      values.shippingAllocationMode,
+      values.shippingValueTotal,
+    ]
   );
-  const shippingPerUnit = totalPurchasedUnits > 0 ? (Number(values.shippingValueTotal) || 0) / totalPurchasedUnits : 0;
   const firstItem = values.items[0] ?? createDefaultPurchaseLine();
   const firstItemProduct = products.find((product) => product.id === firstItem.productId);
   const firstItemVariantOptions = firstItemProduct?.variants ?? [];
@@ -432,6 +458,25 @@ export function PurchaseFormDialog({
       ? convertUsdToCop(Number(draftLine.purchaseUnitValueUsd) || 0, normalizedUsdToCopRate)
       : Number(draftLine.purchaseUnitValue) || 0;
   const draftPurchaseValueTotal = draftPurchaseUnitValueCop * draftQuantity;
+  const draftPurchaseValueAfterDiscount = Number(
+    Math.max(draftPurchaseValueTotal - (draftPurchaseValueTotal * normalizedDiscountPercent) / 100, 0).toFixed(2)
+  );
+  const editingPreview = editingLineIndex === null ? null : previewItems[editingLineIndex] ?? null;
+  const draftShippingEstimateWeight =
+    values.shippingAllocationMode === 'value' ? draftPurchaseValueAfterDiscount : draftQuantity;
+  const draftShippingEstimateTotalWeight =
+    values.shippingAllocationMode === 'value'
+      ? Math.max(totalPurchaseValue - (editingPreview?.purchaseValueTotal ?? 0) + draftPurchaseValueAfterDiscount, draftPurchaseValueAfterDiscount)
+      : Math.max(
+          totalPurchasedUnits -
+            (editingLineIndex === null ? 0 : Number(values.items[editingLineIndex]?.presentationQuantity) || 0) +
+            draftQuantity,
+          draftQuantity
+        );
+  const draftShippingEstimate =
+    draftShippingEstimateWeight > 0 && draftShippingEstimateTotalWeight > 0
+      ? Number((((Number(values.shippingValueTotal) || 0) * draftShippingEstimateWeight) / draftShippingEstimateTotalWeight).toFixed(2))
+      : 0;
   const getAvailableVariantOptions = (productId: string, excludeIndex?: number) => {
     const product = products.find((candidate) => candidate.id === productId);
     const productVariants = product?.variants ?? [];
@@ -771,6 +816,7 @@ export function PurchaseFormDialog({
       busyDescription="Espera la confirmacion para evitar duplicados o cierres accidentales."
       description="Registra una compra con uno o varios productos del mismo proveedor."
       desktopContentClassName="lg:max-w-5xl xl:max-w-[1120px]"
+      mobileFooterMode="inline"
       footer={
         <div className="grid gap-2 sm:flex sm:items-center sm:justify-between">
           <div className="hidden min-w-[190px] rounded-xl border border-border bg-muted/50 px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-900/60 md:block">
@@ -987,7 +1033,7 @@ export function PurchaseFormDialog({
                               </FormControl>
                             </div>
                             <p className="text-xs text-amber-800 dark:text-amber-200">
-                              Se aplica al valor de productos; el envio se suma despues y se reparte por unidades.
+                              Se aplica al valor de productos; el envio se suma despues segun la regla elegida.
                             </p>
                             <FormMessage />
                           </FormItem>
@@ -1017,6 +1063,32 @@ export function PurchaseFormDialog({
                               Este valor se calcula automaticamente desde USD, comision, tasa y DIAN.
                             </p>
                           ) : null}
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="shippingAllocationMode"
+                      render={({ field }) => (
+                        <FormItem className="min-w-0">
+                          <FormLabel className="text-amber-950 dark:text-amber-100">
+                            Repartir envio
+                          </FormLabel>
+                          <Select value={field.value} onValueChange={field.onChange}>
+                            <FormControl>
+                              <SelectTrigger className="h-12 border-amber-300 bg-background/92 dark:bg-slate-950/72">
+                                <SelectValue placeholder="Selecciona reparto" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="units">Por unidades compradas</SelectItem>
+                              <SelectItem value="value">Por valor de productos</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-amber-800 dark:text-amber-200">
+                            Usa valor cuando hay productos baratos mezclados con productos costosos.
+                          </p>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -1589,6 +1661,9 @@ export function PurchaseFormDialog({
                     <p className="text-xs text-emerald-800 dark:text-emerald-200/80">
                       {formatNumber(totalPurchasedUnits)} unidades en {formatNumber(fields.length)} lineas
                       {normalizedDiscountPercent > 0 ? ` - descuento ${formatNumber(normalizedDiscountPercent)}%` : ''}
+                      {Number(values.shippingValueTotal) > 0
+                        ? ` - envio ${values.shippingAllocationMode === 'value' ? 'por valor' : 'por unidades'}`
+                        : ''}
                     </p>
                   </div>
                   <div className="text-left sm:text-right">
@@ -1851,7 +1926,7 @@ export function PurchaseFormDialog({
             <div className="rounded-2xl border border-border/70 bg-background/86 p-3 dark:border-slate-800 dark:bg-slate-950/60 sm:p-4">
               <p className="text-xs text-muted-foreground">Envio estimado</p>
               <p className="mt-1 font-semibold text-foreground">
-                {formatCurrency((Number(values.shippingValueTotal) || 0) * (draftQuantity > 0 && totalPurchasedUnits > 0 ? draftQuantity / (editingLineIndex === null ? totalPurchasedUnits + draftQuantity : Math.max(totalPurchasedUnits - (Number(values.items[editingLineIndex]?.presentationQuantity) || 0) + draftQuantity, draftQuantity)) : 0))}
+                {formatCurrency(draftShippingEstimate)}
               </p>
             </div>
           </div>

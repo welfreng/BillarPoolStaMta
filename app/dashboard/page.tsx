@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   ShoppingCart,
   TrendingUp,
+  WalletCards,
   Wrench,
 } from 'lucide-react';
 import { useAuth } from '@/components/auth-context';
@@ -371,7 +372,7 @@ function QuickActionLink({
 }
 
 export default function DashboardPage() {
-  const { products, movements, purchases, sales, services, customers, registerSale, authorizationRequests } = useAdminData();
+  const { products, movements, purchases, sales, services, customers, expenses, registerSale, authorizationRequests } = useAdminData();
   const { role, profile, user } = useAuth();
   const { toast } = useToast();
   const isSalesUser = role === 'sales';
@@ -483,6 +484,16 @@ export default function DashboardPage() {
     [dashboardRange.endKey, dashboardRange.startKey, purchases]
   );
 
+  const filteredExpenses = useMemo(
+    () =>
+      expenses.filter(
+        (expense) =>
+          expense.status === 'active' &&
+          isDateKeyWithinRange(getDateKeyInBogota(expense.expenseDate), dashboardRange.startKey, dashboardRange.endKey)
+      ),
+    [dashboardRange.endKey, dashboardRange.startKey, expenses]
+  );
+
   const periodRevenue = useMemo(() => {
     const salesRevenue = filteredSales.reduce(
       (sum, sale) => sum + Math.max(Number(sale.totalSale ?? 0) - Number(sale.returnedSaleAmount ?? 0), 0),
@@ -511,6 +522,13 @@ export default function DashboardPage() {
   const periodProfit = useMemo(() => {
     return profitBreakdown.total;
   }, [profitBreakdown.total]);
+
+  const periodExpenses = useMemo(
+    () => filteredExpenses.reduce((sum, expense) => sum + Number(expense.amount ?? 0), 0),
+    [filteredExpenses]
+  );
+
+  const periodNetProfit = useMemo(() => periodProfit - periodExpenses, [periodExpenses, periodProfit]);
 
   const currentPhysicalInvestment = useMemo(
     () =>
@@ -672,6 +690,19 @@ export default function DashboardPage() {
         tone: 'text-violet-700 dark:text-violet-300',
       }));
 
+    const recentExpenses = [...filteredExpenses]
+      .sort((a, b) => new Date(b.expenseDate).getTime() - new Date(a.expenseDate).getTime())
+      .slice(0, 4)
+      .map((expense) => ({
+        id: `expense-${expense.id}`,
+        occurredAt: expense.expenseDate,
+        icon: WalletCards,
+        title: `Gasto - ${expense.description}`,
+        subtitle: `${expense.responsibleUser} - ${expense.paymentMethod}`,
+        value: `-${formatCurrency(Number(expense.amount ?? 0))}`,
+        tone: 'text-rose-700 dark:text-rose-300',
+      }));
+
     const importantMovements = [...movements]
       .filter((movement) =>
         ['manual-adjustment', 'damage', 'transfer', 'return', 'initial-load'].includes(movement.reason) &&
@@ -689,10 +720,10 @@ export default function DashboardPage() {
         tone: 'text-amber-700 dark:text-amber-300',
       }));
 
-    return [...recentSales, ...recentPurchases, ...recentServices, ...importantMovements]
+    return [...recentSales, ...recentPurchases, ...recentServices, ...recentExpenses, ...importantMovements]
       .sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime())
       .slice(0, 8);
-  }, [dashboardRange.endKey, dashboardRange.startKey, filteredPurchases, filteredSales, filteredServices, movements, products]);
+  }, [dashboardRange.endKey, dashboardRange.startKey, filteredExpenses, filteredPurchases, filteredSales, filteredServices, movements, products]);
 
   const selectedProduct = selectedProductId
     ? products.find((product) => product.id === selectedProductId) ?? null
@@ -756,6 +787,7 @@ export default function DashboardPage() {
       ? [{ href: '/dashboard/servicios', icon: Wrench, title: 'Registrar servicio' }]
       : []),
     ...(!isSalesUser ? [{ href: '/dashboard/compras', icon: Boxes, title: 'Nueva compra' }] : []),
+    ...(!isSalesUser ? [{ href: '/dashboard/gastos', icon: WalletCards, title: 'Registrar gasto' }] : []),
     ...(!isSalesUser ? [{ href: '/dashboard/inventario', icon: Package, title: 'Inventario' }] : []),
     ...(role === 'admin' || role === 'superadmin'
       ? [{ href: '/dashboard/autorizaciones', icon: ShieldCheck, title: 'Autorizaciones' }]
@@ -796,11 +828,11 @@ export default function DashboardPage() {
           tone: 'success' as const,
         },
         {
-          title: `Utilidad ${dashboardRange.kpiLabel}`,
-          value: formatCurrency(periodProfit),
-          helper: `Ventas ${formatCurrency(profitBreakdown.sales)} - Servicios ${formatCurrency(profitBreakdown.services)}.`,
+          title: `Utilidad neta ${dashboardRange.kpiLabel}`,
+          value: formatCurrency(periodNetProfit),
+          helper: `Bruta ${formatCurrency(periodProfit)} - Gastos ${formatCurrency(periodExpenses)}.`,
           icon: TrendingUp,
-          tone: periodProfit >= 0 ? ('success' as const) : ('danger' as const),
+          tone: periodNetProfit >= 0 ? ('success' as const) : ('danger' as const),
         },
         {
           title: 'Capital fisico actual',

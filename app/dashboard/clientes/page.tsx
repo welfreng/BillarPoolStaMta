@@ -1,8 +1,9 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CalendarDays, Pencil, Plus, Search, UserRound } from 'lucide-react';
 import { AdminResponsiveDialog } from '@/components/admin/admin-responsive-dialog';
+import { AdminListPagination } from '@/components/admin/shared/admin-list-pagination';
 import { SectionHeader } from '@/components/admin/shared/section-header';
 import { ResponsiveRowActions } from '@/components/admin/shared/responsive-row-actions';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
@@ -26,6 +27,7 @@ const emptyForm: CustomerFormState = {
   phone: '',
   documentNumber: '',
 };
+const customerPageSize = 12;
 
 function getInitialForm(customer?: Customer | null): CustomerFormState {
   return {
@@ -43,6 +45,7 @@ export default function ClientesPage() {
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [formState, setFormState] = useState<CustomerFormState>(emptyForm);
   const [isSaving, setIsSaving] = useState(false);
+  const [customerPage, setCustomerPage] = useState(1);
 
   const filteredCustomers = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -54,6 +57,19 @@ export default function ClientesPage() {
         .includes(normalizedQuery)
     );
   }, [customers, query]);
+  const customerTotalPages = Math.max(Math.ceil(filteredCustomers.length / customerPageSize), 1);
+  const paginatedCustomers = useMemo(
+    () => filteredCustomers.slice((customerPage - 1) * customerPageSize, customerPage * customerPageSize),
+    [customerPage, filteredCustomers]
+  );
+
+  useEffect(() => {
+    setCustomerPage(1);
+  }, [query]);
+
+  useEffect(() => {
+    setCustomerPage((currentPage) => Math.min(currentPage, customerTotalPages));
+  }, [customerTotalPages]);
 
   const customersWithPhone = customers.filter((customer) => customer.phone?.trim()).length;
   const identifiedCustomers = customers.filter((customer) => customer.documentNumber?.trim()).length;
@@ -144,7 +160,7 @@ export default function ClientesPage() {
         {filteredCustomers.length > 0 ? (
           <>
             <div className="space-y-3 md:hidden">
-              {filteredCustomers.map((customer) => (
+              {paginatedCustomers.map((customer) => (
                 <div key={customer.id} className="rounded-[22px] border border-slate-200/90 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-900/70">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -183,7 +199,7 @@ export default function ClientesPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredCustomers.map((customer) => (
+                  {paginatedCustomers.map((customer) => (
                     <TableRow key={customer.id}>
                       <TableCell className="font-medium">{customer.fullName}</TableCell>
                       <TableCell>{customer.phone || 'No registrado'}</TableCell>
@@ -216,6 +232,14 @@ export default function ClientesPage() {
                 </TableBody>
               </Table>
             </div>
+            <AdminListPagination
+              page={customerPage}
+              totalPages={customerTotalPages}
+              totalItems={filteredCustomers.length}
+              pageSize={customerPageSize}
+              itemLabel="clientes"
+              onPageChange={setCustomerPage}
+            />
           </>
         ) : (
           <Empty>

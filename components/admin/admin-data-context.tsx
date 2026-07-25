@@ -40,6 +40,7 @@ import {
 import { initialMovements, initialProducts, initialPurchases, initialSales, initialServices, initialSuppliers } from '@/lib/admin/mock-data';
 import { db } from '@/lib/firebase';
 import { SITE_LOGO } from '@/lib/branding';
+import { useAuth } from '@/components/auth-context';
 import { matchesProductCategoryFamily } from '@/lib/admin/category-rules';
 import { slugifyCategoryKey } from '@/lib/admin/category-utils';
 import {
@@ -56,12 +57,16 @@ import {
   getAllowedSaleGiftCategories,
   getSaleGiftCategoryKey,
 } from '@/lib/admin/sale-gift-rules';
+import { toOperationalDateISOString } from '@/lib/admin/date-utils';
 import { runFirestoreWriteWithBackoff } from '@/lib/firestore-write-retry';
 import type { SaleServiceItem } from '@/lib/admin/types';
 import type {
   AuthorizationRequest,
   AuthorizationRequestStatus,
   AuthorizationRequestType,
+  BusinessExpense,
+  BusinessExpenseArea,
+  BusinessExpenseCategory,
   DashboardSummary,
   Customer,
   InventoryMovement,
@@ -96,6 +101,17 @@ type CustomerMutationInput = {
   fullName: string;
   phone?: string;
   documentNumber?: string;
+};
+type ExpenseMutationInput = {
+  expenseDate: string;
+  category: BusinessExpenseCategory;
+  area: BusinessExpenseArea;
+  description: string;
+  amount: number;
+  paymentMethod: string;
+  paymentReference?: string;
+  responsibleUser: string;
+  notes?: string;
 };
 type NewCategoryInput = {
   label: string;
@@ -139,6 +155,7 @@ interface RegisterPurchaseInput {
   purchasedAt: string;
   discountPercent?: number;
   shippingValueTotal: number;
+  shippingAllocationMode?: 'units' | 'value';
   purchaseType?: 'local' | 'international';
   internationalVendorName?: string;
   productsValueUsd?: number;
@@ -359,6 +376,7 @@ interface AdminDataContextValue {
   customers: Customer[];
   services: ServiceOrder[];
   serviceVisits: ServiceVisit[];
+  expenses: BusinessExpense[];
   authorizationRequests: AuthorizationRequest[];
   summary: DashboardSummary;
   latestMovements: InventoryMovement[];
@@ -380,12 +398,16 @@ interface AdminDataContextValue {
   deleteSubcategory: (categoryId: string, subcategoryId: string) => Promise<void>;
   createProduct: (input: ProductMutationInput) => Promise<Product>;
   updateProduct: (productId: string, input: ProductMutationInput) => Promise<Product>;
+  setProductFeatured: (productId: string, featured: boolean) => Promise<Product>;
   deleteProduct: (productId: string) => Promise<void>;
   createSupplier: (input: NewSupplierInput) => Promise<Supplier>;
   updateSupplier: (supplierId: string, input: NewSupplierInput) => Promise<Supplier>;
   deleteSupplier: (supplierId: string) => Promise<void>;
   createCustomer: (input: CustomerMutationInput) => Promise<Customer>;
   updateCustomer: (customerId: string, input: CustomerMutationInput) => Promise<Customer>;
+  createExpense: (input: ExpenseMutationInput) => Promise<BusinessExpense>;
+  updateExpense: (expenseId: string, input: ExpenseMutationInput) => Promise<BusinessExpense>;
+  voidExpense: (expenseId: string, reason: string) => Promise<BusinessExpense>;
   registerMovement: (input: RegisterMovementInput) => Promise<InventoryMovement>;
   registerInitialStock: (input: RegisterInitialStockInput) => Promise<{
     movement: InventoryMovement;
@@ -432,6 +454,7 @@ type AdminLiveCollectionKey =
   | 'customers'
   | 'services'
   | 'service-visits'
+  | 'expenses'
   | 'authorization-requests';
 
 const allAdminLiveCollections: AdminLiveCollectionKey[] = [
@@ -445,6 +468,7 @@ const allAdminLiveCollections: AdminLiveCollectionKey[] = [
   'customers',
   'services',
   'service-visits',
+  'expenses',
   'authorization-requests',
 ];
 
@@ -458,7 +482,7 @@ function getAdminLiveCollectionsForPath(pathname: string | null): AdminLiveColle
   }
 
   if (normalizedPathname === '/dashboard') {
-    return ['products', 'movements', 'purchases', 'sales', 'services', 'customers', 'authorization-requests'];
+    return ['products', 'movements', 'purchases', 'sales', 'services', 'customers', 'expenses', 'authorization-requests'];
   }
 
   if (normalizedPathname === '/dashboard/compras') {
@@ -493,8 +517,12 @@ function getAdminLiveCollectionsForPath(pathname: string | null): AdminLiveColle
     return ['products', 'movements', 'purchases', 'services', 'service-visits', 'customers'];
   }
 
+  if (normalizedPathname === '/dashboard/gastos') {
+    return ['expenses'];
+  }
+
   if (normalizedPathname === '/dashboard/reportes') {
-    return ['products', 'movements', 'sales', 'services'];
+    return ['products', 'movements', 'sales', 'services', 'expenses'];
   }
 
   if (normalizedPathname === '/dashboard/autorizaciones') {
@@ -684,6 +712,7 @@ function serializePurchaseForFirestore(purchase: Purchase) {
     purchaseGrossValueTotal: purchase.purchaseGrossValueTotal ?? purchase.purchaseValueTotal,
     purchaseDiscountPercent: purchase.purchaseDiscountPercent ?? null,
     purchaseDiscountTotal: purchase.purchaseDiscountTotal ?? null,
+    shippingAllocationMode: purchase.shippingAllocationMode ?? 'units',
     purchaseType: purchase.purchaseType ?? 'local',
     internationalVendorName: purchase.internationalVendorName ?? null,
     productsValueUsd: purchase.productsValueUsd ?? null,
@@ -978,6 +1007,7 @@ function mapPurchaseDocument(documentId: string, data: DocumentData): Purchase {
     purchaseDiscountTotal: Number(data.purchaseDiscountTotal ?? 0),
     purchaseValueTotal: Number(data.purchaseValueTotal ?? 0),
     shippingValueTotal: Number(data.shippingValueTotal ?? 0),
+    shippingAllocationMode: data.shippingAllocationMode === 'value' ? 'value' : 'units',
     purchaseType: data.purchaseType === 'international' ? 'international' : 'local',
     internationalVendorName: data.internationalVendorName ? String(data.internationalVendorName) : undefined,
     productsValueUsd: Number(data.productsValueUsd ?? 0),
@@ -1256,6 +1286,92 @@ function serializeServiceForFirestore(service: ServiceOrder, performedAt: Timest
     materials: serializeServiceMaterials(service.materials ?? []),
     notes: service.notes ?? '',
     responsibleUser: service.responsibleUser ?? 'Administrador',
+  };
+}
+
+const validExpenseCategories: BusinessExpenseCategory[] = [
+  'turning-supplies',
+  'utilities',
+  'transport',
+  'rent',
+  'internet',
+  'packaging',
+  'advertising',
+  'tools',
+  'payroll',
+  'other',
+];
+
+const validExpenseAreas: BusinessExpenseArea[] = [
+  'general',
+  'sales',
+  'turning',
+  'web',
+  'administration',
+];
+
+function normalizeExpenseCategory(value: unknown): BusinessExpenseCategory {
+  return validExpenseCategories.includes(value as BusinessExpenseCategory)
+    ? (value as BusinessExpenseCategory)
+    : 'other';
+}
+
+function normalizeExpenseArea(value: unknown): BusinessExpenseArea {
+  return validExpenseAreas.includes(value as BusinessExpenseArea)
+    ? (value as BusinessExpenseArea)
+    : 'general';
+}
+
+function normalizeExpenseDateInput(value: string) {
+  const trimmedValue = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmedValue)) {
+    return toOperationalDateISOString(trimmedValue);
+  }
+
+  const parsedDate = new Date(trimmedValue);
+  if (Number.isNaN(parsedDate.getTime())) {
+    throw new Error('La fecha del gasto no es valida.');
+  }
+  return parsedDate.toISOString();
+}
+
+function mapExpenseDocument(documentId: string, data: DocumentData): BusinessExpense {
+  return {
+    id: documentId,
+    expenseDate: normalizeDateValue(data.expenseDate),
+    category: normalizeExpenseCategory(data.category),
+    area: normalizeExpenseArea(data.area),
+    description: String(data.description ?? ''),
+    amount: Number(data.amount ?? 0),
+    paymentMethod: String(data.paymentMethod ?? 'efectivo'),
+    paymentReference: data.paymentReference ? String(data.paymentReference) : undefined,
+    responsibleUser: String(data.responsibleUser ?? 'Administrador'),
+    notes: String(data.notes ?? ''),
+    status: data.status === 'void' ? 'void' : 'active',
+    createdAt: normalizeDateValue(data.createdAt),
+    updatedAt: normalizeDateValue(data.updatedAt),
+    voidedAt: data.voidedAt ? normalizeDateValue(data.voidedAt) : undefined,
+    voidReason: data.voidReason ? String(data.voidReason) : undefined,
+  };
+}
+
+function serializeExpenseForFirestore(expense: BusinessExpense) {
+  return {
+    id: expense.id,
+    expenseDate: Timestamp.fromDate(new Date(expense.expenseDate)),
+    category: expense.category,
+    area: expense.area,
+    description: expense.description,
+    amount: Number(expense.amount ?? 0),
+    paymentMethod: expense.paymentMethod,
+    paymentReference: expense.paymentReference ?? null,
+    responsibleUser: expense.responsibleUser,
+    notes: expense.notes ?? '',
+    status: expense.status,
+    createdAt: Timestamp.fromDate(new Date(expense.createdAt)),
+    updatedAt: Timestamp.fromDate(new Date(expense.updatedAt)),
+    voidedAt: expense.voidedAt ? Timestamp.fromDate(new Date(expense.voidedAt)) : null,
+    voidReason: expense.voidReason ?? null,
   };
 }
 
@@ -1639,7 +1755,14 @@ function preserveVariantInventoryState(
 
 export function AdminDataProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const activeCollections = useMemo(() => getAdminLiveCollectionsForPath(pathname), [pathname]);
+  const { role } = useAuth();
+  const activeCollections = useMemo(() => {
+    const routeCollections = getAdminLiveCollectionsForPath(pathname);
+    if (role === 'sales') {
+      return routeCollections.filter((collectionKey) => collectionKey !== 'expenses');
+    }
+    return routeCollections;
+  }, [pathname, role]);
   const activeCollectionSignature = activeCollections.join('|');
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<ProductCategoryRecord[]>([]);
@@ -1652,6 +1775,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [services, setServices] = useState<ServiceOrder[]>(initialServices);
   const [serviceVisits, setServiceVisits] = useState<ServiceVisit[]>([]);
+  const [expenses, setExpenses] = useState<BusinessExpense[]>([]);
   const [authorizationRequests, setAuthorizationRequests] = useState<AuthorizationRequest[]>([]);
   const queueAdminNotification = (
     batch: ReturnType<typeof writeBatch>,
@@ -1880,6 +2004,21 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         (error) => {
           console.error('Error leyendo visitas de servicio desde Firestore:', error);
           markReady('service-visits');
+        }
+      ));
+    }
+
+    if (activeCollectionSet.has('expenses')) {
+      unsubscribers.push(onSnapshot(
+        query(collection(db, 'expenses'), orderBy('expenseDate', 'desc')),
+        (snapshot) => {
+          applyConfirmedSnapshot('expenses', snapshot, () =>
+            setExpenses(snapshot.docs.map((item) => mapExpenseDocument(item.id, item.data())))
+          );
+        },
+        (error) => {
+          console.error('Error leyendo gastos desde Firestore:', error);
+          markReady('expenses');
         }
       ));
     }
@@ -3021,6 +3160,32 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     return migratedProduct;
   };
 
+  const setProductFeatured = async (productId: string, featured: boolean) => {
+    const existingProduct = products.find((product) => product.id === productId);
+    if (!existingProduct) {
+      throw new Error('No se encontro el producto a destacar.');
+    }
+
+    await runFirestoreWriteWithBackoff(() =>
+      updateDoc(doc(db, 'products', productId), {
+        featured,
+        updatedAt: serverTimestamp(),
+      })
+    );
+
+    const updatedProduct: Product = {
+      ...existingProduct,
+      featured,
+      updatedAt: new Date().toISOString(),
+    };
+
+    setProducts((currentProducts) =>
+      currentProducts.map((product) => (product.id === productId ? updatedProduct : product))
+    );
+
+    return updatedProduct;
+  };
+
   const deleteProduct = async (productId: string) => {
     const historySummary = countProductHistoryRecords(productId, {
       purchases,
@@ -3176,6 +3341,119 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     );
 
     return updatedCustomer;
+  };
+
+  const normalizeExpenseInput = (input: ExpenseMutationInput): ExpenseMutationInput => {
+    const description = input.description.trim();
+    if (!description) {
+      throw new Error('Escribe una descripcion clara del gasto.');
+    }
+
+    const amount = Number(input.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new Error('El valor del gasto debe ser mayor a cero.');
+    }
+
+    const responsibleUser = input.responsibleUser.trim() || 'Administrador';
+    const paymentMethod = input.paymentMethod.trim() || 'efectivo';
+
+    return {
+      expenseDate: normalizeExpenseDateInput(input.expenseDate),
+      category: normalizeExpenseCategory(input.category),
+      area: normalizeExpenseArea(input.area),
+      description,
+      amount,
+      paymentMethod,
+      paymentReference: input.paymentReference?.trim() || undefined,
+      responsibleUser,
+      notes: input.notes?.trim() || '',
+    };
+  };
+
+  const createExpense = async (input: ExpenseMutationInput) => {
+    const normalized = normalizeExpenseInput(input);
+    const now = new Date().toISOString();
+    const expenseRef = doc(collection(db, 'expenses'));
+    const expense: BusinessExpense = {
+      id: expenseRef.id,
+      ...normalized,
+      notes: normalized.notes ?? '',
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await runFirestoreWriteWithBackoff(() =>
+      setDoc(expenseRef, serializeExpenseForFirestore(expense))
+    );
+
+    setExpenses((current) => [expense, ...current.filter((item) => item.id !== expense.id)]);
+    return expense;
+  };
+
+  const updateExpense = async (expenseId: string, input: ExpenseMutationInput) => {
+    const existingExpense = expenses.find((expense) => expense.id === expenseId);
+    if (!existingExpense) {
+      throw new Error('No se encontro el gasto a actualizar.');
+    }
+    if (existingExpense.status === 'void') {
+      throw new Error('No puedes editar un gasto anulado.');
+    }
+
+    const normalized = normalizeExpenseInput(input);
+    const updatedExpense: BusinessExpense = {
+      ...existingExpense,
+      ...normalized,
+      notes: normalized.notes ?? '',
+      updatedAt: new Date().toISOString(),
+    };
+
+    await runFirestoreWriteWithBackoff(() =>
+      setDoc(doc(db, 'expenses', expenseId), serializeExpenseForFirestore(updatedExpense), { merge: true })
+    );
+
+    setExpenses((current) =>
+      current
+        .map((expense) => (expense.id === expenseId ? updatedExpense : expense))
+        .sort((left, right) => new Date(right.expenseDate).getTime() - new Date(left.expenseDate).getTime())
+    );
+    return updatedExpense;
+  };
+
+  const voidExpense = async (expenseId: string, reason: string) => {
+    const existingExpense = expenses.find((expense) => expense.id === expenseId);
+    if (!existingExpense) {
+      throw new Error('No se encontro el gasto a anular.');
+    }
+    if (existingExpense.status === 'void') {
+      throw new Error('Este gasto ya esta anulado.');
+    }
+
+    const voidReason = reason.trim();
+    if (!voidReason) {
+      throw new Error('Escribe el motivo de anulacion.');
+    }
+
+    const now = new Date().toISOString();
+    const updatedExpense: BusinessExpense = {
+      ...existingExpense,
+      status: 'void',
+      voidedAt: now,
+      voidReason,
+      updatedAt: now,
+    };
+
+    await runFirestoreWriteWithBackoff(() =>
+      updateDoc(doc(db, 'expenses', expenseId), {
+        status: 'void',
+        voidedAt: Timestamp.fromDate(new Date(now)),
+        voidReason,
+        updatedAt: Timestamp.fromDate(new Date(now)),
+      })
+    );
+
+    setExpenses((current) => current.map((expense) => (expense.id === expenseId ? updatedExpense : expense)));
+    return updatedExpense;
   };
 
   const registerMovement = async (input: RegisterMovementInput) => {
@@ -3659,6 +3937,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
     );
     const normalizedDiscountPercent = Math.min(Math.max(Number(input.discountPercent ?? 0), 0), 100);
     const totalDiscountValue = Number(((totalPurchaseValue * normalizedDiscountPercent) / 100).toFixed(2));
+    const shippingAllocationMode = input.shippingAllocationMode === 'value' ? 'value' : 'units';
     const batchId = existingBatchId ?? doc(collection(db, 'purchase-batches')).id;
     const purchasesCreated: Purchase[] = [];
     const stockDeltas: Array<{ productId: string; quantity: number }> = [];
@@ -3678,9 +3957,11 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
             )
           : purchaseDiscountBase;
       const purchaseValueTotal = Number(Math.max(purchaseGrossValueTotal - adjustedPurchaseDiscount, 0).toFixed(2));
+      const shippingWeight = shippingAllocationMode === 'value' ? purchaseValueTotal : quantityPurchased;
+      const totalShippingWeight = shippingAllocationMode === 'value' ? totalPurchaseValue - totalDiscountValue : totalPurchasedUnits;
       const shippingShare =
-        totalPurchasedUnits > 0
-          ? Number(((input.shippingValueTotal * quantityPurchased) / totalPurchasedUnits).toFixed(2))
+        totalShippingWeight > 0
+          ? Number(((input.shippingValueTotal * shippingWeight) / totalShippingWeight).toFixed(2))
           : Number((input.shippingValueTotal / input.items.length).toFixed(2));
       const adjustedShippingShare =
         index === input.items.length - 1
@@ -3724,6 +4005,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         purchaseDiscountTotal: adjustedPurchaseDiscount,
         purchaseValueTotal,
         shippingValueTotal: adjustedShippingShare,
+        shippingAllocationMode,
         purchaseType: isInternationalPurchase ? 'international' : 'local',
         internationalVendorName: isInternationalPurchase ? String(input.internationalVendorName ?? '') : undefined,
         productsValueUsd: isInternationalPurchase ? Number(input.productsValueUsd ?? 0) : undefined,
@@ -5655,6 +5937,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         customers,
         services,
         serviceVisits,
+        expenses,
         authorizationRequests,
         summary,
         latestMovements,
@@ -5670,12 +5953,16 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         deleteSubcategory,
         createProduct,
         updateProduct,
+        setProductFeatured,
         deleteProduct,
         createSupplier,
         updateSupplier,
         deleteSupplier,
         createCustomer,
         updateCustomer,
+        createExpense,
+        updateExpense,
+        voidExpense,
         registerMovement,
         registerInitialStock,
         registerInitialStockBatch,

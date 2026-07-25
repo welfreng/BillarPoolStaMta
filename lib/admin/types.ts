@@ -5,6 +5,20 @@ export type UserRole = 'superadmin' | 'admin' | 'sales';
 export type MovementType = 'entry' | 'exit' | 'adjustment' | 'purchase';
 export type ProductSaleMode = 'simple' | 'varianted';
 export type VariantStatus = 'active' | 'inactive';
+export type PurchaseShippingAllocationMode = 'units' | 'value';
+export type BusinessExpenseCategory =
+  | 'turning-supplies'
+  | 'utilities'
+  | 'transport'
+  | 'rent'
+  | 'internet'
+  | 'packaging'
+  | 'advertising'
+  | 'tools'
+  | 'payroll'
+  | 'other';
+export type BusinessExpenseArea = 'general' | 'sales' | 'turning' | 'web' | 'administration';
+export type BusinessExpenseStatus = 'active' | 'void';
 export type MovementReason =
   | 'purchase'
   | 'sale'
@@ -155,6 +169,7 @@ export interface Purchase {
   purchaseDiscountTotal?: number;
   purchaseValueTotal: number;
   shippingValueTotal: number;
+  shippingAllocationMode?: PurchaseShippingAllocationMode;
   purchaseType?: 'local' | 'international';
   internationalVendorName?: string;
   productsValueUsd?: number;
@@ -402,6 +417,24 @@ export interface ServiceOrder {
   materials: ServiceMaterialItem[];
   notes: string;
   responsibleUser: string;
+}
+
+export interface BusinessExpense {
+  id: string;
+  expenseDate: string;
+  category: BusinessExpenseCategory;
+  area: BusinessExpenseArea;
+  description: string;
+  amount: number;
+  paymentMethod: string;
+  paymentReference?: string;
+  responsibleUser: string;
+  notes: string;
+  status: BusinessExpenseStatus;
+  createdAt: string;
+  updatedAt: string;
+  voidedAt?: string;
+  voidReason?: string;
 }
 
 export interface DashboardMetric {

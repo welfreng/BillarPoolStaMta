@@ -42,7 +42,7 @@ export function AdminResponsiveDialog({
   headerClassName,
   bodyClassName,
   footerClassName,
-  mobileFooterMode = 'fixed',
+  mobileFooterMode = 'inline',
   busy = false,
   busyTitle = 'Guardando...',
   busyDescription = 'Espera la confirmacion antes de continuar.',
@@ -53,6 +53,7 @@ export function AdminResponsiveDialog({
   const [renderMode, setRenderMode] = React.useState<'mobile' | 'desktop'>(() =>
     typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches ? 'mobile' : 'desktop'
   );
+  const [mobileViewportHeight, setMobileViewportHeight] = React.useState<number | null>(null);
   const wasOpenRef = React.useRef(open);
   const isMobile = renderMode === 'mobile';
 
@@ -98,6 +99,26 @@ export function AdminResponsiveDialog({
     };
   }, [isMobile, open]);
 
+  React.useEffect(() => {
+    if (!open || !isMobile || typeof window === 'undefined') return;
+
+    const syncViewportHeight = () => {
+      setMobileViewportHeight(Math.round(window.visualViewport?.height ?? window.innerHeight));
+    };
+
+    syncViewportHeight();
+    window.addEventListener('resize', syncViewportHeight);
+    window.visualViewport?.addEventListener('resize', syncViewportHeight);
+    window.visualViewport?.addEventListener('scroll', syncViewportHeight);
+
+    return () => {
+      window.removeEventListener('resize', syncViewportHeight);
+      window.visualViewport?.removeEventListener('resize', syncViewportHeight);
+      window.visualViewport?.removeEventListener('scroll', syncViewportHeight);
+      setMobileViewportHeight(null);
+    };
+  }, [isMobile, open]);
+
   if (isMobile) {
     if (!open) return null;
 
@@ -121,21 +142,25 @@ export function AdminResponsiveDialog({
           aria-labelledby={titleId}
           aria-describedby={description ? descriptionId : undefined}
           className={cn(
-            'fixed inset-x-0 top-0 flex max-h-[100dvh] w-screen flex-col overflow-hidden rounded-b-[24px] bg-gradient-to-b from-background via-card to-background shadow-[0_18px_60px_rgba(15,23,42,0.22)] dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 dark:shadow-[0_18px_60px_rgba(2,6,23,0.5)]',
+            'fixed inset-x-0 top-0 flex h-[100dvh] max-h-[100dvh] w-screen flex-col overflow-hidden rounded-b-[18px] bg-gradient-to-b from-background via-card to-background shadow-[0_18px_60px_rgba(15,23,42,0.22)] dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 dark:shadow-[0_18px_60px_rgba(2,6,23,0.5)]',
             mobileContentClassName
           )}
+          style={
+            mobileViewportHeight
+              ? {
+                  height: mobileViewportHeight,
+                  maxHeight: mobileViewportHeight,
+                }
+              : undefined
+          }
         >
           {busyOverlay}
-          <div className={cn('shrink-0 border-b border-slate-200/80 px-3 pt-2.5 pb-2.5 text-left dark:border-slate-800 sm:px-4 sm:pt-4 sm:pb-3', headerClassName)}>
-            <div className="mx-auto mb-2.5 h-1.5 w-14 rounded-full bg-slate-300/80 dark:bg-slate-700/80" />
-            <h2 id={titleId} className="pr-10 text-[1rem] font-semibold tracking-[-0.01em] text-slate-950 dark:text-slate-50 sm:text-[1.05rem]">
+          <div className={cn('relative shrink-0 border-b border-slate-200/80 px-3 pt-2 pb-2 text-left dark:border-slate-800 sm:px-4 sm:pt-4 sm:pb-3', headerClassName)}>
+            <div className="mx-auto mb-2 h-1.5 w-14 rounded-full bg-slate-300/80 dark:bg-slate-700/80" />
+            <h2 id={titleId} className="pr-10 text-[0.95rem] font-semibold tracking-[-0.01em] text-slate-950 dark:text-slate-50 sm:text-[1.05rem]">
               {title}
             </h2>
-            {description ? (
-              <p id={descriptionId} className="pr-8 text-[13px] leading-5 text-slate-500 dark:text-slate-400">
-                {description}
-              </p>
-            ) : null}
+            {description ? <span id={descriptionId} className="sr-only">{description}</span> : null}
             {!busy ? (
               <button
                 type="button"
@@ -149,7 +174,7 @@ export function AdminResponsiveDialog({
           </div>
           <div
             className={cn(
-              'max-h-[calc(100dvh-7rem)] overflow-y-auto overscroll-contain px-2.5 py-2.5 pb-4 sm:px-4 sm:py-4 sm:pb-6',
+              'min-h-0 flex-1 overflow-y-auto overscroll-contain px-2.5 py-2.5 pb-4 sm:px-4 sm:py-4 sm:pb-6',
               bodyClassName
             )}
           >

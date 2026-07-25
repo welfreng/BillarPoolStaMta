@@ -8,6 +8,7 @@ import { Pencil, Plus, Search, UserCog } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { firebaseConfig, db } from '@/lib/firebase';
 import { useAuth } from '@/components/auth-context';
+import { AdminListPagination } from '@/components/admin/shared/admin-list-pagination';
 import { SectionHeader } from '@/components/admin/shared/section-header';
 import { Button } from '@/components/ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
@@ -16,6 +17,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { UserFormDialog, type CreateUserFormValues, type UpdateUserFormValues } from '@/components/admin/users/user-form-dialog';
 import { useToast } from '@/hooks/use-toast';
 import type { AppUserAccount } from '@/lib/admin/types';
+
+const userPageSize = 12;
 
 function normalizeDateValue(value: any) {
   if (typeof value === 'string') return value;
@@ -51,6 +54,7 @@ export default function UsuariosPage() {
   const [queryText, setQueryText] = useState('');
   const [openDialog, setOpenDialog] = useState(false);
   const [editingUser, setEditingUser] = useState<AppUserAccount | undefined>();
+  const [userPage, setUserPage] = useState(1);
 
   useEffect(() => {
     if (role && role !== 'admin' && role !== 'superadmin') {
@@ -101,7 +105,20 @@ export default function UsuariosPage() {
         .includes(queryText.toLowerCase())
     );
   }, [queryText, users]);
+  const userTotalPages = Math.max(Math.ceil(filteredUsers.length / userPageSize), 1);
+  const paginatedUsers = useMemo(
+    () => filteredUsers.slice((userPage - 1) * userPageSize, userPage * userPageSize),
+    [filteredUsers, userPage]
+  );
   const isSuperadminUser = role === 'superadmin';
+
+  useEffect(() => {
+    setUserPage(1);
+  }, [queryText]);
+
+  useEffect(() => {
+    setUserPage((currentPage) => Math.min(currentPage, userTotalPages));
+  }, [userTotalPages]);
 
   const handleCreateUser = async (values: CreateUserFormValues) => {
     const secondaryAuth = getSecondaryAuth();
@@ -306,8 +323,50 @@ export default function UsuariosPage() {
 
         {filteredUsers.length > 0 ? (
           <div className="min-w-0">
+            <div className="space-y-3 md:hidden">
+              {paginatedUsers.map((item) => {
+                const roleLabel = getUserRoleLabel(item.role);
+                return (
+                  <article
+                    key={item.id}
+                    className="rounded-[22px] border border-slate-200/90 bg-white/95 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/72"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-medium text-slate-900 dark:text-slate-100">{item.nombre}</p>
+                        <p className="mt-1 truncate text-sm text-slate-500 dark:text-slate-400">{item.email}</p>
+                        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{item.telefono || 'Sin telefono'}</p>
+                        <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1 font-medium text-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                            {roleLabel}
+                          </span>
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1 font-medium text-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                            {item.status === 'active' ? 'Activo' : 'Inactivo'}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                          Creado: {new Date(item.createdAt).toLocaleDateString('es-CO')}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-9 w-9 shrink-0 rounded-xl"
+                        onClick={() => {
+                          setEditingUser(item);
+                          setOpenDialog(true);
+                        }}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
             <div className="mb-2 hidden text-xs text-slate-500 dark:text-slate-400 md:block">Desliza la tabla hacia la derecha para ver toda la informacion.</div>
-            <div className="pb-2">
+            <div className="hidden pb-2 md:block">
             <Table className="min-w-[760px]">
               <TableHeader>
                 <TableRow>
@@ -322,7 +381,7 @@ export default function UsuariosPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredUsers.map((item) => {
+                {paginatedUsers.map((item) => {
                   const roleLabel = getUserRoleLabel(item.role);
                   const rowHoverSummary = [
                     item.nombre,
@@ -364,6 +423,15 @@ export default function UsuariosPage() {
                 </TableBody>
             </Table>
             </div>
+            <AdminListPagination
+              page={userPage}
+              totalPages={userTotalPages}
+              totalItems={filteredUsers.length}
+              pageSize={userPageSize}
+              itemLabel="usuarios"
+              onPageChange={setUserPage}
+              className="mt-3"
+            />
           </div>
         ) : (
           <Empty className="border border-dashed border-slate-200 bg-slate-50/70 dark:border-slate-800 dark:bg-slate-900/60">
