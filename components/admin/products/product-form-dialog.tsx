@@ -15,7 +15,6 @@ import {
   normalizeVariantAttributeDefinitions,
 } from '@/lib/admin/variant-helpers';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Form,
   FormControl,
@@ -1301,6 +1300,7 @@ export function ProductFormDialog({
       headerClassName="px-4 pt-3 pb-3 sm:px-5 lg:px-5"
       bodyClassName="px-3 py-3 pb-4 sm:px-5 lg:px-5"
       footerClassName="px-3 py-3 sm:px-5 lg:px-5"
+      mobileFooterMode="inline"
       footer={
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button
@@ -2136,26 +2136,6 @@ export function ProductFormDialog({
                               <SelectItem value="archived">Archivado</SelectItem>
                             </SelectContent>
                           </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <div className="mt-3">
-                    <FormField
-                      control={form.control}
-                      name="featured"
-                      render={({ field }) => (
-                        <FormItem className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-900/60 sm:p-3.5">
-                          <div className="flex items-start gap-3">
-                            <FormControl>
-                              <Checkbox checked={field.value} onCheckedChange={(checked) => field.onChange(checked === true)} />
-                            </FormControl>
-                            <div>
-                              <FormLabel className="text-sm font-medium text-slate-950 dark:text-slate-100">Mostrar como producto destacado</FormLabel>
-                            </div>
-                          </div>
                           <FormMessage />
                         </FormItem>
                       )}

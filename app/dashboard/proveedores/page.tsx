@@ -1,11 +1,12 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Building2, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { AdminListPagination } from '@/components/admin/shared/admin-list-pagination';
 import { SectionHeader } from '@/components/admin/shared/section-header';
 import { SupplierFormDialog, type SupplierFormValues } from '@/components/admin/suppliers/supplier-form-dialog';
 import { ResponsiveRowActions } from '@/components/admin/shared/responsive-row-actions';
@@ -13,12 +14,15 @@ import { useAdminData } from '@/components/admin/admin-data-context';
 import { useToast } from '@/hooks/use-toast';
 import type { Supplier } from '@/lib/admin/types';
 
+const supplierPageSize = 12;
+
 export default function ProveedoresPage() {
   const { suppliers, purchases, createSupplier, updateSupplier, deleteSupplier } = useAdminData();
   const { toast } = useToast();
   const [openDialog, setOpenDialog] = useState(false);
   const [query, setQuery] = useState('');
   const [editingSupplier, setEditingSupplier] = useState<Supplier | undefined>();
+  const [supplierPage, setSupplierPage] = useState(1);
 
   const filteredSuppliers = useMemo(() => {
     return suppliers.filter((supplier) =>
@@ -27,6 +31,19 @@ export default function ProveedoresPage() {
         .includes(query.toLowerCase())
     );
   }, [query, suppliers]);
+  const supplierTotalPages = Math.max(Math.ceil(filteredSuppliers.length / supplierPageSize), 1);
+  const paginatedSuppliers = useMemo(
+    () => filteredSuppliers.slice((supplierPage - 1) * supplierPageSize, supplierPage * supplierPageSize),
+    [filteredSuppliers, supplierPage]
+  );
+
+  useEffect(() => {
+    setSupplierPage(1);
+  }, [query]);
+
+  useEffect(() => {
+    setSupplierPage((currentPage) => Math.min(currentPage, supplierTotalPages));
+  }, [supplierTotalPages]);
 
   const handleSave = async (values: SupplierFormValues) => {
     try {
@@ -129,7 +146,7 @@ export default function ProveedoresPage() {
         {filteredSuppliers.length > 0 ? (
           <div className="min-w-0">
             <div className="space-y-3 md:hidden">
-              {filteredSuppliers.map((supplier) => (
+              {paginatedSuppliers.map((supplier) => (
                 <div key={supplier.id} className="rounded-[22px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.94)_100%)] p-4 shadow-sm dark:border-slate-800 dark:bg-[linear-gradient(180deg,rgba(2,6,23,0.92)_0%,rgba(15,23,42,0.86)_100%)]">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -182,7 +199,7 @@ export default function ProveedoresPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredSuppliers.map((supplier) => {
+                {paginatedSuppliers.map((supplier) => {
                   const rowHoverSummary = [
                     supplier.name,
                     `Contacto: ${supplier.contactName}`,
@@ -230,6 +247,15 @@ export default function ProveedoresPage() {
               </TableBody>
             </Table>
             </div>
+            <AdminListPagination
+              page={supplierPage}
+              totalPages={supplierTotalPages}
+              totalItems={filteredSuppliers.length}
+              pageSize={supplierPageSize}
+              itemLabel="proveedores"
+              onPageChange={setSupplierPage}
+              className="mt-3"
+            />
           </div>
         ) : (
           <Empty className="border border-dashed border-slate-200 bg-slate-50/70 dark:border-slate-800 dark:bg-slate-900/60">

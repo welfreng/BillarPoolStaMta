@@ -3,12 +3,14 @@
 import Image from 'next/image';
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
-import { Edit3, Globe, ImagePlus, Megaphone, Plus, RefreshCcw, Save, Trash2 } from 'lucide-react';
+import { Edit3, Globe, ImagePlus, Megaphone, PackageCheck, Plus, RefreshCcw, Save, Star, StarOff, Trash2 } from 'lucide-react';
 import { SectionHeader } from '@/components/admin/shared/section-header';
 import { CatalogImageDialog } from '@/components/admin/products/catalog-image-dialog';
+import { useAdminData } from '@/components/admin/admin-data-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
@@ -229,8 +231,14 @@ function clearPublicPromotionsCache() {
   });
 }
 
+function clearPublicCatalogCache() {
+  if (typeof window === 'undefined') return;
+  window.localStorage.removeItem('bp-public-catalog-cache-v1');
+}
+
 export default function WebPageManagementPage() {
   const { toast } = useToast();
+  const { products, setProductFeatured } = useAdminData();
   const [openCatalogImageDialog, setOpenCatalogImageDialog] = useState(false);
   const [serviceImages, setServiceImages] = useState<string[]>([]);
   const [draftServiceImages, setDraftServiceImages] = useState<string[]>([]);
@@ -238,10 +246,35 @@ export default function WebPageManagementPage() {
   const [promotions, setPromotions] = useState<PromotionDraft[]>([]);
   const [draftPromotions, setDraftPromotions] = useState<PromotionDraft[]>([]);
   const [savingPromotions, setSavingPromotions] = useState(false);
+  const [selectedFeaturedProductId, setSelectedFeaturedProductId] = useState('');
+  const [savingFeaturedProductId, setSavingFeaturedProductId] = useState<string | null>(null);
   const [promotionNow, setPromotionNow] = useState(() => Date.now());
   const [selectedPromotionId, setSelectedPromotionId] = useState<string | null>(null);
   const selectedPromotion =
     draftPromotions.find((promotion) => promotion.id === selectedPromotionId) ?? draftPromotions[0] ?? null;
+  const sortedProducts = useMemo(
+    () =>
+      [...products].sort((left, right) =>
+        `${left.name} ${left.brand}`.localeCompare(`${right.name} ${right.brand}`, 'es', {
+          sensitivity: 'base',
+        })
+      ),
+    [products]
+  );
+  const featuredProducts = useMemo(
+    () => sortedProducts.filter((product) => product.featured),
+    [sortedProducts]
+  );
+  const featuredProductOptions = useMemo(
+    () =>
+      sortedProducts
+        .filter((product) => product.status === 'active' && !product.featured && Number(product.publicStock ?? 0) > 0)
+        .map((product) => ({
+          value: product.id,
+          label: `${product.name} - ${product.brand || 'Sin marca'} (${Math.max(Number(product.publicStock ?? 0), 0)} uds)`,
+        })),
+    [sortedProducts]
+  );
 
   useEffect(() => {
     const unsubscribe = onSnapshot(
@@ -413,6 +446,34 @@ export default function WebPageManagementPage() {
     }
   };
 
+  const handleSetProductFeatured = async (productId: string, featured: boolean) => {
+    if (!productId) return;
+    setSavingFeaturedProductId(productId);
+    try {
+      await setProductFeatured(productId, featured);
+      clearPublicCatalogCache();
+      if (featured) setSelectedFeaturedProductId('');
+      toast({
+        title: featured ? 'Producto destacado' : 'Producto retirado',
+        description: featured
+          ? 'Ya quedo marcado para mostrarse en destacados si mantiene stock disponible.'
+          : 'Ya no aparecera como producto destacado en la web publica.',
+      });
+    } catch (error) {
+      console.error('Error actualizando producto destacado:', error);
+      toast({
+        title: 'No se pudo actualizar destacados',
+        description: getFriendlyFirestoreWriteErrorMessage(
+          error,
+          'Intenta nuevamente en unos segundos.'
+        ),
+        variant: 'destructive',
+      });
+    } finally {
+      setSavingFeaturedProductId(null);
+    }
+  };
+
   return (
     <div className="space-y-5 sm:space-y-6">
       <SectionHeader
@@ -442,6 +503,94 @@ export default function WebPageManagementPage() {
               <p className="mt-1 hidden text-sm leading-6 text-slate-500 dark:text-slate-400 sm:block">
                 Desde aqui puedes cambiar las fotos que se ven en la portada destacada y en la tienda virtual sin tocar el inventario.
               </p>
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-dashed border-border bg-muted/70 p-3.5 dark:border-slate-800 dark:bg-slate-900/70 sm:mt-5 sm:p-4">
+            <div className="flex items-start gap-3">
+              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">
+                <Star className="h-4 w-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground">Productos destacados</p>
+                <p className="mt-1 hidden text-sm leading-6 text-slate-600 dark:text-slate-300 sm:block">
+                  Activa la vitrina de la portada desde aqui, sin tocar variantes, compras ni historial de inventario.
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+              <SearchableSelect
+                value={selectedFeaturedProductId}
+                onChange={setSelectedFeaturedProductId}
+                placeholder="Selecciona producto para destacar"
+                searchPlaceholder="Buscar producto..."
+                emptyLabel="No hay productos activos con stock para destacar."
+                options={featuredProductOptions}
+                recentStorageKey="web-featured-products"
+              />
+              <Button
+                type="button"
+                className="w-full rounded-xl sm:w-auto"
+                onClick={() => void handleSetProductFeatured(selectedFeaturedProductId, true)}
+                disabled={!selectedFeaturedProductId || Boolean(savingFeaturedProductId)}
+              >
+                <Star className="mr-2 h-4 w-4" />
+                Destacar
+              </Button>
+            </div>
+            <div className="mt-4 grid gap-2">
+              {featuredProducts.length > 0 ? (
+                featuredProducts.map((product) => {
+                  const image = product.image || '';
+                  const stock = Math.max(Number(product.publicStock ?? 0), 0);
+                  const isVisible = product.status === 'active' && stock > 0;
+                  return (
+                    <div
+                      key={product.id}
+                      className="flex min-w-0 flex-col gap-3 rounded-xl border border-border bg-background/80 p-3 dark:border-slate-800 dark:bg-slate-950/55 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+                          {image ? (
+                            <Image
+                              src={image}
+                              alt={product.name}
+                              fill
+                              className="object-cover"
+                              unoptimized={image.startsWith('data:')}
+                            />
+                          ) : (
+                            <div className="grid h-full place-items-center">
+                              <PackageCheck className="h-4 w-4 text-slate-400" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-foreground">{product.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {product.brand || 'Sin marca'} · {stock} uds · {isVisible ? 'Visible' : 'Oculto por stock/estado'}
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="w-full rounded-xl sm:w-auto"
+                        onClick={() => void handleSetProductFeatured(product.id, false)}
+                        disabled={savingFeaturedProductId === product.id}
+                      >
+                        <StarOff className="mr-2 h-4 w-4" />
+                        Quitar
+                      </Button>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="rounded-xl border border-dashed border-border bg-background/65 px-4 py-4 text-center text-sm text-muted-foreground dark:border-slate-800 dark:bg-slate-950/45">
+                  No hay productos destacados configurados.
+                </div>
+              )}
             </div>
           </div>
 

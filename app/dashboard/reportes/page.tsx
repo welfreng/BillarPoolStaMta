@@ -44,7 +44,7 @@ const MONTH_OPTIONS = [
 ];
 const reportChartConfig = {
   revenue: { label: 'Ventas', color: '#0891b2' },
-  profit: { label: 'Utilidad', color: '#059669' },
+  profit: { label: 'Utilidad neta', color: '#059669' },
   quantity: { label: 'Unidades', color: '#f59e0b' },
 } satisfies ChartConfig;
 
@@ -63,7 +63,7 @@ function formatMonthAxisLabel(monthValue: string) {
 }
 
 export default function ReportesPage() {
-  const { products, sales, services, movements } = useAdminData();
+  const { products, sales, services, movements, expenses } = useAdminData();
   const { toast } = useToast();
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
   const [calendarOpen, setCalendarOpen] = useState(false);
@@ -75,6 +75,14 @@ export default function ReportesPage() {
         .filter((service) => service.performedAt.slice(0, 7) === selectedMonth)
         .sort((a, b) => new Date(b.performedAt).getTime() - new Date(a.performedAt).getTime()),
     [selectedMonth, services]
+  );
+
+  const monthExpenses = useMemo(
+    () =>
+      expenses
+        .filter((expense) => expense.status === 'active' && expense.expenseDate.slice(0, 7) === selectedMonth)
+        .sort((a, b) => new Date(b.expenseDate).getTime() - new Date(a.expenseDate).getTime()),
+    [expenses, selectedMonth]
   );
 
   const dataset = useMemo(
@@ -89,22 +97,29 @@ export default function ReportesPage() {
   );
 
   const monthlyTotals = useMemo(
-    () => ({
-      transactions: dataset.summaryRows.length,
-      totalRevenue: dataset.summaryRows.reduce((sum, row) => sum + row.totalRevenue, 0),
-      totalCost: dataset.summaryRows.reduce((sum, row) => sum + row.totalCost, 0),
-      totalProfit: dataset.summaryRows.reduce((sum, row) => sum + row.totalProfit, 0),
-      totalQuantity: dataset.summaryRows.reduce((sum, row) => sum + row.totalQuantity, 0),
-      serviceCount: dataset.detailRows.filter((row) => row.itemType === 'service').length,
-    }),
-    [dataset]
+    () => {
+      const totalProfit = dataset.summaryRows.reduce((sum, row) => sum + row.totalProfit, 0);
+      const totalExpenses = monthExpenses.reduce((sum, expense) => sum + Number(expense.amount ?? 0), 0);
+
+      return {
+        transactions: dataset.summaryRows.length,
+        totalRevenue: dataset.summaryRows.reduce((sum, row) => sum + row.totalRevenue, 0),
+        totalCost: dataset.summaryRows.reduce((sum, row) => sum + row.totalCost, 0),
+        totalProfit,
+        totalExpenses,
+        netProfit: totalProfit - totalExpenses,
+        totalQuantity: dataset.summaryRows.reduce((sum, row) => sum + row.totalQuantity, 0),
+        serviceCount: dataset.detailRows.filter((row) => row.itemType === 'service').length,
+      };
+    },
+    [dataset, monthExpenses]
   );
 
   const executiveSummary = useMemo(() => {
     const salesDetailRows = dataset.detailRows.filter((row) => row.itemType === 'product');
     const serviceDetailRows = dataset.detailRows.filter((row) => row.itemType === 'service');
     const averageTicket = monthlyTotals.transactions > 0 ? monthlyTotals.totalRevenue / monthlyTotals.transactions : 0;
-    const profitMargin = monthlyTotals.totalRevenue > 0 ? (monthlyTotals.totalProfit / monthlyTotals.totalRevenue) * 100 : 0;
+    const profitMargin = monthlyTotals.totalRevenue > 0 ? (monthlyTotals.netProfit / monthlyTotals.totalRevenue) * 100 : 0;
     const salesRevenue = salesDetailRows.reduce((sum, row) => sum + row.subtotal, 0);
     const salesProfit = salesDetailRows.reduce((sum, row) => sum + row.utility, 0);
     const serviceRevenue = serviceDetailRows.reduce((sum, row) => sum + row.subtotal, 0);
@@ -134,7 +149,7 @@ export default function ReportesPage() {
       serviceCost,
       topSeller,
     };
-  }, [dataset.detailRows, dataset.summaryRows, monthlyTotals.totalProfit, monthlyTotals.totalRevenue, monthlyTotals.transactions]);
+  }, [dataset.detailRows, dataset.summaryRows, monthlyTotals.netProfit, monthlyTotals.totalRevenue, monthlyTotals.transactions]);
 
   const topProducts = useMemo(() => {
     const totals = new Map<string, { quantity: number; revenue: number }>();
@@ -168,9 +183,12 @@ export default function ReportesPage() {
         services,
         selectedMonth: monthValue,
       });
+      const monthExpenseTotal = expenses
+        .filter((expense) => expense.status === 'active' && expense.expenseDate.slice(0, 7) === monthValue)
+        .reduce((sum, expense) => sum + Number(expense.amount ?? 0), 0);
       const revenue = monthRows.summaryRows.reduce((sum, row) => sum + row.totalRevenue, 0);
       const cost = monthRows.summaryRows.reduce((sum, row) => sum + row.totalCost, 0);
-      const profit = monthRows.summaryRows.reduce((sum, row) => sum + row.totalProfit, 0);
+      const profit = monthRows.summaryRows.reduce((sum, row) => sum + row.totalProfit, 0) - monthExpenseTotal;
       const quantity = monthRows.summaryRows.reduce((sum, row) => sum + row.totalQuantity, 0);
 
       return {
@@ -182,7 +200,7 @@ export default function ReportesPage() {
         quantity,
       };
     });
-  }, [products, sales, selectedMonth, services]);
+  }, [expenses, products, sales, selectedMonth, services]);
 
   const topProductsChartData = useMemo(
     () =>
@@ -457,7 +475,7 @@ export default function ReportesPage() {
         El panel ya consolida ingresos, costos, utilidad y metodo de pago real del mes. El `estado` todavia se infiere desde devoluciones, asi que conviene leerlo como referencia operativa y no como auditoria final.
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
         <div className="rounded-[28px] border border-border bg-card/88 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-slate-950/72 dark:shadow-[0_20px_48px_rgba(2,6,23,0.28)] sm:p-6">
           <p className="text-sm text-slate-500 dark:text-slate-400">Transacciones</p>
           <p className="mt-2 text-2xl font-semibold text-slate-950 dark:text-slate-50">{formatNumber(monthlyTotals.transactions)}</p>
@@ -478,9 +496,19 @@ export default function ReportesPage() {
           <p className="mt-2 text-2xl font-semibold text-amber-950 dark:text-amber-50">{formatCurrency(monthlyTotals.totalCost)}</p>
           <p className="mt-2 text-sm text-amber-900 dark:text-amber-100">Costo de productos y servicios.</p>
         </div>
+        <div className="rounded-[28px] border border-rose-200 bg-[linear-gradient(180deg,rgba(255,241,242,0.98)_0%,rgba(255,228,230,0.82)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-rose-900/70 dark:bg-[linear-gradient(180deg,rgba(136,19,55,0.34)_0%,rgba(190,18,60,0.2)_100%)] sm:p-6">
+          <p className="text-sm text-rose-800 dark:text-rose-200">Gastos operativos</p>
+          <p className="mt-2 text-2xl font-semibold text-rose-950 dark:text-rose-50">{formatCurrency(monthlyTotals.totalExpenses)}</p>
+          <p className="mt-2 text-sm text-rose-900 dark:text-rose-100">Luz, insumos, transporte y otros.</p>
+        </div>
+        <div className="rounded-[28px] border border-slate-200 bg-card/88 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-slate-950/72 sm:p-6">
+          <p className="text-sm text-slate-500 dark:text-slate-400">Utilidad bruta</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-950 dark:text-slate-50">{formatCurrency(monthlyTotals.totalProfit)}</p>
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Antes de gastos operativos.</p>
+        </div>
         <div className="rounded-[28px] border border-emerald-200 bg-[linear-gradient(180deg,rgba(236,253,245,0.98)_0%,rgba(209,250,229,0.82)_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-emerald-900/70 dark:bg-[linear-gradient(180deg,rgba(6,78,59,0.38)_0%,rgba(5,150,105,0.2)_100%)] sm:p-6">
-          <p className="text-sm text-emerald-800 dark:text-emerald-200">Utilidad total</p>
-          <p className="mt-2 text-2xl font-semibold text-emerald-950 dark:text-emerald-50">{formatCurrency(monthlyTotals.totalProfit)}</p>
+          <p className="text-sm text-emerald-800 dark:text-emerald-200">Utilidad neta</p>
+          <p className="mt-2 text-2xl font-semibold text-emerald-950 dark:text-emerald-50">{formatCurrency(monthlyTotals.netProfit)}</p>
           <p className="mt-2 text-sm text-emerald-900 dark:text-emerald-100">Margen {executiveSummary.profitMargin.toFixed(1)}%.</p>
         </div>
       </div>
@@ -496,14 +524,18 @@ export default function ReportesPage() {
               <p className="text-sm text-muted-foreground">Lectura rapida del negocio para el mes seleccionado.</p>
             </div>
           </div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <div className="rounded-2xl border border-border bg-muted/70 p-4 dark:border-slate-800 dark:bg-slate-900/60">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Items facturados</p>
               <p className="mt-2 text-xl font-semibold text-foreground">{formatNumber(dataset.detailRows.length)}</p>
             </div>
             <div className="rounded-2xl border border-border bg-muted/70 p-4 dark:border-slate-800 dark:bg-slate-900/60">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Utilidad neta</p>
-              <p className="mt-2 text-xl font-semibold text-emerald-700">{formatCurrency(monthlyTotals.totalProfit)}</p>
+              <p className="mt-2 text-xl font-semibold text-emerald-700">{formatCurrency(monthlyTotals.netProfit)}</p>
+            </div>
+            <div className="rounded-2xl border border-border bg-muted/70 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Gastos</p>
+              <p className="mt-2 text-xl font-semibold text-rose-700">{formatCurrency(monthlyTotals.totalExpenses)}</p>
             </div>
             <div className="rounded-2xl border border-border bg-muted/70 p-4 dark:border-slate-800 dark:bg-slate-900/60">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Margen</p>

@@ -145,6 +145,7 @@ export default function ComprasPage() {
     purchasedAt: groupItems[0]?.purchasedAt ? getDateKeyInBogota(groupItems[0].purchasedAt) : getTodayDateInputValue(),
     discountPercent: groupItems[0]?.purchaseDiscountPercent ?? 0,
     shippingValueTotal: groupItems.reduce((sum, item) => sum + item.shippingValueTotal, 0),
+    shippingAllocationMode: groupItems[0]?.shippingAllocationMode ?? 'units',
     internationalVendorName: groupItems[0]?.internationalVendorName ?? '',
     productsValueUsd: groupItems[0]?.productsValueUsd ?? 0,
     shippingValueUsd: groupItems[0]?.shippingValueUsd ?? 0,
@@ -366,6 +367,9 @@ export default function ComprasPage() {
                     </div>
                     <div className="rounded-2xl bg-white px-3 py-2 text-slate-600">
                       Envio total: <span className="font-semibold text-slate-900">{formatCurrency(group.totalShipping)}</span>
+                      <span className="ml-1 text-xs text-slate-500">
+                        ({group.items[0]?.shippingAllocationMode === 'value' ? 'por valor' : 'por unidades'})
+                      </span>
                     </div>
                     <div className="rounded-2xl bg-white px-3 py-2 text-slate-600">
                       Inversion: <span className="font-semibold text-slate-900">{formatCurrency(group.totalInvestment)}</span>
@@ -404,6 +408,7 @@ export default function ComprasPage() {
                                 </p>
                               ) : null}
                               <p>Costo real: {formatCurrency(purchase.realUnitCost)}</p>
+                              <p>Envio: {purchase.shippingAllocationMode === 'value' ? 'por valor' : 'por unidades'}</p>
                               <p>Precio sugerido: {formatCurrency(currentSuggestedSalePrice)}</p>
                               <p>Utilidad: {formatCurrency(unitProfit)}</p>
                             </div>
@@ -463,6 +468,7 @@ export default function ComprasPage() {
                               ? `Descuento: ${formatCurrency(purchase.purchaseDiscountTotal ?? 0)}`
                               : '',
                             `Envio: ${formatCurrency(purchase.shippingValueTotal)}`,
+                            `Reparto envio: ${purchase.shippingAllocationMode === 'value' ? 'por valor' : 'por unidades'}`,
                             `Inversion: ${formatCurrency(purchase.totalInvestment)}`,
                             `Costo unitario real: ${formatCurrency(purchase.realUnitCost)}`,
                             `Precio sugerido: ${formatCurrency(currentSuggestedSalePrice)}`,

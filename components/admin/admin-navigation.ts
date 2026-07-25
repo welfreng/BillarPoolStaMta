@@ -14,6 +14,7 @@ import {
   Tags,
   UserRound,
   Users,
+  WalletCards,
   Wrench,
 } from 'lucide-react';
 
@@ -37,6 +38,7 @@ export const adminNavigation: AdminNavItem[] = [
   { href: '/dashboard/servicios', label: 'Servicios', icon: Wrench, helper: 'Torno e instalaciones' },
   { href: '/dashboard/inventario', label: 'Inventario', icon: ClipboardList, helper: 'Movimientos y kardex' },
   { href: '/dashboard/compras', label: 'Compras', icon: ReceiptText, helper: 'Inversion y costos' },
+  { href: '/dashboard/gastos', label: 'Gastos', icon: WalletCards, helper: 'Costos operativos' },
   { href: '/dashboard/web', label: 'Pagina web', icon: Globe, helper: 'Catalogo y servicios web' },
   { href: '/dashboard/reportes', label: 'Reportes', icon: Tags, helper: 'Insights operativos' },
   { href: '/dashboard/usuarios', label: 'Usuarios', icon: Users, helper: 'Roles y accesos' },

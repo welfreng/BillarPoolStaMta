@@ -2716,7 +2716,7 @@ export function SaleFormDialog({
         headerClassName="px-4 pt-3 pb-3 sm:px-5 lg:px-6"
         bodyClassName="px-3 py-3 pb-4 sm:px-5 lg:px-6"
         footerClassName="px-3 py-3 sm:px-5 lg:px-6"
-        mobileFooterMode="fixed"
+        mobileFooterMode="inline"
         footer={
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button

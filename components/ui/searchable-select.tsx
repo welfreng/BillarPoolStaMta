@@ -52,6 +52,7 @@ export function SearchableSelect({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [isMobile, setIsMobile] = useState(false);
+  const [mobileViewportHeight, setMobileViewportHeight] = useState(640);
   const [usageStats, setUsageStats] = useState<SearchableSelectUsageStats>({});
   const listRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -130,15 +131,38 @@ export function SearchableSelect({
 
   useEffect(() => {
     if (!open) return;
+    if (isMobile) return;
     const focusInput = () => inputRef.current?.focus();
     const timeoutId = window.setTimeout(focusInput, 30);
     return () => window.clearTimeout(timeoutId);
-  }, [open]);
+  }, [isMobile, open]);
 
   useEffect(() => {
     if (!open || !listRef.current) return;
     listRef.current.scrollTop = 0;
   }, [open, query]);
+
+  useEffect(() => {
+    if (!open || !isMobile || typeof window === 'undefined') return;
+
+    const syncViewportHeight = () => {
+      setMobileViewportHeight(Math.round(window.visualViewport?.height ?? window.innerHeight));
+    };
+
+    syncViewportHeight();
+    window.addEventListener('resize', syncViewportHeight);
+    window.visualViewport?.addEventListener('resize', syncViewportHeight);
+    window.visualViewport?.addEventListener('scroll', syncViewportHeight);
+
+    return () => {
+      window.removeEventListener('resize', syncViewportHeight);
+      window.visualViewport?.removeEventListener('resize', syncViewportHeight);
+      window.visualViewport?.removeEventListener('scroll', syncViewportHeight);
+    };
+  }, [isMobile, open]);
+
+  const mobileCommandMaxHeight = Math.max(180, Math.min(300, Math.round(mobileViewportHeight * 0.45)));
+  const mobileListMaxHeight = Math.max(96, mobileCommandMaxHeight - 108);
 
   const persistRecentValue = (nextValue: string) => {
     if (!recentStorageKey || typeof window === 'undefined' || !nextValue) return;
@@ -188,8 +212,9 @@ export function SearchableSelect({
     <Command
       className={cn(
         'w-full min-w-0 overflow-hidden',
-        isMobile ? 'max-h-[min(24rem,calc(100dvh-12rem))]' : 'max-h-[min(26rem,calc(100vh-8rem))]'
+        isMobile ? '' : 'max-h-[min(26rem,calc(100vh-8rem))]'
       )}
+      style={isMobile ? { maxHeight: mobileCommandMaxHeight } : undefined}
     >
         <div className="shrink-0 w-full min-w-0 border-b">
           <CommandInput
@@ -222,14 +247,17 @@ export function SearchableSelect({
       <CommandList
         className={cn(
           'min-h-0 w-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain touch-pan-y',
-          isMobile ? 'max-h-[min(18rem,calc(100dvh-17rem))]' : 'max-h-[min(22rem,calc(100vh-12rem))]'
+          isMobile ? '' : 'max-h-[min(22rem,calc(100vh-12rem))]'
         )}
         ref={listRef}
         onWheel={handleListWheel}
         onWheelCapture={handleListWheel}
         onTouchMove={handleListTouchMove}
         onTouchMoveCapture={handleListTouchMove}
-        style={{ WebkitOverflowScrolling: 'touch' }}
+        style={{
+          WebkitOverflowScrolling: 'touch',
+          ...(isMobile ? { maxHeight: mobileListMaxHeight } : {}),
+        }}
       >
         <CommandEmpty>
           {allowCreate && onCreate && query.trim() ? (
@@ -318,8 +346,11 @@ export function SearchableSelect({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
         {open ? (
-          <div className="mt-2 min-w-0 overflow-hidden rounded-2xl border border-border bg-popover text-popover-foreground shadow-xl dark:border-slate-800">
-            <div className="flex items-center justify-between gap-3 border-b px-3 py-2">
+          <div
+            className="mt-2 min-w-0 overflow-hidden rounded-2xl border border-border bg-popover text-popover-foreground shadow-xl dark:border-slate-800"
+            style={{ maxHeight: mobileCommandMaxHeight + 45 }}
+          >
+            <div className="flex h-11 items-center justify-between gap-3 border-b px-3 py-2">
               <p className="min-w-0 flex-1 truncate text-sm font-semibold">{placeholder}</p>
               <Button
                 type="button"
