@@ -79,6 +79,7 @@ export default function ProductosPage() {
     byProductId: {},
     byProductName: {},
     byVariantKey: {},
+    galleryByProductId: {},
   });
   const categoryOptions = useMemo(() => toCategoryOptions(categories), [categories]);
 
@@ -155,7 +156,7 @@ export default function ProductosPage() {
       },
       (error) => {
         console.error('Error leyendo imagenes del catalogo web:', error);
-        setCatalogImageOverrides({ byProductId: {}, byProductName: {}, byVariantKey: {} });
+        setCatalogImageOverrides({ byProductId: {}, byProductName: {}, byVariantKey: {}, galleryByProductId: {} });
       }
     );
 

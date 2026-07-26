@@ -233,7 +233,9 @@ function clearPublicPromotionsCache() {
 
 function clearPublicCatalogCache() {
   if (typeof window === 'undefined') return;
-  window.localStorage.removeItem('bp-public-catalog-cache-v1');
+  ['bp-public-catalog-cache-v1', 'bp-public-catalog-cache-v2'].forEach((key) => {
+    window.localStorage.removeItem(key);
+  });
 }
 
 export default function WebPageManagementPage() {
@@ -1112,12 +1114,13 @@ export default function WebPageManagementPage() {
       <CatalogImageDialog
         open={openCatalogImageDialog}
         onOpenChange={setOpenCatalogImageDialog}
-        onSaved={() =>
+        onSaved={() => {
+          clearPublicCatalogCache();
           toast({
             title: 'Imagenes actualizadas',
             description: 'La tienda virtual ya puede mostrar las nuevas fotos.',
-          })
-        }
+          });
+        }}
       />
     </div>
   );

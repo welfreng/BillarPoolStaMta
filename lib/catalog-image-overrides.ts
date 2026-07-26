@@ -1,9 +1,17 @@
 import type { QuerySnapshot, DocumentData } from 'firebase/firestore';
 
+export interface CatalogGalleryImage {
+  id: string;
+  image: string;
+  label?: string;
+  sortOrder: number;
+}
+
 export interface CatalogImageOverrideMaps {
   byProductId: Record<string, string>;
   byProductName: Record<string, string>;
   byVariantKey: Record<string, string>;
+  galleryByProductId: Record<string, CatalogGalleryImage[]>;
 }
 
 export function buildCatalogVariantImageKey(productId: string, variantId: string) {
@@ -26,8 +34,46 @@ export function extractCatalogImageOverrides(
   const productImages: Record<string, string> = {};
   const productNameImages: Record<string, string> = {};
   const variantImages: Record<string, string> = {};
+  const productGalleries: Record<string, CatalogGalleryImage[]> = {};
 
   snapshot.docs.forEach((item) => {
+    if (item.id.startsWith('catalog-gallery-')) {
+      const data = item.data();
+      const productId = String(data.productId ?? item.id.replace('catalog-gallery-', ''));
+      const images = Array.isArray(data.images)
+        ? data.images
+            .map((galleryItem: unknown, index: number): CatalogGalleryImage | null => {
+              if (typeof galleryItem === 'string') {
+                return {
+                  id: `gallery-${index + 1}`,
+                  image: galleryItem,
+                  sortOrder: index,
+                };
+              }
+
+              if (!galleryItem || typeof galleryItem !== 'object') return null;
+              const record = galleryItem as Record<string, unknown>;
+              const image = record.image;
+              if (typeof image !== 'string' || !image) return null;
+
+              return {
+                id: String(record.id ?? `gallery-${index + 1}`),
+                image,
+                label: typeof record.label === 'string' ? record.label : undefined,
+                sortOrder: Number(record.sortOrder ?? index),
+              };
+            })
+            .filter((galleryItem): galleryItem is CatalogGalleryImage => Boolean(galleryItem))
+            .sort((left, right) => left.sortOrder - right.sortOrder)
+            .slice(0, 5)
+        : [];
+
+      if (productId && images.length > 0) {
+        productGalleries[productId] = images;
+      }
+      return;
+    }
+
     if (item.id === 'catalog-images') {
       const data = item.data();
       if (data && typeof data === 'object' && data.images && typeof data.images === 'object') {
@@ -67,6 +113,7 @@ export function extractCatalogImageOverrides(
     },
     byProductName: productNameImages,
     byVariantKey: variantImages,
+    galleryByProductId: productGalleries,
   };
 }
 
@@ -90,4 +137,11 @@ export function resolveCatalogVariantImageOverride(
   overrides: CatalogImageOverrideMaps
 ) {
   return overrides.byVariantKey[buildCatalogVariantImageKey(productId, variantId)] || baseImage;
+}
+
+export function resolveCatalogGalleryImages(
+  productId: string,
+  overrides: CatalogImageOverrideMaps
+) {
+  return overrides.galleryByProductId?.[productId] ?? [];
 }

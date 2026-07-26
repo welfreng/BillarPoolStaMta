@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { collection, doc, onSnapshot, serverTimestamp, setDoc, type DocumentData } from 'firebase/firestore';
-import { Check, ImagePlus, Images, LoaderCircle, RotateCcw } from 'lucide-react';
+import { Check, ImagePlus, Images, LoaderCircle, RotateCcw, Trash2 } from 'lucide-react';
 import { AdminResponsiveDialog } from '@/components/admin/admin-responsive-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,8 +11,10 @@ import {
   buildCatalogVariantImageKey,
   extractCatalogImageOverrides,
   normalizeCatalogImageName,
+  resolveCatalogGalleryImages,
   resolveCatalogImageOverride,
   resolveCatalogVariantImageOverride,
+  type CatalogGalleryImage,
   type CatalogImageOverrideMaps,
 } from '@/lib/catalog-image-overrides';
 import {
@@ -55,6 +57,24 @@ async function loadFileAsDataUrl(
   event.target.value = '';
 }
 
+async function loadGalleryFileAsDataUrl(
+  event: ChangeEvent<HTMLInputElement>,
+  onLoaded: (value: string) => void
+) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  const optimizedImage = await optimizeImageFile(file, {
+    maxWidth: 1180,
+    maxHeight: 1180,
+    quality: 0.72,
+    minQuality: 0.5,
+    maxBytes: 120 * 1024,
+  });
+  onLoaded(optimizedImage.dataUrl);
+  event.target.value = '';
+}
+
 function mapProduct(documentId: string, data: DocumentData): WebCatalogProduct {
   return {
     id: documentId,
@@ -91,13 +111,15 @@ export function CatalogImageDialog({
     byProductId: {},
     byProductName: {},
     byVariantKey: {},
+    galleryByProductId: {},
   });
   const [draftImages, setDraftImages] = useState<Record<string, string>>({});
   const [draftVariantImages, setDraftVariantImages] = useState<Record<string, string>>({});
+  const [draftGalleryImages, setDraftGalleryImages] = useState<Record<string, CatalogGalleryImage[]>>({});
   const [products, setProducts] = useState<WebCatalogProduct[]>([]);
   const [savingProductId, setSavingProductId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [viewMode, setViewMode] = useState<'all' | 'with-variants' | 'variant-images-pending'>('with-variants');
+  const [viewMode, setViewMode] = useState<'all' | 'with-variants' | 'variant-images-pending' | 'gallery'>('gallery');
   const fileInputsRef = useRef<Record<string, HTMLInputElement | null>>({});
 
   useEffect(() => {
@@ -125,7 +147,7 @@ export function CatalogImageDialog({
       },
       (error) => {
         console.error('Error leyendo imagenes del catalogo:', error);
-        setOverrides({ byProductId: {}, byProductName: {}, byVariantKey: {} });
+        setOverrides({ byProductId: {}, byProductName: {}, byVariantKey: {}, galleryByProductId: {} });
       }
     );
 
@@ -141,6 +163,8 @@ export function CatalogImageDialog({
         ...item,
         previewImage:
           draftImages[item.id] ?? resolveCatalogImageOverride(item.id, item.name, item.image, overrides),
+        galleryImages:
+          draftGalleryImages[item.id] ?? resolveCatalogGalleryImages(item.id, overrides),
         variants: item.variants.map((variant) => ({
           ...variant,
           previewImage:
@@ -153,7 +177,7 @@ export function CatalogImageDialog({
             ),
         })),
       })),
-    [draftImages, draftVariantImages, overrides, products]
+    [draftGalleryImages, draftImages, draftVariantImages, overrides, products]
   );
   const filteredItems = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -176,6 +200,10 @@ export function CatalogImageDialog({
         );
       }
 
+      if (viewMode === 'gallery') {
+        return true;
+      }
+
       return true;
     });
   }, [overrides.byVariantKey, previewItems, search, viewMode]);
@@ -195,6 +223,7 @@ export function CatalogImageDialog({
     return {
       totalProducts: previewItems.length,
       productsWithVariants: productsWithVariants.length,
+      productsWithGallery: previewItems.filter((item) => item.galleryImages.length > 0).length,
       totalVariants,
       variantsWithImage,
       variantsPending: Math.max(totalVariants - variantsWithImage, 0),
@@ -230,6 +259,7 @@ export function CatalogImageDialog({
           [normalizedProductName]: image,
         },
         byVariantKey: current.byVariantKey,
+        galleryByProductId: current.galleryByProductId,
       }));
       setDraftImages((current) => {
         const next = { ...current };
@@ -307,6 +337,66 @@ export function CatalogImageDialog({
     }
   };
 
+  const handleSaveProductGallery = async (
+    productId: string,
+    productName: string,
+    images: CatalogGalleryImage[]
+  ) => {
+    const savingKey = `gallery:${productId}`;
+    setSavingProductId(savingKey);
+    try {
+      const normalizedImages = images
+        .filter((item) => item.image)
+        .slice(0, 5)
+        .map((item, index) => ({
+          id: item.id || `gallery-${Date.now()}-${index}`,
+          image: item.image,
+          label: item.label ?? '',
+          sortOrder: index,
+        }));
+
+      await runFirestoreWriteWithBackoff(() =>
+        setDoc(
+          doc(db, 'siteAssets', `catalog-gallery-${productId}`),
+          {
+            productId,
+            productName,
+            images: normalizedImages,
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        )
+      );
+
+      setOverrides((current) => ({
+        ...current,
+        galleryByProductId: {
+          ...current.galleryByProductId,
+          [productId]: normalizedImages,
+        },
+      }));
+      setDraftGalleryImages((current) => {
+        const next = { ...current };
+        delete next[productId];
+        return next;
+      });
+
+      toast({
+        title: 'Galeria actualizada',
+        description: `${productName} ya muestra sus fotos de detalle en la tienda virtual.`,
+      });
+    } catch (error) {
+      console.error('Error guardando galeria del producto:', error);
+      toast({
+        title: 'No se pudo guardar la galeria',
+        description: 'Intenta de nuevo con imagenes mas livianas o menos fotos.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSavingProductId(null);
+    }
+  };
+
   return (
     <AdminResponsiveDialog
       open={open}
@@ -331,6 +421,15 @@ export function CatalogImageDialog({
               className="rounded-xl"
             />
             <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant={viewMode === 'gallery' ? 'default' : 'outline'}
+                className="rounded-xl"
+                onClick={() => setViewMode('gallery')}
+              >
+                <Images className="h-4 w-4" />
+                Galerias
+              </Button>
               <Button
                 type="button"
                 variant={viewMode === 'with-variants' ? 'default' : 'outline'}
@@ -359,7 +458,7 @@ export function CatalogImageDialog({
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <div className="rounded-2xl border border-border bg-card/88 p-3 dark:border-slate-800 dark:bg-slate-950/72 sm:p-4">
               <p className="text-xs text-muted-foreground">Productos visibles</p>
               <p className="mt-1 text-2xl font-semibold text-foreground">{summary.totalProducts}</p>
@@ -367,6 +466,10 @@ export function CatalogImageDialog({
             <div className="rounded-2xl border border-border bg-card/88 p-3 dark:border-slate-800 dark:bg-slate-950/72 sm:p-4">
               <p className="text-xs text-muted-foreground">Productos con variantes</p>
               <p className="mt-1 text-2xl font-semibold text-foreground">{summary.productsWithVariants}</p>
+            </div>
+            <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/75 p-3 dark:border-emerald-900/60 dark:bg-emerald-950/20 sm:p-4">
+              <p className="text-xs text-emerald-800 dark:text-emerald-200/85">Con galeria</p>
+              <p className="mt-1 text-2xl font-semibold text-emerald-950 dark:text-emerald-100">{summary.productsWithGallery}</p>
             </div>
             <div className="rounded-2xl border border-cyan-200/80 bg-cyan-50/75 p-3 dark:border-cyan-900/60 dark:bg-cyan-950/20 sm:p-4">
               <p className="text-xs text-cyan-800 dark:text-cyan-200/85">Variantes con foto web</p>
@@ -379,7 +482,7 @@ export function CatalogImageDialog({
           </div>
 
           <div className="hidden rounded-2xl border border-dashed border-border bg-muted/70 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300 sm:block">
-            La imagen principal sigue siendo la base del producto. Solo sube imagen por variante cuando esa combinacion realmente necesite verse distinta en la web.
+            La imagen principal sigue siendo la base. La galeria es opcional y aparece solo en el detalle del producto para no recargar la tienda.
           </div>
 
           <div className="space-y-3.5 sm:space-y-4">
@@ -505,6 +608,140 @@ export function CatalogImageDialog({
                   </div>
                 </div>
               </div>
+
+              <details open={viewMode === 'gallery'} className="mt-4 rounded-2xl border border-emerald-200/80 bg-emerald-50/55 p-3 dark:border-emerald-900/60 dark:bg-emerald-950/15 sm:mt-5 sm:p-4">
+                <summary className="cursor-pointer text-sm font-medium text-foreground">
+                  Galeria del producto ({item.galleryImages.length}/5)
+                </summary>
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                  Sube fotos de detalle: taco completo, agarre, punta, acabado o logo. Estas imagenes solo cargan cuando el cliente abre el producto.
+                </p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px] sm:items-start">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
+                    {item.galleryImages.map((galleryImage, index) => (
+                      <div
+                        key={galleryImage.id}
+                        className="group relative overflow-hidden rounded-2xl border border-border bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950/70"
+                      >
+                        <div className="relative aspect-square">
+                          <Image
+                            src={galleryImage.image}
+                            alt={`${item.name} detalle ${index + 1}`}
+                            fill
+                            className="object-contain p-1.5"
+                            unoptimized={galleryImage.image.startsWith('data:')}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          className="absolute right-1.5 top-1.5 inline-flex h-8 w-8 items-center justify-center rounded-xl bg-rose-600 text-white opacity-95 shadow-md transition hover:bg-rose-700"
+                          aria-label="Quitar imagen de la galeria"
+                          onClick={() =>
+                            setDraftGalleryImages((current) => {
+                              const currentGallery = current[item.id] ?? item.galleryImages;
+                              return {
+                                ...current,
+                                [item.id]: currentGallery
+                                  .filter((imageItem) => imageItem.id !== galleryImage.id)
+                                  .map((imageItem, imageIndex) => ({ ...imageItem, sortOrder: imageIndex })),
+                              };
+                            })
+                          }
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                    {item.galleryImages.length === 0 ? (
+                      <div className="col-span-full rounded-2xl border border-dashed border-emerald-200 bg-white/70 px-4 py-6 text-center text-sm text-muted-foreground dark:border-emerald-900/60 dark:bg-slate-950/50">
+                        Todavia no hay fotos de detalle para este producto.
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="grid gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-auto rounded-xl border-dashed px-3 py-3 text-[11px] sm:text-xs"
+                      disabled={item.galleryImages.length >= 5 || savingProductId === `gallery:${item.id}`}
+                      onClick={() => fileInputsRef.current[`gallery:${item.id}`]?.click()}
+                    >
+                      <ImagePlus className="h-4 w-4" />
+                      {item.galleryImages.length >= 5 ? 'Maximo 5 fotos' : 'Agregar foto de detalle'}
+                    </Button>
+                    <input
+                      ref={(element) => {
+                        fileInputsRef.current[`gallery:${item.id}`] = element;
+                      }}
+                      type="file"
+                      accept="image/*"
+                      className="sr-only"
+                      onChange={async (event) => {
+                        try {
+                          await loadGalleryFileAsDataUrl(event, (value) => {
+                            setDraftGalleryImages((current) => {
+                              const currentGallery = current[item.id] ?? item.galleryImages;
+                              if (currentGallery.length >= 5) return current;
+                              return {
+                                ...current,
+                                [item.id]: [
+                                  ...currentGallery,
+                                  {
+                                    id: `gallery-${Date.now()}`,
+                                    image: value,
+                                    sortOrder: currentGallery.length,
+                                  },
+                                ],
+                              };
+                            });
+                          });
+                        } catch (error) {
+                          console.error('Error preparando imagen de galeria:', error);
+                          toast({
+                            title: 'No se pudo cargar la foto',
+                            description: 'Intenta con otra foto o una imagen mas liviana.',
+                            variant: 'destructive',
+                          });
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-auto rounded-xl px-3 py-2 text-[11px] sm:text-xs"
+                      disabled={!draftGalleryImages[item.id] || savingProductId === `gallery:${item.id}`}
+                      onClick={() =>
+                        setDraftGalleryImages((current) => {
+                          const next = { ...current };
+                          delete next[item.id];
+                          return next;
+                        })
+                      }
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                      Descartar galeria
+                    </Button>
+                    <Button
+                      type="button"
+                      className="h-auto rounded-xl px-3 py-2 text-[11px] sm:text-xs"
+                      disabled={!draftGalleryImages[item.id] || savingProductId === `gallery:${item.id}`}
+                      onClick={async () => {
+                        const gallery = draftGalleryImages[item.id];
+                        if (!gallery) return;
+                        await handleSaveProductGallery(item.id, item.name, gallery);
+                        onSaved?.();
+                      }}
+                    >
+                      {savingProductId === `gallery:${item.id}` ? (
+                        <LoaderCircle className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Check className="h-4 w-4" />
+                      )}
+                      Guardar galeria
+                    </Button>
+                  </div>
+                </div>
+              </details>
 
               {item.variants.length > 0 ? (
                 <details className="mt-4 rounded-2xl border border-border bg-muted/70 p-3 dark:border-slate-800 dark:bg-slate-900/60 sm:mt-5 sm:p-4">
