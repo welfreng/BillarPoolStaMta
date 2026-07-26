@@ -2,13 +2,16 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
+import { createPortal } from "react-dom"
 import { collection, getDocs, query as firestoreQuery, type DocumentData, where } from "firebase/firestore"
 import { MessageCircle, Search, ShoppingBag, Tag } from "lucide-react"
 import {
   extractCatalogImageOverrides,
+  resolveCatalogGalleryImages,
   resolveCatalogImageOverride,
   resolveCatalogVariantImageOverride,
   type CatalogImageOverrideMaps,
+  type CatalogGalleryImage,
 } from "@/lib/catalog-image-overrides"
 import { db } from "@/lib/firebase"
 import { publicCatalogCategories, publicCatalogProducts } from "@/lib/public-catalog"
@@ -38,6 +41,7 @@ interface CatalogProduct {
   status: "active" | "draft" | "archived"
   tag: string
   details: string[]
+  galleryImages: CatalogGalleryImage[]
   variantLabel?: string
   variants: Array<{
     id: string
@@ -56,7 +60,7 @@ const categoryLabels = new Map(publicCatalogCategories.map((category) => [catego
 const categoryOrder = new Map(publicCatalogCategories.map((category, index) => [category.id, index]))
 const productQueryParam = "producto"
 const variantQueryParam = "variante"
-const catalogCacheKey = "bp-public-catalog-cache-v1"
+const catalogCacheKey = "bp-public-catalog-cache-v2"
 const catalogCacheTtlMs = 30 * 60 * 1000
 
 interface PublicCatalogCache {
@@ -70,6 +74,7 @@ function getEmptyImageOverrides(): CatalogImageOverrideMaps {
     byProductId: {},
     byProductName: {},
     byVariantKey: {},
+    galleryByProductId: {},
   }
 }
 
@@ -104,7 +109,12 @@ function readCatalogCache(allowExpired = false): PublicCatalogCache | null {
     return {
       storedAt: parsedCache.storedAt,
       products: sortCatalogProducts(parsedCache.products),
-      imageOverrides: parsedCache.imageOverrides,
+      imageOverrides: {
+        byProductId: parsedCache.imageOverrides.byProductId ?? {},
+        byProductName: parsedCache.imageOverrides.byProductName ?? {},
+        byVariantKey: parsedCache.imageOverrides.byVariantKey ?? {},
+        galleryByProductId: parsedCache.imageOverrides.galleryByProductId ?? {},
+      },
     }
   } catch {
     return null
@@ -172,6 +182,7 @@ function mapCatalogProduct(documentId: string, data: DocumentData): CatalogProdu
       data.category ? `Categoria: ${categoryLabels.get(String(data.category)) ?? String(data.category)}` : "",
       data.subcategory ? `Subcategoria: ${String(data.subcategory)}` : "",
     ].filter(Boolean),
+    galleryImages: [],
     variantLabel: typeof data.variantLabel === "string" ? String(data.variantLabel) : undefined,
     variants,
   }
@@ -213,6 +224,8 @@ export default function ProductCatalog({
   const [activeCategory, setActiveCategory] = useState("todos")
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null)
   const [selectedVariantId, setSelectedVariantId] = useState<string>("")
+  const [selectedGalleryImage, setSelectedGalleryImage] = useState("")
+  const [expandedImage, setExpandedImage] = useState<string | null>(null)
   const [products, setProducts] = useState<CatalogProduct[]>([])
   const [imageOverrides, setImageOverrides] = useState<CatalogImageOverrideMaps>(getEmptyImageOverrides())
   const [loading, setLoading] = useState(true)
@@ -288,6 +301,7 @@ export default function ProductCatalog({
       products.map((product) => ({
         ...product,
         image: resolveCatalogImageOverride(product.id, product.name, product.image || defaultImage, imageOverrides),
+        galleryImages: resolveCatalogGalleryImages(product.id, imageOverrides),
         variants: product.variants.map((variant) => ({
           ...variant,
           image: resolveCatalogVariantImageOverride(
@@ -379,6 +393,21 @@ export default function ProductCatalog({
     getDefaultSelectedVariant(selectedProduct) ??
     null
   const selectedProductImage = selectedVariant?.image || selectedProduct?.image || defaultImage
+  const selectedDetailImages = useMemo(() => {
+    if (!selectedProduct) return []
+
+    const images = [
+      selectedVariant?.image,
+      selectedProduct.image,
+      ...selectedProduct.galleryImages.map((item) => item.image),
+    ].filter((image): image is string => Boolean(image))
+
+    return Array.from(new Set(images))
+  }, [selectedProduct, selectedVariant])
+  const activeDetailImage =
+    selectedGalleryImage && selectedDetailImages.includes(selectedGalleryImage)
+      ? selectedGalleryImage
+      : selectedDetailImages[0] ?? selectedProductImage
   const selectedVariantIsAvailable = selectedVariant ? selectedVariant.stock > 0 : (selectedProduct?.publicStock ?? 0) > 0
   const isStorePage = () =>
     typeof window !== "undefined" && window.location.pathname.replace(/\/$/, "") === "/tienda-virtual"
@@ -422,16 +451,19 @@ export default function ProductCatalog({
 
     setSelectedProductId(product.id)
     setSelectedVariantId(defaultVariant?.id ?? "")
+    setSelectedGalleryImage("")
     updateProductUrl(product.id, defaultVariant?.id ?? "")
   }
 
   useEffect(() => {
     if (!selectedProduct) {
       setSelectedVariantId("")
+      setSelectedGalleryImage("")
       return
     }
     if (selectedProduct.variants.length === 0) {
       setSelectedVariantId("")
+      setSelectedGalleryImage("")
       return
     }
     setSelectedVariantId((current) =>
@@ -440,6 +472,10 @@ export default function ProductCatalog({
         : getDefaultSelectedVariant(selectedProduct)?.id ?? ""
     )
   }, [selectedProduct])
+
+  useEffect(() => {
+    setSelectedGalleryImage("")
+  }, [selectedProductId, selectedVariantId])
 
   useEffect(() => {
     if (loading || visibleCatalogProducts.length === 0 || typeof window === "undefined") return
@@ -514,6 +550,44 @@ export default function ProductCatalog({
     const previewVariant = product.variants.find((variant) => variant.id === previewVariantId)
     return previewVariant?.image || product.image || defaultImage
   }
+
+  const expandedImageViewer =
+    expandedImage && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/94 p-3 backdrop-blur-sm sm:p-6"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Imagen ampliada del producto"
+            onClick={() => setExpandedImage(null)}
+          >
+            <button
+              type="button"
+              className="absolute right-4 top-4 z-10 rounded-full bg-white/12 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
+              onClick={(event) => {
+                event.stopPropagation()
+                setExpandedImage(null)
+              }}
+            >
+              Cerrar
+            </button>
+            <div
+              className="relative h-[calc(100dvh-5.5rem)] w-[calc(100vw-1.5rem)] max-w-7xl sm:h-[calc(100dvh-7rem)] sm:w-[calc(100vw-3rem)]"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <Image
+                src={expandedImage}
+                alt="Imagen ampliada del producto"
+                fill
+                sizes="100vw"
+                className="object-contain"
+                unoptimized={expandedImage.startsWith("data:")}
+              />
+            </div>
+          </div>,
+          document.body
+        )
+      : null
 
   return (
     <section
@@ -966,6 +1040,8 @@ export default function ProductCatalog({
           if (!open) {
             setSelectedProductId(null)
             setSelectedVariantId("")
+            setSelectedGalleryImage("")
+            setExpandedImage(null)
             clearProductUrl()
           }
         }}
@@ -980,14 +1056,56 @@ export default function ProductCatalog({
             </DialogHeader>
 
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-6 lg:space-y-5">
-              <div className="relative min-h-[260px] overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-100 sm:min-h-[320px] lg:min-h-[340px] xl:min-h-[360px]">
-                <Image
-                  src={selectedProductImage}
-                  alt={selectedVariant ? `${selectedProduct.name} ${selectedVariant.name}` : selectedProduct.name}
-                  fill
-                  className="object-contain"
-                  unoptimized={selectedProductImage.startsWith("data:")}
-                />
+              <div className="rounded-[28px] border border-slate-200 bg-white p-3 shadow-sm">
+                <button
+                  type="button"
+                  className="relative block h-[52dvh] min-h-[320px] w-full overflow-hidden rounded-2xl bg-gradient-to-br from-white via-slate-50 to-slate-100 sm:h-[58dvh] sm:max-h-[620px] lg:min-h-[460px]"
+                  onClick={() => setExpandedImage(activeDetailImage)}
+                  aria-label="Ampliar imagen del producto"
+                >
+                  <Image
+                    src={activeDetailImage}
+                    alt={selectedVariant ? `${selectedProduct.name} ${selectedVariant.name}` : selectedProduct.name}
+                    fill
+                    sizes="(min-width: 1024px) 900px, 100vw"
+                    className="object-contain p-2 sm:p-4"
+                    unoptimized={activeDetailImage.startsWith("data:")}
+                  />
+                  <span className="absolute bottom-3 right-3 rounded-full bg-slate-950/82 px-3 py-1.5 text-xs font-semibold text-white shadow-lg">
+                    Tocar para ampliar
+                  </span>
+                </button>
+                {selectedDetailImages.length > 1 ? (
+                  <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+                    {selectedDetailImages.map((image, index) => {
+                      const isActive = image === activeDetailImage
+
+                      return (
+                        <button
+                          key={`${image}-${index}`}
+                          type="button"
+                          className={`relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border bg-white transition sm:h-24 sm:w-24 ${
+                            isActive ? "border-[#0a2472] ring-2 ring-[#0a2472]/20" : "border-slate-200 hover:border-[#0a2472]/40"
+                          }`}
+                          onClick={() => setSelectedGalleryImage(image)}
+                          aria-label={`Ver imagen ${index + 1} de ${selectedProduct.name}`}
+                        >
+                          <Image
+                            src={image}
+                            alt={`${selectedProduct.name} miniatura ${index + 1}`}
+                            fill
+                            className="object-contain p-1.5"
+                            unoptimized={image.startsWith("data:")}
+                          />
+                        </button>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <p className="mt-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                    Este producto aun no tiene galeria de detalle; mientras tanto se muestra su imagen principal.
+                  </p>
+                )}
               </div>
 
               <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
@@ -1028,6 +1146,7 @@ export default function ProductCatalog({
                             onClick={() => {
                               if (variant.stock <= 0) return
                               setSelectedVariantId(variant.id)
+                              setSelectedGalleryImage("")
                               updateProductUrl(selectedProduct.id, variant.id, "replace")
                             }}
                             disabled={variant.stock <= 0}
@@ -1118,6 +1237,8 @@ export default function ProductCatalog({
           </DialogContent>
         ) : null}
       </Dialog>
+
+      {expandedImageViewer}
     </section>
   )
 }
